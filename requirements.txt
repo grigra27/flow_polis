@@ -1,0 +1,29 @@
+# Core Django
+Django==4.2.7
+python-decouple==3.8
+
+# Database
+psycopg2-binary==2.9.9
+
+# Django Extensions
+django-extensions==3.2.3
+django-filter==23.5
+django-import-export==3.3.8
+django-auditlog==2.3.0
+
+# Celery for background tasks (optional)
+celery==5.3.4
+redis==5.0.1
+django-celery-beat==2.5.0
+
+# Utils
+python-dateutil==2.8.2
+openpyxl==3.1.2
+Pillow==10.1.0
+
+# Development
+django-debug-toolbar==4.2.0
+
+# Production
+gunicorn==21.2.0
+whitenoise==6.6.0

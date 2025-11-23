@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Отчеты{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Отчеты и экспорт данных</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Экспорт полисов</h5>
+            </div>
+            <div class="card-body">
+                <p>Экспортировать все полисы в формате Excel со всей информацией:</p>
+                <ul>
+                    <li>Номера полисов и ДФА</li>
+                    <li>Клиенты и страховщики</li>
+                    <li>Периоды действия</li>
+                    <li>Финансовая информация</li>
+                    <li>Статусы</li>
+                </ul>
+                <a href="{% url 'reports:export_policies' %}" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Скачать Excel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Экспорт графика платежей</h5>
+            </div>
+            <div class="card-body">
+                <p>Экспортировать график платежей в формате Excel:</p>
+                <ul>
+                    <li>Все платежи по всем полисам</li>
+                    <li>Даты и суммы</li>
+                    <li>Комиссии (КВ)</li>
+                    <li>Статусы оплаты</li>
+                    <li>Согласования со СК</li>
+                </ul>
+                <a href="{% url 'reports:export_payments' %}" class="btn btn-success">
+                    <i class="bi bi-download"></i> Скачать Excel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Дополнительная информация</h5>
+    </div>
+    <div class="card-body">
+        <p>Для более детальной аналитики и фильтрации данных используйте:</p>
+        <ul>
+            <li><a href="{% url 'policies:list' %}">Журнал полисов</a> - с расширенными фильтрами</li>
+            <li><a href="{% url 'policies:payments' %}">График платежей</a> - с фильтрацией по статусам</li>
+            <li><a href="{% url 'admin:index' %}">Админ-панель</a> - для управления данными</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

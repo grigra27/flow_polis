@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}График платежей{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">График платежей</h1>
+</div>
+
+<!-- Filter Buttons -->
+<div class="btn-group mb-3" role="group">
+    <a href="{% url 'policies:payments' %}" class="btn btn-outline-primary {% if not request.GET.status %}active{% endif %}">
+        Все платежи
+    </a>
+    <a href="{% url 'policies:payments' %}?status=upcoming" class="btn btn-outline-warning {% if request.GET.status == 'upcoming' %}active{% endif %}">
+        Предстоящие
+    </a>
+    <a href="{% url 'policies:payments' %}?status=overdue" class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
+        Просроченные
+    </a>
+    <a href="{% url 'policies:payments' %}?status=paid" class="btn btn-outline-success {% if request.GET.status == 'paid' %}active{% endif %}">
+        Оплаченные
+    </a>
+</div>
+
+<!-- Payments Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Полис</th>
+                        <th>Клиент</th>
+                        <th>Год/№</th>
+                        <th>Дата платежа</th>
+                        <th>Сумма</th>
+                        <th>КВ %</th>
+                        <th>КВ ₽</th>
+                        <th>Дата оплаты</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'policies:detail' payment.policy.pk %}">
+                                {{ payment.policy.policy_number }}
+                            </a>
+                        </td>
+                        <td>{{ payment.policy.client.client_name }}</td>
+                        <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
+                        <td>{{ payment.due_date|date:"d.m.Y" }}</td>
+                        <td>{{ payment.amount|floatformat:2 }} ₽</td>
+                        <td>
+                            {% if payment.commission_rate %}
+                                {{ payment.commission_rate.kv_percent }}%
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ payment.kv_rub|floatformat:2 }} ₽</td>
+                        <td>
+                            {% if payment.paid_date %}
+                                {{ payment.paid_date|date:"d.m.Y" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if payment.is_paid %}
+                                <span class="badge bg-success">Оплачен</span>
+                            {% elif payment.is_overdue %}
+                                <span class="badge bg-danger">Просрочен</span>
+                            {% else %}
+                                <span class="badge bg-warning">Ожидается</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}" class="btn btn-sm btn-warning">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">Платежи не найдены</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Предыдущая</a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Следующая</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

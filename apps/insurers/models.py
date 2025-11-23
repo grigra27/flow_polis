@@ -7,6 +7,8 @@ class Insurer(models.Model):
     Insurance company - Страховая компания
     """
     insurer_name = models.CharField('Название страховой компании', max_length=255)
+    contacts = models.URLField('Контакты (ссылка)', blank=True, help_text='Ссылка на контакт (например, Telegram, WhatsApp)')
+    notes = models.TextField('Примечание', blank=True)
 
     class Meta:
         verbose_name = 'Страховая компания'

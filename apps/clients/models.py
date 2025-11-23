@@ -7,6 +7,7 @@ class Client(models.Model):
     """
     client_name = models.CharField('Название компании', max_length=255)
     client_inn = models.CharField('ИНН', max_length=12, blank=True, null=True)
+    notes = models.TextField('Примечание', blank=True)
 
     class Meta:
         verbose_name = 'Клиент'

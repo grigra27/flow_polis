@@ -7,3 +7,4 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = ['client_name', 'client_inn']
     search_fields = ['client_name', 'client_inn']
     list_per_page = 50
+    fields = ['client_name', 'client_inn', 'notes']

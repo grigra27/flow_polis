@@ -4,8 +4,9 @@ from .models import Insurer, Branch, InsuranceType, InfoTag, CommissionRate
 
 @admin.register(Insurer)
 class InsurerAdmin(admin.ModelAdmin):
-    list_display = ['insurer_name']
+    list_display = ['insurer_name', 'contacts']
     search_fields = ['insurer_name']
+    fields = ['insurer_name', 'contacts', 'notes']
 
 
 @admin.register(Branch)

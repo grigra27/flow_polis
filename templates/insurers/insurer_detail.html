@@ -2,6 +2,37 @@
 
 {% block title %}{{ insurer.insurer_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .branch-filter-pills .nav-link {
+        color: #495057;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.4rem 0.8rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        margin: 0 0.25rem 0.5rem 0;
+        transition: all 0.2s ease;
+        background-color: #fff;
+    }
+    .branch-filter-pills .nav-link:hover {
+        background-color: #f8f9fa;
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+    .branch-filter-pills .nav-link.active {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+        font-weight: 600;
+    }
+    .branch-filter-pills .nav-link i {
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">{{ insurer.insurer_name }}</h1>
@@ -24,8 +55,28 @@
             <div class="card-body">
                 <p><strong>Название:</strong><br>
                 {{ insurer.insurer_name }}</p>
+                
+                {% if insurer.contacts %}
+                <p><strong>Контакты:</strong><br>
+                <a href="{{ insurer.contacts }}" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-link-45deg"></i> Открыть контакт
+                </a>
+                </p>
+                {% endif %}
             </div>
         </div>
+
+        <!-- Notes -->
+        {% if insurer.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Примечание</h5>
+            </div>
+            <div class="card-body">
+                {{ insurer.notes|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Commission Rates -->
         {% if commission_rates %}
@@ -59,10 +110,37 @@
 
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Полисы страховщика</h5>
+                {% if branches.count > 1 %}
+                <small class="text-muted">
+                    <i class="bi bi-funnel"></i> Фильтр по филиалу
+                </small>
+                {% endif %}
             </div>
             <div class="card-body">
+                <!-- Branch Filter Pills -->
+                {% if branches.count > 1 %}
+                <div class="mb-3">
+                    <ul class="nav branch-filter-pills flex-wrap">
+                        <li class="nav-item">
+                            <a class="nav-link {% if not selected_branch %}active{% endif %}" 
+                               href="{% url 'insurers:detail' insurer.pk %}">
+                                <i class="bi bi-grid-3x3-gap"></i> Все
+                            </a>
+                        </li>
+                        {% for branch in branches %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}" 
+                               href="?branch={{ branch.id }}">
+                                <i class="bi bi-building"></i> {{ branch.branch_name }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
                 {% if policies %}
                 <div class="table-responsive">
                     <table class="table table-hover">

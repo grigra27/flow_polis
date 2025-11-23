@@ -24,9 +24,27 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['policies'] = self.object.policies.select_related(
+        
+        # Get policies queryset
+        policies_qs = self.object.policies.select_related(
             'client', 'branch', 'insurance_type'
-        ).order_by('-start_date')
+        )
+        
+        # Filter by branch if specified
+        branch_id = self.request.GET.get('branch')
+        if branch_id:
+            policies_qs = policies_qs.filter(branch_id=branch_id)
+        
+        context['policies'] = policies_qs.order_by('-start_date')
+        
+        # Get branches that have policies for this insurer
+        from .models import Branch
+        context['branches'] = Branch.objects.filter(
+            policies__insurer=self.object
+        ).distinct().order_by('branch_name')
+        
+        context['selected_branch'] = branch_id
+        
         context['commission_rates'] = self.object.commission_rates.select_related(
             'insurance_type'
         ).order_by('insurance_type__name')

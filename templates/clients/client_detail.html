@@ -29,6 +29,17 @@
                 {{ client.client_inn|default:"—" }}</p>
             </div>
         </div>
+
+        {% if client.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Примечание</h5>
+            </div>
+            <div class="card-body">
+                {{ client.notes|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="col-md-8">

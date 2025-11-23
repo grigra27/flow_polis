@@ -2,6 +2,33 @@
 
 {% block title %}Полисы{% endblock %}
 
+{% block extra_css %}
+<style>
+    .nav-pills .nav-link {
+        color: #0d6efd;
+        font-weight: 500;
+        border: 2px solid #dee2e6;
+        margin: 0 2px;
+        transition: all 0.3s ease;
+    }
+    .nav-pills .nav-link:hover {
+        background-color: #e7f1ff;
+        border-color: #0d6efd;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(13, 110, 253, 0.2);
+    }
+    .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border-color: #0d6efd;
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+        font-weight: 600;
+    }
+    .nav-pills .nav-link i {
+        margin-right: 5px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Журнал полисов</h1>
@@ -11,6 +38,28 @@
         </a>
     </div>
 </div>
+
+<!-- Branch Tabs -->
+{% if branches %}
+<div class="mb-4">
+    <ul class="nav nav-pills nav-fill" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if not selected_branch %}active{% endif %}" 
+               href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+                <i class="bi bi-grid-3x3-gap"></i> Все филиалы
+            </a>
+        </li>
+        {% for branch in branches %}
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}" 
+               href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                <i class="bi bi-building"></i> {{ branch.branch_name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 <!-- Filters -->
 <div class="card mb-4">
@@ -136,10 +185,10 @@
             <ul class="pagination justify-content-center">
                 {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page=1">Первая</a>
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Первая</a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Предыдущая</a>
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Предыдущая</a>
                     </li>
                 {% endif %}
 
@@ -151,10 +200,10 @@
 
                 {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Следующая</a>
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Следующая</a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Последняя</a>
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Последняя</a>
                     </li>
                 {% endif %}
             </ul>

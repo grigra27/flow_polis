@@ -10,6 +10,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.core.urls')),
     path('clients/', include('apps.clients.urls')),
+    path('insurers/', include('apps.insurers.urls')),
     path('policies/', include('apps.policies.urls')),
     path('reports/', include('apps.reports.urls')),
 ]

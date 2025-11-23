@@ -50,7 +50,7 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Страховщик:</strong><br>
-                        {{ policy.insurer.insurer_name }}
+                        <a href="{% url 'insurers:detail' policy.insurer.pk %}">{{ policy.insurer.insurer_name }}</a>
                     </div>
                     <div class="col-md-6">
                         <strong>Вид страхования:</strong><br>
@@ -198,13 +198,47 @@
         </div>
 
         <!-- Additional Info -->
-        {% if policy.info3 %}
+        {% if info1_tags or info2_tags or policy.info3 or policy.info4 %}
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Дополнительная информация</h5>
             </div>
             <div class="card-body">
-                <p>{{ policy.info3 }}</p>
+                <!-- Info 1 -->
+                {% if info1_tags %}
+                <div class="mb-3 pb-3 border-bottom">
+                    <strong>Инфо 1:</strong><br>
+                    {% for info in info1_tags %}
+                    <span class="badge bg-info me-1">{{ info.tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Info 2 -->
+                {% if info2_tags %}
+                <div class="mb-3 pb-3 border-bottom">
+                    <strong>Инфо 2:</strong><br>
+                    {% for info in info2_tags %}
+                    <span class="badge bg-secondary me-1">{{ info.tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Info 3 -->
+                {% if policy.info3 %}
+                <div class="mb-3 pb-3 border-bottom">
+                    <strong>Инфо 3:</strong><br>
+                    {{ policy.info3|linebreaks }}
+                </div>
+                {% endif %}
+
+                <!-- Info 4 -->
+                {% if policy.info4 %}
+                <div class="mb-0">
+                    <strong>Инфо 4:</strong><br>
+                    {{ policy.info4|linebreaks }}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}

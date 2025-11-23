@@ -15,7 +15,7 @@ class PolicyListView(LoginRequiredMixin, FilterView):
     def get_queryset(self):
         return super().get_queryset().select_related(
             'client', 'insurer', 'branch', 'insurance_type'
-        ).prefetch_related('payment_schedule')
+        ).prefetch_related('payment_schedule', 'info_tags__tag')
 
 
 class PolicyDetailView(LoginRequiredMixin, DetailView):
@@ -30,6 +30,13 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             'payment_schedule__commission_rate',
             'info_tags__tag'
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        policy = self.object
+        context['info1_tags'] = policy.info_tags.filter(info_field=1).select_related('tag')
+        context['info2_tags'] = policy.info_tags.filter(info_field=2).select_related('tag')
+        return context
 
 
 class PaymentScheduleListView(LoginRequiredMixin, ListView):

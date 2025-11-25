@@ -60,12 +60,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
       - name: Build Docker image
         run: |
-          docker buildx build --load -t insurance-broker:${{ github.sha }} .
+          docker build -t insurance-broker:${{ github.sha }} .
           docker tag insurance-broker:${{ github.sha }} insurance-broker:latest
           echo "✅ Docker image built successfully"
       

@@ -164,14 +164,14 @@ jobs:
             echo "🔨 Building images..."
             docker-compose -f docker-compose.prod.yml build
             
-            echo "🔄 Stopping old containers..."
-            docker-compose -f docker-compose.prod.yml down || true
-            
-            echo "🚀 Starting new containers..."
-            docker-compose -f docker-compose.prod.yml up -d
+            echo "🔄 Restarting containers with new images..."
+            docker-compose -f docker-compose.prod.yml up -d --force-recreate --no-deps web celery_worker celery_beat
             
             echo "⏳ Waiting for services to be ready..."
-            sleep 10
+            sleep 15
+            
+            echo "🔄 Restarting nginx to pick up any config changes..."
+            docker-compose -f docker-compose.prod.yml restart nginx
             
             echo "✅ Deployment completed"
           ENDSSH

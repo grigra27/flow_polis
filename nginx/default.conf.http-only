@@ -11,7 +11,7 @@ upstream django {
 server {
     listen 80;
     listen [::]:80;
-    server_name onbr.site www.onbr.site;
+    server_name onbr.site;
 
     # Let's Encrypt ACME challenge location
     location /.well-known/acme-challenge/ {

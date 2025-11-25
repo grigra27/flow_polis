@@ -65,12 +65,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # Healthcheck disabled - web container has no curl/wget/pgrep
+    # Application is monitored via nginx healthcheck instead
     logging:
       driver: "json-file"
       options:

@@ -62,13 +62,20 @@ jobs:
       
       - name: Build Docker image
         run: |
-          docker build -t insurance-broker:${{ github.sha }} .
-          docker tag insurance-broker:${{ github.sha }} insurance-broker:latest
+          echo "Building Docker image..."
+          docker build -t insurance-broker:latest .
           echo "✅ Docker image built successfully"
+          
+      - name: Verify image exists
+        run: |
+          echo "Checking if image exists..."
+          docker images | grep insurance-broker
+          echo "✅ Image verified"
       
       - name: Test Docker image
         run: |
-          docker run --rm insurance-broker:${{ github.sha }} python --version
+          echo "Testing Docker image..."
+          docker run --rm insurance-broker:latest python --version
           echo "✅ Docker image is functional"
 
   deploy:

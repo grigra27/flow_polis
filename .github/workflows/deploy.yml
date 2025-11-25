@@ -22,8 +22,16 @@ jobs:
       
       - name: Validate docker-compose syntax
         run: |
+          # Create temporary env files for validation
+          cp .env.prod.example .env.prod || touch .env.prod
+          cp .env.prod.db.example .env.prod.db || touch .env.prod.db
+          
+          # Validate syntax
           docker compose -f docker-compose.prod.yml config > /dev/null
           echo "✅ docker-compose.prod.yml syntax is valid"
+          
+          # Cleanup
+          rm -f .env.prod .env.prod.db
       
       - name: Check for required files
         run: |

@@ -33,6 +33,8 @@ db.sqlite3-journal
 
 # Environment
 .env
+.env.prod
+.env.prod.db
 .venv
 black_venv/
 venv/
@@ -58,5 +60,8 @@ Thumbs.db
 celerybeat-schedule
 celerybeat.pid
 
+# SSL Certificates (Let's Encrypt)
+certbot/conf/
+certbot/www/
 
 fixtures/

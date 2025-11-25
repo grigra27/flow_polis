@@ -1,0 +1,82 @@
+# Initial Nginx configuration (before SSL certificates are obtained)
+# Use this configuration for the first deployment to obtain Let's Encrypt certificates
+# After obtaining certificates, replace with default.conf
+
+upstream django {
+    server web:8000;
+}
+
+# HTTP Server - Initial setup without SSL
+server {
+    listen 80;
+    listen [::]:80;
+    server_name onbr.site www.onbr.site;
+
+    # Let's Encrypt ACME challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Client upload size limit
+    client_max_body_size 100M;
+
+    # Static files location
+    location /static/ {
+        alias /app/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+        try_files $uri $uri/ =404;
+    }
+
+    # Media files location
+    location /media/ {
+        alias /app/media/;
+        expires 7d;
+        add_header Cache-Control "public";
+        access_log off;
+        try_files $uri $uri/ =404;
+    }
+
+    # Favicon
+    location = /favicon.ico {
+        alias /app/staticfiles/favicon.ico;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Robots.txt
+    location = /robots.txt {
+        alias /app/staticfiles/robots.txt;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Main application proxy
+    location / {
+        proxy_pass http://django;
+        
+        # Proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $server_name;
+        
+        # Proxy settings
+        proxy_redirect off;
+        proxy_buffering off;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Health check endpoint
+    location /health/ {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}

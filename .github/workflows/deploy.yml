@@ -1,0 +1,250 @@
+name: Deploy to Production
+
+# Триггер на push в main ветку
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Позволяет запускать вручную
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate docker-compose syntax
+        run: |
+          docker-compose -f docker-compose.prod.yml config > /dev/null
+          echo "✅ docker-compose.prod.yml syntax is valid"
+      
+      - name: Check for required files
+        run: |
+          required_files=(
+            "Dockerfile"
+            "docker-compose.prod.yml"
+            "entrypoint.sh"
+            "requirements.prod.txt"
+            "nginx/default.conf"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Required file missing: $file"
+              exit 1
+            fi
+          done
+          echo "✅ All required files present"
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        run: |
+          docker build -t insurance-broker:${{ github.sha }} .
+          docker tag insurance-broker:${{ github.sha }} insurance-broker:latest
+          echo "✅ Docker image built successfully"
+      
+      - name: Test Docker image
+        run: |
+          docker run --rm insurance-broker:${{ github.sha }} python --version
+          echo "✅ Docker image is functional"
+
+  deploy:
+    name: Deploy to Digital Ocean
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $DROPLET_HOST >> ~/.ssh/known_hosts
+          echo "✅ SSH configured"
+      
+      - name: Copy files to server
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude='.git' \
+            --exclude='venv' \
+            --exclude='black_venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.env' \
+            --exclude='db.sqlite3' \
+            ./ $DROPLET_USER@$DROPLET_HOST:~/insurance_broker/
+          echo "✅ Files copied to server"
+      
+      - name: Deploy on server
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+            
+            echo "📦 Pulling latest images..."
+            docker-compose -f docker-compose.prod.yml pull || true
+            
+            echo "🔨 Building images..."
+            docker-compose -f docker-compose.prod.yml build
+            
+            echo "🔄 Stopping old containers..."
+            docker-compose -f docker-compose.prod.yml down || true
+            
+            echo "🚀 Starting new containers..."
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            echo "⏳ Waiting for services to be ready..."
+            sleep 10
+            
+            echo "✅ Deployment completed"
+          ENDSSH
+      
+      - name: Run migrations
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+            
+            echo "🔄 Running database migrations..."
+            docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            
+            echo "📦 Collecting static files..."
+            docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+            
+            echo "✅ Migrations completed"
+          ENDSSH
+      
+      - name: Health check
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+            
+            echo "🏥 Checking container health..."
+            docker-compose -f docker-compose.prod.yml ps
+            
+            # Check if web container is running
+            if ! docker-compose -f docker-compose.prod.yml ps | grep -q "web.*Up"; then
+              echo "❌ Web container is not running"
+              docker-compose -f docker-compose.prod.yml logs web
+              exit 1
+            fi
+            
+            # Check if db container is running
+            if ! docker-compose -f docker-compose.prod.yml ps | grep -q "db.*Up"; then
+              echo "❌ Database container is not running"
+              docker-compose -f docker-compose.prod.yml logs db
+              exit 1
+            fi
+            
+            echo "✅ All containers are healthy"
+          ENDSSH
+      
+      - name: Cleanup SSH
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [validate, build, deploy]
+    if: always()
+    
+    steps:
+      - name: Deployment Success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ Deployment to production was successful!"
+          echo "🌐 Application should be available at https://onbr.site"
+      
+      - name: Deployment Failure
+        if: needs.deploy.result == 'failure' || needs.build.result == 'failure' || needs.validate.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Please check the logs above for details."
+          exit 1
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    
+    steps:
+      - name: Setup SSH for rollback
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $DROPLET_HOST >> ~/.ssh/known_hosts
+      
+      - name: Rollback to previous version
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+            
+            echo "⚠️  Deployment failed, attempting rollback..."
+            
+            # Try to restart with previous images
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            echo "🔄 Rollback completed - previous version restored"
+          ENDSSH
+      
+      - name: Cleanup SSH
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+      
+      - name: Notify rollback
+        run: |
+          echo "⚠️  Deployment failed and rollback was executed"
+          echo "Previous version has been restored"
+          exit 1

@@ -3,7 +3,8 @@
 # Production Verification Script
 # Run this script on the Digital Ocean Droplet to verify production deployment
 
-set -e
+# Don't exit on error - we want to run all checks
+set +e
 
 echo "=========================================="
 echo "PRODUCTION DEPLOYMENT VERIFICATION"
@@ -27,16 +28,16 @@ WARNINGS=0
 print_result() {
     if [ $1 -eq 0 ]; then
         echo -e "${GREEN}✓ PASSED${NC}: $2"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         echo -e "${RED}✗ FAILED${NC}: $2"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
 print_warning() {
     echo -e "${YELLOW}⚠ WARNING${NC}: $1"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
 }
 
 print_section() {

@@ -115,6 +115,32 @@ jobs:
             ./ $DROPLET_USER@$DROPLET_HOST:~/insurance_broker/
           echo "✅ Files copied to server"
       
+      - name: Create env files on server
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+            
+            # Create .env.prod.db if it doesn't exist
+            if [ ! -f .env.prod.db ]; then
+              echo "Creating .env.prod.db file..."
+              cp .env.prod.db.example .env.prod.db
+              echo "⚠️  Using example .env.prod.db - please update with real credentials"
+            fi
+            
+            # Create .env.prod if it doesn't exist  
+            if [ ! -f .env.prod ]; then
+              echo "Creating .env.prod file..."
+              cp .env.prod.example .env.prod
+              echo "⚠️  Using example .env.prod - please update with real credentials"
+            fi
+            
+            echo "✅ Environment files ready"
+          ENDSSH
+      
       - name: Deploy on server
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}

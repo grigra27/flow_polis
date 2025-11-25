@@ -1,5 +1,19 @@
 # Быстрая справка по развертыванию
 
+## ⚠️ ВАЖНО: Credentials и Сертификаты
+
+GitHub Actions workflow **НЕ перезаписывает**:
+- `.env.prod` - ваши production credentials
+- `.env.prod.db` - пароли базы данных  
+- `certbot/` - SSL сертификаты Let's Encrypt
+
+Эти файлы сохраняются между деплоями!
+
+**Если забыли пароли:** `./scripts/show-production-credentials.sh`  
+**Подробнее:** [docs/CREDENTIAL_RECOVERY.md](docs/CREDENTIAL_RECOVERY.md)
+
+---
+
 ## Первоначальное развертывание (Task 19)
 
 ### Быстрый старт

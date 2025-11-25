@@ -111,11 +111,14 @@ jobs:
             --exclude='__pycache__' \
             --exclude='*.pyc' \
             --exclude='.env' \
+            --exclude='.env.prod' \
+            --exclude='.env.prod.db' \
             --exclude='db.sqlite3' \
+            --exclude='certbot/' \
             ./ $DROPLET_USER@$DROPLET_HOST:~/insurance_broker/
-          echo "✅ Files copied to server"
+          echo "✅ Files copied to server (preserving credentials and certificates)"
       
-      - name: Create env files on server
+      - name: Verify env files on server
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
@@ -124,21 +127,25 @@ jobs:
             set -e
             cd ~/insurance_broker
             
-            # Create .env.prod.db if it doesn't exist
+            # Check if .env.prod.db exists
             if [ ! -f .env.prod.db ]; then
-              echo "Creating .env.prod.db file..."
-              cp .env.prod.db.example .env.prod.db
-              echo "⚠️  Using example .env.prod.db - please update with real credentials"
+              echo "❌ .env.prod.db not found!"
+              echo "Please create it manually on the server before deploying"
+              exit 1
+            else
+              echo "✅ .env.prod.db exists (preserving existing credentials)"
             fi
             
-            # Create .env.prod if it doesn't exist  
+            # Check if .env.prod exists  
             if [ ! -f .env.prod ]; then
-              echo "Creating .env.prod file..."
-              cp .env.prod.example .env.prod
-              echo "⚠️  Using example .env.prod - please update with real credentials"
+              echo "❌ .env.prod not found!"
+              echo "Please create it manually on the server before deploying"
+              exit 1
+            else
+              echo "✅ .env.prod exists (preserving existing credentials)"
             fi
             
-            echo "✅ Environment files ready"
+            echo "✅ Environment files verified (not modified)"
           ENDSSH
       
       - name: Deploy on server

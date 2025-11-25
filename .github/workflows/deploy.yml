@@ -65,7 +65,7 @@ jobs:
       
       - name: Build Docker image
         run: |
-          docker build -t insurance-broker:${{ github.sha }} .
+          docker buildx build --load -t insurance-broker:${{ github.sha }} .
           docker tag insurance-broker:${{ github.sha }} insurance-broker:latest
           echo "✅ Docker image built successfully"
       

@@ -22,7 +22,7 @@ jobs:
       
       - name: Validate docker-compose syntax
         run: |
-          docker-compose -f docker-compose.prod.yml config > /dev/null
+          docker compose -f docker-compose.prod.yml config > /dev/null
           echo "✅ docker-compose.prod.yml syntax is valid"
       
       - name: Check for required files
@@ -108,6 +108,7 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
+          # Note: Server uses docker-compose (v1 with hyphen), not docker compose (v2)
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
             set -e
             cd ~/insurance_broker

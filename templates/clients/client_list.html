@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Клиенты{% endblock %}
+{% block title %}Лизингополучатели{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Клиенты</h1>
+    <h1 class="h2">Лизингополучатели</h1>
     {% if can_edit %}
     <div class="btn-toolbar mb-2 mb-md-0">
         <a href="{% url 'admin:clients_client_add' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Добавить клиента
+            <i class="bi bi-plus-circle"></i> Добавить лизингополучателя
         </a>
     </div>
     {% endif %}
@@ -60,7 +60,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Клиенты не найдены</td>
+                        <td colspan="3" class="text-center text-muted">Лизингополучатели не найдены</td>
                     </tr>
                     {% endfor %}
                 </tbody>

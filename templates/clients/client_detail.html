@@ -21,7 +21,7 @@
     <div class="col-md-4">
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Информация о клиенте</h5>
+                <h5 class="mb-0">Информация о лизингополучателе</h5>
             </div>
             <div class="card-body">
                 <p><strong>Название:</strong><br>
@@ -47,7 +47,7 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Полисы клиента</h5>
+                <h5 class="mb-0">Полисы лизингополучателя</h5>
             </div>
             <div class="card-body">
                 {% if policies %}
@@ -56,10 +56,10 @@
                         <thead>
                             <tr>
                                 <th>Номер полиса</th>
+                                <th>Номер ДФА</th>
                                 <th>Страховщик</th>
-                                <th>Вид страхования</th>
+                                <th>Имущество</th>
                                 <th>Период</th>
-                                <th>Премия</th>
                                 <th>Статус</th>
                                 <th>Действия</th>
                             </tr>
@@ -68,12 +68,14 @@
                             {% for policy in policies %}
                             <tr>
                                 <td><strong>{{ policy.policy_number }}</strong></td>
+                                <td>{{ policy.dfa_number }}</td>
                                 <td>{{ policy.insurer.insurer_name }}</td>
-                                <td>{{ policy.insurance_type.name }}</td>
+                                <td>
+                                    <small>{{ policy.property_description|truncatewords:10 }}</small>
+                                </td>
                                 <td>
                                     <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
                                 </td>
-                                <td>{{ policy.premium_total|floatformat:2 }} ₽</td>
                                 <td>
                                     {% if policy.policy_active %}
                                         <span class="badge bg-success">Активен</span>
@@ -92,7 +94,7 @@
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted">У клиента пока нет полисов</p>
+                <p class="text-muted">У лизингополучателя пока нет полисов</p>
                 {% endif %}
             </div>
         </div>

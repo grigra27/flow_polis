@@ -151,8 +151,8 @@
                                 <th>Номер полиса</th>
                                 <th>Клиент</th>
                                 <th>Вид страхования</th>
+                                <th>Имущество</th>
                                 <th>Период</th>
-                                <th>Премия</th>
                                 <th>Статус</th>
                                 <th>Действия</th>
                             </tr>
@@ -164,9 +164,11 @@
                                 <td>{{ policy.client.client_name }}</td>
                                 <td>{{ policy.insurance_type.name }}</td>
                                 <td>
+                                    <small>{{ policy.property_description|truncatewords:10 }}</small>
+                                </td>
+                                <td>
                                     <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
                                 </td>
-                                <td>{{ policy.premium_total|floatformat:2 }} ₽</td>
                                 <td>
                                     {% if policy.policy_active %}
                                         <span class="badge bg-success">Активен</span>

@@ -122,12 +122,12 @@
                 <thead>
                     <tr>
                         <th>Полис</th>
+                        <th>Номер ДФА</th>
                         <th>Клиент</th>
+                        <th>Имущество</th>
                         <th>Год/№</th>
                         <th>Дата платежа</th>
                         <th>Сумма</th>
-                        <th>КВ %</th>
-                        <th>КВ ₽</th>
                         <th>Дата оплаты</th>
                         <th>Статус</th>
                         <th>Действия</th>
@@ -141,18 +141,14 @@
                                 {{ payment.policy.policy_number }}
                             </a>
                         </td>
+                        <td>{{ payment.policy.dfa_number }}</td>
                         <td>{{ payment.policy.client.client_name }}</td>
+                        <td>
+                            <small>{{ payment.policy.property_description|truncatewords:10 }}</small>
+                        </td>
                         <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                         <td>{{ payment.amount|floatformat:2 }} ₽</td>
-                        <td>
-                            {% if payment.commission_rate %}
-                                {{ payment.commission_rate.kv_percent }}%
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>{{ payment.kv_rub|floatformat:2 }} ₽</td>
                         <td>
                             {% if payment.paid_date %}
                                 {{ payment.paid_date|date:"d.m.Y" }}

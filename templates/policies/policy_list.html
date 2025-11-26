@@ -123,13 +123,12 @@
                     <tr>
                         <th>Номер полиса</th>
                         <th>Номер ДФА</th>
-                        <th>Клиент</th>
+                        <th>Лизингополучатель</th>
                         <th>Страховщик</th>
-                        <th>Вид страхования</th>
+                        <th>Имущество</th>
                         <th>Инфо 1</th>
                         <th>Инфо 3</th>
                         <th>Период</th>
-                        <th>Премия</th>
                         <th>Статус</th>
                         <th>Действия</th>
                     </tr>
@@ -141,7 +140,9 @@
                         <td>{{ policy.dfa_number }}</td>
                         <td>{{ policy.client.client_name }}</td>
                         <td>{{ policy.insurer.insurer_name }}</td>
-                        <td>{{ policy.insurance_type.name }}</td>
+                        <td>
+                            <small>{{ policy.property_description|truncatewords:10 }}</small>
+                        </td>
                         <td>
                             {% for info in policy.info_tags.all %}
                                 {% if info.info_field == 1 %}
@@ -155,7 +156,6 @@
                         <td>
                             <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
                         </td>
-                        <td>{{ policy.premium_total|floatformat:2 }} ₽</td>
                         <td>
                             {% if policy.policy_active %}
                                 <span class="badge bg-success">Активен</span>
@@ -176,7 +176,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="text-center text-muted">Полисы не найдены</td>
+                        <td colspan="10" class="text-center text-muted">Полисы не найдены</td>
                     </tr>
                     {% endfor %}
                 </tbody>

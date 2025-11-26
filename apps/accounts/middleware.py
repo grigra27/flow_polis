@@ -46,6 +46,11 @@ class PermissionCheckMiddleware:
                 login_url = reverse('accounts:login')
                 return redirect(f'{login_url}?next={request.path}')
             
+            # Superusers always have access
+            if request.user.is_superuser:
+                response = self.get_response(request)
+                return response
+            
             # Check if user has admin privileges (is_staff)
             if not request.user.is_staff:
                 # Log unauthorized access attempt
@@ -58,6 +63,9 @@ class PermissionCheckMiddleware:
                     "You do not have permission to access this page. "
                     "Only administrators can perform this action."
                 )
+            
+            # User is staff but not superuser - permissions will be checked by views
+            # (views should use @admin_required(permission='...') or AdminRequiredMixin with permission_required)
         
         # Continue processing the request
         response = self.get_response(request)

@@ -38,8 +38,12 @@ class CustomUserAdmin(BaseUserAdmin):
             'fields': ('first_name', 'last_name', 'email')
         }),
         ('Права доступа', {
-            'fields': ('is_active', 'is_staff', 'is_superuser'),
-            'description': 'is_staff=True для администратора, is_staff=False для обычного пользователя'
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'description': (
+                'is_staff=True - доступ к админ-панели\n'
+                'is_superuser=True - полный доступ ко всему\n'
+                'Для гранулярных прав: is_staff=True, is_superuser=False, затем выберите конкретные права ниже'
+            )
         }),
         ('Важные даты', {
             'fields': ('last_login', 'date_joined'),
@@ -59,10 +63,11 @@ class CustomUserAdmin(BaseUserAdmin):
         }),
         ('Тип пользователя', {
             'classes': ('wide',),
-            'fields': ('is_staff', 'is_superuser'),
+            'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions'),
             'description': (
                 'Обычный пользователь: is_staff=False, is_superuser=False (только просмотр и экспорт)\n'
-                'Администратор: is_staff=True, is_superuser=True (полный доступ)'
+                'Администратор с полным доступом: is_staff=True, is_superuser=True\n'
+                'Администратор с ограниченными правами: is_staff=True, is_superuser=False + выберите конкретные права'
             )
         }),
     )
@@ -93,9 +98,6 @@ class CustomUserAdmin(BaseUserAdmin):
         """
         Переопределение сохранения для обеспечения корректной установки прав
         """
-        # Если создается новый пользователь и установлен is_staff,
-        # автоматически устанавливаем is_superuser для полного доступа к админке
-        if not change and obj.is_staff and not obj.is_superuser:
-            obj.is_superuser = True
-        
+        # Больше не устанавливаем автоматически is_superuser
+        # Теперь суперюзер может создавать пользователей с гранулярными правами
         super().save_model(request, obj, form, change)

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load insurer_tags %}
 
 {% block title %}{{ insurer.insurer_name }}{% endblock %}
 
@@ -35,7 +36,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">{{ insurer.insurer_name }}</h1>
+    <h1 class="h2">{% insurer_logo insurer size='large' %}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         {% if can_edit %}
         <a href="{% url 'admin:insurers_insurer_change' insurer.pk %}" class="btn btn-warning me-2">

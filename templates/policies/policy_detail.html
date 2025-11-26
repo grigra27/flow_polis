@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load currency_filters %}
+{% load insurer_tags %}
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
@@ -53,7 +54,9 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Страховщик:</strong><br>
-                        <a href="{% url 'insurers:detail' policy.insurer.pk %}">{{ policy.insurer.insurer_name }}</a>
+                        <a href="{% url 'insurers:detail' policy.insurer.pk %}" style="text-decoration: none;">
+                            {% insurer_logo policy.insurer size='medium' %}
+                        </a>
                     </div>
                     <div class="col-md-6">
                         <strong>Вид страхования:</strong><br>

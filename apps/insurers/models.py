@@ -7,6 +7,13 @@ class Insurer(models.Model):
     Insurance company - Страховая компания
     """
     insurer_name = models.CharField('Название страховой компании', max_length=255)
+    logo = models.ImageField(
+        'Логотип',
+        upload_to='insurer_logos/',
+        blank=True,
+        null=True,
+        help_text='Рекомендуемый размер: 200x200px'
+    )
     contacts = models.URLField('Контакты (ссылка)', blank=True, help_text='Ссылка на yonote')
     notes = models.TextField('Примечание', blank=True)
 

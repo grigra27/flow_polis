@@ -4,9 +4,26 @@ from .models import Insurer, Branch, InsuranceType, InfoTag, CommissionRate
 
 @admin.register(Insurer)
 class InsurerAdmin(admin.ModelAdmin):
-    list_display = ['insurer_name', 'contacts']
+    list_display = ['insurer_name', 'contacts', 'has_logo']
     search_fields = ['insurer_name']
-    fields = ['insurer_name', 'contacts', 'notes']
+    fields = ['insurer_name', 'logo', 'contacts', 'notes']
+    readonly_fields = ['logo_preview']
+    
+    def has_logo(self, obj):
+        return '✓' if obj.logo else '✗'
+    has_logo.short_description = 'Логотип'
+    
+    def logo_preview(self, obj):
+        if obj.logo:
+            from django.utils.html import format_html
+            return format_html('<img src="{}" style="max-height: 100px; max-width: 200px;" />', obj.logo.url)
+        return "Логотип не загружен"
+    logo_preview.short_description = 'Предпросмотр логотипа'
+    
+    def get_fields(self, request, obj=None):
+        if obj and obj.logo:
+            return ['insurer_name', 'logo', 'logo_preview', 'contacts', 'notes']
+        return ['insurer_name', 'logo', 'contacts', 'notes']
 
 
 @admin.register(Branch)

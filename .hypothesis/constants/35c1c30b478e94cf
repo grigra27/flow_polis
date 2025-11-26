@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/reports/views.py
+# hypothesis_version: 6.141.1
+
+['%d.%m.%Y', 'Content-Disposition', 'branch', 'client', 'commission_rate', 'insurance_type', 'insurer', 'policy', 'policy__client', 'policy__insurer', 'reports/index.html', 'Активен', 'Вид страхования', 'Год', 'График платежей', 'Дата начала', 'Дата окончания', 'Дата оплаты', 'Дата платежа', 'Дата согласования СК', 'Закрыт', 'КВ %', 'КВ руб', 'Клиент', 'Номер ДФА', 'Номер полиса', 'Общая премия', 'Ожидается', 'Оплачен', 'Платеж №', 'Полисы', 'Просрочен', 'Статус', 'Статус ДФА', 'Статус полиса', 'Стоимость имущества', 'Страховщик', 'Сумма', 'Филиал', 'Франшиза']

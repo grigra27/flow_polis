@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/migrations/0001_initial.py
+# hypothesis_version: 6.141.1
+
+[100, 255, 'Branch', 'CommissionRate', 'ID', 'InfoTag', 'InsuranceType', 'Insurer', 'branch_name', 'commission_rates', 'created_at', 'id', 'insurance_type', 'insurer', 'insurer_name', 'insurers.insurer', 'kv_percent', 'name', 'ordering', 'unique_together', 'updated_at', 'verbose_name', 'verbose_name_plural', 'Вид страхования', 'Виды страхования', 'Дата обновления', 'Дата создания', 'Инфо-метка', 'Инфо-метки', 'Метка', 'Название филиала', 'Ставка комиссии', 'Ставка комиссии (%)', 'Ставки комиссий', 'Страховая компания', 'Страховщик', 'Страховые компании', 'Филиал', 'Филиалы']

@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/urls.py
+# hypothesis_version: 6.141.1
+
+['<int:pk>/', 'detail', 'insurers', 'list']

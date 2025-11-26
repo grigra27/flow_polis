@@ -1,0 +1,65 @@
+/**
+ * Styles for Copy Payment Inline functionality
+ */
+
+.copy-payment-btn-container {
+    margin-top: 5px;
+    display: inline-block;
+}
+
+.copy-payment-btn {
+    background-color: #417690;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.copy-payment-btn:hover {
+    background-color: #2e5266;
+}
+
+.copy-payment-btn:active {
+    background-color: #1f3a4a;
+    transform: translateY(1px);
+}
+
+.copy-payment-btn:focus {
+    outline: 2px solid #79aec8;
+    outline-offset: 2px;
+}
+
+/* Highlight animation for copied row */
+.payment-copied-highlight {
+    animation: highlightFade 2s ease-in-out;
+}
+
+@keyframes highlightFade {
+    0% {
+        background-color: #ffc;
+    }
+    50% {
+        background-color: #ffc;
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Make sure the button container doesn't break layout */
+.inline-related td:last-child {
+    white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .copy-payment-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}

@@ -92,6 +92,7 @@
                                 <th>Год/№</th>
                                 <th>Дата платежа</th>
                                 <th>Сумма</th>
+                                <th>Страховая сумма</th>
                                 <th>КВ %</th>
                                 <th>КВ ₽</th>
                                 <th>Статус</th>
@@ -106,6 +107,7 @@
                                 <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                                 <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                                 <td><strong>{{ payment.amount|floatformat:2 }} ₽</strong></td>
+                                <td>{{ payment.insurance_sum|floatformat:2 }} ₽</td>
                                 <td>
                                     {% if payment.commission_rate %}
                                         {{ payment.commission_rate.kv_percent }}%
@@ -125,7 +127,7 @@
                                 </td>
                             </tr>
                             <tr class="collapse" id="payment-{{ payment.id }}">
-                                <td colspan="7" class="bg-light">
+                                <td colspan="8" class="bg-light">
                                     <div class="p-3">
                                         <div class="row">
                                             <div class="col-md-6">
@@ -143,6 +145,12 @@
                                                 <small>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</small>
                                             </div>
                                             <div class="col-md-6">
+                                                <small><strong>Страховая сумма:</strong></small><br>
+                                                <small>{{ payment.insurance_sum|floatformat:2 }} ₽</small>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-6">
                                                 <small><strong>Ставка комиссии:</strong></small><br>
                                                 <small>
                                                     {% if payment.commission_rate %}
@@ -151,6 +159,8 @@
                                                         —
                                                     {% endif %}
                                                 </small>
+                                            </div>
+                                            <div class="col-md-6">
                                             </div>
                                         </div>
                                         {% if payment.payment_info %}
@@ -173,7 +183,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted">График платежей не заполнен</td>
+                                <td colspan="8" class="text-center text-muted">График платежей не заполнен</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -215,14 +225,15 @@
                 <h5 class="mb-0">Финансовая информация</h5>
             </div>
             <div class="card-body">
-                <p><strong>Стоимость имущества:</strong><br>
-                {{ policy.property_value|floatformat:2 }} ₽</p>
-                
                 <p><strong>Общая премия:</strong><br>
                 <span class="text-primary fs-5">{{ policy.premium_total|floatformat:2 }} ₽</span></p>
                 
                 <p><strong>Франшиза:</strong><br>
                 {{ policy.franchise|floatformat:2 }} ₽</p>
+                
+                <p class="mb-0"><small class="text-muted">
+                    <i class="bi bi-info-circle"></i> Страховая сумма указана для каждого платежа в графике платежей
+                </small></p>
             </div>
         </div>
 

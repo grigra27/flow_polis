@@ -39,12 +39,6 @@ class Policy(TimeStampedModel):
     start_date = models.DateField('Дата начала страхования')
     end_date = models.DateField('Дата окончания страхования')
     
-    property_value = models.DecimalField(
-        'Стоимость имущества (СС за первый год)',
-        max_digits=15,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
     premium_total = models.DecimalField(
         'Общая сумма страховой премии',
         max_digits=15,
@@ -127,6 +121,13 @@ class PaymentSchedule(TimeStampedModel):
         max_digits=15,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    insurance_sum = models.DecimalField(
+        'Страховая сумма',
+        max_digits=15,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text='Стоимость застрахованного имущества для данного платежа'
     )
     
     commission_rate = models.ForeignKey(

@@ -32,6 +32,12 @@ db.sqlite3-journal
 !/media/insurer_logos/
 /media/insurer_logos/*
 !/media/insurer_logos/.gitkeep
+!/media/branch_logos/
+/media/branch_logos/*
+!/media/branch_logos/.gitkeep
+!/media/insurance_type_icons/
+/media/insurance_type_icons/*
+!/media/insurance_type_icons/.gitkeep
 /staticfiles
 
 # Environment

@@ -99,7 +99,7 @@
                         <tbody>
                             {% for rate in commission_rates %}
                             <tr>
-                                <td>{{ rate.insurance_type.name }}</td>
+                                <td>{% insurance_type_icon rate.insurance_type size='small' %}</td>
                                 <td><strong>{{ rate.kv_percent }}%</strong></td>
                             </tr>
                             {% endfor %}
@@ -163,7 +163,7 @@
                             <tr class="clickable-row" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
                                 <td><strong>{{ policy.policy_number }}</strong></td>
                                 <td>{{ policy.client.client_name }}</td>
-                                <td>{{ policy.insurance_type.name }}</td>
+                                <td>{% insurance_type_icon policy.insurance_type size='small' %}</td>
                                 <td>
                                     <small>{{ policy.property_description|truncatewords:10 }}</small>
                                 </td>

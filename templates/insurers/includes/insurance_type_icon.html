@@ -1,0 +1,14 @@
+<span class="insurance-type-with-icon d-inline-flex align-items-center">
+    {% if insurance_type.icon %}
+        <img src="{{ insurance_type.icon.url }}" 
+             alt="{{ insurance_type.name }}" 
+             class="insurance-type-icon me-2"
+             style="width: {{ size }}; height: {{ size }}; object-fit: contain;">
+    {% else %}
+        <span class="insurance-type-icon-placeholder me-2" 
+              style="width: {{ size }}; height: {{ size }}; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
+            <i class="bi bi-shield-check" style="font-size: calc({{ size }} * 0.6);"></i>
+        </span>
+    {% endif %}
+    <span>{{ insurance_type.name }}</span>
+</span>

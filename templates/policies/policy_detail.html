@@ -60,13 +60,13 @@
                     </div>
                     <div class="col-md-6">
                         <strong>Вид страхования:</strong><br>
-                        {{ policy.insurance_type.name }}
+                        {% insurance_type_icon policy.insurance_type size='medium' %}
                     </div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Филиал:</strong><br>
-                        {{ policy.branch.branch_name }}
+                        {% branch_logo policy.branch size='medium' %}
                     </div>
                     <div class="col-md-6">
                         <strong>Менеджер:</strong><br>

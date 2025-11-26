@@ -31,6 +31,13 @@ class Branch(models.Model):
     Branch - Филиал лизинговой компании
     """
     branch_name = models.CharField('Название филиала', max_length=255)
+    logo = models.ImageField(
+        'Логотип',
+        upload_to='branch_logos/',
+        blank=True,
+        null=True,
+        help_text='Рекомендуемый размер: 200x200px'
+    )
 
     class Meta:
         verbose_name = 'Филиал'
@@ -46,6 +53,13 @@ class InsuranceType(models.Model):
     Insurance type - Вид страхования
     """
     name = models.CharField('Вид страхования', max_length=100, unique=True)
+    icon = models.ImageField(
+        'Иконка',
+        upload_to='insurance_type_icons/',
+        blank=True,
+        null=True,
+        help_text='Рекомендуемый размер: 200x200px'
+    )
 
     class Meta:
         verbose_name = 'Вид страхования'

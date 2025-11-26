@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load currency_filters %}
+{% load insurer_tags %}
 
 {% block title %}Дашборд - Система управления полисами{% endblock %}
 
@@ -138,7 +139,7 @@
                     <tr>
                         <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
                         <td>{{ policy.client.client_name }}</td>
-                        <td>{{ policy.insurer.insurer_name }}</td>
+                        <td>{% insurer_logo policy.insurer size='small' %}</td>
                         <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
                         <td>{{ policy.premium_total|rub }}</td>
                         <td>

@@ -5,11 +5,13 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Клиенты</h1>
+    {% if can_edit %}
     <div class="btn-toolbar mb-2 mb-md-0">
         <a href="{% url 'admin:clients_client_add' %}" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> Добавить клиента
         </a>
     </div>
+    {% endif %}
 </div>
 
 <!-- Search -->
@@ -49,9 +51,11 @@
                             <a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-info">
                                 <i class="bi bi-eye"></i> Просмотр
                             </a>
+                            {% if can_edit %}
                             <a href="{% url 'admin:clients_client_change' client.pk %}" class="btn btn-sm btn-warning">
                                 <i class="bi bi-pencil"></i> Редактировать
                             </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

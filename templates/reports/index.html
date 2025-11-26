@@ -60,7 +60,9 @@
         <ul>
             <li><a href="{% url 'policies:list' %}">Журнал полисов</a> - с расширенными фильтрами</li>
             <li><a href="{% url 'policies:payments' %}">График платежей</a> - с фильтрацией по статусам</li>
+            {% if can_edit %}
             <li><a href="{% url 'admin:index' %}">Админ-панель</a> - для управления данными</li>
+            {% endif %}
         </ul>
     </div>
 </div>

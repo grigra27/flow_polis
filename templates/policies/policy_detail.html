@@ -6,9 +6,11 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Полис {{ policy.policy_number }}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
+        {% if can_edit %}
         <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-warning me-2">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
+        {% endif %}
         <a href="{% url 'policies:list' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Назад к списку
         </a>
@@ -159,11 +161,13 @@
                                             </div>
                                         </div>
                                         {% endif %}
+                                        {% if can_edit %}
                                         <div class="mt-2">
                                             <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}" class="btn btn-sm btn-warning">
                                                 <i class="bi bi-pencil"></i> Редактировать
                                             </a>
                                         </div>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>

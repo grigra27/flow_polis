@@ -32,11 +32,13 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Журнал полисов</h1>
+    {% if can_edit %}
     <div class="btn-toolbar mb-2 mb-md-0">
         <a href="{% url 'admin:policies_policy_add' %}" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> Добавить полис
         </a>
     </div>
+    {% endif %}
 </div>
 
 <!-- Branch Tabs -->
@@ -165,9 +167,11 @@
                             <a href="{% url 'policies:detail' policy.pk %}" class="btn btn-sm btn-info">
                                 <i class="bi bi-eye"></i>
                             </a>
+                            {% if can_edit %}
                             <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-sm btn-warning">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

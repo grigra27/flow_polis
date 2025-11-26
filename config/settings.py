@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     
     # Local apps
+    'apps.accounts',
     'apps.core',
     'apps.clients',
     'apps.insurers',
@@ -85,6 +86,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
+    'apps.accounts.middleware.PermissionCheckMiddleware',  # Validates: Requirements 3.5, 4.1
 ]
 
 if DEBUG:
@@ -103,6 +105,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.accounts.context_processors.user_permissions',  # Validates: Requirements 3.2, 4.2
             ],
         },
     },
@@ -179,9 +182,11 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 # Debug Toolbar
 INTERNAL_IPS = ['127.0.0.1']
 
-# Login
-LOGIN_URL = '/admin/login/'
-LOGIN_REDIRECT_URL = '/'
+# Authentication settings
+# Validates: Requirements 1.1, 2.1, 5.2
+LOGIN_URL = 'accounts:login'
+LOGIN_REDIRECT_URL = 'core:dashboard'
+LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # Logging
 LOGGING = {

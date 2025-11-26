@@ -127,8 +127,8 @@
                         <th>Лизингополучатель</th>
                         <th>Объект страхования</th>
                         <th>Год/№</th>
-                        <th>Дата платежа по полису</th>
                         <th>Очередной взнос, ₽</th>
+                        <th>Дата платежа по полису</th>
                         <th>Дата оплаты</th>
                         <th>Статус</th>
                         <th>Действия</th>
@@ -148,8 +148,8 @@
                             <small>{{ payment.policy.property_description|truncatewords:10 }}</small>
                         </td>
                         <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
-                        <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                         <td>{{ payment.amount|rub }}</td>
+                        <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                         <td>
                             {% if payment.paid_date %}
                                 {{ payment.paid_date|date:"d.m.Y" }}

@@ -126,10 +126,9 @@
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Объект страхования</th>
+                        <th>Период</th>
                         <th>Инфо 1</th>
                         <th>Инфо 3</th>
-                        <th>Период</th>
-                        <th>Статус</th>
                         <th>Действия</th>
                     </tr>
                 </thead>
@@ -144,6 +143,9 @@
                             <small>{{ policy.property_description|truncatewords:10 }}</small>
                         </td>
                         <td>
+                            <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
+                        </td>
+                        <td>
                             {% for info in policy.info_tags.all %}
                                 {% if info.info_field == 1 %}
                                     <span class="badge bg-info">{{ info.tag.name }}</span>
@@ -152,16 +154,6 @@
                         </td>
                         <td>
                             <small>{{ policy.info3|truncatewords:10 }}</small>
-                        </td>
-                        <td>
-                            <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
-                        </td>
-                        <td>
-                            {% if policy.policy_active %}
-                                <span class="badge bg-success">Активен</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Закрыт</span>
-                            {% endif %}
                         </td>
                         <td onclick="event.stopPropagation();">
                             <a href="{% url 'policies:detail' policy.pk %}" class="btn btn-sm btn-info">
@@ -176,7 +168,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted">Полисы не найдены</td>
+                        <td colspan="9" class="text-center text-muted">Полисы не найдены</td>
                     </tr>
                     {% endfor %}
                 </tbody>

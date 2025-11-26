@@ -10,7 +10,7 @@ class InsurerListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().prefetch_related('commission_rates__insurance_type')
         search = self.request.GET.get('search')
         if search:
             queryset = queryset.filter(insurer_name__icontains=search)

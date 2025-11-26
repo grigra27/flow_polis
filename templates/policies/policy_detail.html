@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load currency_filters %}
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
@@ -91,10 +92,10 @@
                                 <th style="width: 30px;"></th>
                                 <th>Год/№</th>
                                 <th>Дата платежа</th>
-                                <th>Сумма</th>
-                                <th>Страховая сумма</th>
+                                <th>Сумма, ₽</th>
+                                <th>Страховая сумма, ₽</th>
                                 <th>КВ %</th>
-                                <th>КВ ₽</th>
+                                <th>КВ, ₽</th>
                                 <th>Статус</th>
                             </tr>
                         </thead>
@@ -106,8 +107,8 @@
                                 </td>
                                 <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                                 <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                                <td><strong>{{ payment.amount|floatformat:2 }} ₽</strong></td>
-                                <td>{{ payment.insurance_sum|floatformat:2 }} ₽</td>
+                                <td><strong>{{ payment.amount|rub }}</strong></td>
+                                <td>{{ payment.insurance_sum|rub }}</td>
                                 <td>
                                     {% if payment.commission_rate %}
                                         {{ payment.commission_rate.kv_percent }}%
@@ -115,7 +116,7 @@
                                         —
                                     {% endif %}
                                 </td>
-                                <td>{{ payment.kv_rub|floatformat:2 }} ₽</td>
+                                <td>{{ payment.kv_rub|rub }}</td>
                                 <td>
                                     {% if payment.is_paid %}
                                         <span class="badge bg-success">Оплачен</span>
@@ -146,7 +147,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <small><strong>Страховая сумма:</strong></small><br>
-                                                <small>{{ payment.insurance_sum|floatformat:2 }} ₽</small>
+                                                <small>{{ payment.insurance_sum|rub }}</small>
                                             </div>
                                         </div>
                                         <div class="row mt-2">
@@ -226,10 +227,10 @@
             </div>
             <div class="card-body">
                 <p><strong>Общая премия:</strong><br>
-                <span class="text-primary fs-5">{{ policy.premium_total|floatformat:2 }} ₽</span></p>
+                <span class="text-primary fs-5">{{ policy.premium_total|rub }}</span></p>
                 
                 <p><strong>Франшиза:</strong><br>
-                {{ policy.franchise|floatformat:2 }} ₽</p>
+                {{ policy.franchise|rub }}</p>
                 
                 <p class="mb-0"><small class="text-muted">
                     <i class="bi bi-info-circle"></i> Страховая сумма указана для каждого платежа в графике платежей

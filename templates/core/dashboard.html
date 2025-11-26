@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load currency_filters %}
 
 {% block title %}Дашборд - Система управления полисами{% endblock %}
 
@@ -56,7 +57,7 @@
                         <th>Полис</th>
                         <th>Лизингополучатель</th>
                         <th>Дата платежа (по договору)</th>
-                        <th>Очередной взнос</th>
+                        <th>Очередной взнос, ₽</th>
                         <th>Год/Платеж</th>
                     </tr>
                 </thead>
@@ -66,7 +67,7 @@
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                        <td>{{ payment.amount|floatformat:2 }} ₽</td>
+                        <td>{{ payment.amount|rub }}</td>
                         <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                     </tr>
                     {% endfor %}
@@ -92,7 +93,7 @@
                         <th>Полис</th>
                         <th>Лизингополучатель</th>
                         <th>Дата платежа</th>
-                        <th>Сумма</th>
+                        <th>Сумма, ₽</th>
                         <th>Просрочка (дней)</th>
                     </tr>
                 </thead>
@@ -102,7 +103,7 @@
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                        <td>{{ payment.amount|floatformat:2 }} ₽</td>
+                        <td>{{ payment.amount|rub }}</td>
                         <td>{{ payment.due_date|timesince }}</td>
                     </tr>
                     {% endfor %}
@@ -128,7 +129,7 @@
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Период</th>
-                        <th>Суммарная премия</th>
+                        <th>Суммарная премия, ₽</th>
                         <th>Статус</th>
                     </tr>
                 </thead>
@@ -139,7 +140,7 @@
                         <td>{{ policy.client.client_name }}</td>
                         <td>{{ policy.insurer.insurer_name }}</td>
                         <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
-                        <td>{{ policy.premium_total|floatformat:2 }} ₽</td>
+                        <td>{{ policy.premium_total|rub }}</td>
                         <td>
                             {% if policy.policy_active %}
                                 <span class="badge bg-success">Активен</span>

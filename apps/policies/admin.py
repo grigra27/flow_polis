@@ -20,11 +20,11 @@ class InsuranceSumRangeFilter(SimpleListFilter):
     def lookups(self, request, model_admin):
         """Define the filter options."""
         return (
-            ('0-500k', 'До 500 000 ₽'),
-            ('500k-1m', '500 000 - 1 000 000 ₽'),
-            ('1m-5m', '1 000 000 - 5 000 000 ₽'),
-            ('5m-10m', '5 000 000 - 10 000 000 ₽'),
-            ('10m+', 'Более 10 000 000 ₽'),
+            ('0-500k', 'До 500 000'),
+            ('500k-1m', '500 000 - 1 000 000'),
+            ('1m-5m', '1 000 000 - 5 000 000'),
+            ('5m-10m', '5 000 000 - 10 000 000'),
+            ('10m+', 'Более 10 000 000'),
         )
     
     def queryset(self, request, queryset):

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load currency_filters %}
 
 {% block title %}График платежей{% endblock %}
 
@@ -127,7 +128,7 @@
                         <th>Объект страхования</th>
                         <th>Год/№</th>
                         <th>Дата платежа по полису</th>
-                        <th>Очередной взнос</th>
+                        <th>Очередной взнос, ₽</th>
                         <th>Дата оплаты</th>
                         <th>Статус</th>
                         <th>Действия</th>
@@ -148,7 +149,7 @@
                         </td>
                         <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                        <td>{{ payment.amount|floatformat:2 }} ₽</td>
+                        <td>{{ payment.amount|rub }}</td>
                         <td>
                             {% if payment.paid_date %}
                                 {{ payment.paid_date|date:"d.m.Y" }}

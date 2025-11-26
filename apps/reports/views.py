@@ -87,7 +87,7 @@ def export_payments_excel(request):
             payment.installment_number,
             payment.due_date.strftime('%d.%m.%Y'),
             float(payment.amount),
-            float(payment.commission_rate.kv_percent) if payment.commission_rate else 0,
+            int(round(float(payment.commission_rate.kv_percent))) if payment.commission_rate else 0,
             float(payment.kv_rub),
             payment.paid_date.strftime('%d.%m.%Y') if payment.paid_date else '',
             payment.insurer_date.strftime('%d.%m.%Y') if payment.insurer_date else '',

@@ -82,7 +82,13 @@ class InfoTagAdmin(admin.ModelAdmin):
 
 @admin.register(CommissionRate)
 class CommissionRateAdmin(admin.ModelAdmin):
-    list_display = ['insurer', 'insurance_type', 'kv_percent', 'created_at']
+    list_display = ['insurer', 'insurance_type', 'kv_percent_display', 'created_at']
     list_filter = ['insurer', 'insurance_type']
     search_fields = ['insurer__insurer_name', 'insurance_type__name']
     autocomplete_fields = ['insurer', 'insurance_type']
+    
+    def kv_percent_display(self, obj):
+        """Отображение КВ без дробной части"""
+        return f"{int(round(float(obj.kv_percent)))}%"
+    kv_percent_display.short_description = 'КВ %'
+    kv_percent_display.admin_order_field = 'kv_percent'

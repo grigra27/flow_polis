@@ -114,4 +114,4 @@ class CommissionRate(TimeStampedModel):
         ordering = ['insurer', 'insurance_type']
 
     def __str__(self):
-        return f'{self.insurer} - {self.insurance_type}: {self.kv_percent}%'
+        return f'{self.insurer} - {self.insurance_type}: {int(round(float(self.kv_percent)))}%'

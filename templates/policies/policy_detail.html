@@ -114,7 +114,7 @@
                                 <td>{{ payment.insurance_sum|rub }}</td>
                                 <td>
                                     {% if payment.commission_rate %}
-                                        {{ payment.commission_rate.kv_percent }}%
+                                        {{ payment.commission_rate.kv_percent|percent }}%
                                     {% else %}
                                         —
                                     {% endif %}

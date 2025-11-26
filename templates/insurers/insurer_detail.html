@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load insurer_tags %}
+{% load currency_filters %}
 
 {% block title %}{{ insurer.insurer_name }}{% endblock %}
 
@@ -100,7 +101,7 @@
                             {% for rate in commission_rates %}
                             <tr>
                                 <td>{% insurance_type_icon rate.insurance_type size='small' %}</td>
-                                <td><strong>{{ rate.kv_percent }}%</strong></td>
+                                <td><strong>{{ rate.kv_percent|percent }}%</strong></td>
                             </tr>
                             {% endfor %}
                         </tbody>

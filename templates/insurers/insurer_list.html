@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load insurer_tags %}
+{% load currency_filters %}
 
 {% block title %}Страховщики{% endblock %}
 
@@ -83,7 +84,7 @@
             <thead class="table-light">
                 <tr>
                     <th class="ps-4" style="width: 30%;">Страховая компания</th>
-                    <th style="width: 55%;">Ставки комиссии</th>
+                    <th style="width: 55%;">Базовые ставки комиссии</th>
                     <th style="width: 15%;">Действия</th>
                 </tr>
             </thead>
@@ -105,7 +106,7 @@
                             <div>
                                 {% for rate in insurer.commission_rates.all %}
                                 <span class="commission-item">
-                                    {{ rate.insurance_type.name }}: <strong>{{ rate.kv_percent }}%</strong>
+                                    {{ rate.insurance_type.name }}: <strong>{{ rate.kv_percent|percent }}%</strong>
                                 </span>
                                 {% endfor %}
                             </div>

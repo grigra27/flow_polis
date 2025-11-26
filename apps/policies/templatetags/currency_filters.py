@@ -20,3 +20,17 @@ def format_rub(value):
         return formatted
     except (ValueError, TypeError):
         return value
+
+
+@register.filter(name='percent')
+def format_percent(value):
+    """
+    Форматирует процентное значение без дробной части.
+    Пример: 12.50 -> "12", 15.00 -> "15"
+    """
+    try:
+        # Преобразуем в float и округляем до целого
+        num = float(value)
+        return str(int(round(num)))
+    except (ValueError, TypeError):
+        return value

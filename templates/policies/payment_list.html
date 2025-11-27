@@ -77,7 +77,7 @@
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-funnel"></i> Применить фильтр
                 </button>
-                <a href="{% url 'policies:payments' %}{% if selected_branch %}?branch={{ selected_branch }}{% endif %}" class="btn btn-secondary">
+                <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn btn-secondary">
                     <i class="bi bi-x-circle"></i> Сбросить даты
                 </a>
             </div>
@@ -87,25 +87,47 @@
 
 <!-- Filter Buttons -->
 {% if not request.GET.date_from and not request.GET.date_to %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div class="btn-group" role="group">
-        <a href="{% url 'policies:payments' %}{% if selected_branch %}?branch={{ selected_branch }}{% endif %}" class="btn btn-outline-primary {% if not request.GET.status %}active{% endif %}">
-            Все платежи
+<div class="mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <!-- Past payments group -->
+        <div class="btn-group" role="group">
+            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+               class="btn btn-outline-success {% if request.GET.status == 'paid' %}active{% endif %}">
+                <i class="bi bi-check-circle"></i> Оплаченные
+            </a>
+            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+               class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
+                <i class="bi bi-exclamation-triangle"></i> Просроченные
+            </a>
+        </div>
+        
+        <div class="vr" style="height: 38px;"></div>
+        
+        <!-- Future payments group -->
+        <div class="btn-group" role="group">
+            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+               class="btn btn-outline-warning {% if request.GET.status == 'upcoming' or not request.GET.status %}active{% endif %}">
+                <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
+            </a>
+            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+               class="btn btn-outline-info {% if request.GET.status == 'future' %}active{% endif %}">
+                <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
+            </a>
+        </div>
+        
+        <div class="vr" style="height: 38px;"></div>
+        
+        <!-- All payments -->
+        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+           class="btn btn-outline-primary {% if request.GET.status == 'all' %}active{% endif %}">
+            <i class="bi bi-list-ul"></i> Все платежи
         </a>
-        <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn btn-outline-warning {% if request.GET.status == 'upcoming' %}active{% endif %}">
-            Предстоящие
-        </a>
-        <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
-            Просроченные
-        </a>
-        <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn btn-outline-success {% if request.GET.status == 'paid' %}active{% endif %}">
-            Оплаченные
-        </a>
+        
+        <small class="text-muted ms-auto" style="cursor: help;" 
+               title="Оплаченные: платежи с указанной датой оплаты. Просроченные: неоплаченные платежи с датой ранее сегодня. Предстоит в ближ. 30 дней: неоплаченные платежи в ближайшие 30 дней. Будущие: неоплаченные платежи более чем через 30 дней.">
+            <i class="bi bi-info-circle"></i> Пояснение
+        </small>
     </div>
-    
-    <small class="text-muted" style="cursor: help;" title="Предстоящие: неоплаченные платежи в ближайшие 30 дней. Просроченные: неоплаченные платежи с датой ранее сегодня. Оплаченные: платежи с указанной датой оплаты.">
-        <i class="bi bi-info-circle"></i> Пояснение
-    </small>
 </div>
 {% else %}
 <div class="alert alert-info mb-3">
@@ -192,21 +214,66 @@
         {% if is_paginated %}
         <nav aria-label="Page navigation">
             <ul class="pagination justify-content-center">
+                <!-- First Page -->
                 {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Предыдущая</a>
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Первая страница">
+                            <i class="bi bi-chevron-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Предыдущая">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link"><i class="bi bi-chevron-double-left"></i></span>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link"><i class="bi bi-chevron-left"></i></span>
                     </li>
                 {% endif %}
 
-                <li class="page-item active">
-                    <span class="page-link">
-                        Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
-                    </span>
-                </li>
+                <!-- Page Numbers -->
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                        <li class="page-item">
+                            <a class="page-link" href=""um }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
 
+                <!-- Next Page -->
                 {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Следующая</a>
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Следующая">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Последняя страница">
+                            <i class="bi bi-chevron-double-right"></i>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link"><i class="bi bi-chevron-double-right"></i></span>
                     </li>
                 {% endif %}
             </ul>

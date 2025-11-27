@@ -28,6 +28,8 @@ wheels/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+.sql
+db_backup.sql
 /media/*
 !/media/insurer_logos/
 /media/insurer_logos/*

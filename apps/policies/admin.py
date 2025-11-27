@@ -95,7 +95,7 @@ class PolicyAdmin(admin.ModelAdmin):
         'policy_number', 'dfa_number',
         'client__client_name', 'insurer__insurer_name'
     ]
-    autocomplete_fields = ['client', 'policyholder', 'insurer', 'insurance_type', 'branch']
+    autocomplete_fields = ['client', 'policyholder', 'insurer', 'insurance_type', 'branch', 'leasing_manager']
     readonly_fields = ['premium_total', 'created_at', 'updated_at']
     actions = ['copy_policy']
     

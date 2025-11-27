@@ -3,7 +3,7 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 from apps.core.models import TimeStampedModel
 from apps.clients.models import Client
-from apps.insurers.models import Insurer, Branch, InsuranceType, InfoTag, CommissionRate
+from apps.insurers.models import Insurer, Branch, InsuranceType, InfoTag, CommissionRate, LeasingManager
 
 
 class Policy(TimeStampedModel):
@@ -60,10 +60,13 @@ class Policy(TimeStampedModel):
         related_name='policies'
     )
     
-    leasing_manager = models.CharField(
-        'Менеджер лизинговой компании',
-        max_length=255,
-        blank=True
+    leasing_manager = models.ForeignKey(
+        LeasingManager,
+        on_delete=models.PROTECT,
+        verbose_name='Менеджер лизинговой компании',
+        related_name='policies',
+        blank=True,
+        null=True
     )
     franchise = models.DecimalField(
         'Франшиза',

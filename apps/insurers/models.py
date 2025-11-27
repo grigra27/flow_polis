@@ -85,6 +85,24 @@ class InfoTag(models.Model):
         return self.name
 
 
+class LeasingManager(models.Model):
+    """
+    Leasing company manager - Менеджер лизинговой компании
+    """
+    name = models.CharField('ФИО менеджера', max_length=255, unique=True)
+    phone = models.CharField('Телефон', max_length=50, blank=True)
+    email = models.EmailField('Email', blank=True)
+    notes = models.TextField('Примечание', blank=True)
+
+    class Meta:
+        verbose_name = 'Менеджер лизинговой компании'
+        verbose_name_plural = 'Менеджеры лизинговой компании'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class CommissionRate(TimeStampedModel):
     """
     Commission rates by insurance type and insurer

@@ -103,6 +103,10 @@
                 <label class="form-label">Статус ДФА</label>
                 {{ filter.form.dfa_active }}
             </div>
+            <div class="col-md-2">
+                <label class="form-label">Статус подгрузки</label>
+                {{ filter.form.policy_uploaded }}
+            </div>
             <div class="col-md-12">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-search"></i> Применить
@@ -130,7 +134,7 @@
                         <th>Период</th>
                         <th>Инфо 1</th>
                         <th>Инфо 3</th>
-                        <th>Действия</th>
+                        <th>Ред.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,9 +161,6 @@
                             <small>{{ policy.info3|truncatewords:10 }}</small>
                         </td>
                         <td onclick="event.stopPropagation();">
-                            <a href="{% url 'policies:detail' policy.pk %}" class="btn btn-sm btn-info">
-                                <i class="bi bi-eye"></i>
-                            </a>
                             {% if can_edit %}
                             <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-sm btn-warning">
                                 <i class="bi bi-pencil"></i>

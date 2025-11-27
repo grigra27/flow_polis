@@ -78,6 +78,7 @@ class Policy(TimeStampedModel):
     
     policy_active = models.BooleanField('Полис активен', default=True)
     dfa_active = models.BooleanField('ДФА активен', default=True)
+    policy_uploaded = models.BooleanField('Полис подгружен', default=False)
 
     class Meta:
         verbose_name = 'Полис'
@@ -88,6 +89,7 @@ class Policy(TimeStampedModel):
             models.Index(fields=['dfa_number']),
             models.Index(fields=['start_date', 'end_date']),
             models.Index(fields=['policy_active']),
+            models.Index(fields=['policy_uploaded']),
         ]
 
     def __str__(self):

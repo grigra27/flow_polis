@@ -4,6 +4,24 @@
 
 {% block title %}Дашборд - Система управления полисами{% endblock %}
 
+{% block extra_css %}
+<style>
+    .clickable-row {
+        cursor: pointer;
+    }
+    .clickable-row:hover {
+        background-color: #f8f9fa;
+    }
+    .clickable-row a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .clickable-row a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Дашборд</h1>
@@ -11,7 +29,7 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-primary mb-3">
             <div class="card-body">
                 <h5 class="card-title">
@@ -21,7 +39,17 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-cloud-upload"></i> Не подгружены
+                </h5>
+                <h2 class="card-text">{{ not_uploaded_policies_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card text-white bg-warning mb-3">
             <div class="card-body">
                 <h5 class="card-title">
@@ -32,7 +60,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-danger mb-3">
             <div class="card-body">
                 <h5 class="card-title">
@@ -64,7 +92,7 @@
                 </thead>
                 <tbody>
                     {% for payment in upcoming_payments %}
-                    <tr>
+                    <tr class="clickable-row" data-href="{% url 'policies:detail' payment.policy.pk %}">
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
@@ -100,7 +128,7 @@
                 </thead>
                 <tbody>
                     {% for payment in overdue_payments %}
-                    <tr>
+                    <tr class="clickable-row" data-href="{% url 'policies:detail' payment.policy.pk %}">
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
@@ -136,7 +164,7 @@
                 </thead>
                 <tbody>
                     {% for policy in recent_policies %}
-                    <tr>
+                    <tr class="clickable-row" data-href="{% url 'policies:detail' policy.pk %}">
                         <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
                         <td>{% branch_logo policy.branch size='small' %}</td>
                         <td>{{ policy.client.client_name }}</td>
@@ -157,4 +185,56 @@
         <a href="{% url 'policies:list' %}" class="btn btn-primary">Все полисы</a>
     </div>
 </div>
+
+<!-- Not Uploaded Policies -->
+{% if not_uploaded_policies %}
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> Полисы не подгружены</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Номер полиса</th>
+                        <th>Филиал</th>
+                        <th>Лизингополучатель</th>
+                        <th>Страховщик</th>
+                        <th>Период</th>
+                        <th>Дата создания</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for policy in not_uploaded_policies %}
+                    <tr class="clickable-row" data-href="{% url 'policies:detail' policy.pk %}">
+                        <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
+                        <td>{% branch_logo policy.branch size='small' %}</td>
+                        <td>{{ policy.client.client_name }}</td>
+                        <td>{% insurer_logo policy.insurer size='small' %}</td>
+                        <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
+                        <td>{{ policy.created_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <a href="{% url 'policies:list' %}?policy_uploaded=False" class="btn btn-info">Все не подгруженные полисы</a>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function(e) {
+            // Не переходить, если кликнули по ссылке
+            if (e.target.tagName !== 'A') {
+                window.location.href = this.dataset.href;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

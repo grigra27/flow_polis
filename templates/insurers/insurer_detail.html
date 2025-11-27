@@ -151,12 +151,11 @@
                         <thead>
                             <tr>
                                 <th>Номер полиса</th>
-                                <th>Клиент</th>
+                                <th>ЛП</th>
                                 <th>Вид страхования</th>
-                                <th>Имущество</th>
+                                <th>Объект страхования</th>
                                 <th>Период</th>
                                 <th>Статус</th>
-                                <th>Действия</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -177,11 +176,6 @@
                                     {% else %}
                                         <span class="badge bg-secondary">Закрыт</span>
                                     {% endif %}
-                                </td>
-                                <td onclick="event.stopPropagation();">
-                                    <a href="{% url 'policies:detail' policy.pk %}" class="btn btn-sm btn-info">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}

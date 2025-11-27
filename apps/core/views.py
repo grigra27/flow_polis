@@ -28,6 +28,11 @@ def dashboard(request):
         paid_date__isnull=True
     ).select_related('policy', 'policy__client')
     
+    # Policies not uploaded
+    not_uploaded_policies = Policy.objects.filter(
+        policy_uploaded=False
+    ).select_related('client', 'insurer', 'branch')
+    
     # Recent policies
     recent_policies = Policy.objects.select_related(
         'client', 'insurer', 'branch'
@@ -39,6 +44,8 @@ def dashboard(request):
         'overdue_payments_count': overdue_payments.count(),
         'upcoming_payments': upcoming_payments[:10],
         'overdue_payments': overdue_payments[:10],
+        'not_uploaded_policies_count': not_uploaded_policies.count(),
+        'not_uploaded_policies': not_uploaded_policies[:10],
         'recent_policies': recent_policies,
     }
     

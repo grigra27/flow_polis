@@ -94,12 +94,13 @@
                             <tr>
                                 <th style="width: 30px;"></th>
                                 <th>Год/№</th>
-                                <th>Дата платежа</th>
-                                <th>Сумма, ₽</th>
-                                <th>Страховая сумма, ₽</th>
-                                <th>КВ %</th>
+                                <th>СС, ₽</th>
+                                <th>Премия, ₽</th>
+                                <th>КВ, %</th>
                                 <th>КВ, ₽</th>
+                                <th>Дата платежа</th>
                                 <th>Статус</th>
+                                <th>Примечание</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -109,9 +110,8 @@
                                     <i class="bi bi-chevron-right toggle-icon"></i>
                                 </td>
                                 <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
-                                <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                                <td><strong>{{ payment.amount|rub }}</strong></td>
                                 <td>{{ payment.insurance_sum|rub }}</td>
+                                <td><strong>{{ payment.amount|rub }}</strong></td>
                                 <td>
                                     {% if payment.commission_rate %}
                                         {{ payment.commission_rate.kv_percent|percent }}%
@@ -120,6 +120,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ payment.kv_rub|rub }}</td>
+                                <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                                 <td>
                                     {% if payment.is_paid %}
                                         <span class="badge bg-success">Оплачен</span>
@@ -129,9 +130,12 @@
                                         <span class="badge bg-warning">Ожидается</span>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    <small>{{ payment.payment_info|truncatewords:10|default:"—" }}</small>
+                                </td>
                             </tr>
                             <tr class="collapse" id="payment-{{ payment.id }}">
-                                <td colspan="8" class="bg-light">
+                                <td colspan="9" class="bg-light">
                                     <div class="p-3">
                                         <div class="row">
                                             <div class="col-md-6">
@@ -149,12 +153,6 @@
                                                 <small>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</small>
                                             </div>
                                             <div class="col-md-6">
-                                                <small><strong>Страховая сумма:</strong></small><br>
-                                                <small>{{ payment.insurance_sum|rub }}</small>
-                                            </div>
-                                        </div>
-                                        <div class="row mt-2">
-                                            <div class="col-md-6">
                                                 <small><strong>Ставка комиссии:</strong></small><br>
                                                 <small>
                                                     {% if payment.commission_rate %}
@@ -163,8 +161,6 @@
                                                         —
                                                     {% endif %}
                                                 </small>
-                                            </div>
-                                            <div class="col-md-6">
                                             </div>
                                         </div>
                                         {% if payment.payment_info %}
@@ -187,7 +183,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center text-muted">График платежей не заполнен</td>
+                                <td colspan="9" class="text-center text-muted">График платежей не заполнен</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -274,6 +270,14 @@
                     <span class="badge bg-success">Активен</span>
                 {% else %}
                     <span class="badge bg-secondary">Закрыт</span>
+                {% endif %}
+                </p>
+                
+                <p class="mb-0"><strong>Полис подгружен:</strong><br>
+                {% if policy.policy_uploaded %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
+                {% else %}
+                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
             </div>

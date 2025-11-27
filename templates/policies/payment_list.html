@@ -131,8 +131,9 @@
                         <th>Очередной взнос, ₽</th>
                         <th>Дата платежа по полису</th>
                         <th>Дата оплаты</th>
+                        <th>Примечание</th>
                         <th>Статус</th>
-                        <th>Действия</th>
+                        <th>Ред.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -159,6 +160,9 @@
                             {% endif %}
                         </td>
                         <td>
+                            <small>{{ payment.payment_info|truncatewords:15|default:"—" }}</small>
+                        </td>
+                        <td>
                             {% if payment.is_paid %}
                                 <span class="badge bg-success">Оплачен</span>
                             {% elif payment.is_overdue %}
@@ -177,7 +181,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted">Платежи не найдены</td>
+                        <td colspan="11" class="text-center text-muted">Платежи не найдены</td>
                     </tr>
                     {% endfor %}
                 </tbody>

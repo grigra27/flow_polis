@@ -62,6 +62,7 @@
 - **info4** (*varchar*) - свободное текстовое поле (не видно в журнале)
 - **policy_active** (*boolean*) - полис активен или закрыт
 - **dfa_active** (*boolean*) - ДФА активен или закрыт
+- **policy_uploaded** (*boolean*) - полис подгружен (по умолчанию false)
 - **created_at** *(timestamp)* 
 - **updated_at** *(timestamp)* 
 

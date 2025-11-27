@@ -8,12 +8,13 @@ class PolicyFilter(django_filters.FilterSet):
     client__client_name = django_filters.CharFilter(lookup_expr='icontains', label='Клиент')
     start_date = django_filters.DateFilter(lookup_expr='gte', label='Дата начала от')
     end_date = django_filters.DateFilter(lookup_expr='lte', label='Дата окончания до')
+    policy_uploaded = django_filters.BooleanFilter(label='Статус подгрузки')
     
     class Meta:
         model = Policy
         fields = [
             'policy_number', 'dfa_number', 'client__client_name',
             'insurer', 'branch', 'insurance_type',
-            'policy_active', 'dfa_active',
+            'policy_active', 'dfa_active', 'policy_uploaded',
             'start_date', 'end_date'
         ]

@@ -85,7 +85,7 @@ class PolicyAdmin(admin.ModelAdmin):
         'policy_status', 'dfa_status'
     ]
     list_filter = [
-        'policy_active', 'dfa_active', 'insurance_type',
+        'policy_active', 'dfa_active', 'policy_uploaded', 'insurance_type',
         'branch', 'insurer', 'start_date'
     ]
     search_fields = [
@@ -119,7 +119,7 @@ class PolicyAdmin(admin.ModelAdmin):
             'fields': ('info3', 'info4')
         }),
         ('Статусы', {
-            'fields': ('policy_active', 'dfa_active')
+            'fields': ('policy_active', 'dfa_active', 'policy_uploaded')
         }),
         ('Системная информация', {
             'fields': ('created_at', 'updated_at'),

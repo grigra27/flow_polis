@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/models.py
+# hypothesis_version: 6.141.1
+
+[100, 255, '-created_at', '0', '0.01', '100', 'amount', 'dfa_number', 'due_date', 'end_date', 'info_field', 'info_tags', 'installment_number', 'paid_date', 'payment_schedule', 'payments', 'policies', 'policy', 'policy_active', 'policy_infos', 'policy_number', 'policy_uploaded', 'start_date', 'tag', 'total', 'year_number', 'Вид страхования', 'График платежей', 'ДФА активен', 'Дата согласования СК', 'Инфо 1', 'Инфо 2', 'Инфо-метка полиса', 'Инфо-метки полисов', 'Комиссия (руб)', 'Лизингополучатель', 'Метка', 'Номер ДФА', 'Номер полиса', 'Платеж', 'Поле', 'Полис', 'Полис активен', 'Полис подгружен', 'Полисы', 'Ставка комиссии', 'Страхователь', 'Страховая сумма', 'Страховщик', 'Сумма платежа', 'Филиал', 'Франшиза']

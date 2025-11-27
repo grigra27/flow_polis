@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/templatetags/currency_filters.py
+# hypothesis_version: 6.141.1
+
+[',', '.00', 'percent', 'rub', '{:,.2f}']

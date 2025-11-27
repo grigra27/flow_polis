@@ -94,6 +94,7 @@ class PolicyAdmin(admin.ModelAdmin):
     ]
     autocomplete_fields = ['client', 'policyholder', 'insurer', 'insurance_type', 'branch']
     readonly_fields = ['premium_total', 'created_at', 'updated_at']
+    actions = ['copy_policy']
     
     fieldsets = (
         ('Основная информация', {
@@ -140,6 +141,98 @@ class PolicyAdmin(admin.ModelAdmin):
             return format_html('<span style="color: green;">✓ Активен</span>')
         return format_html('<span style="color: red;">✗ Закрыт</span>')
     dfa_status.short_description = 'Статус ДФА'
+    
+    @admin.action(description='Копировать выбранный полис с графиком платежей')
+    def copy_policy(self, request, queryset):
+        """
+        Copy selected policy with all related data (payment schedule and info tags).
+        
+        This action creates a complete copy of the selected policy including:
+        - All policy fields (with "-COPY" suffix added to policy numbers)
+        - All payment schedule entries
+        - All info tags
+        
+        The new policy is saved immediately and the user is redirected to edit it.
+        """
+        from django.contrib import messages
+        from datetime import datetime
+        
+        # Get the first policy to copy
+        policy = queryset.first()
+        
+        if not policy:
+            self.message_user(request, 'Не выбран полис для копирования', messages.ERROR)
+            return
+        
+        try:
+            # Create a copy of the policy
+            # Add timestamp to make policy number unique
+            timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+            
+            new_policy = Policy.objects.create(
+                policy_number=f"{policy.policy_number}-COPY-{timestamp}",
+                dfa_number=f"{policy.dfa_number}-COPY-{timestamp}" if policy.dfa_number else "",
+                client=policy.client,
+                policyholder=policy.policyholder,
+                insurer=policy.insurer,
+                property_description=policy.property_description,
+                start_date=policy.start_date,
+                end_date=policy.end_date,
+                insurance_type=policy.insurance_type,
+                branch=policy.branch,
+                leasing_manager=policy.leasing_manager,
+                franchise=policy.franchise,
+                info3=policy.info3,
+                info4=policy.info4,
+                policy_active=policy.policy_active,
+                dfa_active=policy.dfa_active,
+                policy_uploaded=policy.policy_uploaded,
+            )
+            
+            # Copy payment schedule
+            payment_count = 0
+            for payment in policy.payment_schedule.all():
+                PaymentSchedule.objects.create(
+                    policy=new_policy,
+                    year_number=payment.year_number,
+                    installment_number=payment.installment_number,
+                    due_date=payment.due_date,
+                    amount=payment.amount,
+                    insurance_sum=payment.insurance_sum,
+                    commission_rate=payment.commission_rate,
+                    kv_rub=payment.kv_rub,
+                    paid_date=payment.paid_date,
+                    insurer_date=payment.insurer_date,
+                    payment_info=payment.payment_info,
+                )
+                payment_count += 1
+            
+            # Copy info tags
+            info_count = 0
+            for info in policy.info_tags.all():
+                PolicyInfo.objects.create(
+                    policy=new_policy,
+                    tag=info.tag,
+                    info_field=info.info_field,
+                )
+                info_count += 1
+            
+            # Show success message
+            message = f'Полис "{policy.policy_number}" успешно скопирован. '
+            message += f'Скопировано платежей: {payment_count}, инфо-меток: {info_count}.'
+            self.message_user(request, message, messages.SUCCESS)
+            
+            # Redirect to edit the new policy
+            change_url = reverse('admin:policies_policy_change', args=[new_policy.id])
+            return redirect(change_url)
+            
+        except Exception as e:
+            self.message_user(
+                request,
+                f'Ошибка при копировании полиса: {str(e)}',
+                messages.ERROR
+            )
+            return
 
 
 @admin.register(PaymentSchedule)

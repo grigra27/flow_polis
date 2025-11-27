@@ -44,12 +44,15 @@ class TestPolicyDetailView:
         
         # Check that insurance_sum is in the response content
         content = response.content.decode('utf-8')
-        assert 'Страховая сумма' in content
         
-        # Check that the actual insurance_sum value is displayed (Django uses comma as decimal separator)
-        # The template uses floatformat:2 which formats as "500000,00"
-        insurance_sum_str = str(sample_payment.insurance_sum).replace('.', ',')
-        assert insurance_sum_str in content
+        # Check that the column header is present
+        assert 'СС, ₽' in content
+        
+        # Check that the actual insurance_sum value is displayed
+        # The template uses custom 'rub' filter which formats as "500 000" (with spaces)
+        # For 500000.00 it should display as "500 000"
+        insurance_sum_formatted = "{:,.0f}".format(float(sample_payment.insurance_sum)).replace(',', ' ')
+        assert insurance_sum_formatted in content
     
     def test_multiple_payments_show_different_insurance_sums(
         self, client, regular_user, sample_policy, payment_schedule_factory

@@ -113,8 +113,8 @@
                                 <td>{{ payment.insurance_sum|rub }}</td>
                                 <td><strong>{{ payment.amount|rub }}</strong></td>
                                 <td>
-                                    {% if payment.commission_rate %}
-                                        {{ payment.commission_rate.kv_percent|percent }}%
+                                    {% if commission_rate %}
+                                        {{ commission_rate.kv_percent|percent }}%
                                     {% else %}
                                         —
                                     {% endif %}
@@ -155,8 +155,8 @@
                                             <div class="col-md-6">
                                                 <small><strong>Ставка комиссии:</strong></small><br>
                                                 <small>
-                                                    {% if payment.commission_rate %}
-                                                        {{ payment.commission_rate }}
+                                                    {% if commission_rate %}
+                                                        {{ commission_rate }}
                                                     {% else %}
                                                         —
                                                     {% endif %}

@@ -50,6 +50,18 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         policy = self.object
         context['info1_tags'] = policy.info_tags.filter(info_field=1).select_related('tag')
         context['info2_tags'] = policy.info_tags.filter(info_field=2).select_related('tag')
+        
+        # Get commission rate for this policy's insurer and insurance type
+        from apps.insurers.models import CommissionRate
+        try:
+            commission_rate = CommissionRate.objects.get(
+                insurer=policy.insurer,
+                insurance_type=policy.insurance_type
+            )
+            context['commission_rate'] = commission_rate
+        except CommissionRate.DoesNotExist:
+            context['commission_rate'] = None
+        
         return context
 
 

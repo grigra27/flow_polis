@@ -57,17 +57,20 @@ class PaymentScheduleInline(admin.TabularInline):
     fields = [
         'year_number', 'installment_number', 'due_date', 'amount',
         'insurance_sum',
-        'commission_rate', 'kv_rub', 'paid_date', 'insurer_date', 'payment_info'
+        'kv_rub', 'paid_date', 'insurer_date', 'payment_info'
     ]
-    autocomplete_fields = ['commission_rate']
+    # commission_rate is excluded from visible fields but still saved via JavaScript
     
     class Media:
-        js = ('policies/js/copy_payment_inline.js',)
+        js = (
+            'policies/js/copy_payment_inline.js',
+            'policies/js/auto_commission_rate.js',
+        )
         css = {
-            'all': ('policies/css/copy_payment_inline.css',)
-        }
-        css = {
-            'all': ('policies/css/copy_payment_inline.css',)
+            'all': (
+                'policies/css/copy_payment_inline.css',
+                'policies/css/auto_commission_rate.css',
+            )
         }
 
 

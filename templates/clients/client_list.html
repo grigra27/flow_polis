@@ -44,10 +44,10 @@
                 </thead>
                 <tbody>
                     {% for client in clients %}
-                    <tr>
+                    <tr class="clickable-row" style="cursor: pointer;" data-href="{% url 'clients:detail' client.pk %}">
                         <td><strong>{{ client.client_name }}</strong></td>
                         <td>{{ client.client_inn|default:"—" }}</td>
-                        <td>
+                        <td onclick="event.stopPropagation();">
                             <a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-info">
                                 <i class="bi bi-eye"></i> Просмотр
                             </a>
@@ -93,4 +93,15 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function() {
+            window.location.href = this.dataset.href;
+        });
+    });
+});
+</script>
 {% endblock %}

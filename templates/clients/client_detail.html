@@ -67,7 +67,7 @@
                         </thead>
                         <tbody>
                             {% for policy in policies %}
-                            <tr>
+                            <tr class="clickable-row" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
                                 <td><strong>{{ policy.policy_number }}</strong></td>
                                 <td>{{ policy.dfa_number }}</td>
                                 <td>{% insurer_logo policy.insurer size='small' %}</td>
@@ -84,7 +84,7 @@
                                         <span class="badge bg-secondary">Закрыт</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td onclick="event.stopPropagation();">
                                     <a href="{% url 'policies:detail' policy.pk %}" class="btn btn-sm btn-info">
                                         <i class="bi bi-eye"></i>
                                     </a>
@@ -101,4 +101,15 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function() {
+            window.location.href = this.dataset.href;
+        });
+    });
+});
+</script>
 {% endblock %}

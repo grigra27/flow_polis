@@ -137,7 +137,7 @@
                 </thead>
                 <tbody>
                     {% for payment in payments %}
-                    <tr>
+                    <tr class="clickable-row" style="cursor: pointer;" data-href="{% url 'policies:detail' payment.policy.pk %}">
                         <td>
                             <a href="{% url 'policies:detail' payment.policy.pk %}">
                                 {{ payment.policy.policy_number }}
@@ -167,7 +167,7 @@
                                 <span class="badge bg-warning">Ожидается</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td onclick="event.stopPropagation();">
                             {% if can_edit %}
                             <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}" class="btn btn-sm btn-warning">
                                 <i class="bi bi-pencil"></i>
@@ -210,4 +210,15 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function() {
+            window.location.href = this.dataset.href;
+        });
+    });
+});
+</script>
 {% endblock %}

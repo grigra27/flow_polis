@@ -127,10 +127,10 @@
                 <thead>
                     <tr>
                         <th>Номер полиса</th>
+                        <th>Филиал</th>
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Период</th>
-                        <th>Суммарная премия, ₽</th>
                         <th>Статус</th>
                     </tr>
                 </thead>
@@ -138,10 +138,10 @@
                     {% for policy in recent_policies %}
                     <tr>
                         <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
+                        <td>{% branch_logo policy.branch size='small' %}</td>
                         <td>{{ policy.client.client_name }}</td>
                         <td>{% insurer_logo policy.insurer size='small' %}</td>
                         <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
-                        <td>{{ policy.premium_total|rub }}</td>
                         <td>
                             {% if policy.policy_active %}
                                 <span class="badge bg-success">Активен</span>

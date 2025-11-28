@@ -88,8 +88,8 @@ class PolicyAdmin(admin.ModelAdmin):
         'policy_status', 'dfa_status'
     ]
     list_filter = [
-        'policy_active', 'dfa_active', 'policy_uploaded', 'insurance_type',
-        'branch', 'insurer', 'start_date'
+        'policy_active', 'dfa_active', 'policy_uploaded', 'broker_participation',
+        'insurance_type', 'branch', 'insurer', 'start_date'
     ]
     search_fields = [
         'policy_number', 'dfa_number',
@@ -108,7 +108,7 @@ class PolicyAdmin(admin.ModelAdmin):
         }),
         ('Детали страхования', {
             'fields': (
-                'insurance_type', 'property_description',
+                'insurance_type', 'property_description', 'property_year',
                 'franchise',
                 'start_date', 'end_date'
             )
@@ -123,7 +123,7 @@ class PolicyAdmin(admin.ModelAdmin):
             'fields': ('info3', 'info4')
         }),
         ('Статусы', {
-            'fields': ('policy_active', 'dfa_active', 'policy_uploaded')
+            'fields': ('policy_active', 'dfa_active', 'policy_uploaded', 'broker_participation')
         }),
         ('Системная информация', {
             'fields': ('created_at', 'updated_at'),
@@ -179,6 +179,7 @@ class PolicyAdmin(admin.ModelAdmin):
                 policyholder=policy.policyholder,
                 insurer=policy.insurer,
                 property_description=policy.property_description,
+                property_year=policy.property_year,
                 start_date=policy.start_date,
                 end_date=policy.end_date,
                 insurance_type=policy.insurance_type,
@@ -190,6 +191,7 @@ class PolicyAdmin(admin.ModelAdmin):
                 policy_active=policy.policy_active,
                 dfa_active=policy.dfa_active,
                 policy_uploaded=policy.policy_uploaded,
+                broker_participation=policy.broker_participation,
             )
             
             # Copy payment schedule

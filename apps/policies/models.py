@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from apps.core.models import TimeStampedModel
 from apps.clients.models import Client
@@ -36,6 +36,13 @@ class Policy(TimeStampedModel):
     )
     
     property_description = models.TextField('Описание застрахованного имущества')
+    property_year = models.IntegerField(
+        'Год выпуска имущества',
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+        help_text='Год выпуска застрахованного имущества (1900-2100)'
+    )
     start_date = models.DateField('Дата начала страхования')
     end_date = models.DateField('Дата окончания страхования')
     
@@ -82,6 +89,7 @@ class Policy(TimeStampedModel):
     policy_active = models.BooleanField('Полис активен', default=True)
     dfa_active = models.BooleanField('ДФА активен', default=True)
     policy_uploaded = models.BooleanField('Полис подгружен', default=False)
+    broker_participation = models.BooleanField('Участие брокера', default=True)
 
     class Meta:
         verbose_name = 'Полис'

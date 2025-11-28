@@ -75,10 +75,18 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-12">
-                        <strong>Описание имущества:</strong><br>
+                        <strong>Описание объекта страхования:</strong><br>
                         {{ policy.property_description }}
                     </div>
                 </div>
+                {% if policy.property_year %}
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <strong>Год выпуска:</strong><br>
+                        {{ policy.property_year }}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -257,27 +265,35 @@
                 <h5 class="mb-0">Статусы</h5>
             </div>
             <div class="card-body">
-                <p><strong>Полис:</strong><br>
+                <p><strong>Полис активен:</strong><br>
                 {% if policy.policy_active %}
-                    <span class="badge bg-success">Активен</span>
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
-                    <span class="badge bg-secondary">Закрыт</span>
+                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
                 
-                <p><strong>ДФА:</strong><br>
+                <p><strong>ДФА активен:</strong><br>
                 {% if policy.dfa_active %}
-                    <span class="badge bg-success">Активен</span>
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
-                    <span class="badge bg-secondary">Закрыт</span>
+                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
                 
-                <p class="mb-0"><strong>Полис подгружен:</strong><br>
+                <p><strong>Полис подгружен:</strong><br>
                 {% if policy.policy_uploaded %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
                     <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
+                {% endif %}
+                </p>
+                
+                <p class="mb-0"><strong>Участие брокера:</strong><br>
+                {% if policy.broker_participation %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
+                {% else %}
+                    <span class="badge bg-secondary"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
             </div>

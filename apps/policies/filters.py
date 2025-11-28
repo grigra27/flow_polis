@@ -15,6 +15,6 @@ class PolicyFilter(django_filters.FilterSet):
         fields = [
             'policy_number', 'dfa_number', 'client__client_name',
             'insurer', 'branch', 'insurance_type',
-            'policy_active', 'dfa_active', 'policy_uploaded',
+            'policy_active', 'dfa_active', 'policy_uploaded', 'broker_participation',
             'start_date', 'end_date'
         ]

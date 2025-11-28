@@ -55,6 +55,11 @@
                     <p class="mb-1">
                         <strong><i class="bi bi-person-badge"></i> {{ item.manager.name }}</strong>
                     </p>
+                    {% if item.manager.full_name %}
+                    <p class="mb-1 text-muted">
+                        <i class="bi bi-person"></i> {{ item.manager.full_name }}
+                    </p>
+                    {% endif %}
                     {% if item.manager.phone %}
                     <p class="mb-1 text-muted">
                         <i class="bi bi-telephone"></i> 

@@ -89,7 +89,8 @@ class LeasingManager(models.Model):
     """
     Leasing company manager - Менеджер лизинговой компании
     """
-    name = models.CharField('ФИО менеджера', max_length=255, unique=True)
+    name = models.CharField('Фамилия менеджера', max_length=255, unique=True)
+    full_name = models.CharField('Полное ФИО', max_length=255, blank=True)
     phone = models.CharField('Телефон', max_length=50, blank=True)
     email = models.EmailField('Email', blank=True)
     notes = models.TextField('Примечание', blank=True)

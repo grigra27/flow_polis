@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/admin.py
+# hypothesis_version: 6.141.1
+
+['branch_name', 'contacts', 'created_at', 'email', 'full_name', 'has_icon', 'has_logo', 'icon', 'icon_preview', 'insurance_type', 'insurance_type__name', 'insurer', 'insurer_name', 'kv_percent', 'kv_percent_display', 'logo', 'logo_preview', 'name', 'notes', 'phone', 'Иконка', 'Иконка не загружена', 'КВ %', 'Логотип', 'Логотип не загружен', 'Предпросмотр иконки', '✓', '✗']

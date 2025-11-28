@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/views.py
+# hypothesis_version: 6.141.1
+
+[400, 500, '-start_date', 'branch', 'branch_name', 'branches', 'client', 'commission_rate_id', 'commission_rates', 'display_name', 'error', 'insurance_type', 'insurance_type__name', 'insurance_type_id', 'insurer', 'insurer_id', 'insurers', 'kv_percent', 'policies', 'search', 'selected_branch', 'success']

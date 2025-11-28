@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/accounts/context_processors.py
+# hypothesis_version: 6.141.1
+
+['can_edit', 'is_admin', 'is_regular_user', 'is_superuser', 'user_perms']

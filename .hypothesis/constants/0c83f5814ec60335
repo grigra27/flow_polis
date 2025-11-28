@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/migrations/0007_leasingmanager.py
+# hypothesis_version: 6.141.1
+
+[254, 255, 'Email', 'ID', 'LeasingManager', 'email', 'id', 'insurers', 'name', 'notes', 'ordering', 'phone', 'verbose_name', 'verbose_name_plural', 'Примечание', 'Телефон', 'ФИО менеджера']

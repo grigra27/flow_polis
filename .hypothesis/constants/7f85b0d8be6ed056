@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/migrations/0008_leasingmanager_full_name_alter_leasingmanager_name.py
+# hypothesis_version: 6.141.1
+
+[255, '0007_leasingmanager', 'full_name', 'insurers', 'leasingmanager', 'name', 'Полное ФИО', 'Фамилия менеджера']

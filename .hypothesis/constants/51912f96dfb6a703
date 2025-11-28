@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/reports/filters.py
+# hypothesis_version: 6.141.1
+
+['branch', 'broker_participation', 'client__client_name', 'client_inn', 'client_name', 'dfa_active', 'dfa_number', 'due_date', 'end_date', 'gte', 'icontains', 'installment_number', 'insurance_type', 'insurer', 'insurer_name', 'isnull', 'lte', 'paid_date', 'policy__branch', 'policy__insurer', 'policy_active', 'policy_number', 'start_date', 'year_number', 'Дата начала до', 'Дата начала от', 'Дата окончания до', 'Дата окончания от', 'Дата платежа до', 'Дата платежа от', 'ИНН', 'Клиент', 'Название клиента', 'Название страховщика', 'Номер ДФА', 'Номер полиса', 'Оплачен']

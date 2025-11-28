@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/migrations/0007_migrate_leasing_manager.py
+# hypothesis_version: 6.141.1
+
+['0007_leasingmanager', 'LeasingManager', 'Policy', 'insurers', 'leasing_manager', 'leasing_manager_new', 'notes', 'policies', 'policy', 'Не указан']

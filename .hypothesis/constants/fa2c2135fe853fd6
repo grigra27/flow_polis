@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/views.py
+# hypothesis_version: 6.141.1
+
+['-paid_date', 'all', 'branch', 'branches', 'can_edit', 'cancelled', 'client', 'commission_rate', 'date_from', 'date_to', 'due_date', 'future', 'info1_tags', 'info2_tags', 'info_tags__tag', 'insurance_type', 'insurer', 'overdue', 'paid', 'payment_schedule', 'payments', 'policies', 'policy', 'policy__branch', 'policy__client', 'policy__insurer', 'policyholder', 'selected_branch', 'status', 'tag', 'upcoming']

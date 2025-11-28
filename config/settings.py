@@ -230,6 +230,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        'apps.reports': {
+            'handlers': ['console'] if DEBUG else ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 

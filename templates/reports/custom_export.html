@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+
+{% block title %}Кастомный экспорт{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Кастомный экспорт</h1>
+    <a href="{% url 'reports:index' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <!-- Основная форма -->
+    <div class="col-md-9">
+        <form method="post" id="exportForm">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="formAction" value="export">
+            
+            <!-- Шаг 1: Выбор источника данных -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">1. Выберите источник данных</h5>
+                </div>
+                <div class="card-body">
+                    {% for choice in form.data_source %}
+                    <div class="form-check">
+                        {{ choice.tag }}
+                        <label class="form-check-label" for="{{ choice.id_for_label }}">
+                            {{ choice.choice_label }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Шаг 2: Выбор полей -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">2. Выберите поля для экспорта</h5>
+                </div>
+                <div class="card-body" id="fieldsContainer">
+                    {% for source, field_groups in available_fields.items %}
+                    <div class="fields-group" data-source="{{ source }}" style="display: none;">
+                        <h6>Основные поля</h6>
+                        <div class="row">
+                            {% for field_name, field_label in field_groups.basic %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="fields" 
+                                           value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
+                                    <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
+                                        {{ field_label }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if field_groups.related %}
+                        <h6 class="mt-3">Связанные поля</h6>
+                        <div class="row">
+                            {% for field_name, field_label in field_groups.related %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="fields" 
+                                           value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
+                                    <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
+                                        {{ field_label }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Шаг 3: Фильтры -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">3. Примените фильтры (опционально)</h5>
+                </div>
+                <div class="card-body" id="filtersContainer">
+                    <p class="text-muted">Выберите источник данных для отображения доступных фильтров</p>
+                </div>
+            </div>
+            
+            <!-- Кнопки действий -->
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" onclick="setAction('export')">
+                    <i class="bi bi-download"></i> Экспортировать
+                </button>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#saveTemplateModal">
+                    <i class="bi bi-bookmark-plus"></i> Сохранить как шаблон
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Боковая панель с шаблонами -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Сохраненные шаблоны</h6>
+            </div>
+            <div class="card-body">
+                {% if templates %}
+                <div class="list-group">
+                    {% for template in templates %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ template.name }}</h6>
+                                <small class="text-muted">{{ template.get_data_source_display }}</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                    onclick="loadTemplate({{ template.id }})">
+                                Загрузить
+                            </button>
+                            <form method="post" action="{% url 'reports:delete_template' template.id %}" 
+                                  style="display: inline;" onsubmit="return confirm('Удалить шаблон?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    Удалить
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">Нет сохраненных шаблонов</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для сохранения шаблона -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Сохранить шаблон</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="templateName" class="form-label">Название шаблона</label>
+                    <input type="text" class="form-control" id="templateName" 
+                           placeholder="Например: Отчет по активным полисам">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" onclick="saveTemplate()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Переключение источника данных
+document.querySelectorAll('input[name="data_source"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const source = this.value;
+        
+        // Показываем соответствующие поля
+        document.querySelectorAll('.fields-group').forEach(group => {
+            group.style.display = group.dataset.source === source ? 'block' : 'none';
+        });
+        
+        // Сбрасываем выбранные поля
+        document.querySelectorAll('input[name="fields"]').forEach(cb => cb.checked = false);
+        
+        // Обновляем фильтры
+        updateFilters(source);
+    });
+});
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    const selectedSource = document.querySelector('input[name="data_source"]:checked');
+    if (selectedSource) {
+        selectedSource.dispatchEvent(new Event('change'));
+    }
+});
+
+function updateFilters(source) {
+    const container = document.getElementById('filtersContainer');
+    
+    // Здесь можно добавить динамическую загрузку фильтров через AJAX
+    // Пока просто показываем заглушку
+    container.innerHTML = '<p class="text-muted">Фильтры для источника: ' + source + '</p>';
+}
+
+function setAction(action) {
+    document.getElementById('formAction').value = action;
+}
+
+function saveTemplate() {
+    const name = document.getElementById('templateName').value;
+    if (!name) {
+        alert('Введите название шаблона');
+        return;
+    }
+    
+    // Добавляем скрытое поле с названием шаблона
+    const form = document.getElementById('exportForm');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'template_name';
+    input.value = name;
+    form.appendChild(input);
+    
+    // Меняем action и отправляем форму
+    document.getElementById('formAction').value = 'save_template';
+    form.submit();
+}
+
+function loadTemplate(templateId) {
+    fetch('{% url "reports:custom_export" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: 'action=load_template&template_id=' + templateId
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Устанавливаем источник данных
+            document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).checked = true;
+            document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).dispatchEvent(new Event('change'));
+            
+            // Устанавливаем выбранные поля
+            setTimeout(() => {
+                data.fields.forEach(field => {
+                    const checkbox = document.querySelector(`input[name="fields"][value="${field}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            }, 100);
+            
+            alert('Шаблон загружен');
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при загрузке шаблона');
+    });
+}
+</script>
+{% endblock %}

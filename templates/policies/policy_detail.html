@@ -4,9 +4,26 @@
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    tr.table-cancelled,
+    tr.table-cancelled > td {
+        background-color: #f8d7da !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Полис {{ policy.policy_number }}</h1>
+    <h1 class="h2">
+        Полис {{ policy.policy_number }}
+        {% if not policy.policy_active %}
+            <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
+        {% endif %}
+        {% if not policy.broker_participation %}
+            <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
+        {% endif %}
+    </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         {% if can_edit %}
         <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-warning me-2">
@@ -113,7 +130,7 @@
                         </thead>
                         <tbody>
                             {% for payment in policy.payment_schedule.all %}
-                            <tr style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.id }}" class="payment-row">
+                            <tr style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.id }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
                                 <td>
                                     <i class="bi bi-chevron-right toggle-icon"></i>
                                 </td>
@@ -132,6 +149,8 @@
                                 <td>
                                     {% if payment.is_paid %}
                                         <span class="badge bg-success">Оплачен</span>
+                                    {% elif payment.is_cancelled %}
+                                        <span class="badge bg-danger">Отменен</span>
                                     {% elif payment.is_overdue %}
                                         <span class="badge bg-danger">Просрочен</span>
                                     {% else %}
@@ -269,7 +288,10 @@
                 {% if policy.policy_active %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
-                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
+                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Нет (расторгнут)</span>
+                    {% if policy.termination_date %}
+                        <br><small class="text-muted">Дата расторжения: {{ policy.termination_date|date:"d.m.Y" }}</small>
+                    {% endif %}
                 {% endif %}
                 </p>
                 
@@ -293,7 +315,7 @@
                 {% if policy.broker_participation %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
-                    <span class="badge bg-secondary"><i class="bi bi-cloud-upload"></i> Нет</span>
+                    <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Нет (без брокера)</span>
                 {% endif %}
                 </p>
             </div>

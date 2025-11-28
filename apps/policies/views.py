@@ -104,32 +104,43 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                     paid_date__isnull=False,
                     due_date__lte=timezone.now().date()
                 )
+            elif status == 'cancelled':
+                # Отмененные: неоплаченные платежи по неактивным полисам
+                queryset = queryset.filter(
+                    paid_date__isnull=True,
+                    policy__policy_active=False
+                )
             elif status == 'overdue':
-                # Просроченные: неоплаченные платежи с датой ранее сегодня
+                # Просроченные: неоплаченные платежи с датой ранее сегодня (только для активных полисов)
                 from django.utils import timezone
                 queryset = queryset.filter(
                     due_date__lt=timezone.now().date(),
-                    paid_date__isnull=True
+                    paid_date__isnull=True,
+                    policy__policy_active=True
                 )
             elif status == 'upcoming':
                 # Предстоит в ближайшие 30 дней: неоплаченные платежи от сегодня до +30 дней включительно
+                # только для активных полисов
                 from django.utils import timezone
                 from datetime import timedelta
                 today = timezone.now().date()
                 next_month = today + timedelta(days=30)
                 queryset = queryset.filter(
                     due_date__range=[today, next_month],
-                    paid_date__isnull=True
+                    paid_date__isnull=True,
+                    policy__policy_active=True
                 )
             elif status == 'future':
                 # Будущие: неоплаченные платежи более чем через 30 дней
+                # только для активных полисов
                 from django.utils import timezone
                 from datetime import timedelta
                 today = timezone.now().date()
                 future_date = today + timedelta(days=31)
                 queryset = queryset.filter(
                     due_date__gte=future_date,
-                    paid_date__isnull=True
+                    paid_date__isnull=True,
+                    policy__policy_active=True
                 )
         
         # Сортировка:

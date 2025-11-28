@@ -28,7 +28,7 @@ def export_policies_excel(request):
         'Номер полиса', 'Номер ДФА', 'Клиент', 'Страховщик',
         'Вид страхования', 'Филиал', 'Дата начала', 'Дата окончания',
         'Стоимость имущества', 'Общая премия', 'Франшиза',
-        'Статус полиса', 'Статус ДФА'
+        'Статус полиса', 'Дата расторжения', 'Статус ДФА'
     ]
     ws.append(headers)
     
@@ -46,7 +46,8 @@ def export_policies_excel(request):
             float(policy.property_value),
             float(policy.premium_total),
             float(policy.franchise),
-            'Активен' if policy.policy_active else 'Закрыт',
+            'Активен' if policy.policy_active else 'Расторгнут',
+            policy.termination_date.strftime('%d.%m.%Y') if policy.termination_date else '',
             'Активен' if policy.dfa_active else 'Закрыт',
         ])
     
@@ -79,7 +80,14 @@ def export_payments_excel(request):
     ws.append(headers)
     
     for payment in payments:
-        status = 'Оплачен' if payment.is_paid else ('Просрочен' if payment.is_overdue else 'Ожидается')
+        if payment.is_paid:
+            status = 'Оплачен'
+        elif payment.is_cancelled:
+            status = 'Отменен'
+        elif payment.is_overdue:
+            status = 'Просрочен'
+        else:
+            status = 'Ожидается'
         ws.append([
             payment.policy.policy_number,
             payment.policy.client.client_name,

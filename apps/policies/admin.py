@@ -118,7 +118,7 @@ class PolicyAdmin(admin.ModelAdmin):
             'fields': ('info3', 'info4')
         }),
         ('Статусы', {
-            'fields': ('policy_active', 'dfa_active', 'policy_uploaded', 'broker_participation')
+            'fields': ('policy_active', 'termination_date', 'dfa_active', 'policy_uploaded', 'broker_participation')
         }),
         ('Системная информация', {
             'fields': ('created_at', 'updated_at'),
@@ -300,6 +300,8 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
     def payment_status(self, obj):
         if obj.is_paid:
             return format_html('<span style="color: green;">✓ Оплачен</span>')
+        elif obj.is_cancelled:
+            return format_html('<span style="color: red;">✕ Отменен</span>')
         elif obj.is_overdue:
             return format_html('<span style="color: red;">✗ Просрочен</span>')
         return format_html('<span style="color: orange;">⏳ Ожидается</span>')

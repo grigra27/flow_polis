@@ -89,6 +89,12 @@ class Policy(TimeStampedModel):
     dfa_active = models.BooleanField('ДФА активен', default=True)
     policy_uploaded = models.BooleanField('Полис подгружен', default=False)
     broker_participation = models.BooleanField('Участие брокера', default=True)
+    termination_date = models.DateField(
+        'Дата расторжения',
+        blank=True,
+        null=True,
+        help_text='Дата досрочного расторжения полиса'
+    )
 
     class Meta:
         verbose_name = 'Полис'
@@ -189,7 +195,25 @@ class PaymentSchedule(TimeStampedModel):
         from django.utils import timezone
         if self.is_paid:
             return False
+        # Если полис неактивен, платеж не просрочен, а отменен
+        if not self.policy.policy_active:
+            return False
         return self.due_date < timezone.now().date()
+    
+    @property
+    def is_cancelled(self):
+        """Платеж отменен из-за расторжения полиса"""
+        # Платеж отменен, если он не оплачен и полис неактивен
+        # и дата платежа после даты расторжения (если она указана)
+        if self.is_paid or self.policy.policy_active:
+            return False
+        
+        # Если есть дата расторжения, проверяем что платеж был после нее
+        if self.policy.termination_date:
+            return self.due_date > self.policy.termination_date
+        
+        # Если даты расторжения нет, но полис неактивен - считаем отмененным
+        return True
 
 
 class PolicyInfo(TimeStampedModel):

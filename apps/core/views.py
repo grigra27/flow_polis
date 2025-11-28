@@ -20,12 +20,14 @@ def dashboard(request):
     
     upcoming_payments = PaymentSchedule.objects.filter(
         due_date__range=[today, next_month],
-        paid_date__isnull=True
+        paid_date__isnull=True,
+        policy__policy_active=True
     ).select_related('policy', 'policy__client')
     
     overdue_payments = PaymentSchedule.objects.filter(
         due_date__lt=today,
-        paid_date__isnull=True
+        paid_date__isnull=True,
+        policy__policy_active=True
     ).select_related('policy', 'policy__client')
     
     # Policies not uploaded

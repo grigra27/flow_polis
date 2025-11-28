@@ -25,8 +25,7 @@ class Policy(TimeStampedModel):
         verbose_name='Страхователь',
         related_name='policyholder_policies',
         blank=True,
-        null=True,
-        help_text='Если АЛ - завести клиентом'
+        null=True
     )
     insurer = models.ForeignKey(
         Insurer,

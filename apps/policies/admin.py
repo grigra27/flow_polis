@@ -103,7 +103,8 @@ class PolicyAdmin(admin.ModelAdmin):
         ('Основная информация', {
             'fields': (
                 'policy_number', 'dfa_number',
-                'client', 'policyholder', 'insurer'
+                'client', 'policyholder',
+                'branch', 'leasing_manager'
             )
         }),
         ('Детали страхования', {
@@ -112,12 +113,6 @@ class PolicyAdmin(admin.ModelAdmin):
                 'franchise',
                 'start_date', 'end_date'
             )
-        }),
-        ('Финансы', {
-            'fields': ('premium_total',)
-        }),
-        ('Организационная информация', {
-            'fields': ('branch', 'leasing_manager')
         }),
         ('Дополнительная информация', {
             'fields': ('info3', 'info4')
@@ -128,6 +123,9 @@ class PolicyAdmin(admin.ModelAdmin):
         ('Системная информация', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
+        }),
+        ('Страховщик', {
+            'fields': ('insurer',)
         }),
     )
     

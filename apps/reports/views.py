@@ -79,6 +79,34 @@ def export_payments_excel(request):
         return redirect('reports:index')
 
 
+@login_required
+def export_thursday_report(request):
+    """Export Thursday report - policies that are NOT uploaded"""
+    try:
+        # Получаем все полисы, которые НЕ подгружены
+        policies = Policy.objects.select_related(
+            'client', 'insurer', 'branch', 'insurance_type'
+        ).filter(policy_uploaded=False)
+        
+        # Применяем опциональные фильтры (если переданы)
+        branch_id = request.GET.get('branch')
+        if branch_id:
+            policies = policies.filter(branch_id=branch_id)
+        
+        # Генерируем отчет
+        exporter = PolicyExporter(policies, [])
+        
+        # Логируем
+        logger.info(f'User {request.user.username} exported Thursday report (not uploaded policies count: {policies.count()})')
+        
+        return exporter.export()
+        
+    except Exception as e:
+        logger.error(f'Error exporting Thursday report: {e}')
+        messages.error(request, 'Ошибка при создании четвергового отчета')
+        return redirect('reports:index')
+
+
 
 class ExportsIndexView(LoginRequiredMixin, TemplateView):
     """Главная страница экспорта"""

@@ -172,7 +172,7 @@ class PolicyExporter(BaseExporter):
             'Номер полиса', 'Номер ДФА', 'Клиент', 'Страховщик',
             'Вид страхования', 'Филиал', 'Дата начала', 'Дата окончания',
             'Общая премия', 'Франшиза',
-            'Статус полиса', 'Дата расторжения', 'Статус ДФА'
+            'Статус полиса', 'Дата расторжения', 'Статус ДФА', 'Полис подгружен'
         ]
     
     def get_row_data(self, policy):
@@ -191,6 +191,7 @@ class PolicyExporter(BaseExporter):
             'Активен' if policy.policy_active else 'Расторгнут',
             self.format_value(policy.termination_date),
             'Активен' if policy.dfa_active else 'Закрыт',
+            self.format_value(policy.policy_uploaded),
         ]
 
 

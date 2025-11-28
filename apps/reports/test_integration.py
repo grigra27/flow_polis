@@ -395,12 +395,13 @@ class ReadyExportsTest(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
         
-        # Проверяем заголовки (13 колонок)
+        # Проверяем заголовки (14 колонок)
         headers = [cell.value for cell in ws[1]]
-        self.assertEqual(len(headers), 13)
+        self.assertEqual(len(headers), 14)
         self.assertIn('Номер полиса', headers)
         self.assertIn('Клиент', headers)
         self.assertIn('Страховщик', headers)
+        self.assertIn('Полис подгружен', headers)
         
         # Проверяем данные
         self.assertGreaterEqual(ws.max_row, 2)  # Минимум заголовок + 1 полис
@@ -471,6 +472,57 @@ class ReadyExportsTest(TestCase):
         # Проверяем конкретные значения
         self.assertEqual(start_date, '01.01.2024')
         self.assertEqual(end_date, '31.12.2024')
+    
+    def test_thursday_report_export(self):
+        """Тест четвергового отчета - экспорт неподгруженных полисов"""
+        # Создаем дополнительный полис с policy_uploaded=True
+        uploaded_policy = Policy.objects.create(
+            policy_number='UPLOADED-001',
+            dfa_number='DFA-UPLOADED-001',
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            premium_total=Decimal('50000.00'),
+            policy_uploaded=True  # Этот полис подгружен
+        )
+        
+        self.test_client.login(username='testuser', password='testpass123')
+        
+        response = self.test_client.get('/reports/export/thursday/')
+        
+        # Проверяем что получили Excel файл
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+        # Проверяем содержимое
+        excel_file = BytesIO(response.content)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+        
+        # Проверяем заголовки
+        headers = [cell.value for cell in ws[1]]
+        self.assertIn('Номер полиса', headers)
+        self.assertIn('Полис подгружен', headers)
+        
+        # Проверяем что в отчете только неподгруженные полисы
+        # Должна быть только одна строка данных (READY-001 с policy_uploaded=False)
+        policy_numbers = []
+        for row in range(2, ws.max_row + 1):
+            policy_number = ws.cell(row=row, column=1).value
+            if policy_number:
+                policy_numbers.append(policy_number)
+        
+        # Проверяем что READY-001 есть в отчете (policy_uploaded=False)
+        self.assertIn('READY-001', policy_numbers)
+        
+        # Проверяем что UPLOADED-001 НЕТ в отчете (policy_uploaded=True)
+        self.assertNotIn('UPLOADED-001', policy_numbers)
 
 
 class AuthorizationTest(TestCase):
@@ -511,6 +563,10 @@ class AuthorizationTest(TestCase):
         response2 = self.test_client.get('/reports/export/payments/')
         self.assertEqual(response2.status_code, 302)
         self.assertIn('/accounts/login/', response2.url)
+        
+        response3 = self.test_client.get('/reports/export/thursday/')
+        self.assertEqual(response3.status_code, 302)
+        self.assertIn('/accounts/login/', response3.url)
     
     def test_authorized_access(self):
         """Авторизованный пользователь имеет доступ"""

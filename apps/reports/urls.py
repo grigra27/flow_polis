@@ -14,4 +14,5 @@ urlpatterns = [
     # Готовые экспорты (старые функции для обратной совместимости)
     path('export/policies/', views.export_policies_excel, name='export_policies'),
     path('export/payments/', views.export_payments_excel, name='export_payments'),
+    path('export/thursday/', views.export_thursday_report, name='export_thursday_report'),
 ]

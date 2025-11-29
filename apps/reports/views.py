@@ -53,23 +53,69 @@ def export_policies_excel(request):
 
 @login_required
 def export_payments_excel(request):
-    """Export payment schedule to Excel"""
+    """Export payment schedule to Excel with date range filter"""
     try:
-        # Получаем все платежи с оптимизированными запросами
+        # Получаем параметры дат из запроса
+        date_from_str = request.GET.get('date_from')
+        date_to_str = request.GET.get('date_to')
+        
+        # Проверяем наличие обязательных параметров
+        if not date_from_str or not date_to_str:
+            messages.error(request, 'Необходимо указать дату начала и дату окончания периода')
+            return redirect('reports:index')
+        
+        # Парсим даты
+        try:
+            from datetime import datetime
+            date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+            date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, 'Неверный формат даты. Используйте формат ГГГГ-ММ-ДД')
+            return redirect('reports:index')
+        
+        # Проверяем корректность диапазона
+        if date_from > date_to:
+            messages.error(request, 'Дата начала не может быть позже даты окончания')
+            return redirect('reports:index')
+        
+        # Получаем платежи с оптимизированными запросами и фильтрацией по диапазону дат
+        # Добавляем аннотацию для подсчета количества платежей в году
+        # Сортируем по дате платежа (самая ранняя дата вверху)
+        from django.db.models import Count, Q, OuterRef, Subquery
+        
+        # Подзапрос для подсчета платежей в том же году того же полиса
+        payments_in_year_subquery = PaymentSchedule.objects.filter(
+            policy=OuterRef('policy'),
+            year_number=OuterRef('year_number')
+        ).values('policy', 'year_number').annotate(
+            count=Count('id')
+        ).values('count')
+        
         payments = PaymentSchedule.objects.select_related(
-            'policy', 'policy__client', 'policy__insurer', 'commission_rate'
-        ).all()
+            'policy', 'policy__client', 'policy__insurer', 'policy__leasing_manager', 'commission_rate'
+        ).annotate(
+            payments_in_year=Subquery(payments_in_year_subquery)
+        ).filter(
+            due_date__gte=date_from,
+            due_date__lte=date_to
+        ).order_by('due_date', 'policy__policy_number')
         
         # Применяем опциональные фильтры
         branch_id = request.GET.get('branch')
         if branch_id:
             payments = payments.filter(policy__branch_id=branch_id)
         
-        # Генерируем отчет
-        exporter = PaymentExporter(payments, [])
+        # Проверяем наличие данных
+        if not payments.exists():
+            messages.warning(request, f'Нет платежей в указанном периоде с {date_from_str} по {date_to_str}')
+            return redirect('reports:index')
+        
+        # Генерируем отчет с использованием нового экспортера
+        from .exporters import ScheduledPaymentsExporter
+        exporter = ScheduledPaymentsExporter(payments, [], date_from=date_from, date_to=date_to)
         
         # Логируем
-        logger.info(f'User {request.user.username} exported payments (count: {payments.count()})')
+        logger.info(f'User {request.user.username} exported payments (count: {payments.count()}, period: {date_from_str} - {date_to_str})')
         
         return exporter.export()
         

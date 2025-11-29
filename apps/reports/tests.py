@@ -630,7 +630,7 @@ class PolicyExporterTest(TestCase):
         exporter = PolicyExporter(queryset, [])
         headers = exporter.get_headers()
         
-        self.assertEqual(len(headers), 13)
+        self.assertEqual(len(headers), 14)
         self.assertIn('Номер полиса', headers)
         self.assertIn('Клиент', headers)
         self.assertIn('Страховщик', headers)
@@ -642,7 +642,7 @@ class PolicyExporterTest(TestCase):
         exporter = PolicyExporter([], [])
         row = exporter.get_row_data(self.policy)
         
-        self.assertEqual(len(row), 13)
+        self.assertEqual(len(row), 14)
         self.assertEqual(row[0], 'TEST-001')  # policy_number
         self.assertEqual(row[1], 'DFA-001')  # dfa_number
         self.assertEqual(row[2], 'Тестовый клиент')  # client

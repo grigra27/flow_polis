@@ -85,7 +85,7 @@ def export_thursday_report(request):
     try:
         # Получаем все полисы, которые НЕ подгружены
         policies = Policy.objects.select_related(
-            'client', 'insurer', 'branch', 'insurance_type'
+            'client', 'insurer', 'branch', 'insurance_type', 'policyholder'
         ).filter(policy_uploaded=False)
         
         # Применяем опциональные фильтры (если переданы)
@@ -93,11 +93,28 @@ def export_thursday_report(request):
         if branch_id:
             policies = policies.filter(branch_id=branch_id)
         
-        # Генерируем отчет
-        exporter = PolicyExporter(policies, [])
+        # Получаем дату для фильтрации раздела 2 (платежи)
+        payment_date_str = request.GET.get('payment_date')
+        payment_date = None
+        if payment_date_str:
+            try:
+                from datetime import datetime
+                payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                logger.warning(f'Invalid payment_date format: {payment_date_str}')
+                payment_date = None
+        
+        # Если дата не указана, используем текущую дату
+        if not payment_date:
+            from django.utils import timezone
+            payment_date = timezone.now().date()
+        
+        # Генерируем отчет с использованием специального экспортера
+        from .exporters import ThursdayReportExporter
+        exporter = ThursdayReportExporter(policies, [], payment_date=payment_date)
         
         # Логируем
-        logger.info(f'User {request.user.username} exported Thursday report (not uploaded policies count: {policies.count()})')
+        logger.info(f'User {request.user.username} exported Thursday report (not uploaded policies count: {policies.count()}, payment_date: {payment_date})')
         
         return exporter.export()
         

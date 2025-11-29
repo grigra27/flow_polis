@@ -219,6 +219,13 @@ class PaymentSchedule(TimeStampedModel):
         
         # Если даты расторжения нет, но полис неактивен - считаем отмененным
         return True
+    
+    @property
+    def kv_percent_actual(self):
+        """Фактический процент КВ, рассчитанный из КВ руб и премии"""
+        if self.amount and self.amount > 0:
+            return (self.kv_rub / self.amount) * Decimal('100')
+        return Decimal('0')
 
 
 class PolicyInfo(TimeStampedModel):

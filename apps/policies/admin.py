@@ -202,7 +202,6 @@ class PolicyAdmin(admin.ModelAdmin):
                     due_date=payment.due_date,
                     amount=payment.amount,
                     insurance_sum=payment.insurance_sum,
-                    commission_rate=payment.commission_rate,
                     kv_rub=payment.kv_rub,
                     paid_date=payment.paid_date,
                     insurer_date=payment.insurer_date,
@@ -246,9 +245,10 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
     ]
     list_filter = ['due_date', 'paid_date', InsuranceSumRangeFilter]
     search_fields = ['policy__policy_number', 'policy__client__client_name']
-    autocomplete_fields = ['policy', 'commission_rate']
+    autocomplete_fields = ['policy']
     date_hierarchy = 'due_date'
     actions = ['copy_payments']
+    exclude = ['commission_rate']
     
     @admin.action(description='Копировать выбранные платежи')
     def copy_payments(self, request, queryset):
@@ -270,7 +270,7 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
             return
         
         # Build dictionary of field values to copy
-        # Exclude id, created_at, updated_at as per requirements
+        # Exclude id, created_at, updated_at, commission_rate as per requirements
         copy_data = {
             'policy': payment.policy.id,
             'year_number': payment.year_number,
@@ -283,8 +283,6 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
         }
         
         # Add optional fields if they exist
-        if payment.commission_rate:
-            copy_data['commission_rate'] = payment.commission_rate.id
         if payment.paid_date:
             copy_data['paid_date'] = payment.paid_date
         if payment.insurer_date:

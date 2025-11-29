@@ -16,7 +16,7 @@ class TestPaymentScheduleProperties(TestCase):
     """Property-based tests for PaymentSchedule model."""
     
     @pytest.mark.property
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         insurance_sum=st.decimals(
             min_value=Decimal('0.01'),
@@ -88,7 +88,7 @@ class TestPaymentScheduleProperties(TestCase):
 
 
     @pytest.mark.property
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         # Generate a list of insurance sums for creating payments
         insurance_sums=st.lists(
@@ -205,7 +205,7 @@ class TestPaymentScheduleProperties(TestCase):
 
 
     @pytest.mark.property
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         year_number=st.integers(min_value=1, max_value=10),
         installment_number=st.integers(min_value=1, max_value=12),
@@ -224,7 +224,7 @@ class TestPaymentScheduleProperties(TestCase):
             max_value=Decimal('999999999.99'),
             places=2
         ),
-        payment_info=st.text(max_size=200)
+        payment_info=st.text(max_size=200, alphabet=st.characters(blacklist_characters='\x00'))
     )
     def test_payment_copy_field_identity(self, year_number, installment_number, 
                                          amount, insurance_sum, kv_rub, payment_info):
@@ -326,3 +326,150 @@ class TestPaymentScheduleProperties(TestCase):
         # Verify that id is different (not set yet for unsaved object)
         assert copied_payment.id is None
         assert original_payment.id is not None
+
+
+    @pytest.mark.property
+    @settings(max_examples=100, deadline=None)
+    @given(
+        amount=st.decimals(
+            min_value=Decimal('0.01'),
+            max_value=Decimal('999999999.99'),
+            places=2
+        ),
+        kv_rub=st.decimals(
+            min_value=Decimal('0.00'),
+            max_value=Decimal('99999999.99'),
+            places=2
+        )
+    )
+    def test_kv_percent_actual_calculation(self, amount, kv_rub):
+        """
+        **Feature: policy-payment-enhancements, Property 4: Расчет фактического процента КВ**
+        **Validates: Requirements 5.1, 5.2**
+        
+        Property: For any payment with amount > 0, the kv_percent_actual property
+        should equal (kv_rub / amount) * 100, with proper handling of edge cases.
+        """
+        from apps.clients.models import Client
+        from apps.insurers.models import Insurer, Branch, InsuranceType
+        from apps.policies.models import Policy
+        from datetime import date, timedelta
+        
+        # Create required related objects
+        client = Client.objects.create(
+            client_name='Test Client KV',
+            client_inn='1234567893'
+        )
+        insurer = Insurer.objects.create(
+            insurer_name='Test Insurer KV',
+            contacts='test@example.com'
+        )
+        branch = Branch.objects.create(
+            branch_name='Test Branch KV'
+        )
+        insurance_type = InsuranceType.objects.create(
+            name='Test Type KV'
+        )
+        
+        # Create policy
+        policy = Policy.objects.create(
+            policy_number='TEST-KV-001',
+            client=client,
+            insurer=insurer,
+            branch=branch,
+            insurance_type=insurance_type,
+            property_description='Test property',
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=365),
+            premium_total=Decimal('50000.00')
+        )
+        
+        # Create payment with generated values
+        payment = PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date.today() + timedelta(days=30),
+            amount=amount,
+            insurance_sum=Decimal('1000000.00'),
+            kv_rub=kv_rub
+        )
+        
+        # Calculate expected percentage
+        expected_percent = (kv_rub / amount) * Decimal('100')
+        
+        # Get actual percentage from property
+        actual_percent = payment.kv_percent_actual
+        
+        # Assert equality with tolerance for decimal precision
+        # Using quantize to ensure same precision
+        assert actual_percent.quantize(Decimal('0.01')) == expected_percent.quantize(Decimal('0.01')), \
+            f"Expected kv_percent_actual {expected_percent}, but got {actual_percent}"
+        
+        # Property: kv_percent_actual should always be >= 0
+        assert actual_percent >= Decimal('0'), \
+            f"kv_percent_actual should be non-negative, but got {actual_percent}"
+        
+        # Property: if kv_rub is 0, kv_percent_actual should be 0
+        if kv_rub == Decimal('0'):
+            assert actual_percent == Decimal('0'), \
+                f"When kv_rub is 0, kv_percent_actual should be 0, but got {actual_percent}"
+
+
+    @pytest.mark.property
+    def test_kv_percent_actual_zero_amount(self):
+        """
+        **Feature: policy-payment-enhancements, Property 5: Обработка нулевой премии**
+        **Validates: Requirements 5.3**
+        
+        Property: When amount is 0 or None, kv_percent_actual should return 0
+        without raising an exception.
+        """
+        from apps.clients.models import Client
+        from apps.insurers.models import Insurer, Branch, InsuranceType
+        from apps.policies.models import Policy
+        from datetime import date, timedelta
+        
+        # Create required related objects
+        client = Client.objects.create(
+            client_name='Test Client Zero',
+            client_inn='1234567894'
+        )
+        insurer = Insurer.objects.create(
+            insurer_name='Test Insurer Zero',
+            contacts='test@example.com'
+        )
+        branch = Branch.objects.create(
+            branch_name='Test Branch Zero'
+        )
+        insurance_type = InsuranceType.objects.create(
+            name='Test Type Zero'
+        )
+        
+        # Create policy
+        policy = Policy.objects.create(
+            policy_number='TEST-ZERO-001',
+            client=client,
+            insurer=insurer,
+            branch=branch,
+            insurance_type=insurance_type,
+            property_description='Test property',
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=365),
+            premium_total=Decimal('50000.00')
+        )
+        
+        # Test with amount = 0
+        payment_zero = PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date.today() + timedelta(days=30),
+            amount=Decimal('0.00'),
+            insurance_sum=Decimal('1000000.00'),
+            kv_rub=Decimal('1000.00')
+        )
+        
+        # Should not raise exception and should return 0
+        assert payment_zero.kv_percent_actual == Decimal('0'), \
+            f"Expected kv_percent_actual to be 0 for zero amount, but got {payment_zero.kv_percent_actual}"

@@ -138,8 +138,13 @@
                                 <td>{{ payment.insurance_sum|rub }}</td>
                                 <td><strong>{{ payment.amount|rub }}</strong></td>
                                 <td>
-                                    {% if commission_rate %}
-                                        {{ commission_rate.kv_percent|percent }}%
+                                    {% if payment.amount and payment.amount > 0 %}
+                                        <span class="{% if commission_rate and payment.kv_percent_actual|floatformat:0 != commission_rate.kv_percent|floatformat:0 %}text-danger{% endif %}">
+                                            {{ payment.kv_percent_actual|floatformat:0 }}%
+                                        </span>
+                                        {% if commission_rate and payment.kv_percent_actual|floatformat:0 != commission_rate.kv_percent|floatformat:0 %}
+                                            <br><small class="text-muted" title="Ставка комиссии из справочника">(ставка: {{ commission_rate.kv_percent|floatformat:0 }}%)</small>
+                                        {% endif %}
                                     {% else %}
                                         —
                                     {% endif %}
@@ -182,7 +187,7 @@
                                                 <small>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</small>
                                             </div>
                                             <div class="col-md-6">
-                                                <small><strong>Ставка комиссии:</strong></small><br>
+                                                <small><strong>Ставка комиссии (базовая):</strong></small><br>
                                                 <small>
                                                     {% if commission_rate %}
                                                         {{ commission_rate }}

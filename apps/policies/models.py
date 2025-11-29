@@ -189,13 +189,18 @@ class PaymentSchedule(TimeStampedModel):
     @property
     def is_paid(self):
         return self.paid_date is not None
+    
+    @property
+    def is_approved(self):
+        """Платеж согласован со страховой компанией"""
+        return self.insurer_date is not None
 
     @property
     def is_overdue(self):
         from django.utils import timezone
         if self.is_paid:
             return False
-        # Если полис неактивен, платеж не просрочен, а отменен
+        # Если полис неактивен, платеж не является неоплаченным, а отменен
         if not self.policy.policy_active:
             return False
         return self.due_date < timezone.now().date()

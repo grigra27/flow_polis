@@ -298,11 +298,13 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
         return redirect(redirect_url)
     
     def payment_status(self, obj):
-        if obj.is_paid:
-            return format_html('<span style="color: green;">✓ Оплачен</span>')
+        if obj.is_approved:
+            return format_html('<span style="color: green;">✓ Согласовано с СК</span>')
+        elif obj.is_paid:
+            return format_html('<span style="color: blue;">✓ Оплачен</span>')
         elif obj.is_cancelled:
             return format_html('<span style="color: red;">✕ Отменен</span>')
         elif obj.is_overdue:
-            return format_html('<span style="color: red;">✗ Просрочен</span>')
+            return format_html('<span style="color: red;">✗ Не оплачен</span>')
         return format_html('<span style="color: orange;">⏳ Ожидается</span>')
     payment_status.short_description = 'Статус'

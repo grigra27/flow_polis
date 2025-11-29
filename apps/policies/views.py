@@ -97,12 +97,19 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
             if status == 'all':
                 # Все платежи: без фильтрации по статусу
                 pass
+            elif status == 'approved':
+                # Согласованные со СК: платежи с указанной датой согласования СК
+                queryset = queryset.filter(
+                    insurer_date__isnull=False
+                )
             elif status == 'paid':
                 # Оплаченные: платежи с указанной датой оплаты (дата платежа <= сегодня)
+                # но БЕЗ даты согласования СК (иначе они попадают в "Согласовано с СК")
                 from django.utils import timezone
                 queryset = queryset.filter(
                     paid_date__isnull=False,
-                    due_date__lte=timezone.now().date()
+                    due_date__lte=timezone.now().date(),
+                    insurer_date__isnull=True
                 )
             elif status == 'cancelled':
                 # Отмененные: неоплаченные платежи по неактивным полисам
@@ -111,7 +118,7 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                     policy__policy_active=False
                 )
             elif status == 'overdue':
-                # Просроченные: неоплаченные платежи с датой ранее сегодня (только для активных полисов)
+                # Не оплаченные: неоплаченные платежи с датой ранее сегодня (только для активных полисов)
                 from django.utils import timezone
                 queryset = queryset.filter(
                     due_date__lt=timezone.now().date(),
@@ -144,11 +151,14 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                 )
         
         # Сортировка:
+        # - для согласованных: по дате согласования (от новых к старым)
         # - для оплаченных: по дате оплаты (от новых к старым)
-        # - для просроченных: по дате платежа (от старых к новым)
+        # - для не оплаченных: по дате платежа (от старых к новым)
         # - для предстоящих: по дате платежа (от ближайших к дальним)
         # - для остальных: по дате платежа (от ближайших к дальним)
-        if status == 'paid':
+        if status == 'approved':
+            return queryset.order_by('-insurer_date')
+        elif status == 'paid':
             return queryset.order_by('-paid_date')
         elif status == 'overdue':
             return queryset.order_by('due_date')

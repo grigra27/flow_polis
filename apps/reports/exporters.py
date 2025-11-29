@@ -213,12 +213,14 @@ class PaymentExporter(BaseExporter):
     def get_row_data(self, payment):
         """Возвращает данные строки для платежа"""
         # Определение статуса
-        if payment.is_paid:
+        if payment.is_approved:
+            status = 'Согласовано с СК'
+        elif payment.is_paid:
             status = 'Оплачен'
         elif payment.is_cancelled:
             status = 'Отменен'
         elif payment.is_overdue:
-            status = 'Просрочен'
+            status = 'Не оплачен'
         else:
             status = 'Ожидается'
         

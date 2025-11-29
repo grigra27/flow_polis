@@ -147,12 +147,14 @@
                                 <td>{{ payment.kv_rub|rub }}</td>
                                 <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                                 <td>
-                                    {% if payment.is_paid %}
-                                        <span class="badge bg-success">Оплачен</span>
+                                    {% if payment.is_approved %}
+                                        <span class="badge bg-success">Согласовано с СК</span>
+                                    {% elif payment.is_paid %}
+                                        <span class="badge bg-primary">Оплачен</span>
                                     {% elif payment.is_cancelled %}
                                         <span class="badge bg-danger">Отменен</span>
                                     {% elif payment.is_overdue %}
-                                        <span class="badge bg-danger">Просрочен</span>
+                                        <span class="badge bg-danger">Не оплачен</span>
                                     {% else %}
                                         <span class="badge bg-warning">Ожидается</span>
                                     {% endif %}

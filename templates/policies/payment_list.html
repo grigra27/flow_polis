@@ -99,13 +99,17 @@
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <!-- Past payments group -->
         <div class="btn-group" role="group">
+            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+               class="btn btn-outline-success {% if request.GET.status == 'approved' %}active{% endif %}">
+                <i class="bi bi-check2-circle"></i> Согласовано с СК
+            </a>
             <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
-               class="btn btn-outline-success {% if request.GET.status == 'paid' %}active{% endif %}">
+               class="btn btn-outline-primary {% if request.GET.status == 'paid' %}active{% endif %}">
                 <i class="bi bi-check-circle"></i> Оплаченные
             </a>
             <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
                class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
-                <i class="bi bi-exclamation-triangle"></i> Просроченные
+                <i class="bi bi-exclamation-triangle"></i> Не оплаченные
             </a>
         </div>
         
@@ -132,7 +136,17 @@
         </a>
         
         <small class="text-muted ms-auto" style="cursor: help;" 
-               title="Оплаченные: платежи с указанной датой оплаты. Просроченные: неоплаченные платежи активных полисов с датой ранее сегодня. Предстоит в ближ. 30 дней: неоплаченные платежи активных полисов в ближайшие 30 дней. Будущие: неоплаченные платежи активных полисов более чем через 30 дней. Отмененные платежи (расторгнутые полисы) отображаются с красным бейджем во всех срезах.">
+               title="Статусы платежей (по приоритету):
+• Согласовано с СК — есть дата согласования
+• Оплачен — есть дата оплаты
+• Отменен — полис расторгнут
+• Не оплачен — дата платежа прошла
+• Ожидается — остальные
+
+Срезы:
+• Согласовано с СК / Оплаченные / Не оплаченные — прошедшие платежи
+• Предстоит в ближ. 30 дней — от сегодня до +30 дней
+• Будущие — более чем через 30 дней">
             <i class="bi bi-info-circle"></i> Пояснение
         </small>
     </div>
@@ -193,12 +207,14 @@
                             <small>{{ payment.payment_info|truncatewords:15|default:"—" }}</small>
                         </td>
                         <td>
-                            {% if payment.is_paid %}
-                                <span class="badge bg-success">Оплачен</span>
+                            {% if payment.is_approved %}
+                                <span class="badge bg-success">Согласовано с СК</span>
+                            {% elif payment.is_paid %}
+                                <span class="badge bg-primary">Оплачен</span>
                             {% elif payment.is_cancelled %}
                                 <span class="badge bg-danger">Отменен</span>
                             {% elif payment.is_overdue %}
-                                <span class="badge bg-danger">Просрочен</span>
+                                <span class="badge bg-danger">Не оплачен</span>
                             {% else %}
                                 <span class="badge bg-warning">Ожидается</span>
                             {% endif %}

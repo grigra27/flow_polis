@@ -80,10 +80,10 @@ def send_overdue_notification(payments):
     """
     Send email notification about overdue payments
     """
-    subject = 'Внимание: просроченные платежи'
+    subject = 'Внимание: не оплаченные платежи'
     
     message_lines = [
-        'Просроченные платежи:\n',
+        'Не оплаченные платежи:\n',
     ]
     
     for payment in payments:

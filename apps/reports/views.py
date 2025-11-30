@@ -201,6 +201,170 @@ def export_thursday_report(request):
         return redirect("reports:index")
 
 
+@login_required
+def export_policy_expiration(request):
+    """Export policies with expiration date in specified range"""
+    try:
+        # Получаем параметры дат из запроса
+        date_from_str = request.GET.get("date_from")
+        date_to_str = request.GET.get("date_to")
+
+        # Проверяем наличие обязательных параметров
+        if not date_from_str or not date_to_str:
+            messages.error(
+                request, "Необходимо указать дату начала и дату окончания периода"
+            )
+            return redirect("reports:index")
+
+        # Парсим даты
+        try:
+            from datetime import datetime
+
+            date_from = datetime.strptime(date_from_str, "%Y-%m-%d").date()
+            date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date()
+        except ValueError:
+            messages.error(
+                request, "Неверный формат даты. Используйте формат ГГГГ-ММ-ДД"
+            )
+            return redirect("reports:index")
+
+        # Проверяем корректность диапазона
+        if date_from > date_to:
+            messages.error(request, "Дата начала не может быть позже даты окончания")
+            return redirect("reports:index")
+
+        # Получаем полисы с окончанием страхования в заданном диапазоне
+        policies = (
+            Policy.objects.select_related(
+                "client",
+                "insurer",
+                "branch",
+                "insurance_type",
+                "policyholder",
+                "leasing_manager",
+            )
+            .filter(end_date__gte=date_from, end_date__lte=date_to)
+            .order_by("end_date", "policy_number")
+        )
+
+        # Применяем опциональные фильтры
+        branch_id = request.GET.get("branch")
+        if branch_id:
+            policies = policies.filter(branch_id=branch_id)
+
+        # Проверяем наличие данных
+        if not policies.exists():
+            messages.warning(
+                request,
+                f"Нет полисов с окончанием страхования в периоде с {date_from_str} по {date_to_str}",
+            )
+            return redirect("reports:index")
+
+        # Генерируем отчет
+        from .exporters import PolicyExpirationExporter
+
+        exporter = PolicyExpirationExporter(
+            policies, [], date_from=date_from, date_to=date_to
+        )
+
+        # Логируем
+        logger.info(
+            f"User {request.user.username} exported policy expiration report (count: {policies.count()}, period: {date_from_str} - {date_to_str})"
+        )
+
+        return exporter.export()
+
+    except Exception as e:
+        logger.error(f"Error exporting policy expiration report: {e}")
+        messages.error(request, "Ошибка при создании экспорта полисов")
+        return redirect("reports:index")
+
+
+@login_required
+def export_commission_report(request):
+    """Export commission report - paid but not approved by insurer"""
+    try:
+        # Получаем ID страховой компании из запроса
+        insurer_id = request.GET.get("insurer")
+
+        # Проверяем наличие обязательного параметра
+        if not insurer_id:
+            messages.error(request, "Необходимо выбрать страховую компанию")
+            return redirect("reports:index")
+
+        # Проверяем существование страховой компании
+        try:
+            insurer = Insurer.objects.get(id=insurer_id)
+        except Insurer.DoesNotExist:
+            messages.error(request, "Страховая компания не найдена")
+            return redirect("reports:index")
+
+        # Получаем платежи с оптимизированными запросами
+        # Фильтруем: есть дата оплаты, но нет даты согласования СК
+        from django.db.models import Count, OuterRef, Subquery
+
+        # Подзапрос для подсчета платежей в том же году того же полиса
+        payments_in_year_subquery = (
+            PaymentSchedule.objects.filter(
+                policy=OuterRef("policy"), year_number=OuterRef("year_number")
+            )
+            .values("policy", "year_number")
+            .annotate(count=Count("id"))
+            .values("count")
+        )
+
+        payments = (
+            PaymentSchedule.objects.select_related(
+                "policy",
+                "policy__client",
+                "policy__insurer",
+                "policy__leasing_manager",
+                "policy__policyholder",
+                "policy__branch",
+                "commission_rate",
+            )
+            .annotate(payments_in_year=Subquery(payments_in_year_subquery))
+            .filter(
+                policy__insurer_id=insurer_id,
+                paid_date__isnull=False,  # Есть дата оплаты
+                insurer_date__isnull=True,  # Нет даты согласования СК
+            )
+            .order_by("paid_date", "policy__policy_number")
+        )
+
+        # Применяем опциональные фильтры
+        branch_id = request.GET.get("branch")
+        if branch_id:
+            payments = payments.filter(policy__branch_id=branch_id)
+
+        # Проверяем наличие данных
+        if not payments.exists():
+            messages.warning(
+                request,
+                f"Нет платежей для страховой компании {insurer.insurer_name}, которые оплачены но не согласованы СК",
+            )
+            return redirect("reports:index")
+
+        # Генерируем отчет
+        from .exporters import CommissionReportExporter
+
+        exporter = CommissionReportExporter(
+            payments, [], insurer_name=insurer.insurer_name
+        )
+
+        # Логируем
+        logger.info(
+            f"User {request.user.username} exported commission report (insurer: {insurer.insurer_name}, count: {payments.count()})"
+        )
+
+        return exporter.export()
+
+    except Exception as e:
+        logger.error(f"Error exporting commission report: {e}")
+        messages.error(request, "Ошибка при создании отчета по КВ")
+        return redirect("reports:index")
+
+
 class ExportsIndexView(LoginRequiredMixin, TemplateView):
     """Главная страница экспорта"""
 
@@ -212,6 +376,8 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
         context["recent_templates"] = CustomExportTemplate.objects.filter(
             user=self.request.user
         )[:5]
+        # Получаем список всех страховых компаний для отчета по КВ
+        context["insurers"] = Insurer.objects.all().order_by("insurer_name")
         return context
 
 

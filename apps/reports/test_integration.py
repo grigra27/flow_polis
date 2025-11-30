@@ -644,6 +644,294 @@ class ReadyExportsTest(TestCase):
             "Платеж с датой 2025-01-01 не должен попасть в отчет с фильтром 2024-12-31",
         )
 
+    def test_policy_expiration_export(self):
+        """Тест экспорта полисов с окончанием страхования в заданном периоде"""
+        # Создаем дополнительные полисы с разными датами окончания
+        policy_in_range = Policy.objects.create(
+            policy_number="EXPIRING-001",
+            dfa_number="DFA-EXPIRING-001",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 6, 15),  # В диапазоне
+            premium_total=Decimal("75000.00"),
+        )
+
+        policy_out_of_range = Policy.objects.create(
+            policy_number="EXPIRING-002",
+            dfa_number="DFA-EXPIRING-002",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),  # Вне диапазона
+            premium_total=Decimal("85000.00"),
+        )
+
+        self.test_client.login(username="testuser", password="testpass123")
+
+        # Экспортируем полисы с окончанием с 01.06.2024 по 30.06.2024
+        response = self.test_client.get(
+            "/reports/export/policy-expiration/?date_from=2024-06-01&date_to=2024-06-30"
+        )
+
+        # Проверяем что получили Excel файл
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        # Проверяем содержимое
+        excel_file = BytesIO(response.content)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+
+        # Проверяем заголовок отчета (строка 1)
+        report_title = ws.cell(row=1, column=1).value
+        self.assertIsNotNone(report_title)
+        self.assertIn("ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ С", report_title)
+        self.assertIn("01.06.2024", report_title)
+        self.assertIn("30.06.2024", report_title)
+
+        # Проверяем что строка 2 пустая
+        empty_row = ws.cell(row=2, column=1).value
+        self.assertTrue(empty_row is None or empty_row == "")
+
+        # Проверяем заголовки столбцов (строка 3)
+        headers = [cell.value for cell in ws[3]]
+        expected_headers = [
+            "Номер полиса",
+            "Номер ДФА",
+            "Филиал",
+            "Лизингополучатель",
+            "Страховщик",
+            "Страхователь",
+            "Дата начала страхования",
+            "Дата оконч. страхования",
+            "Объект страхования",
+            "Страховая премия",
+            "Контактное лицо",
+        ]
+        self.assertEqual(headers, expected_headers)
+
+        # Проверяем что строка 4 пустая
+        empty_row_4 = ws.cell(row=4, column=1).value
+        self.assertTrue(empty_row_4 is None or empty_row_4 == "")
+
+        # Проверяем что в отчете только полисы с окончанием в заданном диапазоне
+        # Данные начинаются с 5-й строки
+        policy_numbers = []
+        for row in range(5, ws.max_row + 1):
+            policy_number = ws.cell(row=row, column=1).value
+            if policy_number:
+                policy_numbers.append(policy_number)
+
+        # Проверяем что EXPIRING-001 есть в отчете (end_date в диапазоне)
+        self.assertIn("EXPIRING-001", policy_numbers)
+
+        # Проверяем что EXPIRING-002 НЕТ в отчете (end_date вне диапазона)
+        self.assertNotIn("EXPIRING-002", policy_numbers)
+
+        # Проверяем данные в строке с EXPIRING-001
+        for row in range(5, ws.max_row + 1):
+            if ws.cell(row=row, column=1).value == "EXPIRING-001":
+                # Проверяем дату окончания (8-й столбец)
+                end_date = ws.cell(row=row, column=8).value
+                self.assertEqual(end_date, "15.06.2024")
+                # Проверяем страховую премию (10-й столбец)
+                premium = ws.cell(row=row, column=10).value
+                self.assertEqual(float(premium), 75000.00)
+                break
+
+        # Проверяем что без параметров дат возвращается ошибка
+        response_no_dates = self.test_client.get("/reports/export/policy-expiration/")
+        self.assertEqual(response_no_dates.status_code, 302)  # Редирект
+
+        # Проверяем что с некорректным диапазоном возвращается ошибка
+        response_invalid_range = self.test_client.get(
+            "/reports/export/policy-expiration/?date_from=2024-06-30&date_to=2024-06-01"
+        )
+        self.assertEqual(response_invalid_range.status_code, 302)  # Редирект
+
+    def test_commission_report_export(self):
+        """Тест отчета по КВ - платежи оплаченные но не согласованные СК"""
+        from apps.policies.models import PaymentSchedule
+
+        # Создаем платежи с разными статусами
+        # 1. Оплачен, но не согласован СК (должен попасть в отчет)
+        paid_not_approved = PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=2,
+            installment_number=1,
+            due_date=date(2024, 6, 1),
+            amount=Decimal("25000.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2500.00"),
+            paid_date=date(2024, 6, 5),  # Есть дата оплаты
+            insurer_date=None,  # Нет даты согласования СК
+        )
+
+        # 2. Оплачен и согласован СК (НЕ должен попасть в отчет)
+        paid_and_approved = PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=2,
+            installment_number=2,
+            due_date=date(2024, 7, 1),
+            amount=Decimal("25000.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2500.00"),
+            paid_date=date(2024, 7, 5),  # Есть дата оплаты
+            insurer_date=date(2024, 7, 10),  # Есть дата согласования СК
+        )
+
+        # 3. Не оплачен (НЕ должен попасть в отчет)
+        not_paid = PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=2,
+            installment_number=3,
+            due_date=date(2024, 8, 1),
+            amount=Decimal("25000.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2500.00"),
+            paid_date=None,  # Нет даты оплаты
+            insurer_date=None,
+        )
+
+        self.test_client.login(username="testuser", password="testpass123")
+
+        # Экспортируем отчет по КВ для страховой компании
+        response = self.test_client.get(
+            f"/reports/export/commission-report/?insurer={self.insurer.id}"
+        )
+
+        # Проверяем что получили Excel файл
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        # Проверяем содержимое
+        excel_file = BytesIO(response.content)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+
+        # Проверяем заголовок отчета (строка 1)
+        report_title = ws.cell(row=1, column=1).value
+        self.assertIsNotNone(report_title)
+        self.assertIn("ОТЧЕТ ПО КВ", report_title)
+        self.assertIn(self.insurer.insurer_name.upper(), report_title)
+
+        # Проверяем что строка 2 пустая
+        empty_row = ws.cell(row=2, column=1).value
+        self.assertTrue(empty_row is None or empty_row == "")
+
+        # Проверяем заголовки столбцов (строка 3)
+        headers = [cell.value for cell in ws[3]]
+        expected_headers = [
+            "Номер полиса",
+            "Страхователь",
+            "Дата начала страхования",
+            "Дата оконч. страхования",
+            "Объект страхования",
+            "Страховая сумма",
+            "Очередной взнос",
+            "КВ %",
+            "КВ руб",
+            "Дата платежа по договору",
+            "Дата факт. оплаты",
+            "Филиал",
+        ]
+        self.assertEqual(headers, expected_headers)
+
+        # Проверяем что в заголовке есть дата
+        import re
+
+        date_pattern = r"\d{2}\.\d{2}\.\d{4}"
+        self.assertRegex(report_title, date_pattern)
+
+        # Проверяем что строка 4 пустая
+        empty_row_4 = ws.cell(row=4, column=1).value
+        self.assertTrue(empty_row_4 is None or empty_row_4 == "")
+
+        # Проверяем что в отчете только платежи оплаченные но не согласованные СК
+        # Данные начинаются с 5-й строки
+        payment_dates = []
+        for row in range(5, ws.max_row + 1):
+            payment_date = ws.cell(row=row, column=10).value  # Дата платежа по договору
+            if payment_date:
+                payment_dates.append(payment_date)
+
+        # Проверяем что платеж с датой 01.06.2024 есть в отчете (оплачен, но не согласован)
+        self.assertIn("01.06.2024", payment_dates)
+
+        # Проверяем что платеж с датой 01.07.2024 НЕТ в отчете (оплачен и согласован)
+        self.assertNotIn("01.07.2024", payment_dates)
+
+        # Проверяем что платеж с датой 01.08.2024 НЕТ в отчете (не оплачен)
+        self.assertNotIn("01.08.2024", payment_dates)
+
+        # Проверяем данные в строке с платежом по дате факт. оплаты 05.06.2024
+        # Примечание: в отчете kv_rub может отличаться от созданного в тесте
+        # из-за того, что могут быть другие платежи с той же датой
+        found_june_payment = False
+        for row in range(5, ws.max_row + 1):
+            paid_date = ws.cell(row=row, column=11).value  # Дата факт. оплаты
+            if paid_date == "05.06.2024":
+                # Проверяем номер полиса (1-й столбец)
+                policy_number = ws.cell(row=row, column=1).value
+                self.assertEqual(policy_number, "READY-001")
+                # Проверяем очередной взнос (7-й столбец)
+                amount = ws.cell(row=row, column=7).value
+                self.assertEqual(float(amount), 25000.00)
+                # Проверяем КВ руб (9-й столбец) - проверяем что значение есть
+                kv_rub = ws.cell(row=row, column=9).value
+                self.assertIsNotNone(kv_rub)
+                self.assertGreater(float(kv_rub), 0)
+                # Проверяем дату платежа по договору (10-й столбец)
+                due_date = ws.cell(row=row, column=10).value
+                self.assertEqual(due_date, "01.06.2024")
+                found_june_payment = True
+                break
+
+        self.assertTrue(
+            found_june_payment,
+            "Платеж с датой факт. оплаты 05.06.2024 должен быть в отчете",
+        )
+
+        # Проверяем что в отчете есть платеж из setUp (с датой факт. оплаты 28.02.2024)
+        found_march_payment = False
+        for row in range(5, ws.max_row + 1):
+            paid_date = ws.cell(row=row, column=11).value  # Дата факт. оплаты
+            if paid_date == "28.02.2024":
+                # Проверяем КВ руб (9-й столбец)
+                kv_rub = ws.cell(row=row, column=9).value
+                self.assertEqual(float(kv_rub), 10000.00)
+                found_march_payment = True
+                break
+
+        self.assertTrue(
+            found_march_payment,
+            "Платеж с датой факт. оплаты 28.02.2024 должен быть в отчете",
+        )
+
+        # Проверяем что без параметра insurer возвращается ошибка
+        response_no_insurer = self.test_client.get("/reports/export/commission-report/")
+        self.assertEqual(response_no_insurer.status_code, 302)  # Редирект
+
+        # Проверяем что с несуществующим insurer возвращается ошибка
+        response_invalid_insurer = self.test_client.get(
+            "/reports/export/commission-report/?insurer=99999"
+        )
+        self.assertEqual(response_invalid_insurer.status_code, 302)  # Редирект
+
 
 class AuthorizationTest(TestCase):
     """

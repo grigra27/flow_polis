@@ -19,4 +19,14 @@ urlpatterns = [
     path(
         "export/thursday/", views.export_thursday_report, name="export_thursday_report"
     ),
+    path(
+        "export/policy-expiration/",
+        views.export_policy_expiration,
+        name="export_policy_expiration",
+    ),
+    path(
+        "export/commission-report/",
+        views.export_commission_report,
+        name="export_commission_report",
+    ),
 ]

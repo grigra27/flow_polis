@@ -854,3 +854,439 @@ class ThursdayReportExporter(BaseExporter):
             ):
                 continue
             ws.row_dimensions[row].height = 20
+
+
+class PolicyExpirationExporter(BaseExporter):
+    """Экспортер для полисов с окончанием страхования в заданном периоде"""
+
+    def __init__(self, queryset, fields, date_from=None, date_to=None):
+        """
+        Инициализация экспортера
+
+        Args:
+            queryset: QuerySet полисов
+            fields: Список полей (не используется, для совместимости)
+            date_from: Дата начала периода
+            date_to: Дата окончания периода
+        """
+        super().__init__(queryset, fields)
+        self.date_from = date_from
+        self.date_to = date_to
+
+    def get_filename(self):
+        """Возвращает базовое имя файла"""
+        return "policy_expiration"
+
+    def get_headers(self):
+        """Возвращает список заголовков"""
+        return [
+            "Номер полиса",
+            "Номер ДФА",
+            "Филиал",
+            "Лизингополучатель",
+            "Страховщик",
+            "Страхователь",
+            "Дата начала страхования",
+            "Дата оконч. страхования",
+            "Объект страхования",
+            "Страховая премия",
+            "Контактное лицо",
+        ]
+
+    def export(self):
+        """Генерирует Excel файл с форматированием"""
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        wb = Workbook()
+        ws = wb.active
+
+        # Добавляем заголовок отчета с диапазоном дат
+        if self.date_from and self.date_to:
+            date_from_str = self.date_from.strftime("%d.%m.%Y")
+            date_to_str = self.date_to.strftime("%d.%m.%Y")
+            report_title = (
+                f"ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ С {date_from_str} ПО {date_to_str}"
+            )
+        else:
+            from datetime import date
+
+            current_date = date.today().strftime("%d.%m.%Y")
+            report_title = f"ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ НА {current_date}"
+
+        ws.append([report_title])
+
+        # Форматирование заголовка отчета
+        title_cell = ws.cell(row=1, column=1)
+        title_cell.font = Font(bold=True, size=14, color="000000")
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 30
+
+        # Объединяем ячейки для заголовка отчета
+        num_columns = len(self.get_headers())
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_columns)
+
+        # Пустая строка после заголовка отчета
+        ws.append([""])
+
+        # Заголовки столбцов
+        headers = self.get_headers()
+        ws.append(headers)
+
+        # Форматирование заголовков столбцов (теперь в строке 3)
+        # Используем синий цвет как в четверговом отчете
+        header_fill = PatternFill(
+            start_color="366092", end_color="366092", fill_type="solid"
+        )
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        for cell in ws[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
+                wrap_text=True,  # Перенос текста в заголовках
+            )
+
+        # Увеличенная высота строки заголовков столбцов
+        ws.row_dimensions[3].height = 30
+
+        # Пустая строка после заголовков столбцов
+        ws.append([""] * len(headers))
+
+        # Данные полисов
+        for policy in self.queryset:
+            row = self.get_row_data(policy)
+            ws.append(row)
+
+        # Форматирование
+        self.apply_formatting(ws)
+
+        return self.create_response(wb)
+
+    def get_row_data(self, policy):
+        """Возвращает данные строки для полиса"""
+        # Получаем фамилию менеджера лизинговой компании
+        leasing_manager_name = ""
+        if policy.leasing_manager:
+            leasing_manager_name = policy.leasing_manager.name
+
+        return [
+            policy.policy_number,
+            policy.dfa_number,
+            policy.branch.branch_name if policy.branch else "",
+            policy.client.client_name,
+            policy.insurer.insurer_name,
+            policy.policyholder.client_name if policy.policyholder else "",
+            self.format_value(policy.start_date),
+            self.format_value(policy.end_date),
+            policy.property_description,
+            self.format_value(policy.premium_total),
+            leasing_manager_name,
+        ]
+
+    def apply_formatting(self, ws):
+        """Применяет расширенное форматирование к листу"""
+        from openpyxl.styles import Alignment
+
+        # 1. Настройка ширины столбцов
+        column_widths = {
+            "A": 15,  # Номер полиса
+            "B": 15,  # Номер ДФА
+            "C": None,  # Филиал - автоподгонка
+            "D": None,  # Лизингополучатель - автоподгонка
+            "E": None,  # Страховщик - автоподгонка
+            "F": None,  # Страхователь - автоподгонка
+            "G": 13,  # Дата начала страхования
+            "H": 13,  # Дата окончания страхования
+            "I": None,  # Объект страхования - автоподгонка с большим лимитом
+            "J": 16,  # Страховая премия
+            "K": None,  # Контактное лицо - автоподгонка
+        }
+
+        from openpyxl.utils import get_column_letter
+
+        for col_idx, column_cells in enumerate(ws.columns, start=1):
+            column_letter = get_column_letter(col_idx)
+
+            # Если задана фиксированная ширина, используем её
+            if (
+                column_letter in column_widths
+                and column_widths[column_letter] is not None
+            ):
+                ws.column_dimensions[column_letter].width = column_widths[column_letter]
+            else:
+                # Иначе автоподгонка
+                max_length = 0
+                for cell in column_cells:
+                    # Пропускаем объединенные ячейки
+                    if hasattr(cell, "value") and cell.value:
+                        # Пропускаем заголовок отчета
+                        if (
+                            isinstance(cell.value, str)
+                            and "ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ" in cell.value
+                        ):
+                            continue
+                        max_length = max(max_length, len(str(cell.value)))
+
+                adjusted_width = max_length + 2
+
+                if column_letter == "I":  # Объект страхования
+                    adjusted_width = min(max(adjusted_width, 12), 60)
+                else:
+                    adjusted_width = min(max(adjusted_width, 10), 50)
+
+                ws.column_dimensions[column_letter].width = adjusted_width
+
+        # 2. Перенос текста для столбца "Объект страхования" (I)
+        for cell in ws["I"]:
+            if cell.row > 3:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        # 3. Выравнивание для разных типов данных
+        for row in ws.iter_rows(
+            min_row=5
+        ):  # Начинаем с 5 строки (первая строка данных)
+            for idx, cell in enumerate(row, start=1):
+                # Столбцы с датами (G, H) - по центру
+                if idx in [7, 8]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                # Столбец со страховой премией (J) - справа
+                elif idx == 10:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    # Применяем числовой формат с разделителями тысяч
+                    cell.number_format = "#,##0.00"
+                # Остальные - слева
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        # 4. Закрепление заголовков
+        ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
+
+        # 5. Автофильтры на заголовки столбцов (строка 3)
+        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+
+        # 6. Высота строк данных
+        for row in range(5, ws.max_row + 1):
+            ws.row_dimensions[row].height = 20
+
+
+class CommissionReportExporter(BaseExporter):
+    """Экспортер для отчета по КВ - платежи оплаченные но не согласованные СК"""
+
+    def __init__(self, queryset, fields, insurer_name=None):
+        """
+        Инициализация экспортера
+
+        Args:
+            queryset: QuerySet платежей
+            fields: Список полей (не используется, для совместимости)
+            insurer_name: Название страховой компании для заголовка
+        """
+        super().__init__(queryset, fields)
+        self.insurer_name = insurer_name
+
+    def get_filename(self):
+        """Возвращает базовое имя файла"""
+        return "commission_report_kv"
+
+    def get_headers(self):
+        """Возвращает список заголовков"""
+        return [
+            "Номер полиса",
+            "Страхователь",
+            "Дата начала страхования",
+            "Дата оконч. страхования",
+            "Объект страхования",
+            "Страховая сумма",
+            "Очередной взнос",
+            "КВ %",
+            "КВ руб",
+            "Дата платежа по договору",
+            "Дата факт. оплаты",
+            "Филиал",
+        ]
+
+    def export(self):
+        """Генерирует Excel файл с форматированием"""
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from datetime import date
+
+        wb = Workbook()
+        ws = wb.active
+
+        # Добавляем заголовок отчета с названием страховой компании и датой
+        current_date = date.today().strftime("%d.%m.%Y")
+        if self.insurer_name:
+            report_title = (
+                f"ОТЧЕТ ПО КВ - {self.insurer_name.upper()} - НА {current_date}"
+            )
+        else:
+            report_title = f"ОТЧЕТ ПО КВ - НА {current_date}"
+
+        ws.append([report_title])
+
+        # Форматирование заголовка отчета
+        title_cell = ws.cell(row=1, column=1)
+        title_cell.font = Font(bold=True, size=14, color="000000")
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 30
+
+        # Объединяем ячейки для заголовка отчета
+        num_columns = len(self.get_headers())
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_columns)
+
+        # Пустая строка после заголовка отчета
+        ws.append([""])
+
+        # Заголовки столбцов
+        headers = self.get_headers()
+        ws.append(headers)
+
+        # Форматирование заголовков столбцов (теперь в строке 3)
+        # Используем темно-коричневый цвет
+        header_fill = PatternFill(
+            start_color="5D4037", end_color="5D4037", fill_type="solid"
+        )  # Темно-коричневый (Brown 800)
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        for cell in ws[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
+                wrap_text=True,  # Перенос текста в заголовках
+            )
+
+        # Увеличенная высота строки заголовков столбцов
+        ws.row_dimensions[3].height = 30
+
+        # Пустая строка после заголовков столбцов
+        ws.append([""] * len(headers))
+
+        # Данные платежей
+        for payment in self.queryset:
+            row = self.get_row_data(payment)
+            ws.append(row)
+
+        # Форматирование
+        self.apply_formatting(ws)
+
+        return self.create_response(wb)
+
+    def get_row_data(self, payment):
+        """Возвращает данные строки для платежа"""
+        policy = payment.policy
+
+        # Получаем КВ % из commission_rate
+        kv_percent = (
+            int(round(float(payment.commission_rate.kv_percent)))
+            if payment.commission_rate
+            else 0
+        )
+
+        return [
+            policy.policy_number,
+            policy.policyholder.client_name if policy.policyholder else "",
+            self.format_value(policy.start_date),
+            self.format_value(policy.end_date),
+            policy.property_description,
+            self.format_value(payment.insurance_sum),  # Страховая сумма из платежа
+            self.format_value(
+                payment.amount
+            ),  # Сумма конкретного платежа (очередной взнос)
+            kv_percent,  # КВ %
+            self.format_value(payment.kv_rub),  # КВ руб
+            self.format_value(payment.due_date),  # Дата платежа по договору
+            self.format_value(payment.paid_date),  # Дата фактической оплаты
+            policy.branch.branch_name if policy.branch else "",
+        ]
+
+    def apply_formatting(self, ws):
+        """Применяет расширенное форматирование к листу"""
+        from openpyxl.styles import Alignment
+
+        # 1. Настройка ширины столбцов
+        # Фиксированная ширина для столбцов с предсказуемым форматом
+        column_widths = {
+            "A": 15,  # Номер полиса
+            "B": None,  # Страхователь - автоподгонка
+            "C": 13,  # Дата начала страхования
+            "D": 13,  # Дата окончания страхования
+            "E": None,  # Объект страхования - автоподгонка с большим лимитом
+            "F": 16,  # Страховая сумма
+            "G": 16,  # Очередной взнос
+            "H": 10,  # КВ %
+            "I": 16,  # КВ руб
+            "J": 13,  # Дата платежа по договору
+            "K": 13,  # Дата факт. оплаты
+            "L": None,  # Филиал - автоподгонка
+        }
+
+        from openpyxl.utils import get_column_letter
+
+        for col_idx, column_cells in enumerate(ws.columns, start=1):
+            column_letter = get_column_letter(col_idx)
+
+            # Если задана фиксированная ширина, используем её
+            if (
+                column_letter in column_widths
+                and column_widths[column_letter] is not None
+            ):
+                ws.column_dimensions[column_letter].width = column_widths[column_letter]
+            else:
+                # Иначе автоподгонка
+                max_length = 0
+                for cell in column_cells:
+                    # Пропускаем объединенные ячейки
+                    if hasattr(cell, "value") and cell.value:
+                        # Пропускаем заголовок отчета
+                        if isinstance(cell.value, str) and "ОТЧЕТ ПО КВ" in cell.value:
+                            continue
+                        max_length = max(max_length, len(str(cell.value)))
+
+                adjusted_width = max_length + 2
+
+                if column_letter == "E":  # Объект страхования (теперь столбец E)
+                    adjusted_width = min(max(adjusted_width, 12), 60)
+                else:
+                    adjusted_width = min(max(adjusted_width, 10), 50)
+
+                ws.column_dimensions[column_letter].width = adjusted_width
+
+        # 2. Перенос текста для столбца "Объект страхования" (E)
+        for cell in ws["E"]:
+            if (
+                cell.row > 3
+            ):  # Пропускаем заголовок отчета, пустую строку и заголовки столбцов
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        # 3. Выравнивание и форматирование для разных типов данных
+        for row in ws.iter_rows(
+            min_row=5
+        ):  # Начинаем с 5 строки (первая строка данных)
+            for idx, cell in enumerate(row, start=1):
+                # Столбцы с финансовыми данными (F - Страховая сумма, G - Очередной взнос, I - КВ руб)
+                if idx in [6, 7, 9]:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
+                    # Без символа валюты для совместимости с Excel на Mac
+                    cell.number_format = "#,##0.00"
+                # Столбец КВ % (H) - по центру
+                elif idx == 8:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                # Столбцы с датами (C, D, J, K) - по центру
+                elif idx in [3, 4, 10, 11]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                # Остальные - слева
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        # 4. Закрепление заголовков (заголовок отчета + пустая строка + заголовки столбцов + пустая строка)
+        ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
+
+        # 5. Автофильтры на заголовки столбцов (строка 3)
+        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+
+        # 6. Высота строк данных (пропускаем заголовки)
+        for row in range(5, ws.max_row + 1):
+            ws.row_dimensions[row].height = 20

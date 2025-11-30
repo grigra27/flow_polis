@@ -52,28 +52,85 @@
 <h4 class="mb-3">Готовые экспорты</h4>
 <div class="row">
     <div class="col-md-6">
-        <div class="card mb-4 shadow-sm">
+        <div class="card mb-4 shadow-sm border-primary">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="bi bi-file-earmark-spreadsheet"></i> Экспорт полисов
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Пролонгация
                 </h5>
             </div>
             <div class="card-body">
-                <p class="card-text text-muted mb-3">
-                    Полный экспорт всех полисов со всей информацией
+                <p class="text-muted mb-3">
+                    Экспорт полисов с окончанием страхования за период
                 </p>
-                <ul class="list-unstyled mb-3">
-                    <li class="mb-1"><i class="bi bi-check-circle text-primary"></i> Номера полисов и ДФА</li>
-                    <li class="mb-1"><i class="bi bi-check-circle text-primary"></i> Клиенты и страховщики</li>
-                    <li class="mb-1"><i class="bi bi-check-circle text-primary"></i> Периоды действия</li>
-                    <li class="mb-1"><i class="bi bi-check-circle text-primary"></i> Финансовая информация</li>
-                    <li class="mb-1"><i class="bi bi-check-circle text-primary"></i> Статусы</li>
-                </ul>
-                <div class="d-grid">
-                    <a href="{% url 'reports:export_policies' %}" class="btn btn-primary">
-                        <i class="bi bi-download"></i> Скачать отчет
-                    </a>
+
+                <!-- Ключевые особенности -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check2-circle text-primary me-2"></i>
+                            <small>11 столбцов</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check2-circle text-primary me-2"></i>
+                            <small>Сортировка по дате</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check2-circle text-primary me-2"></i>
+                            <small>Форматирование сумм</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check2-circle text-primary me-2"></i>
+                            <small>Контактные лица</small>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Форма с диапазоном дат -->
+                <form method="get" action="{% url 'reports:export_policy_expiration' %}" class="needs-validation" novalidate>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label for="policy_date_from" class="form-label small mb-1">
+                                <i class="bi bi-calendar-range"></i> С
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   id="policy_date_from"
+                                   name="date_from"
+                                   value="{{ request.GET.date_from|default:'' }}"
+                                   required>
+                        </div>
+                        <div class="col-6">
+                            <label for="policy_date_to" class="form-label small mb-1">
+                                <i class="bi bi-calendar-range"></i> По
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   id="policy_date_to"
+                                   name="date_to"
+                                   value="{{ request.GET.date_to|default:'' }}"
+                                   required>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border py-2 px-3 mb-3" role="alert">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            Полисы по дате окончания страхования
+                        </small>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-file-earmark-excel"></i> Экспортировать в Excel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -163,15 +220,18 @@
     </div>
 
     <div class="col-md-6">
-        <div class="card mb-4 shadow-sm">
+        <div class="card mb-4 shadow-sm border-warning">
             <div class="card-header bg-warning text-dark">
                 <h5 class="mb-0">
                     <i class="bi bi-file-earmark-text"></i> Четверговый отчет
                 </h5>
             </div>
             <div class="card-body">
-                <p class="card-text text-muted mb-3">
-                    Перечень ДФА, по которым не хватает документов по страхованию
+                <p class="mb-2">
+                    <strong>Контроль документов по страхованию</strong>
+                </p>
+                <p class="text-muted small mb-3">
+                    Перечень ДФА с недостающими документами
                 </p>
 
                 <!-- Разделы отчета -->
@@ -192,27 +252,111 @@
                     </div>
                 </div>
 
-                <hr class="my-3">
-
                 <!-- Форма с датой -->
                 <form method="get" action="{% url 'reports:export_thursday_report' %}">
                     <div class="mb-3">
-                        <label for="payment_date" class="form-label small fw-semibold">
+                        <label for="payment_date" class="form-label small mb-1 fw-semibold">
                             <i class="bi bi-calendar-event"></i> Дата для раздела 2
                         </label>
                         <input type="date"
-                               class="form-control"
+                               class="form-control form-control-sm"
                                id="payment_date"
                                name="payment_date"
                                value="{{ request.GET.payment_date|default:'' }}"
                                placeholder="Текущая дата">
                         <div class="form-text">
-                            Платежи с датой платежа по договору до указанной. По умолчанию — текущая дата
+                            По умолчанию — текущая дата
                         </div>
+                    </div>
+
+                    <div class="alert py-2 px-3 mb-3" style="background-color: #fffbf0; border: 1px solid #ffe082;">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle text-warning"></i>
+                            Платежи до указанной даты
+                        </small>
                     </div>
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-download"></i> Скачать отчет
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-sm" style="border-color: #5D4037;">
+            <div class="card-header text-white" style="background-color: #5D4037;">
+                <h5 class="mb-0">
+                    <i class="bi bi-cash-stack"></i> Отчет по КВ
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Комиссионное вознаграждение</strong>
+                </p>
+                <p class="text-muted small mb-3">
+                    Оплаченные платежи, ожидающие согласования страховой компанией
+                </p>
+
+                <!-- Ключевые показатели -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill me-2" style="color: #5D4037;"></i>
+                            <small><strong>КВ %</strong> и <strong>КВ руб</strong></small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill me-2" style="color: #5D4037;"></i>
+                            <small>Дата оплаты</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill me-2" style="color: #5D4037;"></i>
+                            <small>Страховые суммы</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill me-2" style="color: #5D4037;"></i>
+                            <small>12 столбцов</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Форма с выбором страховой компании -->
+                <form method="get" action="{% url 'reports:export_commission_report' %}" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="insurer" class="form-label small mb-1 fw-semibold">
+                            <i class="bi bi-building"></i> Страховая компания
+                        </label>
+                        <select class="form-select form-select-sm"
+                                id="insurer"
+                                name="insurer"
+                                required>
+                            <option value="">Выберите страховую компанию</option>
+                            {% for insurer in insurers %}
+                            <option value="{{ insurer.id }}" {% if request.GET.insurer == insurer.id|stringformat:"s" %}selected{% endif %}>
+                                {{ insurer.insurer_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="alert py-2 px-3 mb-3" style="background-color: #faf8f7; border: 1px solid #d7ccc8;">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle" style="color: #5D4037;"></i>
+                            Статус: оплачено, не согласовано СК
+                        </small>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn text-white" style="background-color: #5D4037;">
                             <i class="bi bi-download"></i> Скачать отчет
                         </button>
                     </div>

@@ -33,7 +33,7 @@ cp .env.example .env
 
 ### Production Environment
 
-**Files**: 
+**Files**:
 - `.env.prod` (created from `.env.prod.example`)
 - `.env.prod.db` (created from `.env.prod.db.example`)
 
@@ -96,7 +96,7 @@ SECRET_KEY=django-insecure-a8f#2k9$mxp@4v7n!q3w&e5r^t6y*u8i(o0p)
 
 **Purpose**: List of host/domain names that Django will serve
 
-**Development**: 
+**Development**:
 ```
 ALLOWED_HOSTS=localhost,127.0.0.1
 ```
@@ -168,7 +168,7 @@ python -c 'import secrets; print(secrets.token_urlsafe(32))'
 DB_PASSWORD=xK9mP2nQ5rT8wY3zA6bC9dF2gH5jK8lM
 ```
 
-**Security**: 
+**Security**:
 - Must match `POSTGRES_PASSWORD` in `.env.prod.db`
 - Use at least 20 characters
 - Include uppercase, lowercase, numbers, and special characters
@@ -702,7 +702,7 @@ Never hardcode these values in `.github/workflows/` files!
 
 **Problem**: Django can't find the SECRET_KEY environment variable
 
-**Solution**: 
+**Solution**:
 1. Ensure `.env` or `.env.prod` file exists
 2. Check the file contains `SECRET_KEY=...`
 3. Restart your application/container

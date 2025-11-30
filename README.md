@@ -42,15 +42,21 @@ python3 manage.py loaddata fixtures/initial_data.json
 
 ### 5. Создание суперпользователя
 
-**Быстрый способ (для разработки):**
+**Рекомендуемый способ (безопасный):**
 ```bash
-python3 create_superuser.py
+python3 secure_create_superuser.py
 ```
-Будет создан пользователь: `admin` / `admin`
+Скрипт запросит имя пользователя, email и пароль с валидацией.
 
-**Или вручную:**
+**Или через Django:**
 ```bash
 python3 manage.py createsuperuser
+```
+
+**⚠️ УСТАРЕЛО (только для разработки):**
+```bash
+# НЕ ИСПОЛЬЗУЙТЕ В PRODUCTION!
+# python3 create_superuser.py  # Содержит захардкоженный пароль
 ```
 
 ### 6. Запуск сервера разработки
@@ -188,11 +194,11 @@ insurance_broker/
 **Создание суперпользователя (администратора):**
 
 ```bash
-# Интерактивный режим
-python manage.py createsuperuser
+# Рекомендуемый способ (безопасный с валидацией пароля)
+python secure_create_superuser.py
 
-# Или быстрый способ для разработки
-python create_superuser.py
+# Или стандартный Django способ
+python manage.py createsuperuser
 ```
 
 **Создание обычного пользователя через Django shell:**
@@ -690,7 +696,7 @@ docker compose -f docker-compose.prod.yml logs -f web
 docker inspect --format='{{.State.Health.Status}}' insurance_broker_web
 ```
 
-Подробная документация: [docs/MONITORING.md](docs/MONITORING.md)  
+Подробная документация: [docs/MONITORING.md](docs/MONITORING.md)
 Быстрый справочник: [MONITORING_QUICK_REFERENCE.md](MONITORING_QUICK_REFERENCE.md)
 
 ### Переменные окружения

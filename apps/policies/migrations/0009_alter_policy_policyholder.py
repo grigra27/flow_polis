@@ -5,16 +5,22 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('clients', '0002_client_notes'),
-        ('policies', '0008_policy_broker_participation_policy_property_year'),
+        ("clients", "0002_client_notes"),
+        ("policies", "0008_policy_broker_participation_policy_property_year"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='policy',
-            name='policyholder',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='policyholder_policies', to='clients.client', verbose_name='Страхователь'),
+            model_name="policy",
+            name="policyholder",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="policyholder_policies",
+                to="clients.client",
+                verbose_name="Страхователь",
+            ),
         ),
     ]

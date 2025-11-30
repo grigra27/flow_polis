@@ -56,7 +56,7 @@ fi
 send_alert() {
     local subject="$1"
     local message="$2"
-    
+
     if [ "$SEND_ALERTS" = true ] && [ -n "$ALERT_EMAIL" ]; then
         echo "$message" | mail -s "$subject" "$ALERT_EMAIL" 2>/dev/null || true
     fi
@@ -88,30 +88,30 @@ echo ""
 
 for SERVICE in $SERVICES; do
     TOTAL_SERVICES=$((TOTAL_SERVICES + 1))
-    
+
     # Get container name
     CONTAINER=$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE" 2>/dev/null)
-    
+
     if [ -z "$CONTAINER" ]; then
         echo -e "${RED}✗ $SERVICE: DOWN (container not found)${NC}"
         DOWN_SERVICES=$((DOWN_SERVICES + 1))
         send_alert "Docker Alert: $SERVICE is DOWN" "Service $SERVICE is not running"
         continue
     fi
-    
+
     # Get container status
     STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null)
-    
+
     if [ "$STATUS" != "running" ]; then
         echo -e "${RED}✗ $SERVICE: $STATUS${NC}"
         DOWN_SERVICES=$((DOWN_SERVICES + 1))
         send_alert "Docker Alert: $SERVICE is $STATUS" "Service $SERVICE status: $STATUS"
         continue
     fi
-    
+
     # Check health status if available
     HEALTH=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$CONTAINER" 2>/dev/null)
-    
+
     case "$HEALTH" in
         healthy)
             echo -e "${GREEN}✓ $SERVICE: healthy${NC}"

@@ -29,6 +29,11 @@ pytest==7.4.3
 pytest-django==4.7.0
 hypothesis==6.92.1
 
+# Security
+pre-commit==3.6.0
+detect-secrets==1.4.0
+filetype==1.2.0
+
 # Production
 gunicorn==21.2.0
 whitenoise==6.6.0

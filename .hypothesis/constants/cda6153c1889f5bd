@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/core/file_validators.py
+# hypothesis_version: 6.141.1
+
+[1024, 2048, ', ', '.', 'application/pdf', 'image/jpeg', 'image/png', 'jpeg', 'jpg', 'pdf', 'png', 'security', 'xlsx']

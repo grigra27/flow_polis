@@ -27,7 +27,7 @@ This document provides a reference for the `docker-compose.prod.yml` configurati
 - **Build**: From local Dockerfile
 - **Purpose**: Main Django application
 - **Command**: `gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120`
-- **Volumes**: 
+- **Volumes**:
   - `static_volume:/app/staticfiles`
   - `media_volume:/app/media`
 - **Networks**: `backend`, `frontend`
@@ -57,7 +57,7 @@ This document provides a reference for the `docker-compose.prod.yml` configurati
 ### 6. nginx
 - **Image**: `nginx:alpine`
 - **Purpose**: Reverse proxy, SSL termination, static file serving
-- **Ports**: 
+- **Ports**:
   - `80:80` (HTTP)
   - `443:443` (HTTPS)
 - **Volumes**:
@@ -85,7 +85,7 @@ All volumes use the `local` driver for data persistence:
 - **backend**: Internal network for database and cache services
   - Services: db, redis, web, celery_worker, celery_beat
   - Isolated from external access
-  
+
 - **frontend**: Network for web-facing services
   - Services: web, nginx
   - Nginx exposes ports 80 and 443 to the host

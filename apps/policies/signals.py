@@ -13,12 +13,12 @@ def calculate_commission(sender, instance, **kwargs):
     """
     if not instance.commission_rate:
         return
-    
+
     # For new records, always calculate
     if not instance.pk:
         instance.kv_rub = instance.calculate_kv_rub()
         return
-    
+
     # For existing records, check if commission_rate changed
     try:
         old_instance = PaymentSchedule.objects.get(pk=instance.pk)
@@ -42,4 +42,4 @@ def update_policy_premium_total(sender, instance, **kwargs):
     """
     policy = instance.policy
     policy.premium_total = policy.calculate_premium_total()
-    policy.save(update_fields=['premium_total', 'updated_at'])
+    policy.save(update_fields=["premium_total", "updated_at"])

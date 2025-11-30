@@ -44,17 +44,17 @@ check_permissions() {
 # Check if required commands are available
 check_dependencies() {
     log_info "Checking dependencies..."
-    
+
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
-    
+
     if ! command -v docker-compose &> /dev/null; then
         log_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
-    
+
     log_info "All dependencies are available."
 }
 
@@ -77,11 +77,11 @@ check_existing_certificates() {
 # Create required directories
 create_directories() {
     log_info "Creating required directories..."
-    
+
     mkdir -p "$CERTBOT_DIR/conf"
     mkdir -p "$CERTBOT_DIR/www"
     mkdir -p "$NGINX_CONF_DIR"
-    
+
     log_info "Directories created successfully."
 }
 
@@ -92,7 +92,7 @@ check_env_file() {
         log_info "Please create .env.prod from .env.prod.example"
         exit 1
     fi
-    
+
     if [ ! -f ".env.prod.db" ]; then
         log_error ".env.prod.db file not found!"
         log_info "Please create .env.prod.db from .env.prod.db.example"
@@ -111,12 +111,12 @@ backup_nginx_config() {
 # Use initial nginx configuration (without SSL)
 use_initial_nginx_config() {
     log_info "Setting up initial nginx configuration (without SSL)..."
-    
+
     if [ ! -f "$NGINX_CONF_DIR/default.conf.initial" ]; then
         log_error "Initial nginx configuration not found at $NGINX_CONF_DIR/default.conf.initial"
         exit 1
     fi
-    
+
     cp "$NGINX_CONF_DIR/default.conf.initial" "$NGINX_CONF_DIR/default.conf"
     log_info "Initial nginx configuration applied."
 }
@@ -124,15 +124,15 @@ use_initial_nginx_config() {
 # Start Docker services
 start_services() {
     log_info "Starting Docker services..."
-    
+
     docker-compose -f "$COMPOSE_FILE" up -d db redis
     log_info "Waiting for database and redis to be ready..."
     sleep 10
-    
+
     docker-compose -f "$COMPOSE_FILE" up -d web
     log_info "Waiting for web service to be ready..."
     sleep 15
-    
+
     docker-compose -f "$COMPOSE_FILE" up -d nginx
     log_info "Nginx started."
     sleep 5
@@ -141,19 +141,19 @@ start_services() {
 # Verify services are running
 verify_services() {
     log_info "Verifying services are running..."
-    
+
     if ! docker-compose -f "$COMPOSE_FILE" ps | grep -q "Up"; then
         log_error "Some services failed to start. Check logs with: docker-compose -f $COMPOSE_FILE logs"
         exit 1
     fi
-    
+
     log_info "All services are running."
 }
 
 # Test HTTP access
 test_http_access() {
     log_info "Testing HTTP access..."
-    
+
     # Try to access the health endpoint
     if command -v curl &> /dev/null; then
         if curl -f http://localhost/health/ &> /dev/null; then
@@ -169,13 +169,13 @@ test_http_access() {
 # Obtain SSL certificate
 obtain_certificate() {
     log_info "Obtaining SSL certificate from Let's Encrypt..."
-    
+
     local staging_arg=""
     if [ "$STAGING" = "1" ]; then
         log_warn "Using Let's Encrypt STAGING server (for testing)"
         staging_arg="--staging"
     fi
-    
+
     # Request certificate
     docker-compose -f "$COMPOSE_FILE" run --rm --entrypoint "\
         certbot certonly --webroot \
@@ -195,25 +195,25 @@ obtain_certificate() {
         log_info "You can test with staging server: STAGING=1 ./scripts/init-letsencrypt.sh"
         exit 1
     }
-    
+
     log_info "SSL certificate obtained successfully!"
 }
 
 # Verify certificate files
 verify_certificate() {
     log_info "Verifying certificate files..."
-    
+
     local cert_dir="$CERTBOT_DIR/conf/live/$DOMAIN"
-    
+
     if [ ! -f "$cert_dir/fullchain.pem" ] || \
        [ ! -f "$cert_dir/privkey.pem" ] || \
        [ ! -f "$cert_dir/chain.pem" ]; then
         log_error "Certificate files not found in $cert_dir"
         exit 1
     fi
-    
+
     log_info "Certificate files verified."
-    
+
     # Show certificate expiry
     log_info "Certificate details:"
     docker-compose -f "$COMPOSE_FILE" run --rm --entrypoint "\
@@ -223,7 +223,7 @@ verify_certificate() {
 # Restore SSL-enabled nginx configuration
 restore_ssl_nginx_config() {
     log_info "Restoring SSL-enabled nginx configuration..."
-    
+
     # The default.conf should already have SSL configuration
     # We just need to ensure it's the right version
     if [ -f "$NGINX_CONF_DIR/default.conf.backup."* ]; then
@@ -234,7 +234,7 @@ restore_ssl_nginx_config() {
             log_info "Restored previous SSL configuration."
         fi
     fi
-    
+
     # If no suitable backup, we assume default.conf.initial was temporary
     # and we need to restore the original default.conf from git or use a template
     log_info "SSL-enabled nginx configuration is ready."
@@ -243,7 +243,7 @@ restore_ssl_nginx_config() {
 # Reload nginx
 reload_nginx() {
     log_info "Reloading nginx with SSL configuration..."
-    
+
     docker-compose -f "$COMPOSE_FILE" exec nginx nginx -t || {
         log_error "Nginx configuration test failed!"
         log_info "Restoring initial configuration..."
@@ -251,7 +251,7 @@ reload_nginx() {
         docker-compose -f "$COMPOSE_FILE" restart nginx
         exit 1
     }
-    
+
     docker-compose -f "$COMPOSE_FILE" restart nginx
     log_info "Nginx reloaded successfully."
 }
@@ -259,9 +259,9 @@ reload_nginx() {
 # Test HTTPS access
 test_https_access() {
     log_info "Testing HTTPS access..."
-    
+
     sleep 5
-    
+
     if command -v curl &> /dev/null; then
         if curl -f -k https://localhost/health/ &> /dev/null; then
             log_info "HTTPS access verified."
@@ -276,7 +276,7 @@ test_https_access() {
 # Setup automatic renewal
 setup_auto_renewal() {
     log_info "Setting up automatic certificate renewal..."
-    
+
     # Add certbot service to docker-compose if not present
     if ! grep -q "certbot:" "$COMPOSE_FILE"; then
         log_warn "Certbot service not found in $COMPOSE_FILE"
@@ -293,7 +293,7 @@ setup_auto_renewal() {
         log_info "Certbot service found in docker-compose. Starting it for automatic renewal..."
         docker-compose -f "$COMPOSE_FILE" up -d certbot
     fi
-    
+
     log_info "Automatic renewal setup complete."
     log_info "Certificates will be checked for renewal twice daily."
 }
@@ -325,35 +325,35 @@ print_success() {
 main() {
     log_info "Starting Let's Encrypt SSL certificate initialization..."
     echo ""
-    
+
     check_permissions
     check_dependencies
     check_env_file
-    
+
     local is_new_cert=0
     if check_existing_certificates; then
         is_new_cert=1
     fi
-    
+
     create_directories
     backup_nginx_config
-    
+
     if [ $is_new_cert -eq 1 ]; then
         use_initial_nginx_config
         start_services
         verify_services
         test_http_access
     fi
-    
+
     obtain_certificate
     verify_certificate
-    
+
     if [ $is_new_cert -eq 1 ]; then
         restore_ssl_nginx_config
         reload_nginx
         test_https_access
     fi
-    
+
     setup_auto_renewal
     print_success
 }

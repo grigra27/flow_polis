@@ -4,25 +4,46 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Client',
+            name="Client",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('client_name', models.CharField(max_length=255, verbose_name='Название компании')),
-                ('client_inn', models.CharField(blank=True, max_length=12, null=True, verbose_name='ИНН')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "client_name",
+                    models.CharField(max_length=255, verbose_name="Название компании"),
+                ),
+                (
+                    "client_inn",
+                    models.CharField(
+                        blank=True, max_length=12, null=True, verbose_name="ИНН"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Клиент',
-                'verbose_name_plural': 'Клиенты',
-                'ordering': ['client_name'],
-                'indexes': [models.Index(fields=['client_name'], name='clients_cli_client__9a16e0_idx'), models.Index(fields=['client_inn'], name='clients_cli_client__f6efc9_idx')],
+                "verbose_name": "Клиент",
+                "verbose_name_plural": "Клиенты",
+                "ordering": ["client_name"],
+                "indexes": [
+                    models.Index(
+                        fields=["client_name"], name="clients_cli_client__9a16e0_idx"
+                    ),
+                    models.Index(
+                        fields=["client_inn"], name="clients_cli_client__f6efc9_idx"
+                    ),
+                ],
             },
         ),
     ]

@@ -6,7 +6,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,22 +14,76 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='CustomExportTemplate',
+            name="CustomExportTemplate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Дата обновления')),
-                ('name', models.CharField(help_text='Уникальное название для пользователя', max_length=255, verbose_name='Название шаблона')),
-                ('data_source', models.CharField(choices=[('policies', 'Полисы'), ('payments', 'Платежи'), ('clients', 'Клиенты'), ('insurers', 'Страховщики')], max_length=50, verbose_name='Источник данных')),
-                ('config', models.JSONField(help_text='JSON с выбранными полями и фильтрами', verbose_name='Конфигурация')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='export_templates', to=settings.AUTH_USER_MODEL, verbose_name='Пользователь')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата создания"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Дата обновления"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Уникальное название для пользователя",
+                        max_length=255,
+                        verbose_name="Название шаблона",
+                    ),
+                ),
+                (
+                    "data_source",
+                    models.CharField(
+                        choices=[
+                            ("policies", "Полисы"),
+                            ("payments", "Платежи"),
+                            ("clients", "Клиенты"),
+                            ("insurers", "Страховщики"),
+                        ],
+                        max_length=50,
+                        verbose_name="Источник данных",
+                    ),
+                ),
+                (
+                    "config",
+                    models.JSONField(
+                        help_text="JSON с выбранными полями и фильтрами",
+                        verbose_name="Конфигурация",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="export_templates",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Пользователь",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Шаблон экспорта',
-                'verbose_name_plural': 'Шаблоны экспортов',
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['user', '-created_at'], name='reports_cus_user_id_d99855_idx')],
-                'unique_together': {('user', 'name')},
+                "verbose_name": "Шаблон экспорта",
+                "verbose_name_plural": "Шаблоны экспортов",
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["user", "-created_at"],
+                        name="reports_cus_user_id_d99855_idx",
+                    )
+                ],
+                "unique_together": {("user", "name")},
             },
         ),
     ]

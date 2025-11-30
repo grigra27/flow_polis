@@ -321,4 +321,3 @@ If you want to use PostgreSQL in development:
 - Read the main [README.md](README.md) for application features
 - Check [docs/](docs/) for detailed documentation
 - Review [DOCKER_COMPOSE_REFERENCE.md](DOCKER_COMPOSE_REFERENCE.md) for production deployment
-

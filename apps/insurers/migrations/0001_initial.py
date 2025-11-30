@@ -5,76 +5,161 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Branch',
+            name="Branch",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('branch_name', models.CharField(max_length=255, verbose_name='Название филиала')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "branch_name",
+                    models.CharField(max_length=255, verbose_name="Название филиала"),
+                ),
             ],
             options={
-                'verbose_name': 'Филиал',
-                'verbose_name_plural': 'Филиалы',
-                'ordering': ['branch_name'],
+                "verbose_name": "Филиал",
+                "verbose_name_plural": "Филиалы",
+                "ordering": ["branch_name"],
             },
         ),
         migrations.CreateModel(
-            name='InfoTag',
+            name="InfoTag",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100, unique=True, verbose_name='Метка')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=100, unique=True, verbose_name="Метка"),
+                ),
             ],
             options={
-                'verbose_name': 'Инфо-метка',
-                'verbose_name_plural': 'Инфо-метки',
-                'ordering': ['name'],
+                "verbose_name": "Инфо-метка",
+                "verbose_name_plural": "Инфо-метки",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='InsuranceType',
+            name="InsuranceType",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100, unique=True, verbose_name='Вид страхования')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        max_length=100, unique=True, verbose_name="Вид страхования"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Вид страхования',
-                'verbose_name_plural': 'Виды страхования',
-                'ordering': ['name'],
+                "verbose_name": "Вид страхования",
+                "verbose_name_plural": "Виды страхования",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Insurer',
+            name="Insurer",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('insurer_name', models.CharField(max_length=255, verbose_name='Название страховой компании')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "insurer_name",
+                    models.CharField(
+                        max_length=255, verbose_name="Название страховой компании"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Страховая компания',
-                'verbose_name_plural': 'Страховые компании',
-                'ordering': ['insurer_name'],
+                "verbose_name": "Страховая компания",
+                "verbose_name_plural": "Страховые компании",
+                "ordering": ["insurer_name"],
             },
         ),
         migrations.CreateModel(
-            name='CommissionRate',
+            name="CommissionRate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Дата обновления')),
-                ('kv_percent', models.DecimalField(decimal_places=2, max_digits=5, verbose_name='Ставка комиссии (%)')),
-                ('insurance_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='commission_rates', to='insurers.insurancetype', verbose_name='Вид страхования')),
-                ('insurer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='commission_rates', to='insurers.insurer', verbose_name='Страховщик')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата создания"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Дата обновления"),
+                ),
+                (
+                    "kv_percent",
+                    models.DecimalField(
+                        decimal_places=2,
+                        max_digits=5,
+                        verbose_name="Ставка комиссии (%)",
+                    ),
+                ),
+                (
+                    "insurance_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="commission_rates",
+                        to="insurers.insurancetype",
+                        verbose_name="Вид страхования",
+                    ),
+                ),
+                (
+                    "insurer",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="commission_rates",
+                        to="insurers.insurer",
+                        verbose_name="Страховщик",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Ставка комиссии',
-                'verbose_name_plural': 'Ставки комиссий',
-                'ordering': ['insurer', 'insurance_type'],
-                'unique_together': {('insurer', 'insurance_type')},
+                "verbose_name": "Ставка комиссии",
+                "verbose_name_plural": "Ставки комиссий",
+                "ordering": ["insurer", "insurance_type"],
+                "unique_together": {("insurer", "insurance_type")},
             },
         ),
     ]

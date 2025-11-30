@@ -4,20 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('insurers', '0007_leasingmanager'),
+        ("insurers", "0007_leasingmanager"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='leasingmanager',
-            name='full_name',
-            field=models.CharField(blank=True, max_length=255, verbose_name='Полное ФИО'),
+            model_name="leasingmanager",
+            name="full_name",
+            field=models.CharField(
+                blank=True, max_length=255, verbose_name="Полное ФИО"
+            ),
         ),
         migrations.AlterField(
-            model_name='leasingmanager',
-            name='name',
-            field=models.CharField(max_length=255, unique=True, verbose_name='Фамилия менеджера'),
+            model_name="leasingmanager",
+            name="name",
+            field=models.CharField(
+                max_length=255, unique=True, verbose_name="Фамилия менеджера"
+            ),
         ),
     ]

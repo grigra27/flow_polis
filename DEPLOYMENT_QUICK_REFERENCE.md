@@ -4,12 +4,12 @@
 
 GitHub Actions workflow **НЕ перезаписывает**:
 - `.env.prod` - ваши production credentials
-- `.env.prod.db` - пароли базы данных  
+- `.env.prod.db` - пароли базы данных
 - `certbot/` - SSL сертификаты Let's Encrypt
 
 Эти файлы сохраняются между деплоями!
 
-**Если забыли пароли:** `./scripts/show-production-credentials.sh`  
+**Если забыли пароли:** `./scripts/show-production-credentials.sh`
 **Подробнее:** [docs/CREDENTIAL_RECOVERY.md](docs/CREDENTIAL_RECOVERY.md)
 
 ---
@@ -34,10 +34,10 @@ export DROPLET_IP="64.227.75.233"
 
 ## Предварительные требования
 
-✅ Droplet создан и настроен (Task 17)  
-✅ DNS настроен для onbr.site (Task 18)  
-✅ SSH ключи настроены  
-✅ Firewall разрешает порты 22, 80, 443  
+✅ Droplet создан и настроен (Task 17)
+✅ DNS настроен для onbr.site (Task 18)
+✅ SSH ключи настроены
+✅ Firewall разрешает порты 22, 80, 443
 
 ---
 
@@ -315,10 +315,10 @@ docker compose -f docker-compose.prod.yml ps
 
 ## Контакты и ссылки
 
-**Droplet IP:** `64.227.75.233`  
-**Домен:** onbr.site  
-**SSH:** `ssh root@64.227.75.233`  
-**Директория:** `/opt/insurance_broker`  
+**Droplet IP:** `64.227.75.233`
+**Домен:** onbr.site
+**SSH:** `ssh root@64.227.75.233`
+**Директория:** `/opt/insurance_broker`
 
 ### Документация
 

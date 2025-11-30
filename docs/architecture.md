@@ -15,7 +15,7 @@
 - **id** *(serial)* — PK.
 - **insurer_name** *(varchar)* — название страховой компании.
 
-### 3. **Branch** (Филиал) 
+### 3. **Branch** (Филиал)
 
 - **id** *(serial)* — PK.
 - **branch_name** *(varchar)* — название филиала (Москва, Казань, Псков, Архангельск и т. д.).
@@ -54,7 +54,7 @@
 - **end_date** *(date)* - дата окончания страхования.
 - **property_value** *(numeric)* — стоимость имущества (__СС за первый год__).
 - **premium_total** *(numeric)* — общая сумма страховой премии (сумма всех премий из ***PaymentSchedule***).
-- **insurance_type_id** *(FK → InsuranceType.id)* — вид страхования.  
+- **insurance_type_id** *(FK → InsuranceType.id)* — вид страхования.
 - **branch_id** *(FK → Branch.id)* — филиал, к которому относится полис.
 - **leasing_manager** (*varchar*) -  фамилия менеджера лизинговой компании.
 - **franchise** (*numeric*) - размер франшизы, если франшизы нет то ставить 0.
@@ -63,8 +63,8 @@
 - **policy_active** (*boolean*) - полис активен или закрыт
 - **dfa_active** (*boolean*) - ДФА активен или закрыт
 - **policy_uploaded** (*boolean*) - полис подгружен (по умолчанию false)
-- **created_at** *(timestamp)* 
-- **updated_at** *(timestamp)* 
+- **created_at** *(timestamp)*
+- **updated_at** *(timestamp)*
 
 ### 8. **PaymentSchedule** (График платежей)
 
@@ -81,7 +81,7 @@
 - **paid_date** *(date, nullable)* — фактическая дата оплаты.
 - **insurer_date** *(date, nullable)* —  дата согласования СК.
 - **payment_info** (*varchar*) - свободное текстовое поле.
-- **created_at** *(timestamp)* 
+- **created_at** *(timestamp)*
 - **updated_at** *(timestamp)*
 
 ### 9. **PolicyInfo** (Связка полис ↔ метки для инфо-полей)
@@ -90,13 +90,13 @@
 - **policy_id** *(FK → Policy.id)*
 - **tag_id** *(FK → InfoTag.id)*
 - **info_field** *(smallint)* → 1 = Инфо 1, 2 = Инфо 2
-- **created_at** *(timestamp)* 
+- **created_at** *(timestamp)*
 - **updated_at** *(timestamp)*
 
 
 ---
 
-##  Логика и связи 
+##  Логика и связи
 
 - Один **Client** может иметь много **Policy**.
 - Один **Insurer** может быть у многих **Policy**.
@@ -104,6 +104,4 @@
 - **Policy ↔ PaymentSchedule** — один-ко-многим.
 - **Policy ↔ InfoTag** — многие-ко-многим через PolicyInfo, где info_field задаёт, к какому полю относится метка.
 - **Client / Insurer / Branch** — справочники для ссылок из Policy.
-- **InsuranceType ↔ Insurer ↔ CommissionRate** — связка ставок комиссий.  
-
- 
+- **InsuranceType ↔ Insurer ↔ CommissionRate** — связка ставок комиссий.

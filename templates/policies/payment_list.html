@@ -49,14 +49,14 @@
 <div class="mb-4">
     <ul class="nav nav-pills nav-fill" role="tablist">
         <li class="nav-item" role="presentation">
-            <a class="nav-link {% if not selected_branch %}active{% endif %}" 
+            <a class="nav-link {% if not selected_branch %}active{% endif %}"
                href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
                 <i class="bi bi-grid-3x3-gap"></i> Все филиалы
             </a>
         </li>
         {% for branch in branches %}
         <li class="nav-item" role="presentation">
-            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}" 
+            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
                href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
                 {% branch_logo branch size='small' %}
             </a>
@@ -99,43 +99,43 @@
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <!-- Past payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-success {% if request.GET.status == 'approved' %}active{% endif %}">
                 <i class="bi bi-check2-circle"></i> Согласовано с СК
             </a>
-            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-primary {% if request.GET.status == 'paid' %}active{% endif %}">
                 <i class="bi bi-check-circle"></i> Оплаченные
             </a>
-            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
                 <i class="bi bi-exclamation-triangle"></i> Не оплаченные
             </a>
         </div>
-        
+
         <div class="vr" style="height: 38px;"></div>
-        
+
         <!-- Future payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-warning {% if request.GET.status == 'upcoming' or not request.GET.status %}active{% endif %}">
                 <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
             </a>
-            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-info {% if request.GET.status == 'future' %}active{% endif %}">
                 <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
             </a>
         </div>
-        
+
         <div class="vr" style="height: 38px;"></div>
-        
+
         <!-- All payments -->
-        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" 
+        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
            class="btn btn-outline-primary {% if request.GET.status == 'all' %}active{% endif %}">
             <i class="bi bi-list-ul"></i> Все платежи
         </a>
-        
-        <small class="text-muted ms-auto" style="cursor: help;" 
+
+        <small class="text-muted ms-auto" style="cursor: help;"
                title="Статусы платежей (по приоритету):
 • Согласовано с СК — есть дата согласования
 • Оплачен — есть дата оплаты
@@ -153,8 +153,8 @@
 </div>
 {% else %}
 <div class="alert alert-info mb-3">
-    <i class="bi bi-funnel-fill"></i> 
-    Применен фильтр по датам: 
+    <i class="bi bi-funnel-fill"></i>
+    Применен фильтр по датам:
     {% if request.GET.date_from %}с {{ request.GET.date_from }}{% endif %}
     {% if request.GET.date_to %}по {{ request.GET.date_to }}{% endif %}
 </div>

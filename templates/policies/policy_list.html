@@ -55,14 +55,14 @@
 <div class="mb-4">
     <ul class="nav nav-pills nav-fill" role="tablist">
         <li class="nav-item" role="presentation">
-            <a class="nav-link {% if not selected_branch %}active{% endif %}" 
+            <a class="nav-link {% if not selected_branch %}active{% endif %}"
                href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
                 <i class="bi bi-grid-3x3-gap"></i> Все филиалы
             </a>
         </li>
         {% for branch in branches %}
         <li class="nav-item" role="presentation">
-            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}" 
+            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
                href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
                 {% branch_logo branch size='small' %}
             </a>

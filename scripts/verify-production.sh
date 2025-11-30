@@ -96,7 +96,7 @@ fi
 # Check SSL certificate
 if [ -d "/etc/letsencrypt/live/onbr.site" ] || [ -d "certbot/conf/live/onbr.site" ]; then
     print_result 0 "SSL certificate directory exists"
-    
+
     # Check certificate expiry
     if command -v openssl &> /dev/null; then
         if [ -f "certbot/conf/live/onbr.site/cert.pem" ]; then
@@ -115,7 +115,7 @@ print_section "4. Database Connectivity"
 
 if docker compose -f docker-compose.prod.yml exec -T db psql -U postgres -d insurance_broker_prod -c "SELECT 1;" &> /dev/null; then
     print_result 0 "PostgreSQL database is accessible"
-    
+
     # Check number of tables
     TABLE_COUNT=$(docker compose -f docker-compose.prod.yml exec -T db psql -U postgres -d insurance_broker_prod -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
     if [ "$TABLE_COUNT" -gt 0 ]; then
@@ -140,7 +140,7 @@ print_section "5. Redis Connectivity"
 
 if docker compose -f docker-compose.prod.yml exec -T redis redis-cli ping 2>&1 | grep -q "PONG"; then
     print_result 0 "Redis is responding"
-    
+
     # Check Redis memory usage
     REDIS_MEMORY=$(docker compose -f docker-compose.prod.yml exec -T redis redis-cli info memory 2>/dev/null | grep "used_memory_human" | cut -d: -f2 | tr -d '\r')
     if [ -n "$REDIS_MEMORY" ]; then
@@ -200,14 +200,14 @@ print_section "9. Environment Configuration"
 
 if [ -f ".env.prod" ]; then
     print_result 0 ".env.prod file exists"
-    
+
     # Check DEBUG setting
     if grep -q "^DEBUG=False" .env.prod; then
         print_result 0 "DEBUG is set to False (production mode)"
     else
         print_result 1 "DEBUG is not set to False"
     fi
-    
+
     # Check ALLOWED_HOSTS
     if grep -q "^ALLOWED_HOSTS=" .env.prod; then
         ALLOWED_HOSTS=$(grep "^ALLOWED_HOSTS=" .env.prod | cut -d= -f2)
@@ -225,20 +225,20 @@ print_section "10. Firewall Configuration"
 if command -v ufw &> /dev/null; then
     if ufw status | grep -q "Status: active"; then
         print_result 0 "UFW firewall is active"
-        
+
         # Check required ports
         if ufw status | grep -q "80"; then
             print_result 0 "Port 80 (HTTP) is open"
         else
             print_warning "Port 80 may not be open"
         fi
-        
+
         if ufw status | grep -q "443"; then
             print_result 0 "Port 443 (HTTPS) is open"
         else
             print_warning "Port 443 may not be open"
         fi
-        
+
         if ufw status | grep -q "22"; then
             print_result 0 "Port 22 (SSH) is open"
         else
@@ -258,7 +258,7 @@ if command -v dig &> /dev/null; then
     DOMAIN_IP=$(dig +short onbr.site | tail -n1)
     if [ -n "$DOMAIN_IP" ]; then
         print_result 0 "DNS resolves onbr.site to $DOMAIN_IP"
-        
+
         # Check if it matches server IP
         SERVER_IP=$(curl -s ifconfig.me)
         if [ "$DOMAIN_IP" = "$SERVER_IP" ]; then

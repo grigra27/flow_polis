@@ -93,4 +93,3 @@ services:
 networks:
   dev_network:
     driver: bridge
-

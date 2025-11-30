@@ -4,20 +4,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('insurers', '0003_insurer_notes'),
+        ("insurers", "0003_insurer_notes"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='insurer',
-            name='logo',
-            field=models.ImageField(blank=True, help_text='Рекомендуемый размер: 200x200px', null=True, upload_to='insurer_logos/', verbose_name='Логотип'),
+            model_name="insurer",
+            name="logo",
+            field=models.ImageField(
+                blank=True,
+                help_text="Рекомендуемый размер: 200x200px",
+                null=True,
+                upload_to="insurer_logos/",
+                verbose_name="Логотип",
+            ),
         ),
         migrations.AlterField(
-            model_name='insurer',
-            name='contacts',
-            field=models.URLField(blank=True, help_text='Ссылка на yonote', verbose_name='Контакты (ссылка)'),
+            model_name="insurer",
+            name="contacts",
+            field=models.URLField(
+                blank=True,
+                help_text="Ссылка на yonote",
+                verbose_name="Контакты (ссылка)",
+            ),
         ),
     ]

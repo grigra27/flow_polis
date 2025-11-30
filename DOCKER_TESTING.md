@@ -71,7 +71,7 @@ The integration tests validate the following requirements from the specification
    lsof -i :443
    ```
 
-5. **System Resources**: 
+5. **System Resources**:
    - At least 4GB RAM available
    - At least 10GB disk space
    - CPU with 2+ cores recommended
@@ -385,15 +385,15 @@ on:
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    
+
     - name: Create environment files
       run: |
         cp .env.prod.example .env.prod
@@ -402,11 +402,11 @@ jobs:
         sed -i 's/your-secret-key-here/test-secret-key/' .env.prod
         sed -i 's/your-strong-database-password-here/test_password/' .env.prod
         sed -i 's/your-strong-database-password-here/test_password/' .env.prod.db
-    
+
     - name: Run integration tests
       run: |
         python tests/test_docker_integration.py
-    
+
     - name: Clean up
       if: always()
       run: |

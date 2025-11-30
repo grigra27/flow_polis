@@ -5,20 +5,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0007_migrate_leasing_manager'),
+        ("policies", "0007_migrate_leasing_manager"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='policy',
-            name='broker_participation',
-            field=models.BooleanField(default=True, verbose_name='Участие брокера'),
+            model_name="policy",
+            name="broker_participation",
+            field=models.BooleanField(default=True, verbose_name="Участие брокера"),
         ),
         migrations.AddField(
-            model_name='policy',
-            name='property_year',
-            field=models.IntegerField(blank=True, help_text='Год выпуска застрахованного имущества (1900-2100)', null=True, validators=[django.core.validators.MinValueValidator(1900), django.core.validators.MaxValueValidator(2100)], verbose_name='Год выпуска имущества'),
+            model_name="policy",
+            name="property_year",
+            field=models.IntegerField(
+                blank=True,
+                help_text="Год выпуска застрахованного имущества (1900-2100)",
+                null=True,
+                validators=[
+                    django.core.validators.MinValueValidator(1900),
+                    django.core.validators.MaxValueValidator(2100),
+                ],
+                verbose_name="Год выпуска имущества",
+            ),
         ),
     ]

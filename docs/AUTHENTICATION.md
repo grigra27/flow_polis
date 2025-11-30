@@ -117,12 +117,12 @@ is_active = True
    - **Email address** - Email
 
 2. Установите права доступа:
-   
+
    **Для обычного пользователя:**
    - ☐ Active (должна быть установлена)
    - ☐ Staff status (НЕ устанавливать)
    - ☐ Superuser status (НЕ устанавливать)
-   
+
    **Для администратора:**
    - ☑ Active
    - ☑ Staff status
@@ -219,4 +219,3 @@ for data in users_data:
     user = User.objects.create_user(**data)
     print(f"Создан: {user.username}")
 ```
-

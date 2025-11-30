@@ -7,107 +7,365 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('insurers', '0001_initial'),
-        ('clients', '0001_initial'),
+        ("insurers", "0001_initial"),
+        ("clients", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Policy',
+            name="Policy",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Дата обновления')),
-                ('policy_number', models.CharField(max_length=100, verbose_name='Номер полиса')),
-                ('dfa_number', models.CharField(blank=True, max_length=100, verbose_name='Номер ДФА')),
-                ('property_description', models.TextField(verbose_name='Описание застрахованного имущества')),
-                ('start_date', models.DateField(verbose_name='Дата начала страхования')),
-                ('end_date', models.DateField(verbose_name='Дата окончания страхования')),
-                ('property_value', models.DecimalField(decimal_places=2, max_digits=15, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))], verbose_name='Стоимость имущества (СС за первый год)')),
-                ('premium_total', models.DecimalField(decimal_places=2, default=0, help_text='Рассчитывается автоматически из графика платежей', max_digits=15, verbose_name='Общая сумма страховой премии')),
-                ('leasing_manager', models.CharField(blank=True, max_length=255, verbose_name='Менеджер лизинговой компании')),
-                ('franchise', models.DecimalField(decimal_places=2, default=0, max_digits=15, validators=[django.core.validators.MinValueValidator(Decimal('0'))], verbose_name='Франшиза')),
-                ('info3', models.TextField(blank=True, verbose_name='Инфо 3 (видно в журнале)')),
-                ('info4', models.TextField(blank=True, verbose_name='Инфо 4 (не видно в журнале)')),
-                ('policy_active', models.BooleanField(default=True, verbose_name='Полис активен')),
-                ('dfa_active', models.BooleanField(default=True, verbose_name='ДФА активен')),
-                ('branch', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='policies', to='insurers.branch', verbose_name='Филиал')),
-                ('client', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='policies', to='clients.client', verbose_name='Лизингополучатель')),
-                ('insurance_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='policies', to='insurers.insurancetype', verbose_name='Вид страхования')),
-                ('insurer', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='policies', to='insurers.insurer', verbose_name='Страховщик')),
-                ('policyholder', models.ForeignKey(blank=True, help_text='Если АЛ - завести клиентом', null=True, on_delete=django.db.models.deletion.PROTECT, related_name='policyholder_policies', to='clients.client', verbose_name='Страхователь')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата создания"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Дата обновления"),
+                ),
+                (
+                    "policy_number",
+                    models.CharField(max_length=100, verbose_name="Номер полиса"),
+                ),
+                (
+                    "dfa_number",
+                    models.CharField(
+                        blank=True, max_length=100, verbose_name="Номер ДФА"
+                    ),
+                ),
+                (
+                    "property_description",
+                    models.TextField(verbose_name="Описание застрахованного имущества"),
+                ),
+                (
+                    "start_date",
+                    models.DateField(verbose_name="Дата начала страхования"),
+                ),
+                (
+                    "end_date",
+                    models.DateField(verbose_name="Дата окончания страхования"),
+                ),
+                (
+                    "property_value",
+                    models.DecimalField(
+                        decimal_places=2,
+                        max_digits=15,
+                        validators=[
+                            django.core.validators.MinValueValidator(Decimal("0.01"))
+                        ],
+                        verbose_name="Стоимость имущества (СС за первый год)",
+                    ),
+                ),
+                (
+                    "premium_total",
+                    models.DecimalField(
+                        decimal_places=2,
+                        default=0,
+                        help_text="Рассчитывается автоматически из графика платежей",
+                        max_digits=15,
+                        verbose_name="Общая сумма страховой премии",
+                    ),
+                ),
+                (
+                    "leasing_manager",
+                    models.CharField(
+                        blank=True,
+                        max_length=255,
+                        verbose_name="Менеджер лизинговой компании",
+                    ),
+                ),
+                (
+                    "franchise",
+                    models.DecimalField(
+                        decimal_places=2,
+                        default=0,
+                        max_digits=15,
+                        validators=[
+                            django.core.validators.MinValueValidator(Decimal("0"))
+                        ],
+                        verbose_name="Франшиза",
+                    ),
+                ),
+                (
+                    "info3",
+                    models.TextField(
+                        blank=True, verbose_name="Инфо 3 (видно в журнале)"
+                    ),
+                ),
+                (
+                    "info4",
+                    models.TextField(
+                        blank=True, verbose_name="Инфо 4 (не видно в журнале)"
+                    ),
+                ),
+                (
+                    "policy_active",
+                    models.BooleanField(default=True, verbose_name="Полис активен"),
+                ),
+                (
+                    "dfa_active",
+                    models.BooleanField(default=True, verbose_name="ДФА активен"),
+                ),
+                (
+                    "branch",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="policies",
+                        to="insurers.branch",
+                        verbose_name="Филиал",
+                    ),
+                ),
+                (
+                    "client",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="policies",
+                        to="clients.client",
+                        verbose_name="Лизингополучатель",
+                    ),
+                ),
+                (
+                    "insurance_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="policies",
+                        to="insurers.insurancetype",
+                        verbose_name="Вид страхования",
+                    ),
+                ),
+                (
+                    "insurer",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="policies",
+                        to="insurers.insurer",
+                        verbose_name="Страховщик",
+                    ),
+                ),
+                (
+                    "policyholder",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Если АЛ - завести клиентом",
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="policyholder_policies",
+                        to="clients.client",
+                        verbose_name="Страхователь",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Полис',
-                'verbose_name_plural': 'Полисы',
-                'ordering': ['-created_at'],
+                "verbose_name": "Полис",
+                "verbose_name_plural": "Полисы",
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='PaymentSchedule',
+            name="PaymentSchedule",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Дата обновления')),
-                ('year_number', models.PositiveSmallIntegerField(verbose_name='Порядковый номер года')),
-                ('installment_number', models.PositiveSmallIntegerField(verbose_name='Порядковый номер платежа')),
-                ('due_date', models.DateField(verbose_name='Дата платежа (по договору)')),
-                ('amount', models.DecimalField(decimal_places=2, max_digits=15, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))], verbose_name='Сумма платежа')),
-                ('kv_rub', models.DecimalField(decimal_places=2, default=0, help_text='Рассчитывается автоматически', max_digits=15, verbose_name='Комиссия (руб)')),
-                ('paid_date', models.DateField(blank=True, null=True, verbose_name='Фактическая дата оплаты')),
-                ('insurer_date', models.DateField(blank=True, null=True, verbose_name='Дата согласования СК')),
-                ('payment_info', models.TextField(blank=True, verbose_name='Дополнительная информация')),
-                ('commission_rate', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='payments', to='insurers.commissionrate', verbose_name='Ставка комиссии')),
-                ('policy', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payment_schedule', to='policies.policy', verbose_name='Полис')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата создания"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Дата обновления"),
+                ),
+                (
+                    "year_number",
+                    models.PositiveSmallIntegerField(
+                        verbose_name="Порядковый номер года"
+                    ),
+                ),
+                (
+                    "installment_number",
+                    models.PositiveSmallIntegerField(
+                        verbose_name="Порядковый номер платежа"
+                    ),
+                ),
+                (
+                    "due_date",
+                    models.DateField(verbose_name="Дата платежа (по договору)"),
+                ),
+                (
+                    "amount",
+                    models.DecimalField(
+                        decimal_places=2,
+                        max_digits=15,
+                        validators=[
+                            django.core.validators.MinValueValidator(Decimal("0.01"))
+                        ],
+                        verbose_name="Сумма платежа",
+                    ),
+                ),
+                (
+                    "kv_rub",
+                    models.DecimalField(
+                        decimal_places=2,
+                        default=0,
+                        help_text="Рассчитывается автоматически",
+                        max_digits=15,
+                        verbose_name="Комиссия (руб)",
+                    ),
+                ),
+                (
+                    "paid_date",
+                    models.DateField(
+                        blank=True, null=True, verbose_name="Фактическая дата оплаты"
+                    ),
+                ),
+                (
+                    "insurer_date",
+                    models.DateField(
+                        blank=True, null=True, verbose_name="Дата согласования СК"
+                    ),
+                ),
+                (
+                    "payment_info",
+                    models.TextField(
+                        blank=True, verbose_name="Дополнительная информация"
+                    ),
+                ),
+                (
+                    "commission_rate",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="payments",
+                        to="insurers.commissionrate",
+                        verbose_name="Ставка комиссии",
+                    ),
+                ),
+                (
+                    "policy",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="payment_schedule",
+                        to="policies.policy",
+                        verbose_name="Полис",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Платеж',
-                'verbose_name_plural': 'График платежей',
-                'ordering': ['policy', 'year_number', 'installment_number'],
+                "verbose_name": "Платеж",
+                "verbose_name_plural": "График платежей",
+                "ordering": ["policy", "year_number", "installment_number"],
             },
         ),
         migrations.CreateModel(
-            name='PolicyInfo',
+            name="PolicyInfo",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Дата обновления')),
-                ('info_field', models.PositiveSmallIntegerField(choices=[(1, 'Инфо 1'), (2, 'Инфо 2')], verbose_name='Поле')),
-                ('policy', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='info_tags', to='policies.policy', verbose_name='Полис')),
-                ('tag', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='policy_infos', to='insurers.infotag', verbose_name='Метка')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата создания"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Дата обновления"),
+                ),
+                (
+                    "info_field",
+                    models.PositiveSmallIntegerField(
+                        choices=[(1, "Инфо 1"), (2, "Инфо 2")], verbose_name="Поле"
+                    ),
+                ),
+                (
+                    "policy",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="info_tags",
+                        to="policies.policy",
+                        verbose_name="Полис",
+                    ),
+                ),
+                (
+                    "tag",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="policy_infos",
+                        to="insurers.infotag",
+                        verbose_name="Метка",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Инфо-метка полиса',
-                'verbose_name_plural': 'Инфо-метки полисов',
-                'unique_together': {('policy', 'tag', 'info_field')},
+                "verbose_name": "Инфо-метка полиса",
+                "verbose_name_plural": "Инфо-метки полисов",
+                "unique_together": {("policy", "tag", "info_field")},
             },
         ),
         migrations.AddIndex(
-            model_name='policy',
-            index=models.Index(fields=['policy_number'], name='policies_po_policy__a03f9f_idx'),
+            model_name="policy",
+            index=models.Index(
+                fields=["policy_number"], name="policies_po_policy__a03f9f_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='policy',
-            index=models.Index(fields=['dfa_number'], name='policies_po_dfa_num_0265c6_idx'),
+            model_name="policy",
+            index=models.Index(
+                fields=["dfa_number"], name="policies_po_dfa_num_0265c6_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='policy',
-            index=models.Index(fields=['start_date', 'end_date'], name='policies_po_start_d_1c1c3e_idx'),
+            model_name="policy",
+            index=models.Index(
+                fields=["start_date", "end_date"], name="policies_po_start_d_1c1c3e_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='policy',
-            index=models.Index(fields=['policy_active'], name='policies_po_policy__b7fb15_idx'),
+            model_name="policy",
+            index=models.Index(
+                fields=["policy_active"], name="policies_po_policy__b7fb15_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='paymentschedule',
-            index=models.Index(fields=['due_date'], name='policies_pa_due_dat_ca6e67_idx'),
+            model_name="paymentschedule",
+            index=models.Index(
+                fields=["due_date"], name="policies_pa_due_dat_ca6e67_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='paymentschedule',
-            index=models.Index(fields=['paid_date'], name='policies_pa_paid_da_631467_idx'),
+            model_name="paymentschedule",
+            index=models.Index(
+                fields=["paid_date"], name="policies_pa_paid_da_631467_idx"
+            ),
         ),
     ]

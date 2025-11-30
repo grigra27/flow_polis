@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/accounts/forms.py
+# hypothesis_version: 6.141.1
+
+[150, 'autocomplete', 'autofocus', 'class', 'current-password', 'form-control', 'inactive', 'invalid_login', 'new-password', 'new_password1', 'password_incorrect', 'password_mismatch', 'placeholder', 'required', 'Введите новый пароль', 'Введите пароль', 'Имя пользователя', 'Новый пароль', 'Пароль', 'Текущий пароль']

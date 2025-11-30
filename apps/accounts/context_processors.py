@@ -1,7 +1,7 @@
 def user_permissions(request):
     """
     Context processor that adds user permission information to all templates.
-    
+
     Adds the following variables to template context:
     - is_admin: True if user is authenticated and is staff
     - is_regular_user: True if user is authenticated but not staff
@@ -11,9 +11,9 @@ def user_permissions(request):
     """
     user = request.user
     return {
-        'is_admin': user.is_authenticated and user.is_staff,
-        'is_regular_user': user.is_authenticated and not user.is_staff,
-        'can_edit': user.is_authenticated and (user.is_staff or user.is_superuser),
-        'is_superuser': user.is_authenticated and user.is_superuser,
-        'user_perms': user if user.is_authenticated else None,
+        "is_admin": user.is_authenticated and user.is_staff,
+        "is_regular_user": user.is_authenticated and not user.is_staff,
+        "can_edit": user.is_authenticated and (user.is_staff or user.is_superuser),
+        "is_superuser": user.is_authenticated and user.is_superuser,
+        "user_perms": user if user.is_authenticated else None,
     }

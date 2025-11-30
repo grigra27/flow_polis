@@ -45,7 +45,7 @@ server {
         expires 30d;
         add_header Cache-Control "public, immutable";
         access_log off;
-        
+
         # Handle missing files gracefully
         try_files $uri $uri/ =404;
     }
@@ -56,7 +56,7 @@ server {
         expires 7d;
         add_header Cache-Control "public";
         access_log off;
-        
+
         # Handle missing files gracefully
         try_files $uri $uri/ =404;
     }
@@ -78,18 +78,18 @@ server {
     # Main application proxy
     location / {
         proxy_pass http://django;
-        
+
         # Proxy headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $server_name;
-        
+
         # Proxy settings
         proxy_redirect off;
         proxy_buffering off;
-        
+
         # Timeouts
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;

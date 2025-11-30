@@ -4,14 +4,15 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0005_policy_policy_uploaded'),
+        ("policies", "0005_policy_policy_uploaded"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='policy',
-            index=models.Index(fields=['policy_uploaded'], name='policies_po_policy__44a6bf_idx'),
+            model_name="policy",
+            index=models.Index(
+                fields=["policy_uploaded"], name="policies_po_policy__44a6bf_idx"
+            ),
         ),
     ]

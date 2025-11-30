@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Доступ временно заблокирован{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-lock"></i> Доступ временно заблокирован
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>{{ error_message }}</strong>
+                    </div>
+
+                    <p>
+                        Ваш IP-адрес был временно заблокирован из-за множественных
+                        неудачных попыток входа в систему.
+                    </p>
+
+                    <p>
+                        Это мера безопасности для защиты от несанкционированного доступа.
+                    </p>
+
+                    {% if unblock_time %}
+                    <p class="mb-0">
+                        <strong>Время разблокировки:</strong>
+                        {{ unblock_time|date:"d.m.Y H:i" }}
+                    </p>
+                    {% endif %}
+
+                    <hr>
+
+                    <p class="text-muted mb-0">
+                        <small>
+                            Если вы считаете, что это ошибка, пожалуйста, свяжитесь
+                            с администратором системы.
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer text-center">
+                    <a href="{% url 'core:dashboard' %}" class="btn btn-secondary">
+                        <i class="fas fa-home"></i> На главную
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

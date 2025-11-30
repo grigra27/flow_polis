@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0001_initial'),
+        ("policies", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='paymentschedule',
-            name='kv_rub',
-            field=models.DecimalField(decimal_places=2, default=0, help_text='Рассчитывается автоматически, но можно изменить вручную', max_digits=15, verbose_name='Комиссия (руб)'),
+            model_name="paymentschedule",
+            name="kv_rub",
+            field=models.DecimalField(
+                decimal_places=2,
+                default=0,
+                help_text="Рассчитывается автоматически, но можно изменить вручную",
+                max_digits=15,
+                verbose_name="Комиссия (руб)",
+            ),
         ),
     ]

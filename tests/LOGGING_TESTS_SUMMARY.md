@@ -338,6 +338,6 @@ These tests ensure the production logging infrastructure is working correctly an
 
 ---
 
-**Implementation Date:** November 25, 2024  
-**Task:** 14. Написать тесты для проверки логирования  
+**Implementation Date:** November 25, 2024
+**Task:** 14. Написать тесты для проверки логирования
 **Status:** ✅ Complete

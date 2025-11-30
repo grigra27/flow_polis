@@ -56,7 +56,7 @@ if [ -f "$KEY_PATH" ]; then
         print_warning "Создаем резервную копию старого ключа"
         mv "$KEY_PATH" "${KEY_PATH}.backup.$(date +%Y%m%d_%H%M%S)"
         mv "${KEY_PATH}.pub" "${KEY_PATH}.pub.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-        
+
         print_step "Создание нового SSH ключа"
         ssh-keygen -t ed25519 -C "github-actions-deploy" -f "$KEY_PATH" -N ""
         print_success "Новый SSH ключ создан"

@@ -27,7 +27,7 @@
             <div class="card-body">
                 <p><strong>Название:</strong><br>
                 {{ client.client_name }}</p>
-                
+
                 <p><strong>ИНН:</strong><br>
                 {{ client.client_inn|default:"—" }}</p>
             </div>
@@ -62,22 +62,22 @@
                     {% endif %}
                     {% if item.manager.phone %}
                     <p class="mb-1 text-muted">
-                        <i class="bi bi-telephone"></i> 
+                        <i class="bi bi-telephone"></i>
                         <a href="tel:{{ item.manager.phone }}">{{ item.manager.phone }}</a>
                     </p>
                     {% endif %}
                     {% if item.manager.email %}
                     <p class="mb-1 text-muted">
-                        <i class="bi bi-envelope"></i> 
+                        <i class="bi bi-envelope"></i>
                         <a href="mailto:{{ item.manager.email }}">{{ item.manager.email }}</a>
                     </p>
                     {% endif %}
                     <p class="mb-1 text-muted small">
-                        <i class="bi bi-building"></i> 
+                        <i class="bi bi-building"></i>
                         {% for branch in item.branches %}{{ branch }}{% if not forloop.last %}, {% endif %}{% endfor %}
                     </p>
                     <p class="mb-0 text-muted small">
-                        <i class="bi bi-file-text"></i> 
+                        <i class="bi bi-file-text"></i>
                         Полисов: {{ item.policies_count }}
                     </p>
                 </div>

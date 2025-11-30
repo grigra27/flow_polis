@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('insurers', '0001_initial'),
+        ("insurers", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='insurer',
-            name='contacts',
-            field=models.URLField(blank=True, help_text='Ссылка на контакт (например, Telegram, WhatsApp)', verbose_name='Контакты (ссылка)'),
+            model_name="insurer",
+            name="contacts",
+            field=models.URLField(
+                blank=True,
+                help_text="Ссылка на контакт (например, Telegram, WhatsApp)",
+                verbose_name="Контакты (ссылка)",
+            ),
         ),
     ]

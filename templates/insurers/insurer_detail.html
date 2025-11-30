@@ -59,7 +59,7 @@
             <div class="card-body">
                 <p><strong>Название:</strong><br>
                 {{ insurer.insurer_name }}</p>
-                
+
                 {% if insurer.contacts %}
                 <p><strong>Контакты:</strong><br>
                 <a href="{{ insurer.contacts }}" target="_blank" rel="noopener noreferrer">
@@ -128,14 +128,14 @@
                 <div class="mb-3">
                     <ul class="nav branch-filter-pills flex-wrap">
                         <li class="nav-item">
-                            <a class="nav-link {% if not selected_branch %}active{% endif %}" 
+                            <a class="nav-link {% if not selected_branch %}active{% endif %}"
                                href="{% url 'insurers:detail' insurer.pk %}">
                                 <i class="bi bi-grid-3x3-gap"></i> Все
                             </a>
                         </li>
                         {% for branch in branches %}
                         <li class="nav-item">
-                            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}" 
+                            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
                                href="?branch={{ branch.id }}">
                                 <i class="bi bi-building"></i> {{ branch.branch_name }}
                             </a>
@@ -144,7 +144,7 @@
                     </ul>
                 </div>
                 {% endif %}
-                
+
                 {% if policies %}
                 <div class="table-responsive">
                     <table class="table table-hover">

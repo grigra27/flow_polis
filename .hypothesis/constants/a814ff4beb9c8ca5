@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/insurers/migrations/0009_alter_branch_logo_alter_insurancetype_icon_and_more.py
+# hypothesis_version: 6.141.1
+
+['branch', 'branch_logos/', 'icon', 'insurancetype', 'insurer', 'insurer_logos/', 'insurers', 'logo', 'Иконка', 'Логотип']

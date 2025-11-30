@@ -261,10 +261,10 @@
             <div class="card-body">
                 <p><strong>Общая премия:</strong><br>
                 <span class="text-primary fs-5">{{ policy.premium_total|rub }}</span></p>
-                
+
                 <p><strong>Франшиза:</strong><br>
                 {{ policy.franchise|rub }}</p>
-                
+
                 <p class="mb-0"><small class="text-muted">
                     <i class="bi bi-info-circle"></i> Страховая сумма указана для каждого платежа в графике платежей
                 </small></p>
@@ -279,7 +279,7 @@
             <div class="card-body">
                 <p><strong>Начало:</strong><br>
                 {{ policy.start_date|date:"d.m.Y" }}</p>
-                
+
                 <p><strong>Окончание:</strong><br>
                 {{ policy.end_date|date:"d.m.Y" }}</p>
             </div>
@@ -301,7 +301,7 @@
                     {% endif %}
                 {% endif %}
                 </p>
-                
+
                 <p><strong>ДФА активен:</strong><br>
                 {% if policy.dfa_active %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
@@ -309,7 +309,7 @@
                     <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
-                
+
                 <p><strong>Полис подгружен:</strong><br>
                 {% if policy.policy_uploaded %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
@@ -317,7 +317,7 @@
                     <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
                 </p>
-                
+
                 <p class="mb-0"><strong>Участие брокера:</strong><br>
                 {% if policy.broker_participation %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>

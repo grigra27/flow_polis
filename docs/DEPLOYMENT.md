@@ -451,19 +451,19 @@ services:
   web:
     restart: unless-stopped
     # или restart: always
-  
+
   db:
     restart: unless-stopped
-  
+
   redis:
     restart: unless-stopped
-  
+
   celery_worker:
     restart: unless-stopped
-  
+
   celery_beat:
     restart: unless-stopped
-  
+
   nginx:
     restart: unless-stopped
 ```

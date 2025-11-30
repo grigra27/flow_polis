@@ -1,6 +1,6 @@
 # Default docker-compose file for development
 # This is a symlink/alias to docker-compose.dev.yml for convenience
-# 
+#
 # Usage:
 #   docker compose up        # Uses this file by default
 #   docker compose up -d     # Run in background
@@ -103,4 +103,3 @@ services:
 networks:
   dev_network:
     driver: bridge
-

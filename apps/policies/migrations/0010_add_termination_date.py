@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0009_alter_policy_policyholder'),
+        ("policies", "0009_alter_policy_policyholder"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='policy',
-            name='termination_date',
-            field=models.DateField(blank=True, help_text='Дата досрочного расторжения полиса', null=True, verbose_name='Дата расторжения'),
+            model_name="policy",
+            name="termination_date",
+            field=models.DateField(
+                blank=True,
+                help_text="Дата досрочного расторжения полиса",
+                null=True,
+                verbose_name="Дата расторжения",
+            ),
         ),
     ]

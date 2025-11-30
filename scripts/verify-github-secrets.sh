@@ -34,9 +34,9 @@ check() {
     local command="$2"
     local success_msg="$3"
     local error_msg="$4"
-    
+
     echo -n "Проверка: $name... "
-    
+
     if eval "$command" &>/dev/null; then
         echo -e "${GREEN}✅ PASS${NC}"
         [ -n "$success_msg" ] && echo "  ℹ️  $success_msg"
@@ -54,7 +54,7 @@ check() {
 warn() {
     local name="$1"
     local message="$2"
-    
+
     echo -e "${YELLOW}⚠️  WARNING: $name${NC}"
     echo "  $message"
     ((WARNINGS++))

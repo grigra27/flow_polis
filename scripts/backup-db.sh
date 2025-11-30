@@ -58,34 +58,34 @@ backup_database() {
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/db_backup_${timestamp}.sql"
     local backup_file_gz="${backup_file}.gz"
-    
+
     log_info "Starting database backup..."
     log_info "Database: $DB_NAME"
     log_info "Backup file: $backup_file_gz"
-    
+
     # Create backup using pg_dump
     if docker exec "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" > "$backup_file"; then
         log_info "Database dump completed successfully"
-        
+
         # Compress the backup
         log_info "Compressing backup..."
         if gzip "$backup_file"; then
             log_info "Backup compressed successfully"
-            
+
             # Get file size
             local file_size=$(du -h "$backup_file_gz" | cut -f1)
             log_info "Backup size: $file_size"
-            
+
             # Create latest symlink
             ln -sf "$(basename "$backup_file_gz")" "$BACKUP_DIR/latest_backup.sql.gz"
             log_info "Created symlink to latest backup"
-            
+
             # Save backup metadata
             echo "timestamp=$timestamp" > "$BACKUP_DIR/backup_${timestamp}.meta"
             echo "database=$DB_NAME" >> "$BACKUP_DIR/backup_${timestamp}.meta"
             echo "size=$file_size" >> "$BACKUP_DIR/backup_${timestamp}.meta"
             echo "file=$(basename "$backup_file_gz")" >> "$BACKUP_DIR/backup_${timestamp}.meta"
-            
+
             log_info "Backup completed successfully: $backup_file_gz"
             return 0
         else
@@ -103,14 +103,14 @@ backup_database() {
 # Verify backup integrity
 verify_backup() {
     local backup_file=$1
-    
+
     log_info "Verifying backup integrity..."
-    
+
     if [ ! -f "$backup_file" ]; then
         log_error "Backup file not found: $backup_file"
         return 1
     fi
-    
+
     # Check if file is a valid gzip file
     if gzip -t "$backup_file" 2>/dev/null; then
         log_info "Backup file integrity verified"
@@ -124,9 +124,9 @@ verify_backup() {
 # Clean up old backups
 cleanup_old_backups() {
     log_info "Cleaning up backups older than $RETENTION_DAYS days..."
-    
+
     local deleted_count=0
-    
+
     # Find and delete old backup files
     while IFS= read -r file; do
         if [ -f "$file" ]; then
@@ -138,7 +138,7 @@ cleanup_old_backups() {
             log_info "Deleted old backup: $(basename "$file")"
         fi
     done < <(find "$BACKUP_DIR" -name "db_backup_*.sql.gz" -type f -mtime +$RETENTION_DAYS)
-    
+
     if [ $deleted_count -eq 0 ]; then
         log_info "No old backups to clean up"
     else
@@ -150,15 +150,15 @@ cleanup_old_backups() {
 list_backups() {
     log_info "Existing backups in $BACKUP_DIR:"
     echo ""
-    
+
     if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR"/db_backup_*.sql.gz 2>/dev/null)" ]; then
         log_warn "No backups found"
         return
     fi
-    
+
     printf "%-30s %-15s %-20s\n" "Backup File" "Size" "Date"
     printf "%-30s %-15s %-20s\n" "----------" "----" "----"
-    
+
     for backup in "$BACKUP_DIR"/db_backup_*.sql.gz; do
         if [ -f "$backup" ]; then
             local filename=$(basename "$backup")
@@ -232,40 +232,40 @@ main() {
             exit 1
             ;;
     esac
-    
+
     log_info "========================================="
     log_info "  Database Backup Process"
     log_info "========================================="
     echo ""
-    
+
     # Create backup directory
     create_backup_dir
-    
+
     # Check if container is running
     check_container
-    
+
     # Perform backup
     backup_database || {
         log_error "Backup failed"
         exit 1
     }
-    
+
     # Verify the backup
     local latest_backup="$BACKUP_DIR/latest_backup.sql.gz"
     verify_backup "$latest_backup" || {
         log_warn "Backup verification failed"
     }
-    
+
     # Clean up old backups
     cleanup_old_backups
-    
+
     # List current backups
     list_backups
-    
+
     log_info "========================================="
     log_info "  Backup Process Completed"
     log_info "========================================="
-    
+
     exit 0
 }
 

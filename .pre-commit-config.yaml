@@ -1,0 +1,49 @@
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*\.lock$|
+            .*\.min\.js$|
+            .*\.min\.css$|
+            package-lock\.json$|
+            poetry\.lock$|
+            \.secrets\.baseline$|
+            staticfiles/.*|
+            media/.*|
+            \.hypothesis/.*
+          )$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-yaml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+        exclude: |
+          (?x)^(
+            \.github/workflows/README\.md$|
+            docs/DROPLET_QUICK_START\.md$|
+            docs/GITHUB_SECRETS_SETUP\.md$|
+            docs/GITHUB_SECRETS_VISUAL_GUIDE\.md$
+          )$
+      - id: check-merge-conflict
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        exclude: |
+          (?x)^(
+            migrations/.*|
+            venv/.*|
+            black_venv/.*
+          )$

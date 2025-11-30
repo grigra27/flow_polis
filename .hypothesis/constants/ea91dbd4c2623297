@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/accounts/middleware.py
+# hypothesis_version: 6.141.1
+
+[403, ',', '.*/\\d+/delete/$', '.*/\\d+/edit/$', '.*/\\d+/update/$', '.*/create/$', '.*/delete/$', '.*/edit/$', '.*/update/$', 'HTTP_USER_AGENT', 'HTTP_X_FORWARDED_FOR', 'POST', 'REMOTE_ADDR', '^/admin/', 'accounts:login', 'error_message', 'ip_address', 'unblock_time', 'user', 'username']

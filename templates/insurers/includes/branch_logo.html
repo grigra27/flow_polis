@@ -1,11 +1,11 @@
 <span class="branch-with-logo d-inline-flex align-items-center">
     {% if branch.logo %}
-        <img src="{{ branch.logo.url }}" 
-             alt="{{ branch.branch_name }}" 
+        <img src="{{ branch.logo.url }}"
+             alt="{{ branch.branch_name }}"
              class="branch-logo me-2"
              style="width: {{ size }}; height: {{ size }}; object-fit: contain;">
     {% else %}
-        <span class="branch-logo-placeholder me-2" 
+        <span class="branch-logo-placeholder me-2"
               style="width: {{ size }}; height: {{ size }}; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
             <i class="bi bi-building" style="font-size: calc({{ size }} * 0.6);"></i>
         </span>

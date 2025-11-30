@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0004_transfer_property_value'),
+        ("policies", "0004_transfer_property_value"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='policy',
-            name='policy_uploaded',
-            field=models.BooleanField(default=False, verbose_name='Полис подгружен'),
+            model_name="policy",
+            name="policy_uploaded",
+            field=models.BooleanField(default=False, verbose_name="Полис подгружен"),
         ),
     ]

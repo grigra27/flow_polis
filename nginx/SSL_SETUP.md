@@ -71,7 +71,7 @@ The automated script handles the entire SSL setup process including certificate 
    ```bash
    STAGING=1 ./scripts/init-letsencrypt.sh
    ```
-   
+
    Using staging is recommended for testing to avoid hitting Let's Encrypt rate limits (5 certificates per domain per week).
 
 #### What the Script Does
@@ -165,7 +165,7 @@ If you prefer manual control over each step:
    ```bash
    # If you have the original in git
    git checkout nginx/default.conf
-   
+
    # Or copy from backup
    cp nginx/default.conf.backup.YYYYMMDD_HHMMSS nginx/default.conf
    ```

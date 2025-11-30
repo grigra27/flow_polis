@@ -169,7 +169,7 @@ NAME                              STATUS              PORTS
 insurance_broker_web              Up (healthy)        8000/tcp
 insurance_broker_db               Up (healthy)        5432/tcp
 insurance_broker_redis            Up (healthy)        6379/tcp
-insurance_broker_celery_worker    Up (healthy)        
+insurance_broker_celery_worker    Up (healthy)
 insurance_broker_nginx            Up (healthy)        0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp
 ```
 

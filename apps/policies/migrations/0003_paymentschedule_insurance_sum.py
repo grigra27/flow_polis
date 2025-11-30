@@ -6,16 +6,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('policies', '0002_editable_commission'),
+        ("policies", "0002_editable_commission"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='paymentschedule',
-            name='insurance_sum',
-            field=models.DecimalField(decimal_places=2, default=1, help_text='Стоимость застрахованного имущества для данного платежа', max_digits=15, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))], verbose_name='Страховая сумма'),
+            model_name="paymentschedule",
+            name="insurance_sum",
+            field=models.DecimalField(
+                decimal_places=2,
+                default=1,
+                help_text="Стоимость застрахованного имущества для данного платежа",
+                max_digits=15,
+                validators=[django.core.validators.MinValueValidator(Decimal("0.01"))],
+                verbose_name="Страховая сумма",
+            ),
             preserve_default=False,
         ),
     ]

@@ -61,13 +61,13 @@ check_dns_record() {
     local hostname=$1
     local dns_server=$2
     local dns_name=$3
-    
+
     if [ -n "$dns_server" ]; then
         result=$(dig @$dns_server $hostname +short 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
     else
         result=$(dig $hostname +short 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
     fi
-    
+
     if [ -z "$result" ]; then
         print_color "$RED" "  ✗ $dns_name: Не найдено"
         return 1
@@ -143,7 +143,7 @@ if [ -z "$current_ip" ]; then
     print_color "$RED" "  ✗ Невозможно определить IP адрес домена"
 else
     echo "Проверка HTTP на $current_ip..."
-    
+
     # Проверка HTTP
     if curl -s -I -m 5 http://$DOMAIN > /dev/null 2>&1; then
         http_status=$(curl -s -I -m 5 http://$DOMAIN | head -n1)
@@ -151,7 +151,7 @@ else
     else
         print_color "$RED" "  ✗ HTTP недоступен"
     fi
-    
+
     # Проверка HTTPS
     if curl -s -I -m 5 https://$DOMAIN > /dev/null 2>&1; then
         https_status=$(curl -s -I -m 5 https://$DOMAIN | head -n1)
@@ -171,11 +171,11 @@ successful_checks=0
 # Проверяем основные DNS серверы
 for dns in "8.8.8.8" "1.1.1.1" "208.67.222.222"; do
     total_checks=$((total_checks + 2))  # Для корневого и www
-    
+
     if dig @$dns $DOMAIN +short 2>/dev/null | grep -q -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
         successful_checks=$((successful_checks + 1))
     fi
-    
+
     if dig @$dns www.$DOMAIN +short 2>/dev/null | grep -q -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
         successful_checks=$((successful_checks + 1))
     fi

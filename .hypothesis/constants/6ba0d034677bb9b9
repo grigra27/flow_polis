@@ -1,0 +1,4 @@
+# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/core/security_utils.py
+# hypothesis_version: 6.141.1
+
+['\x00', '"', "'", '*/', ', ', '--', '/*', '/\\*.*\\*/', ';', '\\', '\\bDELETE\\b.*\\bFROM\\b', '\\bDROP\\b.*\\bTABLE\\b', '\\bEXEC\\b|\\bEXECUTE\\b', '\\bINSERT\\b.*\\bINTO\\b', '\\bUPDATE\\b.*\\bSET\\b', '\\bsp_\\w+', '\\bxp_\\w+', 'api_key="***"', "api_key='***'", 'inn="***"', "inn='***'", 'inn\\s*=\\s*"[^"]*"', "inn\\s*=\\s*'[^']*'", 'passport_data="***"', "passport_data='***'", 'password="***"', "password='***'", 'secret="***"', "secret='***'", 'secret\\s*=\\s*"[^"]*"', "secret\\s*=\\s*'[^']*'", 'security', 'sp_', 'token="***"', "token='***'", 'token\\s*=\\s*"[^"]*"', "token\\s*=\\s*'[^']*'", 'xp_']

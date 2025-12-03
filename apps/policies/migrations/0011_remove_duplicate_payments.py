@@ -18,8 +18,18 @@ def remove_duplicate_payments(apps, schema_editor):
         .filter(count__gt=1)
     )
 
+    duplicate_groups = list(duplicates)
+    total_duplicates = sum(d["count"] - 1 for d in duplicate_groups)
+
+    if not duplicate_groups:
+        print("✅ No duplicate payment schedules found")
+        return
+
+    print(f"⚠️  Found {len(duplicate_groups)} groups with duplicates")
+    print(f"⚠️  Total duplicate records to remove: {total_duplicates}")
+
     deleted_count = 0
-    for dup in duplicates:
+    for dup in duplicate_groups:
         # Get all records with this combination
         records = PaymentSchedule.objects.filter(
             policy_id=dup["policy_id"],
@@ -29,12 +39,18 @@ def remove_duplicate_payments(apps, schema_editor):
 
         # Keep the first (latest), delete the rest
         records_to_delete = records[1:]
+        count_to_delete = len(records_to_delete)
+
+        print(
+            f"  Policy {dup['policy_id']}, Year {dup['year_number']}, "
+            f"Installment {dup['installment_number']}: removing {count_to_delete} duplicate(s)"
+        )
+
         for record in records_to_delete:
             record.delete()
             deleted_count += 1
 
-    if deleted_count > 0:
-        print(f"Removed {deleted_count} duplicate payment schedule records")
+    print(f"✅ Successfully removed {deleted_count} duplicate payment schedule records")
 
 
 class Migration(migrations.Migration):

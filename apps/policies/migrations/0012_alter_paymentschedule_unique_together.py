@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("policies", "0010_add_termination_date"),
+        ("policies", "0011_remove_duplicate_payments"),
     ]
 
     operations = [

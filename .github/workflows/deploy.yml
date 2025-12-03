@@ -185,11 +185,14 @@ jobs:
             set -e
             cd ~/insurance_broker
 
+            echo "⏳ Waiting for database to be ready..."
+            sleep 10
+
             echo "🔄 Running database migrations..."
-            docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            docker-compose -f docker-compose.prod.yml run --rm web python manage.py migrate --noinput
 
             echo "📦 Collecting static files..."
-            docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+            docker-compose -f docker-compose.prod.yml run --rm web python manage.py collectstatic --noinput
 
             echo "✅ Migrations completed"
           ENDSSH

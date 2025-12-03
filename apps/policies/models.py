@@ -178,6 +178,7 @@ class PaymentSchedule(TimeStampedModel):
         verbose_name = "Платеж"
         verbose_name_plural = "График платежей"
         ordering = ["policy", "year_number", "installment_number"]
+        unique_together = ["policy", "year_number", "installment_number"]
         indexes = [
             models.Index(fields=["due_date"]),
             models.Index(fields=["paid_date"]),
@@ -185,6 +186,74 @@ class PaymentSchedule(TimeStampedModel):
 
     def __str__(self):
         return f"{self.policy.policy_number} - Год {self.year_number}, Платеж {self.installment_number}"
+
+    def clean(self):
+        """
+        Валидация дат платежа.
+        Проверяет, что даты текущего платежа не раньше дат предыдущих платежей.
+        """
+        from django.core.exceptions import ValidationError
+
+        if not self.policy_id:
+            return
+
+        # Находим предыдущий платеж
+        previous_payment = (
+            PaymentSchedule.objects.filter(policy=self.policy)
+            .exclude(pk=self.pk)  # Исключаем текущий платеж при редактировании
+            .filter(
+                models.Q(year_number__lt=self.year_number)
+                | models.Q(
+                    year_number=self.year_number,
+                    installment_number__lt=self.installment_number,
+                )
+            )
+            .order_by("-year_number", "-installment_number")
+            .first()
+        )
+
+        if not previous_payment:
+            return  # Это первый платеж, валидация не нужна
+
+        errors = {}
+
+        # Проверяем дату по договору
+        if self.due_date and previous_payment.due_date:
+            if self.due_date <= previous_payment.due_date:
+                errors["due_date"] = (
+                    f"Дата платежа по договору ({self.due_date}) не может быть раньше или равна "
+                    f"дате предыдущего платежа ({previous_payment.due_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        # Проверяем фактическую дату оплаты
+        if self.paid_date and previous_payment.paid_date:
+            if self.paid_date <= previous_payment.paid_date:
+                errors["paid_date"] = (
+                    f"Фактическая дата оплаты ({self.paid_date}) не может быть раньше или равна "
+                    f"дате оплаты предыдущего платежа ({previous_payment.paid_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        # Проверяем дату согласования СК
+        if self.insurer_date and previous_payment.insurer_date:
+            if self.insurer_date <= previous_payment.insurer_date:
+                errors["insurer_date"] = (
+                    f"Дата согласования СК ({self.insurer_date}) не может быть раньше или равна "
+                    f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Переопределяем save для вызова валидации"""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def calculate_kv_rub(self):
         """Calculate commission in rubles"""

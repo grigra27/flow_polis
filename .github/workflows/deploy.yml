@@ -188,6 +188,18 @@ jobs:
             echo "⏳ Waiting for database to be ready..."
             sleep 10
 
+            echo "🔧 Fixing migration conflicts..."
+            # Remove old conflicting migration from database if exists
+            docker-compose -f docker-compose.prod.yml exec -T db psql -U postgres -d insurance_broker -c "
+              DELETE FROM django_migrations
+              WHERE app = 'policies'
+                AND name = '0011_alter_paymentschedule_unique_together';
+            " 2>/dev/null || echo "No conflicting migration in database"
+
+            # Remove old migration file if exists
+            rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py 2>/dev/null || true
+            echo "✅ Migration conflicts resolved"
+
             echo "🔄 Running database migrations..."
             docker-compose -f docker-compose.prod.yml run --rm web python manage.py migrate --noinput
 

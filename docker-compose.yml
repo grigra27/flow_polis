@@ -1,11 +1,14 @@
-# Default docker-compose file for development
-# This is a symlink/alias to docker-compose.dev.yml for convenience
+# Development docker-compose configuration
+#
+# Note: PostgreSQL is managed separately via scripts/import_prod_db.sh
+# It runs as 'local_postgres' container outside of docker-compose
 #
 # Usage:
-#   docker compose up        # Uses this file by default
-#   docker compose up -d     # Run in background
+#   docker compose up        # Start all services
+#   docker compose up -d     # Start in background
+#   docker compose up redis  # Start only Redis
 #
-# For production, explicitly use:
+# For production, use:
 #   docker compose -f docker-compose.prod.yml up
 
 version: '3.8'

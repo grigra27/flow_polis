@@ -153,16 +153,15 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+          SSL_STATUS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
             cd ~/insurance_broker
 
             # Check if SSL certificates exist
             if [ -d "certbot/conf/live/polis.insflow.ru" ]; then
               echo "✅ SSL certificates found"
-              echo "SSL_EXISTS=true" >> $GITHUB_ENV
+              echo "true"
             else
               echo "⚠️  SSL certificates not found - will use initial config"
-              echo "SSL_EXISTS=false" >> $GITHUB_ENV
 
               # Backup SSL config and use initial config
               if [ -f "nginx/default.conf" ]; then
@@ -170,8 +169,15 @@ jobs:
                 cp nginx/default.conf.initial nginx/default.conf
                 echo "✅ Switched to initial nginx config (no SSL)"
               fi
+              echo "false"
             fi
           ENDSSH
+          )
+
+          # Extract the last line (true/false) from the output
+          SSL_EXISTS=$(echo "$SSL_STATUS" | tail -n 1)
+          echo "SSL_EXISTS=$SSL_EXISTS" >> $GITHUB_ENV
+          echo "SSL certificates status: $SSL_EXISTS"
 
       - name: Deploy on server
         env:

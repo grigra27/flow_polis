@@ -1213,12 +1213,8 @@ class CommissionReportExporter(BaseExporter):
         """Возвращает данные строки для платежа"""
         policy = payment.policy
 
-        # Получаем КВ % из commission_rate
-        kv_percent = (
-            int(round(float(payment.commission_rate.kv_percent)))
-            if payment.commission_rate
-            else 0
-        )
+        # Получаем фактический КВ % (рассчитанный из КВ руб и премии)
+        kv_percent = int(round(float(payment.kv_percent_actual)))
 
         return [
             policy.policy_number,

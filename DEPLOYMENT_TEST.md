@@ -16,7 +16,7 @@ This file was created to test the automatic deployment workflow via GitHub Actio
    - Run database migrations
    - Collect static files
    - Perform health checks
-5. Site should be accessible at https://onbr.site after deployment
+5. Site should be accessible at https://polis.insflow.ru after deployment
 
 ## Test Status
 
@@ -24,7 +24,7 @@ This file was created to test the automatic deployment workflow via GitHub Actio
 - [x] Commit created (df00890)
 - [x] Push to main completed
 - [x] GitHub Actions triggered
-- [x] Site accessible at https://onbr.site
+- [x] Site accessible at https://polis.insflow.ru
 - [x] SSL certificate valid (expires Feb 23, 2026)
 - [x] HTTP → HTTPS redirect working
 - [x] Issue identified: docker-compose v1 not available on GitHub Actions runner

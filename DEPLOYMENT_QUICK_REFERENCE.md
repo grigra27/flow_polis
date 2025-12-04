@@ -19,12 +19,12 @@ GitHub Actions workflow **НЕ перезаписывает**:
 ### Быстрый старт
 
 ```bash
-# IP уже прописан по умолчанию: 64.227.75.233
+# IP уже прописан по умолчанию: 109.68.215.223
 # Просто запустите скрипт:
 ./scripts/initial-deploy.sh
 
 # Или явно укажите IP (если нужно переопределить):
-export DROPLET_IP="64.227.75.233"
+export DROPLET_IP="109.68.215.223"
 ./scripts/initial-deploy.sh
 ```
 
@@ -35,7 +35,7 @@ export DROPLET_IP="64.227.75.233"
 ## Предварительные требования
 
 ✅ Droplet создан и настроен (Task 17)
-✅ DNS настроен для onbr.site (Task 18)
+✅ DNS настроен для polis.insflow.ru (Task 18)
 ✅ SSH ключи настроены
 ✅ Firewall разрешает порты 22, 80, 443
 
@@ -46,7 +46,7 @@ export DROPLET_IP="64.227.75.233"
 ### Подключение к Droplet
 
 ```bash
-ssh root@64.227.75.233
+ssh root@109.68.215.223
 cd /opt/insurance_broker
 ```
 
@@ -120,10 +120,10 @@ cat backup_20240101.sql | docker compose -f docker-compose.prod.yml exec -T db p
 docker compose -f docker-compose.prod.yml ps
 
 # Проверка сайта
-curl -I https://onbr.site
+curl -I https://polis.insflow.ru
 
 # Проверка HTTP редиректа
-curl -I http://onbr.site
+curl -I http://polis.insflow.ru
 ```
 
 ### Детальная проверка
@@ -161,7 +161,7 @@ docker compose -f docker-compose.prod.yml up -d [service]
 
 ```bash
 # Проверить DNS
-dig onbr.site +short
+dig polis.insflow.ru +short
 
 # Проверить firewall
 sudo ufw status
@@ -213,9 +213,9 @@ docker compose -f docker-compose.prod.yml exec web env | grep DB_
 
 | Что | URL |
 |-----|-----|
-| Главная страница | https://onbr.site |
-| Админ панель | https://onbr.site/admin/ |
-| API (если есть) | https://onbr.site/api/ |
+| Главная страница | https://polis.insflow.ru |
+| Админ панель | https://polis.insflow.ru/admin/ |
+| API (если есть) | https://polis.insflow.ru/api/ |
 
 ---
 
@@ -226,7 +226,7 @@ docker compose -f docker-compose.prod.yml exec web env | grep DB_
 ```bash
 SECRET_KEY=...          # Django secret key
 DEBUG=False             # Всегда False в production
-ALLOWED_HOSTS=...       # onbr.site,www.onbr.site
+ALLOWED_HOSTS=...       # polis.insflow.ru,www.polis.insflow.ru
 DB_PASSWORD=...         # Пароль PostgreSQL
 EMAIL_HOST_USER=...     # Email для уведомлений
 EMAIL_HOST_PASSWORD=... # Пароль email
@@ -315,9 +315,9 @@ docker compose -f docker-compose.prod.yml ps
 
 ## Контакты и ссылки
 
-**Droplet IP:** `64.227.75.233`
-**Домен:** onbr.site
-**SSH:** `ssh root@64.227.75.233`
+**Droplet IP:** `109.68.215.223`
+**Домен:** polis.insflow.ru
+**SSH:** `ssh root@109.68.215.223`
 **Директория:** `/opt/insurance_broker`
 
 ### Документация

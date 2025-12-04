@@ -706,7 +706,7 @@ docker inspect --format='{{.State.Health.Status}}' insurance_broker_web
 **Django Core:**
 - `SECRET_KEY` - Криптографический ключ (генерируйте случайно, 50+ символов)
 - `DEBUG` - Должен быть `False` в production
-- `ALLOWED_HOSTS` - Список доменов через запятую (например: `onbr.site,www.onbr.site`)
+- `ALLOWED_HOSTS` - Список доменов через запятую (например: `polis.insflow.ru,www.polis.insflow.ru`)
 
 **База данных:**
 - `DB_NAME` - Имя базы данных (например: `insurance_broker_prod`)
@@ -794,7 +794,7 @@ docker compose -f docker-compose.prod.yml exec web python manage.py dbshell
 **Диагностика:**
 ```bash
 # Проверка существования сертификатов
-ls -la certbot/conf/live/onbr.site/
+ls -la certbot/conf/live/polis.insflow.ru/
 
 # Проверка логов certbot
 docker compose -f docker-compose.prod.yml logs certbot
@@ -803,11 +803,11 @@ docker compose -f docker-compose.prod.yml logs certbot
 docker compose -f docker-compose.prod.yml exec nginx nginx -t
 
 # Тест SSL
-openssl s_client -connect onbr.site:443 -servername onbr.site < /dev/null
+openssl s_client -connect polis.insflow.ru:443 -servername polis.insflow.ru < /dev/null
 ```
 
 **Решения:**
-1. Убедитесь, что DNS указывает на ваш сервер: `dig onbr.site`
+1. Убедитесь, что DNS указывает на ваш сервер: `dig polis.insflow.ru`
 2. Проверьте, что порт 80 открыт для ACME challenge
 3. Запустите скрипт инициализации: `./scripts/init-letsencrypt.sh`
 4. Для тестирования используйте staging: `STAGING=1 ./scripts/init-letsencrypt.sh`
@@ -906,7 +906,7 @@ docker compose -f docker-compose.prod.yml exec nginx cat /etc/nginx/conf.d/defau
 docker volume inspect insurance_broker_static_volume
 
 # Тест доступа
-curl -I https://onbr.site/static/css/custom.css
+curl -I https://polis.insflow.ru/static/css/custom.css
 ```
 
 **Решения:**
@@ -1391,7 +1391,7 @@ docker compose -f docker-compose.prod.yml logs web | grep "Slow query" | wc -l
 
 **Необходимые секреты:**
 - `SSH_PRIVATE_KEY` - Приватный SSH ключ для подключения к Droplet
-- `DROPLET_HOST` - IP адрес Droplet (64.227.75.233)
+- `DROPLET_HOST` - IP адрес Droplet (109.68.215.223)
 - `DROPLET_USER` - SSH пользователь (root)
 
 **Добавление секретов в GitHub:**

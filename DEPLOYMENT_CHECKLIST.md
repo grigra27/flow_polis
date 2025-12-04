@@ -6,12 +6,12 @@
 
 - [ ] Создан аккаунт на Digital Ocean
 - [ ] Создан Droplet (Ubuntu 22.04, минимум 2GB RAM)
-- [ ] IP адрес Droplet: `64.227.75.233`
+- [ ] IP адрес Droplet: `109.68.215.223`
 - [ ] Установлены Docker и Docker Compose на Droplet
 - [ ] Настроен firewall (UFW) - разрешены порты 22, 80, 443
 - [ ] Настроены SSH ключи для доступа к Droplet
-- [ ] DNS настроен для onbr.site и www.onbr.site
-- [ ] DNS распространился (проверено через `dig onbr.site`)
+- [ ] DNS настроен для polis.insflow.ru и www.polis.insflow.ru
+- [ ] DNS распространился (проверено через `dig polis.insflow.ru`)
 
 ## Шаг 1: Копирование файлов на Droplet
 
@@ -64,7 +64,7 @@ celery_beat:   [ ] Up
 - [ ] Проверено, что порты 80 и 443 открыты
 - [ ] Запущен скрипт `./scripts/init-letsencrypt.sh`
 - [ ] SSL сертификат успешно получен
-- [ ] Проверены файлы сертификата в `certbot/conf/live/onbr.site/`
+- [ ] Проверены файлы сертификата в `certbot/conf/live/polis.insflow.ru/`
 
 **Срок действия сертификата:** `___________________`
 
@@ -77,12 +77,12 @@ celery_beat:   [ ] Up
 
 ## Шаг 6: Проверка доступности сайта
 
-- [ ] HTTP редиректит на HTTPS (проверено через `curl -I http://onbr.site`)
-- [ ] HTTPS работает (проверено через `curl -I https://onbr.site`)
-- [ ] Сайт открывается в браузере: https://onbr.site
+- [ ] HTTP редиректит на HTTPS (проверено через `curl -I http://polis.insflow.ru`)
+- [ ] HTTPS работает (проверено через `curl -I https://polis.insflow.ru`)
+- [ ] Сайт открывается в браузере: https://polis.insflow.ru
 - [ ] Нет предупреждений о сертификате в браузере
 - [ ] Статические файлы загружаются корректно
-- [ ] Админ панель доступна: https://onbr.site/admin/
+- [ ] Админ панель доступна: https://polis.insflow.ru/admin/
 
 ## Шаг 7: Финальная настройка
 
@@ -158,7 +158,7 @@ docker compose -f docker-compose.prod.yml ps
 ### SSL сертификат не получается
 ```bash
 # Проверить DNS
-dig onbr.site +short
+dig polis.insflow.ru +short
 
 # Проверить firewall
 sudo ufw status
@@ -200,8 +200,8 @@ docker stats
 
 ## Контактная информация
 
-**Droplet IP:** `64.227.75.233`
-**Домен:** onbr.site
+**Droplet IP:** `109.68.215.223`
+**Домен:** polis.insflow.ru
 **SSH пользователь:** root
 **Директория приложения:** /opt/insurance_broker
 

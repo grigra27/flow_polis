@@ -4,6 +4,148 @@ This directory contains utility scripts for managing the Insurance Broker applic
 
 ## Available Scripts
 
+### migrate-database.sh
+
+Automated database export script for server-to-server migration.
+
+#### Purpose
+
+Exports the PostgreSQL database from the old server (Digital Ocean) for migration to a new server (Timeweb Cloud). This script:
+- Verifies SSH connectivity to the old server
+- Checks database container status
+- Gathers database statistics
+- Creates a complete SQL dump
+- Verifies backup integrity
+- Creates checksums for data verification
+
+#### Usage
+
+**Basic usage (with defaults):**
+```bash
+./scripts/migrate-database.sh
+```
+
+**With custom parameters:**
+```bash
+OLD_SERVER_IP=64.227.75.233 \
+OLD_SERVER_USER=root \
+BACKUP_DIR=./backups \
+./scripts/migrate-database.sh
+```
+
+#### Environment Variables
+
+- `OLD_SERVER_IP` - IP address of old server (default: `64.227.75.233`)
+- `OLD_SERVER_USER` - SSH user on old server (default: `root`)
+- `BACKUP_DIR` - Directory for backup files (default: `./backups`)
+
+#### Prerequisites
+
+- SSH access to old server
+- Docker and Docker Compose running on old server
+- Database container running on old server
+- Sufficient disk space for backup file
+
+#### What It Does
+
+1. **SSH Connection Check** - Verifies connectivity to old server
+2. **Container Status Check** - Ensures database container is running
+3. **Database Statistics** - Gathers table counts and row counts
+4. **Backup Creation** - Creates SQL dump using pg_dump
+5. **Integrity Verification** - Checks backup file size and content
+6. **Checksum Creation** - Generates MD5 checksum for verification
+
+#### Output
+
+Creates two files in the backup directory:
+- `insurance_broker_backup_YYYYMMDD_HHMMSS.sql` - Database dump
+- `insurance_broker_backup_YYYYMMDD_HHMMSS.sql.md5` - Checksum file
+
+#### Examples
+
+```bash
+# Export from default server
+./scripts/migrate-database.sh
+
+# Export from custom server
+OLD_SERVER_IP=192.168.1.100 ./scripts/migrate-database.sh
+
+# Export to custom directory
+BACKUP_DIR=/mnt/backups ./scripts/migrate-database.sh
+```
+
+#### Related Documentation
+
+See [docs/DATABASE_MIGRATION_GUIDE.md](../docs/DATABASE_MIGRATION_GUIDE.md) for complete migration guide.
+
+### import-database.sh
+
+Automated database import script for server-to-server migration.
+
+#### Purpose
+
+Imports a PostgreSQL database backup to the new server (Timeweb Cloud). This script:
+- Verifies backup file integrity
+- Checks Docker Compose installation
+- Validates environment configuration
+- Creates backup of existing database
+- Imports database from backup file
+- Verifies imported data
+- Runs Django migrations
+
+#### Usage
+
+**Import from backup file:**
+```bash
+./scripts/import-database.sh insurance_broker_backup_20231204_120000.sql
+```
+
+#### Prerequisites
+
+- Backup file from migrate-database.sh
+- Docker and Docker Compose v1 installed
+- `.env.prod` and `.env.prod.db` files configured
+- `docker-compose.prod.yml` present
+- Sufficient disk space
+
+#### What It Does
+
+1. **Checksum Verification** - Validates backup file integrity (if .md5 file present)
+2. **Environment Check** - Verifies Docker Compose and configuration files
+3. **Container Management** - Starts database container if not running
+4. **Pre-Import Backup** - Creates backup of current database (if exists)
+5. **Database Import** - Restores data from backup file
+6. **Data Verification** - Checks table counts and key tables
+7. **Django Migrations** - Runs migrations to ensure schema compatibility
+
+#### Safety Features
+
+- Creates automatic backup before import
+- Verifies data integrity after import
+- Checks for required environment files
+- Validates backup file before import
+
+#### Examples
+
+```bash
+# Import from backup file
+cd ~/insurance_broker
+./scripts/import-database.sh insurance_broker_backup_20231204_120000.sql
+
+# Import will automatically:
+# - Verify checksum if .md5 file exists
+# - Backup current database
+# - Import new data
+# - Run migrations
+# - Verify import success
+```
+
+#### Related Documentation
+
+See [docs/DATABASE_MIGRATION_GUIDE.md](../docs/DATABASE_MIGRATION_GUIDE.md) for complete migration guide.
+
+## Available Scripts
+
 ### init-letsencrypt.sh
 
 Automated script for initializing Let's Encrypt SSL certificates.

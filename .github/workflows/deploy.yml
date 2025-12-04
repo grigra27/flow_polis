@@ -79,7 +79,7 @@ jobs:
           echo "✅ Docker image is functional"
 
   deploy:
-    name: Deploy to Digital Ocean
+    name: Deploy to Timeweb Cloud
     runs-on: ubuntu-latest
     needs: build
 
@@ -254,7 +254,7 @@ jobs:
         if: needs.deploy.result == 'success'
         run: |
           echo "✅ Deployment to production was successful!"
-          echo "🌐 Application should be available at https://onbr.site"
+          echo "🌐 Application should be available at https://polis.insflow.ru"
 
       - name: Deployment Failure
         if: needs.deploy.result == 'failure' || needs.build.result == 'failure' || needs.validate.result == 'failure'

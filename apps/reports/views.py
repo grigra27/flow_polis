@@ -234,6 +234,7 @@ def export_policy_expiration(request):
             return redirect("reports:index")
 
         # Получаем полисы с окончанием страхования в заданном диапазоне
+        # Сортируем по филиалу (алфавитно), затем по дате окончания
         policies = (
             Policy.objects.select_related(
                 "client",
@@ -244,7 +245,7 @@ def export_policy_expiration(request):
                 "leasing_manager",
             )
             .filter(end_date__gte=date_from, end_date__lte=date_to)
-            .order_by("end_date", "policy_number")
+            .order_by("branch__branch_name", "end_date", "policy_number")
         )
 
         # Применяем опциональные фильтры

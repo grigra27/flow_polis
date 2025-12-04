@@ -494,8 +494,12 @@ class ScheduledPaymentsExporter(BaseExporter):
         # 4. Закрепление заголовков (заголовок отчета + пустая строка + заголовки столбцов + пустая строка)
         ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
 
-        # 5. Автофильтры на заголовки столбцов (строка 3)
-        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+        # 5. Автофильтры на заголовки столбцов (строка 3) с данными
+        # Устанавливаем автофильтр на весь диапазон данных, включая заголовки
+        if ws.max_row > 3:  # Проверяем, что есть данные
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
 
         # 6. Высота строк данных (пропускаем заголовки)
         for row in range(5, ws.max_row + 1):
@@ -837,8 +841,12 @@ class ThursdayReportExporter(BaseExporter):
         # 4. Закрепление заголовков (заголовок отчета + пустая строка + заголовки столбцов + пустая строка)
         ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
 
-        # 5. Автофильтры на заголовки столбцов (строка 3)
-        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+        # 5. Автофильтры на заголовки столбцов (строка 3) с данными
+        # Устанавливаем автофильтр на весь диапазон данных, включая заголовки
+        if ws.max_row > 3:  # Проверяем, что есть данные
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
 
         # 6. Высота строк данных (пропускаем заголовки)
         for row in range(5, ws.max_row + 1):
@@ -882,7 +890,6 @@ class PolicyExpirationExporter(BaseExporter):
         return [
             "Номер полиса",
             "Номер ДФА",
-            "Филиал",
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
@@ -953,10 +960,62 @@ class PolicyExpirationExporter(BaseExporter):
         # Пустая строка после заголовков столбцов
         ws.append([""] * len(headers))
 
-        # Данные полисов
+        # Группируем полисы по филиалам
+        from collections import defaultdict
+
+        policies_by_branch = defaultdict(list)
         for policy in self.queryset:
-            row = self.get_row_data(policy)
-            ws.append(row)
+            branch_name = policy.branch.branch_name if policy.branch else "Без филиала"
+            policies_by_branch[branch_name].append(policy)
+
+        # Сортируем филиалы по алфавиту
+        sorted_branches = sorted(policies_by_branch.keys())
+
+        # Добавляем данные по филиалам
+        for branch_name in sorted_branches:
+            # Добавляем заголовок филиала
+            ws.append([branch_name])
+            branch_header_row = ws.max_row
+
+            # Форматирование заголовка филиала
+            branch_cell = ws.cell(row=branch_header_row, column=1)
+            branch_cell.font = Font(bold=True, size=12, color="000000")
+            branch_cell.fill = PatternFill(
+                start_color="E3F2FD", end_color="E3F2FD", fill_type="solid"
+            )  # Светло-голубой фон
+            branch_cell.alignment = Alignment(horizontal="left", vertical="center")
+
+            # Добавляем границы для заголовка филиала
+            thin_border = Border(
+                left=Side(style="thin", color="000000"),
+                right=Side(style="thin", color="000000"),
+                top=Side(style="thin", color="000000"),
+                bottom=Side(style="thin", color="000000"),
+            )
+            branch_cell.border = thin_border
+
+            ws.row_dimensions[branch_header_row].height = 25
+
+            # Объединяем ячейки для заголовка филиала
+            ws.merge_cells(
+                start_row=branch_header_row,
+                start_column=1,
+                end_row=branch_header_row,
+                end_column=num_columns,
+            )
+
+            # Применяем границы ко всем объединенным ячейкам
+            for col in range(1, num_columns + 1):
+                cell = ws.cell(row=branch_header_row, column=col)
+                cell.border = thin_border
+
+            # Добавляем полисы филиала
+            for policy in policies_by_branch[branch_name]:
+                row = self.get_row_data(policy)
+                ws.append(row)
+
+            # Пустая строка после блока филиала
+            ws.append([""] * len(headers))
 
         # Форматирование
         self.apply_formatting(ws)
@@ -973,7 +1032,6 @@ class PolicyExpirationExporter(BaseExporter):
         return [
             policy.policy_number,
             policy.dfa_number,
-            policy.branch.branch_name if policy.branch else "",
             policy.client.client_name,
             policy.insurer.insurer_name,
             policy.policyholder.client_name if policy.policyholder else "",
@@ -992,15 +1050,14 @@ class PolicyExpirationExporter(BaseExporter):
         column_widths = {
             "A": 15,  # Номер полиса
             "B": 15,  # Номер ДФА
-            "C": None,  # Филиал - автоподгонка
-            "D": None,  # Лизингополучатель - автоподгонка
-            "E": None,  # Страховщик - автоподгонка
-            "F": None,  # Страхователь - автоподгонка
-            "G": 13,  # Дата начала страхования
-            "H": 13,  # Дата окончания страхования
-            "I": None,  # Объект страхования - автоподгонка с большим лимитом
-            "J": 16,  # Страховая премия
-            "K": None,  # Контактное лицо - автоподгонка
+            "C": None,  # Лизингополучатель - автоподгонка
+            "D": None,  # Страховщик - автоподгонка
+            "E": None,  # Страхователь - автоподгонка
+            "F": 13,  # Дата начала страхования
+            "G": 13,  # Дата окончания страхования
+            "H": None,  # Объект страхования - автоподгонка с большим лимитом
+            "I": 16,  # Страховая премия
+            "J": None,  # Контактное лицо - автоподгонка
         }
 
         from openpyxl.utils import get_column_letter
@@ -1020,25 +1077,29 @@ class PolicyExpirationExporter(BaseExporter):
                 for cell in column_cells:
                     # Пропускаем объединенные ячейки
                     if hasattr(cell, "value") and cell.value:
-                        # Пропускаем заголовок отчета
-                        if (
-                            isinstance(cell.value, str)
-                            and "ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ" in cell.value
+                        # Пропускаем заголовок отчета и заголовки филиалов
+                        if isinstance(cell.value, str) and (
+                            "ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ" in cell.value
+                            or (
+                                col_idx == 1
+                                and ws.cell(row=cell.row, column=2).value is None
+                                and cell.row > 3
+                            )
                         ):
                             continue
                         max_length = max(max_length, len(str(cell.value)))
 
                 adjusted_width = max_length + 2
 
-                if column_letter == "I":  # Объект страхования
+                if column_letter == "H":  # Объект страхования
                     adjusted_width = min(max(adjusted_width, 12), 60)
                 else:
                     adjusted_width = min(max(adjusted_width, 10), 50)
 
                 ws.column_dimensions[column_letter].width = adjusted_width
 
-        # 2. Перенос текста для столбца "Объект страхования" (I)
-        for cell in ws["I"]:
+        # 2. Перенос текста для столбца "Объект страхования" (H)
+        for cell in ws["H"]:
             if cell.row > 3:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
@@ -1046,12 +1107,26 @@ class PolicyExpirationExporter(BaseExporter):
         for row in ws.iter_rows(
             min_row=5
         ):  # Начинаем с 5 строки (первая строка данных)
+            # Проверяем, является ли строка заголовком филиала
+            first_cell_value = row[0].value
+            is_branch_header = (
+                first_cell_value
+                and isinstance(first_cell_value, str)
+                and row[1].value is None  # Вторая ячейка пустая (объединенная)
+            )
+
+            # Пропускаем пустые строки-разделители
+            is_empty_row = all(cell.value is None or cell.value == "" for cell in row)
+
+            if is_branch_header or is_empty_row:
+                continue
+
             for idx, cell in enumerate(row, start=1):
-                # Столбцы с датами (G, H) - по центру
-                if idx in [7, 8]:
+                # Столбцы с датами (F, G) - по центру
+                if idx in [6, 7]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                # Столбец со страховой премией (J) - справа
-                elif idx == 10:
+                # Столбец со страховой премией (I) - справа
+                elif idx == 9:
                     cell.alignment = Alignment(horizontal="right", vertical="center")
                     # Применяем числовой формат с разделителями тысяч
                     cell.number_format = "#,##0.00"
@@ -1062,12 +1137,25 @@ class PolicyExpirationExporter(BaseExporter):
         # 4. Закрепление заголовков
         ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
 
-        # 5. Автофильтры на заголовки столбцов (строка 3)
-        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+        # 5. Автофильтры на заголовки столбцов (строка 3) с данными
+        # Устанавливаем автофильтр на весь диапазон данных, включая заголовки
+        if ws.max_row > 3:  # Проверяем, что есть данные
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
 
         # 6. Высота строк данных
         for row in range(5, ws.max_row + 1):
-            ws.row_dimensions[row].height = 20
+            # Проверяем, является ли строка заголовком филиала (уже имеет высоту 25)
+            cell_value = ws.cell(row=row, column=1).value
+            is_branch_header = (
+                cell_value
+                and isinstance(cell_value, str)
+                and ws.cell(row=row, column=2).value is None
+            )
+
+            if not is_branch_header:
+                ws.row_dimensions[row].height = 20
 
 
 class CommissionReportExporter(BaseExporter):
@@ -1284,8 +1372,12 @@ class CommissionReportExporter(BaseExporter):
         # 4. Закрепление заголовков (заголовок отчета + пустая строка + заголовки столбцов + пустая строка)
         ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
 
-        # 5. Автофильтры на заголовки столбцов (строка 3)
-        ws.auto_filter.ref = f"A3:{ws.cell(row=3, column=ws.max_column).coordinate}"
+        # 5. Автофильтры на заголовки столбцов (строка 3) с данными
+        # Устанавливаем автофильтр на весь диапазон данных, включая заголовки
+        if ws.max_row > 3:  # Проверяем, что есть данные
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
 
         # 6. Высота строк данных (пропускаем заголовки)
         for row in range(5, ws.max_row + 1):

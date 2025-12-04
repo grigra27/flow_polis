@@ -75,4 +75,7 @@ celerybeat.pid
 certbot/conf/
 certbot/www/
 
+# Backups
+backups/
+
 fixtures/

@@ -5,8 +5,8 @@
 
 set -e  # Exit on error
 
-PROD_SERVER="root@64.227.75.233"
-PROD_APP_DIR="/opt/insurance_broker"
+PROD_SERVER="root@109.68.215.223"
+PROD_APP_DIR="~/insurance_broker"
 PROD_CONTAINER="insurance_broker_db"
 PROD_DB_NAME="insurance_broker_prod"
 PROD_DB_USER="postgres"

@@ -64,6 +64,9 @@ docker-compose*.yml
 # CI/CD
 .github/
 
+# Backups
+backups/
+
 # Other
 *.bak
 *.tmp

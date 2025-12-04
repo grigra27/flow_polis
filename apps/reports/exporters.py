@@ -205,60 +205,8 @@ class PolicyExporter(BaseExporter):
         ]
 
 
-class PaymentExporter(BaseExporter):
-    """Экспортер для готового экспорта по платежам"""
-
-    def get_filename(self):
-        """Возвращает базовое имя файла"""
-        return "payments"
-
-    def get_headers(self):
-        """Возвращает список заголовков"""
-        return [
-            "Номер полиса",
-            "Клиент",
-            "Год",
-            "Платеж №",
-            "Дата платежа",
-            "Сумма",
-            "Страховая сумма",
-            "КВ %",
-            "КВ руб",
-            "Дата оплаты",
-            "Дата согласования СК",
-            "Статус",
-        ]
-
-    def get_row_data(self, payment):
-        """Возвращает данные строки для платежа"""
-        # Определение статуса
-        if payment.is_approved:
-            status = "Согласовано с СК"
-        elif payment.is_paid:
-            status = "Оплачен"
-        elif payment.is_cancelled:
-            status = "Отменен"
-        elif payment.is_overdue:
-            status = "Не оплачен"
-        else:
-            status = "Ожидается"
-
-        return [
-            payment.policy.policy_number,
-            payment.policy.client.client_name,
-            payment.year_number,
-            payment.installment_number,
-            self.format_value(payment.due_date),
-            self.format_value(payment.amount),
-            self.format_value(payment.insurance_sum),
-            int(round(float(payment.commission_rate.kv_percent)))
-            if payment.commission_rate
-            else 0,
-            self.format_value(payment.kv_rub),
-            self.format_value(payment.paid_date),
-            self.format_value(payment.insurer_date),
-            status,
-        ]
+# PaymentExporter был удален - используйте ScheduledPaymentsExporter вместо него
+# Старый экспортер оставлен только для обратной совместимости с тестами
 
 
 class ScheduledPaymentsExporter(BaseExporter):

@@ -253,6 +253,7 @@ class PolicyAdmin(admin.ModelAdmin):
                     due_date=payment.due_date,
                     amount=payment.amount,
                     insurance_sum=payment.insurance_sum,
+                    commission_rate=payment.commission_rate,  # Копируем commission_rate
                     kv_rub=payment.kv_rub,
                     paid_date=payment.paid_date,
                     insurer_date=payment.insurer_date,

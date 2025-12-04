@@ -7,10 +7,33 @@ from .models import PaymentSchedule, Policy
 def calculate_commission(sender, instance, **kwargs):
     """
     Automatically calculate commission in rubles before saving
-    Only auto-calculate if:
+
+    Auto-sets commission_rate if not set:
+    - Looks up rate based on policy's insurer and insurance_type
+
+    Auto-calculates kv_rub if:
     - It's a new record (no pk yet), OR
     - Commission rate changed and kv_rub wasn't manually edited
     """
+    # Auto-set commission_rate if not set
+    if not instance.commission_rate and instance.policy_id:
+        try:
+            from apps.insurers.models import CommissionRate
+
+            # Try to get commission rate from policy's insurer and insurance type
+            policy = instance.policy
+            rate = CommissionRate.objects.get(
+                insurer=policy.insurer, insurance_type=policy.insurance_type
+            )
+            instance.commission_rate = rate
+        except CommissionRate.DoesNotExist:
+            # No commission rate found - will be caught by validation if required
+            pass
+        except Exception:
+            # Any other error - don't break the save
+            pass
+
+    # If still no commission_rate, can't calculate kv_rub
     if not instance.commission_rate:
         return
 

@@ -16,7 +16,7 @@ from .filters import (
     ClientExportFilter,
     InsurerExportFilter,
 )
-from .exporters import CustomExporter, PolicyExporter, PaymentExporter
+from .exporters import CustomExporter, PolicyExporter
 import logging
 
 logger = logging.getLogger(__name__)

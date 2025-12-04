@@ -148,6 +148,31 @@ jobs:
             echo "✅ Environment files verified (not modified)"
           ENDSSH
 
+      - name: Check SSL certificates
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            cd ~/insurance_broker
+
+            # Check if SSL certificates exist
+            if [ -d "certbot/conf/live/polis.insflow.ru" ]; then
+              echo "✅ SSL certificates found"
+              echo "SSL_EXISTS=true" >> $GITHUB_ENV
+            else
+              echo "⚠️  SSL certificates not found - will use initial config"
+              echo "SSL_EXISTS=false" >> $GITHUB_ENV
+
+              # Backup SSL config and use initial config
+              if [ -f "nginx/default.conf" ]; then
+                cp nginx/default.conf nginx/default.conf.ssl
+                cp nginx/default.conf.initial nginx/default.conf
+                echo "✅ Switched to initial nginx config (no SSL)"
+              fi
+            fi
+          ENDSSH
+
       - name: Deploy on server
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
@@ -164,16 +189,36 @@ jobs:
             echo "🔨 Building images..."
             docker-compose -f docker-compose.prod.yml build
 
-            echo "🔄 Restarting containers with new images..."
-            docker-compose -f docker-compose.prod.yml up -d --force-recreate --no-deps web celery_worker celery_beat
+            echo "🔄 Starting containers..."
+            docker-compose -f docker-compose.prod.yml up -d
 
             echo "⏳ Waiting for services to be ready..."
             sleep 15
 
-            echo "🔄 Restarting nginx to pick up any config changes..."
-            docker-compose -f docker-compose.prod.yml restart nginx
-
             echo "✅ Deployment completed"
+          ENDSSH
+
+      - name: Setup SSL (first deployment only)
+        if: env.SSL_EXISTS == 'false'
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_HOST << 'ENDSSH'
+            set -e
+            cd ~/insurance_broker
+
+            echo "🔐 Setting up SSL certificates..."
+            echo "⚠️  This is a first deployment - SSL setup required"
+            echo ""
+            echo "Please run the following command on the server:"
+            echo "  cd ~/insurance_broker && ./scripts/setup-ssl.sh"
+            echo ""
+            echo "Or manually:"
+            echo "  1. Verify DNS is configured: nslookup polis.insflow.ru"
+            echo "  2. Run: docker-compose -f docker-compose.prod.yml run --rm certbot certonly --webroot --webroot-path=/var/www/certbot --email admin@insflow.ru --agree-tos --no-eff-email -d polis.insflow.ru"
+            echo "  3. Switch to SSL config: cp nginx/default.conf.ssl nginx/default.conf"
+            echo "  4. Restart nginx: docker-compose -f docker-compose.prod.yml restart nginx"
           ENDSSH
 
       - name: Run migrations

@@ -1,7 +1,7 @@
-# Initial Nginx configuration (before SSL certificates are obtained)
-# Use this configuration for the first deployment to obtain Let's Encrypt certificates
-# After obtaining certificates, replace with default.conf
+# Initial Nginx configuration (without SSL)
+# Use this for first deployment before SSL certificates are obtained
 
+# Upstream configuration for Django application
 upstream django {
     server web:8000;
 }
@@ -10,11 +10,18 @@ upstream django {
 server {
     listen 80;
     listen [::]:80;
-    server_name onbr.site www.onbr.site;
+    server_name polis.insflow.ru;
 
     # Let's Encrypt ACME challenge location
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
+    }
+
+    # Health check endpoint (for Docker healthcheck)
+    location /health/ {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
     }
 
     # Client upload size limit
@@ -71,12 +78,5 @@ server {
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
-    }
-
-    # Health check endpoint
-    location /health/ {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
     }
 }

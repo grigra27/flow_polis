@@ -3,18 +3,17 @@
 ## Проблема
 Nginx не запускается при первом деплое из-за отсутствия SSL сертификатов.
 
-## Быстрое решение
+## Решение
 
 Подключитесь к серверу и выполните:
 
 ```bash
 cd ~/insurance_broker
-
-# Автоматическая настройка SSL
+git pull origin main
 ./scripts/setup-ssl.sh
 ```
 
-Готово! Скрипт автоматически:
+Скрипт автоматически:
 - Переключит nginx на конфигурацию без SSL
 - Получит SSL сертификат
 - Включит SSL конфигурацию
@@ -29,6 +28,10 @@ docker-compose -f docker-compose.prod.yml ps
 # Проверьте HTTPS
 curl https://polis.insflow.ru/health/
 ```
+
+## Подробная документация
+
+См. [docs/FIRST_DEPLOYMENT.md](docs/FIRST_DEPLOYMENT.md)
 
 ## Если автоматический скрипт не работает
 

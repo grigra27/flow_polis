@@ -186,10 +186,16 @@ jobs:
             echo "📦 Pulling latest images..."
             docker-compose -f docker-compose.prod.yml pull || true
 
-            echo "🔨 Building images..."
+            echo "🛑 Stopping old containers..."
+            docker-compose -f docker-compose.prod.yml down
+
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+
+            echo "🔨 Building new images..."
             docker-compose -f docker-compose.prod.yml build
 
-            echo "🔄 Starting containers..."
+            echo "🚀 Starting containers with new images..."
             docker-compose -f docker-compose.prod.yml up -d
 
             echo "⏳ Waiting for services to be ready..."

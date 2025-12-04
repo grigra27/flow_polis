@@ -841,11 +841,9 @@ class PolicyExpirationExporter(BaseExporter):
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
-            "Дата начала страхования",
             "Дата оконч. страхования",
             "Объект страхования",
             "Страховая премия",
-            "Контактное лицо",
         ]
 
     def export(self):
@@ -972,22 +970,15 @@ class PolicyExpirationExporter(BaseExporter):
 
     def get_row_data(self, policy):
         """Возвращает данные строки для полиса"""
-        # Получаем фамилию менеджера лизинговой компании
-        leasing_manager_name = ""
-        if policy.leasing_manager:
-            leasing_manager_name = policy.leasing_manager.name
-
         return [
             policy.policy_number,
             policy.dfa_number,
             policy.client.client_name,
             policy.insurer.insurer_name,
             policy.policyholder.client_name if policy.policyholder else "",
-            self.format_value(policy.start_date),
             self.format_value(policy.end_date),
             policy.property_description,
             self.format_value(policy.premium_total),
-            leasing_manager_name,
         ]
 
     def apply_formatting(self, ws):
@@ -1001,11 +992,9 @@ class PolicyExpirationExporter(BaseExporter):
             "C": None,  # Лизингополучатель - автоподгонка
             "D": None,  # Страховщик - автоподгонка
             "E": None,  # Страхователь - автоподгонка
-            "F": 13,  # Дата начала страхования
-            "G": 13,  # Дата окончания страхования
-            "H": None,  # Объект страхования - автоподгонка с большим лимитом
-            "I": 16,  # Страховая премия
-            "J": None,  # Контактное лицо - автоподгонка
+            "F": 13,  # Дата окончания страхования
+            "G": None,  # Объект страхования - автоподгонка с большим лимитом
+            "H": 16,  # Страховая премия
         }
 
         from openpyxl.utils import get_column_letter
@@ -1039,15 +1028,15 @@ class PolicyExpirationExporter(BaseExporter):
 
                 adjusted_width = max_length + 2
 
-                if column_letter == "H":  # Объект страхования
+                if column_letter == "G":  # Объект страхования
                     adjusted_width = min(max(adjusted_width, 12), 60)
                 else:
                     adjusted_width = min(max(adjusted_width, 10), 50)
 
                 ws.column_dimensions[column_letter].width = adjusted_width
 
-        # 2. Перенос текста для столбца "Объект страхования" (H)
-        for cell in ws["H"]:
+        # 2. Перенос текста для столбца "Объект страхования" (G)
+        for cell in ws["G"]:
             if cell.row > 3:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 

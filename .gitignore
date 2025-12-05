@@ -46,6 +46,8 @@ db_backup.sql
 .env
 .env.prod
 .env.prod.db
+.env.test
+.env.test.db
 .venv
 black_venv/
 venv/

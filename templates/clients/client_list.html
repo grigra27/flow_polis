@@ -18,7 +18,7 @@
 <div class="mb-4">
     <form method="get" class="row g-2">
         <div class="col-md-10">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Поиск по названию или ИНН" value="{{ request.GET.search }}">
+            <input type="text" name="search" class="form-control form-control-sm" placeholder="Поиск по названию, альтернативному названию или ИНН" value="{{ request.GET.search }}">
         </div>
         <div class="col-md-2">
             <button type="submit" class="btn btn-sm btn-primary w-100">Найти</button>
@@ -33,7 +33,7 @@
     <div class="col">
         <div class="client-item p-2" onclick="window.location.href='{% url 'clients:detail' client.pk %}'" style="cursor: pointer;">
             <div class="client-name mb-1">{{ client.client_name }}</div>
-            <div class="client-inn text-muted small">{{ client.client_inn|default:"—" }}</div>
+            <div class="client-inn text-muted small">ИНН: {{ client.client_inn|default:"—" }}</div>
         </div>
     </div>
     {% endfor %}

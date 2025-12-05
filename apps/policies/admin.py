@@ -59,8 +59,8 @@ class PaymentScheduleInline(admin.TabularInline):
         "year_number",
         "installment_number",
         "due_date",
-        "amount",
         "insurance_sum",
+        "amount",
         "kv_rub",
         "paid_date",
         "insurer_date",
@@ -175,6 +175,10 @@ class PolicyAdmin(admin.ModelAdmin):
     )
 
     inlines = [PaymentScheduleInline, PolicyInfoInline]
+
+    class Media:
+        js = ("policies/js/auto_copy_policyholder.js",)
+        css = {"all": ("policies/css/auto_copy_policyholder.css",)}
 
     def policy_status(self, obj):
         if obj.policy_active:
@@ -296,8 +300,8 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
         "year_number",
         "installment_number",
         "due_date",
-        "amount",
         "insurance_sum",
+        "amount",
         "kv_rub",
         "payment_status",
     ]

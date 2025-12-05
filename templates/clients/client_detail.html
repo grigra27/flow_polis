@@ -28,6 +28,11 @@
                 <p><strong>Название:</strong><br>
                 {{ client.client_name }}</p>
 
+                {% if client.alternative_name %}
+                <p><strong>Альтернативное название:</strong><br>
+                {{ client.alternative_name }}</p>
+                {% endif %}
+
                 <p><strong>ИНН:</strong><br>
                 {{ client.client_inn|default:"—" }}</p>
             </div>

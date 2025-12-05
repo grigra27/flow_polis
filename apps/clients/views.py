@@ -13,8 +13,10 @@ class ClientListView(LoginRequiredMixin, ListView):
         queryset = super().get_queryset()
         search = self.request.GET.get("search")
         if search:
-            queryset = queryset.filter(client_name__icontains=search) | queryset.filter(
-                client_inn__icontains=search
+            queryset = (
+                queryset.filter(client_name__icontains=search)
+                | queryset.filter(client_inn__icontains=search)
+                | queryset.filter(alternative_name__icontains=search)
             )
         return queryset
 

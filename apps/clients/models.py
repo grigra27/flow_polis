@@ -10,14 +10,16 @@ def validate_inn(value):
     """
     if not value:
         return
-    
+
     # Проверяем, что ИНН содержит только цифры
-    if not re.match(r'^\d+$', value):
-        raise ValidationError('ИНН должен содержать только цифры.')
-    
+    if not re.match(r"^\d+$", value):
+        raise ValidationError("ИНН должен содержать только цифры.")
+
     # Проверяем длину ИНН
     if len(value) not in [10, 12]:
-        raise ValidationError('ИНН должен содержать 10 цифр (для юридических лиц) или 12 цифр (для физических лиц).')
+        raise ValidationError(
+            "ИНН должен содержать 10 цифр (для юридических лиц) или 12 цифр (для физических лиц)."
+        )
 
 
 class Client(models.Model):
@@ -26,14 +28,17 @@ class Client(models.Model):
     """
 
     client_name = models.CharField("Название компании", max_length=255)
+    alternative_name = models.CharField(
+        "Альтернативное название", max_length=255, blank=True, null=True
+    )
     client_inn = models.CharField(
-        "ИНН", 
-        max_length=12, 
-        blank=True, 
+        "ИНН",
+        max_length=12,
+        blank=True,
         null=True,
         unique=True,
         validators=[validate_inn],
-        help_text="ИНН должен содержать 10 или 12 цифр"
+        help_text="ИНН должен содержать 10 или 12 цифр",
     )
     notes = models.TextField("Примечание", blank=True)
 

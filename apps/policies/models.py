@@ -140,18 +140,18 @@ class PaymentSchedule(TimeStampedModel):
     installment_number = models.PositiveSmallIntegerField("Порядковый номер платежа")
 
     due_date = models.DateField("Дата платежа (по договору)")
-    amount = models.DecimalField(
-        "Сумма платежа",
-        max_digits=15,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal("0.01"))],
-    )
     insurance_sum = models.DecimalField(
         "Страховая сумма",
         max_digits=15,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
         help_text="Стоимость застрахованного имущества для данного платежа",
+    )
+    amount = models.DecimalField(
+        "Страховая премия",
+        max_digits=15,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
     )
 
     commission_rate = models.ForeignKey(

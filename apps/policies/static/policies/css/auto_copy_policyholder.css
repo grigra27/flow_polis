@@ -1,0 +1,26 @@
+/**
+ * Styles for auto-copy policyholder feature
+ */
+
+.auto-copy-help {
+    padding: 8px 12px;
+    background-color: #e3f2fd;
+    border-left: 3px solid #2196f3;
+    border-radius: 3px;
+    margin-top: 8px;
+}
+
+.auto-copy-help i {
+    margin-right: 5px;
+    color: #2196f3;
+}
+
+/* Highlight effect when value is copied */
+@keyframes copyHighlight {
+    0% {
+        background-color: #e8f5e9;
+    }
+    100% {
+        background-color: transparent;
+    }
+}

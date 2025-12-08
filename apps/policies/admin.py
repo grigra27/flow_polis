@@ -72,6 +72,7 @@ class PaymentScheduleInline(admin.TabularInline):
         js = (
             "policies/js/copy_payment_inline.js",
             "policies/js/auto_commission_rate.js",
+            "policies/js/validate_payment_dates.js",
         )
         css = {
             "all": (

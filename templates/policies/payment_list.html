@@ -273,7 +273,7 @@
                         </li>
                     {% elif num == 1 or num == page_obj.paginator.num_pages %}
                         <li class="page-item">
-                            <a class="page-link" href=""um }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
                         </li>
                     {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
                         <li class="page-item disabled">

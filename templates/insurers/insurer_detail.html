@@ -73,6 +73,22 @@
         background-color: #e9ecef !important;
         cursor: default;
     }
+    tr.table-terminated,
+    tr.table-terminated > td {
+        background-color: #f8d7da !important;
+    }
+    tr.table-terminated:hover,
+    tr.table-terminated:hover > td {
+        background-color: #f5c2c7 !important;
+    }
+    tr.table-secondary,
+    tr.table-secondary > td {
+        background-color: #e9ecef !important;
+    }
+    tr.table-secondary:hover,
+    tr.table-secondary:hover > td {
+        background-color: #dee2e6 !important;
+    }
 </style>
 {% endblock %}
 
@@ -314,8 +330,16 @@
                         </thead>
                         <tbody>
                             {% for policy in policies %}
-                            <tr class="clickable-row" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
-                                <td><strong>{{ policy.policy_number }}</strong></td>
+                            <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
+                                <td>
+                                    <strong>{{ policy.policy_number }}</strong>
+                                    {% if not policy.policy_active %}
+                                        <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
+                                    {% endif %}
+                                    {% if not policy.broker_participation %}
+                                        <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ policy.client.client_name }}</td>
                                 <td>{% insurance_type_icon policy.insurance_type size='small' %}</td>
                                 <td>
@@ -328,7 +352,7 @@
                                     {% if policy.policy_active %}
                                         <span class="badge bg-success">Активен</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">Закрыт</span>
+                                        <span class="badge bg-danger">Закрыт</span>
                                     {% endif %}
                                 </td>
                             </tr>

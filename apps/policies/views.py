@@ -10,7 +10,7 @@ class PolicyListView(LoginRequiredMixin, FilterView):
     template_name = "policies/policy_list.html"
     context_object_name = "policies"
     filterset_class = PolicyFilter
-    paginate_by = 50
+    paginate_by = 30
 
     def get_queryset(self):
         queryset = (

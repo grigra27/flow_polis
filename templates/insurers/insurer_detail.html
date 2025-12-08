@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load insurer_tags %}
 {% load currency_filters %}
+{% load l10n %}
 
 {% block title %}{{ insurer.insurer_name }}{% endblock %}
 
@@ -31,6 +32,46 @@
     .branch-filter-pills .nav-link i {
         font-size: 0.75rem;
         margin-right: 0.25rem;
+    }
+
+    /* Statistics styles */
+    .stat-box {
+        transition: all 0.3s ease;
+    }
+    .stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .stat-value {
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .progress {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .progress-bar {
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        transition: width 0.6s ease;
+    }
+
+    /* Chart legend styles */
+    .legend-color {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+    }
+    .branch-legend .bg-light:hover {
+        background-color: #e9ecef !important;
+        cursor: default;
     }
 </style>
 {% endblock %}
@@ -78,6 +119,119 @@
             </div>
             <div class="card-body">
                 {{ insurer.notes|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Statistics -->
+        {% if statistics.total_policies > 0 %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Статистика по сделкам этой СК</h5>
+            </div>
+            <div class="card-body">
+                <!-- Summary Stats -->
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-primary fw-bold fs-4">{{ statistics.total_policies }}</div>
+                            <div class="stat-label text-muted small">Всего полисов</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-success fw-bold fs-4">{{ statistics.active_policies }}</div>
+                            <div class="stat-label text-muted small">Активных</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-info fw-bold fs-5">{{ statistics.total_premium|rub }} ₽</div>
+                            <div class="stat-label text-muted small">Общая премия</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value fw-bold fs-6">{{ statistics.avg_premium|rub }} ₽</div>
+                            <div class="stat-label text-muted small">Средняя премия</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch Distribution -->
+                {% if statistics.branch_distribution %}
+                <h6 class="mb-3 fw-bold"><i class="bi bi-building"></i> Распределение по филиалам</h6>
+
+                <div class="mb-4">
+                    <canvas id="branchChart" style="max-height: 250px;"></canvas>
+                </div>
+
+                <!-- Branch Legend with Details -->
+                <div class="branch-legend">
+                    {% for branch in statistics.branch_distribution %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                        <div class="d-flex align-items-center">
+                            <span class="legend-color me-2" style="background-color: {{ branch.color }};"></span>
+                            <span class="small fw-semibold">{{ branch.name }}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="small">
+                                <span class="badge bg-primary">{{ branch.percentage }}%</span>
+                                <span class="text-muted ms-1">{{ branch.count }} {{ branch.count|ru_pluralize:"полис,полиса,полисов" }}</span>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.7rem;">
+                                сумма СП, справочно: {{ branch.total_premium|rub }} ₽
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <hr class="my-4">
+
+                <!-- Insurance Type Distribution -->
+                {% if statistics.type_distribution %}
+                <h6 class="mb-3 fw-bold"><i class="bi bi-shield-check"></i> Распределение по видам страхования</h6>
+                {% for type in statistics.type_distribution %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold">{{ type.name }}</span>
+                        <span class="badge bg-success">{{ type.percentage }}%</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar"
+                             style="width: {{ type.percentage }}%;"
+                             aria-valuenow="{{ type.percentage }}"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            {{ type.count }} {{ type.count|ru_pluralize:"полис,полиса,полисов" }}
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-1">
+                        Премия: {{ type.total_premium|rub }} ₽
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <hr class="my-4">
+
+                <!-- Broker Participation -->
+                <div class="text-center p-3 bg-light rounded">
+                    <div class="mb-2">
+                        <i class="bi bi-briefcase fs-3 text-warning"></i>
+                    </div>
+                    <div class="fw-bold">Участие брокера</div>
+                    <div class="fs-4 text-warning fw-bold">{{ statistics.broker_percentage }}%</div>
+                    <div class="text-muted small">{{ statistics.broker_participation }} из {{ statistics.total_policies }} полисов</div>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -190,6 +344,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const rows = document.querySelectorAll('.clickable-row');
@@ -198,6 +353,57 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = this.dataset.href;
         });
     });
+
+    // Branch Distribution Pie Chart
+    {% if statistics.branch_distribution %}
+    const branchCtx = document.getElementById('branchChart');
+    if (branchCtx) {
+        const branchData = {
+            labels: [
+                {% for branch in statistics.branch_distribution %}
+                '{{ branch.name }}'{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            datasets: [{
+                data: [
+                    {% for branch in statistics.branch_distribution %}
+                    {{ branch.percentage|unlocalize }}{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                backgroundColor: [
+                    {% for branch in statistics.branch_distribution %}
+                    '{{ branch.color }}'{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        };
+
+        new Chart(branchCtx, {
+            type: 'pie',
+            data: branchData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                return label + ': ' + value.toFixed(1) + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
 });
 </script>
 {% endblock %}

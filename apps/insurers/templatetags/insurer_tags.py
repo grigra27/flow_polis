@@ -3,6 +3,34 @@ from django import template
 register = template.Library()
 
 
+@register.filter
+def ru_pluralize(value, forms):
+    """
+    Склонение существительных в русском языке
+
+    Использование:
+    {{ count }} {{ count|ru_pluralize:"полис,полиса,полисов" }}
+
+    forms: строка с тремя формами через запятую (1, 2-4, 5+)
+    """
+    try:
+        value = int(value)
+        forms_list = forms.split(",")
+
+        if len(forms_list) != 3:
+            return forms_list[0] if forms_list else ""
+
+        # Определяем форму по правилам русского языка
+        if value % 10 == 1 and value % 100 != 11:
+            return forms_list[0]
+        elif value % 10 in [2, 3, 4] and value % 100 not in [12, 13, 14]:
+            return forms_list[1]
+        else:
+            return forms_list[2]
+    except (ValueError, TypeError):
+        return forms_list[0] if "forms_list" in locals() else ""
+
+
 @register.inclusion_tag("insurers/includes/insurer_logo.html")
 def insurer_logo(insurer, size="medium"):
     """

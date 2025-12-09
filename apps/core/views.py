@@ -18,15 +18,23 @@ def dashboard(request):
     # Statistics
     total_policies = Policy.objects.filter(policy_active=True).count()
 
-    upcoming_payments = PaymentSchedule.objects.filter(
-        due_date__range=[today, next_month],
-        paid_date__isnull=True,
-        policy__policy_active=True,
-    ).select_related("policy", "policy__client")
+    upcoming_payments = (
+        PaymentSchedule.objects.filter(
+            due_date__range=[today, next_month],
+            paid_date__isnull=True,
+            policy__policy_active=True,
+        )
+        .select_related("policy", "policy__client")
+        .order_by("due_date", "policy__policy_number")
+    )
 
-    overdue_payments = PaymentSchedule.objects.filter(
-        due_date__lt=today, paid_date__isnull=True, policy__policy_active=True
-    ).select_related("policy", "policy__client")
+    overdue_payments = (
+        PaymentSchedule.objects.filter(
+            due_date__lt=today, paid_date__isnull=True, policy__policy_active=True
+        )
+        .select_related("policy", "policy__client")
+        .order_by("due_date", "policy__policy_number")
+    )
 
     # Policies not uploaded
     not_uploaded_policies = Policy.objects.filter(policy_uploaded=False).select_related(

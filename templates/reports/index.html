@@ -7,49 +7,16 @@
     <h1 class="h2">Отчеты и экспорт данных</h1>
 </div>
 
-<!-- Кастомный экспорт -->
-<div class="card mb-4 shadow-sm">
-    <div class="card-header bg-info text-white">
-        <h5 class="mb-0">
-            <i class="bi bi-sliders"></i> Кастомный экспорт
-        </h5>
-    </div>
-    <div class="card-body">
-        <p class="card-text text-muted mb-3">
-            Создайте экспорт с выбором полей и фильтров по вашим требованиям
-        </p>
-        <div class="d-grid">
-            <a href="{% url 'reports:custom_export' %}" class="btn btn-info">
-                <i class="bi bi-gear"></i> Создать кастомный экспорт
-            </a>
+<!-- Раздел 1: Готовый экспорт (доступен всем) -->
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <div class="flex-grow-1">
+            <h4 class="mb-1">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Готовый экспорт
+            </h4>
+            <p class="text-muted small mb-0">Стандартные отчеты, доступные всем пользователям</p>
         </div>
-
-        {% if recent_templates %}
-        <hr class="my-3">
-        <h6 class="mb-3">
-            <i class="bi bi-clock-history"></i> Последние шаблоны
-        </h6>
-        <div class="list-group">
-            {% for template in recent_templates %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="bi bi-bookmark text-info"></i>
-                    <strong>{{ template.name }}</strong>
-                    <div class="small text-muted">{{ template.get_data_source_display }}</div>
-                </div>
-                <a href="{% url 'reports:custom_export' %}?template={{ template.id }}"
-                   class="btn btn-sm btn-outline-info">
-                    <i class="bi bi-arrow-right"></i> Использовать
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
     </div>
-</div>
-
-<!-- Готовые экспорты -->
-<h4 class="mb-3">Готовые экспорты</h4>
 <div class="row">
     <div class="col-md-6">
         <div class="card mb-4 shadow-sm border-primary">
@@ -285,7 +252,29 @@
             </div>
         </div>
     </div>
+</div>
+</div>
 
+<!-- Раздел 2: Готовый экспорт (админ. права) -->
+{% if user.is_staff or user.is_superuser %}
+<hr class="my-5" style="border-top: 2px solid #dee2e6;">
+
+<div class="mb-5 p-4 rounded" style="background-color: #fff3cd;">
+    <div class="d-flex align-items-center mb-3">
+        <div class="flex-grow-1">
+            <h4 class="mb-1">
+                <i class="bi bi-shield-lock"></i> Готовый экспорт (админ. права)
+            </h4>
+            <p class="text-muted small mb-0">
+                <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                Специальные отчеты, доступные только администраторам
+            </p>
+        </div>
+        <span class="badge bg-warning text-dark px-3 py-2">
+            <i class="bi bi-shield-check"></i> Только для админов
+        </span>
+    </div>
+<div class="row">
     <div class="col-md-6">
         <div class="card mb-4 shadow-sm" style="border-color: #5D4037;">
             <div class="card-header text-white" style="background-color: #5D4037;">
@@ -364,5 +353,150 @@
             </div>
         </div>
     </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4 shadow-sm border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-filetype-csv"></i> Экспорт CSV
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Выгрузка данных по полисам</strong>
+                </p>
+                <p class="text-muted small mb-3">
+                    Экспорт полисов по годам в формате CSV для анализа данных
+                </p>
+
+                <!-- Ключевые особенности -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-secondary me-2"></i>
+                            <small>Формат CSV</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-secondary me-2"></i>
+                            <small>Фильтр по годам</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-secondary me-2"></i>
+                            <small>Все поля полисов</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill text-secondary me-2"></i>
+                            <small>UTF-8 кодировка</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Форма с выбором года -->
+                <form method="get" action="{% url 'reports:export_policies_csv' %}" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="year" class="form-label small mb-1 fw-semibold">
+                            <i class="bi bi-calendar3"></i> Год
+                        </label>
+                        <select class="form-select form-select-sm"
+                                id="year"
+                                name="year"
+                                required>
+                            <option value="">Выберите год</option>
+                            <option value="all">Все годы</option>
+                            {% for year in years %}
+                            <option value="{{ year }}" {% if request.GET.year == year|stringformat:"s" %}selected{% endif %}>
+                                {{ year }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Выберите год или "Все годы" для полной выгрузки
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border py-2 px-3 mb-3" role="alert">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            Фильтр по году начала страхования
+                        </small>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="bi bi-filetype-csv"></i> Экспортировать в CSV
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+</div>
+
+<hr class="my-5" style="border-top: 2px solid #dee2e6;">
+
+<!-- Раздел 3: Кастомный экспорт (админ. права) -->
+<div class="mb-5 p-4 rounded" style="background-color: #d1ecf1;">
+    <div class="d-flex align-items-center mb-3">
+        <div class="flex-grow-1">
+            <h4 class="mb-1">
+                <i class="bi bi-sliders"></i> Кастомный экспорт
+            </h4>
+            <p class="text-muted small mb-0">
+                <i class="bi bi-gear-fill text-info me-1"></i>
+                Создайте собственный отчет с выбором полей и фильтров
+            </p>
+        </div>
+        <span class="badge bg-info text-white px-3 py-2">
+            <i class="bi bi-tools"></i> Конструктор
+        </span>
+    </div>
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-gear"></i> Создать кастомный экспорт
+        </h5>
+    </div>
+    <div class="card-body">
+        <p class="card-text text-muted mb-3">
+            Создайте экспорт с выбором полей и фильтров по вашим требованиям
+        </p>
+        <div class="d-grid">
+            <a href="{% url 'reports:custom_export' %}" class="btn btn-info">
+                <i class="bi bi-gear"></i> Создать кастомный экспорт
+            </a>
+        </div>
+
+        {% if recent_templates %}
+        <hr class="my-3">
+        <h6 class="mb-3">
+            <i class="bi bi-clock-history"></i> Последние шаблоны
+        </h6>
+        <div class="list-group">
+            {% for template in recent_templates %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-bookmark text-info"></i>
+                    <strong>{{ template.name }}</strong>
+                    <div class="small text-muted">{{ template.get_data_source_display }}</div>
+                </div>
+                <a href="{% url 'reports:custom_export' %}?template={{ template.id }}"
+                   class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-arrow-right"></i> Использовать
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+</div>
+{% endif %}
+
 {% endblock %}

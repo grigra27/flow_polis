@@ -282,6 +282,124 @@ def export_policy_expiration(request):
 
 
 @login_required
+def export_policies_csv(request):
+    """Export policies to CSV format by year"""
+    # Проверяем права администратора
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "У вас нет прав для выполнения этого действия")
+        return redirect("reports:index")
+
+    try:
+        import csv
+        from django.utils import timezone
+
+        # Получаем параметр года из запроса
+        year_param = request.GET.get("year")
+
+        # Проверяем наличие обязательного параметра
+        if not year_param:
+            messages.error(request, "Необходимо выбрать год")
+            return redirect("reports:index")
+
+        # Получаем полисы с оптимизированными запросами
+        policies = Policy.objects.select_related(
+            "client",
+            "insurer",
+            "branch",
+            "insurance_type",
+            "policyholder",
+            "leasing_manager",
+        ).all()
+
+        # Применяем фильтр по году, если не выбрано "Все годы"
+        if year_param != "all":
+            try:
+                year = int(year_param)
+                policies = policies.filter(start_date__year=year)
+            except ValueError:
+                messages.error(request, "Неверный формат года")
+                return redirect("reports:index")
+
+        # Проверяем наличие данных
+        if not policies.exists():
+            messages.warning(
+                request,
+                f"Нет полисов для выбранного периода",
+            )
+            return redirect("reports:index")
+
+        # Создаем HTTP ответ с CSV
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        year_str = year_param if year_param == "all" else f"{year_param}"
+        filename = f"policies_{year_str}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        # Добавляем BOM для корректного отображения в Excel
+        response.write("\ufeff")
+
+        writer = csv.writer(response, delimiter=";")
+
+        # Заголовки
+        headers = [
+            "Номер полиса",
+            "Номер ДФА",
+            "Клиент",
+            "Страховщик",
+            "Вид страхования",
+            "Филиал",
+            "Дата начала",
+            "Дата окончания",
+            "Стоимость имущества",
+            "Общая премия",
+            "Франшиза",
+            "Страхователь",
+            "Менеджер по лизингу",
+            "Статус полиса",
+            "Статус ДФА",
+            "Участие брокера",
+            "Дата расторжения",
+        ]
+        writer.writerow(headers)
+
+        # Данные
+        for policy in policies:
+            row = [
+                policy.policy_number or "",
+                policy.dfa_number or "",
+                policy.client.client_name if policy.client else "",
+                policy.insurer.insurer_name if policy.insurer else "",
+                policy.insurance_type.name if policy.insurance_type else "",
+                policy.branch.branch_name if policy.branch else "",
+                policy.start_date.strftime("%d.%m.%Y") if policy.start_date else "",
+                policy.end_date.strftime("%d.%m.%Y") if policy.end_date else "",
+                str(policy.property_value) if policy.property_value else "",
+                str(policy.premium_total) if policy.premium_total else "",
+                str(policy.franchise) if policy.franchise else "",
+                policy.policyholder.client_name if policy.policyholder else "",
+                policy.leasing_manager.manager_name if policy.leasing_manager else "",
+                "Активен" if policy.policy_active else "Неактивен",
+                "Активен" if policy.dfa_active else "Неактивен",
+                "Да" if policy.broker_participation else "Нет",
+                policy.termination_date.strftime("%d.%m.%Y")
+                if policy.termination_date
+                else "",
+            ]
+            writer.writerow(row)
+
+        # Логируем
+        logger.info(
+            f"User {request.user.username} exported policies to CSV (year: {year_param}, count: {policies.count()})"
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error exporting policies to CSV: {e}")
+        messages.error(request, "Ошибка при создании CSV файла")
+        return redirect("reports:index")
+
+
+@login_required
 def export_commission_report(request):
     """Export commission report - paid but not approved by insurer"""
     try:
@@ -379,6 +497,16 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
         )[:5]
         # Получаем список всех страховых компаний для отчета по КВ
         context["insurers"] = Insurer.objects.all().order_by("insurer_name")
+        # Получаем список годов для CSV экспорта
+        from django.db.models.functions import ExtractYear
+
+        years = (
+            Policy.objects.annotate(year=ExtractYear("start_date"))
+            .values_list("year", flat=True)
+            .distinct()
+            .order_by("-year")
+        )
+        context["years"] = [year for year in years if year]
         return context
 
 

@@ -23,6 +23,63 @@ class InsurerListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(insurer_name__icontains=search)
         return queryset
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Add statistics for each insurer
+        insurers_with_stats = []
+        for insurer in context["insurers"]:
+            insurer.stats = self._calculate_insurer_statistics(insurer)
+            insurers_with_stats.append(insurer)
+
+        context["insurers"] = insurers_with_stats
+        return context
+
+    def _calculate_insurer_statistics(self, insurer):
+        """Calculate statistics for a single insurer"""
+        all_policies = insurer.policies.all()
+        active_policies = all_policies.filter(policy_active=True)
+
+        # Total counts
+        total_policies = all_policies.count()
+        active_count = active_policies.count()
+
+        # Distribution by insurance types (only active policies)
+        type_stats = (
+            active_policies.values("insurance_type__name")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        # Calculate percentages for insurance types
+        type_distribution = []
+        colors = ["#0d6efd", "#198754", "#ffc107", "#dc3545", "#6610f2", "#20c997"]
+
+        for idx, stat in enumerate(type_stats):
+            percentage = (stat["count"] / active_count * 100) if active_count > 0 else 0
+            type_distribution.append(
+                {
+                    "name": stat["insurance_type__name"],
+                    "count": stat["count"],
+                    "percentage": round(percentage, 1),
+                    "color": colors[idx % len(colors)],
+                }
+            )
+
+        # Broker participation (only active policies)
+        broker_participation = active_policies.filter(broker_participation=True).count()
+        broker_percentage = (
+            (broker_participation / active_count * 100) if active_count > 0 else 0
+        )
+
+        return {
+            "total_policies": total_policies,
+            "active_policies": active_count,
+            "type_distribution": type_distribution,
+            "broker_participation": broker_participation,
+            "broker_percentage": round(broker_percentage, 1),
+        }
+
 
 class InsurerDetailView(LoginRequiredMixin, DetailView):
     model = Insurer

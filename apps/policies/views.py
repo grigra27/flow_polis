@@ -72,6 +72,9 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         except CommissionRate.DoesNotExist:
             context["commission_rate"] = None
 
+        # Get rates by insurance year
+        context["rates_by_year"] = policy.get_rates_by_year()
+
         return context
 
 

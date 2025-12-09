@@ -123,6 +123,62 @@ class Policy(TimeStampedModel):
         ] or Decimal("0")
         return total
 
+    def get_rates_by_year(self):
+        """
+        Calculate insurance rates by year.
+
+        Returns a list of dictionaries with year_number, total_premium,
+        insurance_sum (from first payment of the year), and rate (as percentage).
+
+        Rate is calculated as: (sum of all premiums for the year / insurance_sum) * 100
+
+        IMPORTANT: Only years where the first payment (installment_number=1) exists
+        are included in the calculation. This prevents incorrect calculations for years
+        where only later installments were entered into the database.
+        """
+        from django.db.models import Sum, Min
+
+        # Group payments by year_number
+        years_data = (
+            self.payment_schedule.values("year_number")
+            .annotate(
+                total_premium=Sum("amount"), min_installment=Min("installment_number")
+            )
+            .order_by("year_number")
+        )
+
+        rates_by_year = []
+        for year_data in years_data:
+            year_number = year_data["year_number"]
+            min_installment = year_data["min_installment"]
+
+            # Skip this year if the first payment (installment_number=1) doesn't exist
+            # This prevents incorrect calculations when only later installments are in the database
+            if min_installment != 1:
+                continue
+
+            total_premium = year_data["total_premium"] or Decimal("0")
+
+            # Get insurance_sum from the first payment of this year
+            first_payment = self.payment_schedule.filter(
+                year_number=year_number, installment_number=1
+            ).first()
+
+            if first_payment and first_payment.insurance_sum > 0:
+                insurance_sum = first_payment.insurance_sum
+                rate = (total_premium / insurance_sum) * Decimal("100")
+
+                rates_by_year.append(
+                    {
+                        "year_number": year_number,
+                        "total_premium": total_premium,
+                        "insurance_sum": insurance_sum,
+                        "rate": rate,
+                    }
+                )
+
+        return rates_by_year
+
 
 class PaymentSchedule(TimeStampedModel):
     """

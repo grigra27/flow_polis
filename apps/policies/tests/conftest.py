@@ -113,6 +113,30 @@ def commission_rate_factory(db, insurer_factory, insurance_type_factory):
 
 
 @pytest.fixture
+def leasing_manager_factory(db):
+    """
+    Factory fixture for creating LeasingManager instances.
+
+    Usage:
+        manager = leasing_manager_factory(name="John Doe")
+    """
+    from apps.insurers.models import LeasingManager
+
+    def create_leasing_manager(**kwargs):
+        defaults = {
+            "name": "Test Manager",
+            "full_name": "Test Manager Full Name",
+            "phone": "+7 (999) 123-45-67",
+            "email": "test.manager@example.com",
+            "notes": "Test manager notes",
+        }
+        defaults.update(kwargs)
+        return LeasingManager.objects.create(**defaults)
+
+    return create_leasing_manager
+
+
+@pytest.fixture
 def policy_factory(
     db, client_factory, insurer_factory, branch_factory, insurance_type_factory
 ):
@@ -141,7 +165,7 @@ def policy_factory(
             "start_date": date.today(),
             "end_date": date.today() + timedelta(days=365),
             "premium_total": Decimal("50000.00"),
-            "leasing_manager": "Test Manager",
+            "leasing_manager": None,
             "franchise": Decimal("5000.00"),
             "info3": "Test info 3",
             "info4": "Test info 4",

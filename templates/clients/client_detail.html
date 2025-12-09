@@ -56,6 +56,39 @@
 
                 <p><strong>ИНН:</strong><br>
                 {{ client.client_inn|default:"—" }}</p>
+
+                {% if client.client_inn %}
+                {% load static %}
+                <div class="mt-3 pt-3 border-top">
+                    <p class="mb-2"><strong>Внешние ресурсы:</strong></p>
+                    <div class="d-flex gap-2">
+                        <a href="https://fedresurs.ru/entities?searchString={{ client.client_inn }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="btn btn-outline-primary btn-sm d-flex align-items-center">
+                            <img src="{% static 'images/favicon-fedres.png' %}"
+                                 alt="Федресурс"
+                                 width="16"
+                                 height="16"
+                                 class="me-1">
+                            <span>Федресурс</span>
+                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                        </a>
+                        <a href="https://www.rusprofile.ru/search?query={{ client.client_inn }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="btn btn-outline-primary btn-sm d-flex align-items-center">
+                            <img src="{% static 'images/rusprofile-favicon.ico' %}"
+                                 alt="Rusprofile"
+                                 width="16"
+                                 height="16"
+                                 class="me-1">
+                            <span>Rusprofile</span>
+                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 

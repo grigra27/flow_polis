@@ -9,7 +9,7 @@ set -o pipefail  # Exit on pipe failure
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-BACKUP_DIR="${BACKUP_DIR:-~/insurance_broker_backups/database}"
+BACKUP_DIR="${BACKUP_DIR:-$HOME/insurance_broker_backups/database}"
 CONTAINER_NAME="${DB_CONTAINER:-insurance_broker_db}"
 DB_NAME="${DB_NAME:-insurance_broker_prod}"
 DB_USER="${DB_USER:-postgres}"

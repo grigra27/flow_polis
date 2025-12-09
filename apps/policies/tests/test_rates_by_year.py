@@ -288,3 +288,115 @@ class TestRatesByYear:
         assert rates[1]["total_premium"] == Decimal("48000.00")
         assert rates[1]["insurance_sum"] == Decimal("800000.00")
         assert rates[1]["rate"] == Decimal("6.00")
+
+    def test_rates_by_year_current_year_detection(
+        self, policy_factory, payment_schedule_factory
+    ):
+        """
+        Test that current year is correctly identified based on payment dates.
+
+        A year is current if:
+        - First payment of this year has occurred (due_date <= today)
+        - First payment of next year has not occurred yet (due_date > today or doesn't exist)
+        """
+        from datetime import date, timedelta
+
+        # Create policy
+        policy = policy_factory(policy_number="TEST-RATE-007")
+
+        today = date.today()
+
+        # Year 1: Started 100 days ago - NOT current (year 2 has started)
+        payment_schedule_factory(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=today - timedelta(days=100),
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("80000.00"),
+        )
+
+        # Year 2: Started 10 days ago - CURRENT (year 3 hasn't started)
+        payment_schedule_factory(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=today - timedelta(days=10),
+            insurance_sum=Decimal("900000.00"),
+            amount=Decimal("63000.00"),
+        )
+
+        # Year 3: Starts in 355 days - NOT current (future)
+        payment_schedule_factory(
+            policy=policy,
+            year_number=3,
+            installment_number=1,
+            due_date=today + timedelta(days=355),
+            insurance_sum=Decimal("800000.00"),
+            amount=Decimal("48000.00"),
+        )
+
+        # Calculate rates
+        rates = policy.get_rates_by_year()
+
+        # Verify
+        assert len(rates) == 3
+
+        # Year 1 - not current
+        assert rates[0]["year_number"] == 1
+        assert rates[0]["is_current"] is False
+
+        # Year 2 - CURRENT
+        assert rates[1]["year_number"] == 2
+        assert rates[1]["is_current"] is True
+
+        # Year 3 - not current (future)
+        assert rates[2]["year_number"] == 3
+        assert rates[2]["is_current"] is False
+
+    def test_rates_by_year_current_year_last_year(
+        self, policy_factory, payment_schedule_factory
+    ):
+        """
+        Test that last year is marked as current if there's no next year.
+        """
+        from datetime import date, timedelta
+
+        # Create policy
+        policy = policy_factory(policy_number="TEST-RATE-008")
+
+        today = date.today()
+
+        # Year 1: Started 400 days ago - NOT current
+        payment_schedule_factory(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=today - timedelta(days=400),
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("80000.00"),
+        )
+
+        # Year 2: Started 30 days ago, no year 3 - CURRENT (last year)
+        payment_schedule_factory(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=today - timedelta(days=30),
+            insurance_sum=Decimal("900000.00"),
+            amount=Decimal("63000.00"),
+        )
+
+        # Calculate rates
+        rates = policy.get_rates_by_year()
+
+        # Verify
+        assert len(rates) == 2
+
+        # Year 1 - not current
+        assert rates[0]["year_number"] == 1
+        assert rates[0]["is_current"] is False
+
+        # Year 2 - CURRENT (last year, no next year)
+        assert rates[1]["year_number"] == 2
+        assert rates[1]["is_current"] is True

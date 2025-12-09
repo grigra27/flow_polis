@@ -128,17 +128,25 @@ class Policy(TimeStampedModel):
         Calculate insurance rates by year.
 
         Returns a list of dictionaries with year_number, total_premium,
-        insurance_sum (from first payment of the year), and rate (as percentage).
+        insurance_sum (from first payment of the year), rate (as percentage),
+        and is_current flag.
 
         Rate is calculated as: (sum of all premiums for the year / insurance_sum) * 100
+
+        Current year is determined by:
+        - First payment of this year has occurred (due_date <= today)
+        - First payment of next year has not occurred yet (due_date > today or doesn't exist)
 
         IMPORTANT: Only years where the first payment (installment_number=1) exists
         are included in the calculation. This prevents incorrect calculations for years
         where only later installments were entered into the database.
         """
         from django.db.models import Sum, Min
+        from datetime import date
 
-        # Group payments by year_number
+        today = date.today()
+
+        # Query 1: Group payments by year_number
         years_data = (
             self.payment_schedule.values("year_number")
             .annotate(
@@ -146,6 +154,12 @@ class Policy(TimeStampedModel):
             )
             .order_by("year_number")
         )
+
+        # Query 2: Get ALL first payments at once (optimized)
+        first_payments = {
+            p.year_number: p
+            for p in self.payment_schedule.filter(installment_number=1).select_related()
+        }
 
         rates_by_year = []
         for year_data in years_data:
@@ -159,23 +173,36 @@ class Policy(TimeStampedModel):
 
             total_premium = year_data["total_premium"] or Decimal("0")
 
-            # Get insurance_sum from the first payment of this year
-            first_payment = self.payment_schedule.filter(
-                year_number=year_number, installment_number=1
-            ).first()
+            # Get first payment from dictionary (no additional DB query)
+            first_payment = first_payments.get(year_number)
 
-            if first_payment and first_payment.insurance_sum > 0:
-                insurance_sum = first_payment.insurance_sum
-                rate = (total_premium / insurance_sum) * Decimal("100")
+            if not first_payment or first_payment.insurance_sum <= 0:
+                continue
 
-                rates_by_year.append(
-                    {
-                        "year_number": year_number,
-                        "total_premium": total_premium,
-                        "insurance_sum": insurance_sum,
-                        "rate": rate,
-                    }
-                )
+            # Determine if this is the current year
+            current_year_started = first_payment.due_date <= today
+
+            # Check if next year has started
+            next_year_payment = first_payments.get(year_number + 1)
+            next_year_not_started = (
+                next_year_payment is None or next_year_payment.due_date > today
+            )
+
+            is_current = current_year_started and next_year_not_started
+
+            # Calculate rate
+            insurance_sum = first_payment.insurance_sum
+            rate = (total_premium / insurance_sum) * Decimal("100")
+
+            rates_by_year.append(
+                {
+                    "year_number": year_number,
+                    "total_premium": total_premium,
+                    "insurance_sum": insurance_sum,
+                    "rate": rate,
+                    "is_current": is_current,
+                }
+            )
 
         return rates_by_year
 

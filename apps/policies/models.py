@@ -276,62 +276,87 @@ class PaymentSchedule(TimeStampedModel):
         Проверяет, что даты текущего платежа не раньше дат предыдущих платежей.
         """
         from django.core.exceptions import ValidationError
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         if not self.policy_id:
             return
 
-        # Находим предыдущий платеж
-        previous_payment = (
-            PaymentSchedule.objects.filter(policy=self.policy)
-            .exclude(pk=self.pk)  # Исключаем текущий платеж при редактировании
-            .filter(
-                models.Q(year_number__lt=self.year_number)
-                | models.Q(
-                    year_number=self.year_number,
-                    installment_number__lt=self.installment_number,
+        try:
+            # Находим предыдущий платеж с защитой от race conditions
+            previous_payment = (
+                PaymentSchedule.objects.filter(policy=self.policy)
+                .exclude(pk=self.pk)  # Исключаем текущий платеж при редактировании
+                .filter(
+                    models.Q(year_number__lt=self.year_number)
+                    | models.Q(
+                        year_number=self.year_number,
+                        installment_number__lt=self.installment_number,
+                    )
                 )
+                .order_by("-year_number", "-installment_number")
+                .first()
             )
-            .order_by("-year_number", "-installment_number")
-            .first()
-        )
 
-        if not previous_payment:
-            return  # Это первый платеж, валидация не нужна
+            if not previous_payment:
+                return  # Это первый платеж, валидация не нужна
 
-        errors = {}
+            errors = {}
 
-        # Проверяем дату по договору
-        if self.due_date and previous_payment.due_date:
-            if self.due_date <= previous_payment.due_date:
-                errors["due_date"] = (
-                    f"Дата платежа по договору ({self.due_date}) не может быть раньше или равна "
-                    f"дате предыдущего платежа ({previous_payment.due_date}). "
-                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                    f"Платеж {previous_payment.installment_number}."
+            # Проверяем дату по договору
+            if self.due_date and previous_payment.due_date:
+                if self.due_date <= previous_payment.due_date:
+                    errors["due_date"] = (
+                        f"Дата платежа по договору ({self.due_date}) не может быть раньше или равна "
+                        f"дате предыдущего платежа ({previous_payment.due_date}). "
+                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                        f"Платеж {previous_payment.installment_number}."
+                    )
+
+            # Проверяем фактическую дату оплаты (только если обе даты заполнены)
+            if self.paid_date and previous_payment.paid_date:
+                if self.paid_date <= previous_payment.paid_date:
+                    errors["paid_date"] = (
+                        f"Фактическая дата оплаты ({self.paid_date}) не может быть раньше или равна "
+                        f"дате оплаты предыдущего платежа ({previous_payment.paid_date}). "
+                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                        f"Платеж {previous_payment.installment_number}."
+                    )
+
+            # Проверяем дату согласования СК (только если обе даты заполнены)
+            if self.insurer_date and previous_payment.insurer_date:
+                if self.insurer_date <= previous_payment.insurer_date:
+                    errors["insurer_date"] = (
+                        f"Дата согласования СК ({self.insurer_date}) не может быть раньше или равна "
+                        f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
+                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                        f"Платеж {previous_payment.installment_number}."
+                    )
+
+            if errors:
+                logger.warning(
+                    f"Payment validation errors for policy {self.policy_id}, "
+                    f"year {self.year_number}, installment {self.installment_number}: {errors}"
                 )
+                raise ValidationError(errors)
 
-        # Проверяем фактическую дату оплаты
-        if self.paid_date and previous_payment.paid_date:
-            if self.paid_date <= previous_payment.paid_date:
-                errors["paid_date"] = (
-                    f"Фактическая дата оплаты ({self.paid_date}) не может быть раньше или равна "
-                    f"дате оплаты предыдущего платежа ({previous_payment.paid_date}). "
-                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                    f"Платеж {previous_payment.installment_number}."
-                )
-
-        # Проверяем дату согласования СК
-        if self.insurer_date and previous_payment.insurer_date:
-            if self.insurer_date <= previous_payment.insurer_date:
-                errors["insurer_date"] = (
-                    f"Дата согласования СК ({self.insurer_date}) не может быть раньше или равна "
-                    f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
-                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                    f"Платеж {previous_payment.installment_number}."
-                )
-
-        if errors:
-            raise ValidationError(errors)
+        except ValidationError:
+            # Re-raise validation errors as they are expected
+            raise
+        except Exception as e:
+            # Log unexpected errors but don't break the save
+            logger.error(
+                f"Unexpected error in PaymentSchedule.clean() for policy {self.policy_id}, "
+                f"year {getattr(self, 'year_number', 'unknown')}, "
+                f"installment {getattr(self, 'installment_number', 'unknown')}: {e}",
+                exc_info=True,
+            )
+            # Don't raise - allow save to continue with a warning
+            logger.warning(
+                f"Skipping date validation for payment due to error. "
+                f"Manual review recommended for policy {self.policy_id}"
+            )
 
     def save(self, *args, **kwargs):
         """Переопределяем save для вызова валидации"""

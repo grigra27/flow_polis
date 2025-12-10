@@ -13,6 +13,77 @@ SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-this-key")
 DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
+# Sentry Configuration for Error Monitoring
+SENTRY_DSN = config("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(
+                transaction_style="url",
+                middleware_spans=True,
+                signals_spans=True,
+            ),
+            CeleryIntegration(
+                monitor_beat_tasks=True,
+                propagate_traces=True,
+            ),
+            RedisIntegration(),
+        ],
+        # Performance monitoring
+        traces_sample_rate=0.1 if not DEBUG else 0.0,
+        # Error sampling
+        sample_rate=1.0,
+        # Send user information (be careful with PII)
+        send_default_pii=False,
+        # Environment
+        environment="production" if not DEBUG else "development",
+        # Release tracking
+        release=config("SENTRY_RELEASE", default="unknown"),
+        # Additional options
+        attach_stacktrace=True,
+        max_breadcrumbs=50,
+        # Filter out some common errors
+        before_send=lambda event, hint: event
+        if not _should_filter_sentry_event(event, hint)
+        else None,
+    )
+
+
+def _should_filter_sentry_event(event, hint):
+    """
+    Filter out common errors that we don't want to track in Sentry
+    """
+    if "exc_info" in hint:
+        exc_type, exc_value, tb = hint["exc_info"]
+
+        # Filter out common Django errors that are not actionable
+        if exc_type.__name__ in [
+            "DisallowedHost",  # Invalid Host header
+            "SuspiciousOperation",  # CSRF, etc.
+            "PermissionDenied",  # 403 errors
+        ]:
+            return False
+
+        # Filter out specific error messages
+        error_message = str(exc_value).lower()
+        filtered_messages = [
+            "broken pipe",
+            "connection reset by peer",
+            "client disconnected",
+        ]
+
+        if any(msg in error_message for msg in filtered_messages):
+            return False
+
+    return True
+
+
 # Production environment checks
 # Check if we're running in production mode (DEBUG=False)
 if not DEBUG:

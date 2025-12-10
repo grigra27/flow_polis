@@ -8,3 +8,11 @@ class PoliciesConfig(AppConfig):
 
     def ready(self):
         import apps.policies.signals
+
+        # Регистрация моделей для auditlog
+        from auditlog.registry import auditlog
+        from .models import Policy, PaymentSchedule, PolicyInfo
+
+        auditlog.register(Policy)
+        auditlog.register(PaymentSchedule)
+        auditlog.register(PolicyInfo)

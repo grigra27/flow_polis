@@ -4,6 +4,11 @@ Django settings for insurance_broker project.
 from pathlib import Path
 from decouple import config, Csv
 import sys
+import warnings
+
+# Подавляем предупреждения urllib3 о LibreSSL
+warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL 1.1.1+")
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -243,6 +243,7 @@ class ScheduledPaymentsExporter(BaseExporter):
             "Объект страхования",
             "Страховая сумма",
             "Очередной взнос",
+            "Статус рассрочки",
             "Этот взнос",
             "Дата платежа по договору",
             "Филиал",
@@ -307,15 +308,83 @@ class ScheduledPaymentsExporter(BaseExporter):
         # Пустая строка после заголовков столбцов
         ws.append([""] * len(headers))
 
-        # Данные платежей
+        # Группируем платежи по филиалам
+        from collections import defaultdict
+
+        payments_by_branch = defaultdict(list)
         for payment in self.queryset:
-            row = self.get_row_data(payment)
-            ws.append(row)
+            branch_name = (
+                payment.policy.branch.branch_name
+                if payment.policy.branch
+                else "Без филиала"
+            )
+            payments_by_branch[branch_name].append(payment)
+
+        # Сортируем филиалы по алфавиту
+        sorted_branches = sorted(payments_by_branch.keys())
+
+        # Добавляем данные по филиалам
+        for branch_name in sorted_branches:
+            # Добавляем заголовок филиала
+            ws.append([branch_name])
+            branch_header_row = ws.max_row
+
+            # Форматирование заголовка филиала (зеленая цветовая схема)
+            branch_cell = ws.cell(row=branch_header_row, column=1)
+            branch_cell.font = Font(bold=True, size=12, color="000000")
+            branch_cell.fill = PatternFill(
+                start_color="C6F6D5", end_color="C6F6D5", fill_type="solid"
+            )  # Светло-зеленый фон
+            branch_cell.alignment = Alignment(horizontal="left", vertical="center")
+
+            # Добавляем границы для заголовка филиала
+            thin_border = Border(
+                left=Side(style="thin", color="000000"),
+                right=Side(style="thin", color="000000"),
+                top=Side(style="thin", color="000000"),
+                bottom=Side(style="thin", color="000000"),
+            )
+            branch_cell.border = thin_border
+
+            ws.row_dimensions[branch_header_row].height = 25
+
+            # Объединяем ячейки для заголовка филиала
+            ws.merge_cells(
+                start_row=branch_header_row,
+                start_column=1,
+                end_row=branch_header_row,
+                end_column=num_columns,
+            )
+
+            # Применяем границы ко всем объединенным ячейкам
+            for col in range(1, num_columns + 1):
+                cell = ws.cell(row=branch_header_row, column=col)
+                cell.border = thin_border
+
+            # Добавляем платежи филиала
+            for payment in payments_by_branch[branch_name]:
+                row = self.get_row_data(payment)
+                ws.append(row)
+
+            # Пустая строка после блока филиала
+            ws.append([""] * len(headers))
 
         # Форматирование
         self.apply_formatting(ws)
 
         return self.create_response(wb)
+
+    def get_installment_status(self, payment, payments_in_year):
+        """Определяет статус рассрочки для платежа"""
+        # Если номер платежа не равен 1, то это рассрочка
+        if payment.installment_number != 1:
+            return "рассрочка"
+
+        # Если номер платежа равен 1, проверяем есть ли другие платежи в том же году
+        if payments_in_year and payments_in_year > 1:
+            return "рассрочка"
+        else:
+            return "годовой"
 
     def get_row_data(self, payment):
         """Возвращает данные строки для платежа"""
@@ -328,6 +397,9 @@ class ScheduledPaymentsExporter(BaseExporter):
         else:
             # Fallback на случай, если аннотация не сработала
             payment_position = str(payment.installment_number)
+
+        # Определяем статус рассрочки
+        installment_status = self.get_installment_status(payment, payments_in_year)
 
         # Получаем фамилию менеджера лизинговой компании
         leasing_manager_name = ""
@@ -348,6 +420,7 @@ class ScheduledPaymentsExporter(BaseExporter):
             self.format_value(
                 payment.amount
             ),  # Сумма конкретного платежа (очередной взнос)
+            installment_status,  # Статус рассрочки
             payment_position,  # "1 из 2", "2 из 3" и т.д.
             self.format_value(payment.due_date),
             policy.branch.branch_name if policy.branch else "",
@@ -371,10 +444,11 @@ class ScheduledPaymentsExporter(BaseExporter):
             "H": None,  # Объект страхования - автоподгонка с большим лимитом
             "I": 16,  # Страховая сумма
             "J": 16,  # Очередной взнос
-            "K": 12,  # Этот взнос ("1 из 2")
-            "L": 13,  # Дата платежа по договору
-            "M": None,  # Филиал - автоподгонка
-            "N": None,  # Контактное лицо - автоподгонка
+            "K": 12,  # Статус рассрочки
+            "L": 12,  # Этот взнос ("1 из 2")
+            "M": 13,  # Дата платежа по договору
+            "N": None,  # Филиал - автоподгонка
+            "O": None,  # Контактное лицо - автоподгонка
         }
 
         from openpyxl.utils import get_column_letter
@@ -394,10 +468,14 @@ class ScheduledPaymentsExporter(BaseExporter):
                 for cell in column_cells:
                     # Пропускаем объединенные ячейки
                     if hasattr(cell, "value") and cell.value:
-                        # Пропускаем заголовок отчета
-                        if (
-                            isinstance(cell.value, str)
-                            and "ОЧЕРЕДНЫЕ ВЗНОСЫ" in cell.value
+                        # Пропускаем заголовок отчета и заголовки филиалов
+                        if isinstance(cell.value, str) and (
+                            "ОЧЕРЕДНЫЕ ВЗНОСЫ" in cell.value
+                            or (
+                                col_idx == 1
+                                and ws.cell(row=cell.row, column=2).value is None
+                                and cell.row > 3
+                            )
                         ):
                             continue
                         max_length = max(max_length, len(str(cell.value)))
@@ -422,6 +500,19 @@ class ScheduledPaymentsExporter(BaseExporter):
         for row in ws.iter_rows(
             min_row=5
         ):  # Начинаем с 5 строки (первая строка данных)
+            # Проверяем, является ли строка заголовком филиала
+            first_cell_value = row[0].value
+            is_branch_header = (
+                first_cell_value
+                and isinstance(first_cell_value, str)
+                and ws.cell(row=row[0].row, column=2).value is None
+                and row[0].row > 3
+            )
+
+            # Пропускаем форматирование заголовков филиалов (они уже отформатированы)
+            if is_branch_header:
+                continue
+
             for idx, cell in enumerate(row, start=1):
                 # Столбцы с финансовыми данными (I - Страховая сумма, J - Очередной взнос)
                 if idx in [9, 10]:
@@ -429,11 +520,11 @@ class ScheduledPaymentsExporter(BaseExporter):
                     # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
                     # Без символа валюты для совместимости с Excel на Mac
                     cell.number_format = "#,##0.00"
-                # Столбцы с датами (F, G, L) - по центру
-                elif idx in [6, 7, 12]:
+                # Столбцы с датами (F, G, M) - по центру
+                elif idx in [6, 7, 13]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                # Столбец "Этот взнос" (K) - по центру
-                elif idx == 11:
+                # Столбцы "Статус рассрочки" (K) и "Этот взнос" (L) - по центру
+                elif idx in [11, 12]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                 # Остальные - слева
                 else:

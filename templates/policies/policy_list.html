@@ -35,6 +35,22 @@
     tr.table-terminated:hover > td {
         background-color: #f5c2c7 !important;
     }
+
+    /* Стили для столбца с иконками видов страхования */
+    .insurance-type-icon-cell {
+        width: 40px !important;
+        min-width: 40px;
+        max-width: 40px;
+        text-align: center;
+        padding: 4px !important;
+        vertical-align: middle;
+    }
+
+    .insurance-type-icon-cell img,
+    .insurance-type-icon-cell span {
+        display: inline-block;
+        vertical-align: middle;
+    }
 </style>
 {% endblock %}
 
@@ -151,6 +167,7 @@
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Объект страхования</th>
+                        <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
                         <th>Период</th>
                         <th>Инфо 1</th>
                         <th>Инфо 3</th>
@@ -175,6 +192,19 @@
                         <td>
                             <small>{{ policy.property_description|truncatewords:10 }}</small>
                         </td>
+                        <td class="insurance-type-icon-cell">
+                            {% if policy.insurance_type.icon %}
+                                <img src="{{ policy.insurance_type.icon.url }}"
+                                     alt="{{ policy.insurance_type.name }}"
+                                     title="{{ policy.insurance_type.name }}"
+                                     style="width: 24px; height: 24px; object-fit: contain;">
+                            {% else %}
+                                <span title="{{ policy.insurance_type.name }}"
+                                      style="width: 24px; height: 24px; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-shield-check" style="font-size: 14px; color: #6c757d;"></i>
+                                </span>
+                            {% endif %}
+                        </td>
                         <td>
                             <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
                         </td>
@@ -198,7 +228,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted">Полисы не найдены</td>
+                        <td colspan="10" class="text-center text-muted">Полисы не найдены</td>
                     </tr>
                     {% endfor %}
                 </tbody>

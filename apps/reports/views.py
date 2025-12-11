@@ -114,7 +114,11 @@ def export_payments_excel(request):
                 "commission_rate",
             )
             .annotate(payments_in_year=Subquery(payments_in_year_subquery))
-            .filter(due_date__gte=date_from, due_date__lte=date_to)
+            .filter(
+                due_date__gte=date_from,
+                due_date__lte=date_to,
+                policy__policy_active=True,  # Только активные полисы, как на странице платежей
+            )
             .order_by("due_date", "policy__policy_number")
         )
 

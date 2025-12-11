@@ -21,6 +21,22 @@
     tr.table-secondary:hover > td {
         background-color: #dee2e6 !important;
     }
+
+    /* Стили для столбца с иконками видов страхования */
+    .insurance-type-icon-cell {
+        width: 40px !important;
+        min-width: 40px;
+        max-width: 40px;
+        text-align: center;
+        padding: 4px !important;
+        vertical-align: middle;
+    }
+
+    .insurance-type-icon-cell img,
+    .insurance-type-icon-cell span {
+        display: inline-block;
+        vertical-align: middle;
+    }
 </style>
 {% endblock %}
 
@@ -40,7 +56,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Информация о лизингополучателе</h5>
@@ -146,7 +162,7 @@
         {% endif %}
     </div>
 
-    <div class="col-md-8">
+    <div class="col-md-9">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Полисы лизингополучателя</h5>
@@ -161,6 +177,7 @@
                                 <th>Номер ДФА</th>
                                 <th>Страховщик</th>
                                 <th>Объект страхования</th>
+                                <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
                                 <th>Период</th>
                                 <th>Статус</th>
                             </tr>
@@ -181,6 +198,19 @@
                                 <td>{% insurer_logo policy.insurer size='small' %}</td>
                                 <td>
                                     <small>{{ policy.property_description|truncatewords:10 }}</small>
+                                </td>
+                                <td class="insurance-type-icon-cell">
+                                    {% if policy.insurance_type.icon %}
+                                        <img src="{{ policy.insurance_type.icon.url }}"
+                                             alt="{{ policy.insurance_type.name }}"
+                                             title="{{ policy.insurance_type.name }}"
+                                             style="width: 24px; height: 24px; object-fit: contain;">
+                                    {% else %}
+                                        <span title="{{ policy.insurance_type.name }}"
+                                              style="width: 24px; height: 24px; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                                            <i class="bi bi-shield-check" style="font-size: 14px; color: #6c757d;"></i>
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>

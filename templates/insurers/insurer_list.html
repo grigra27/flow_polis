@@ -125,7 +125,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="bi bi-building"></i> Страховые компании</h1>
+    <h1 class="h2"><!--i class="bi bi-building"></i--> Страховые компании</h1>
 </div>
 
 <!-- Search -->
@@ -177,7 +177,7 @@
                                         <i class="bi bi-files"></i> Всего: <strong>{{ insurer.stats.total_policies }}</strong>
                                     </span>
                                     <span class="stats-badge stats-badge-success">
-                                        <i class="bi bi-check-circle"></i> Активных: <strong>{{ insurer.stats.active_policies }}</strong>
+                                        <i class="bi bi-check-circle"></i> Действующих: <strong>{{ insurer.stats.active_policies }}</strong>
                                     </span>
                                     {% if insurer.stats.active_policies > 0 %}
                                     <span class="broker-badge">
@@ -193,7 +193,7 @@
                             {% if insurer.stats.type_distribution %}
                             <div class="stats-section">
                                 <div class="stats-label">
-                                    <i class="bi bi-pie-chart"></i> По видам страхования (только активные полисы)
+                                    <i class="bi bi-pie-chart"></i> По видам страхования (только действующие полисы)
                                 </div>
                                 <div>
                                     {% for type_stat in insurer.stats.type_distribution %}

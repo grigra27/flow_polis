@@ -9,7 +9,7 @@ set -o pipefail  # Exit on pipe failure
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-BACKUP_DIR="${BACKUP_DIR:-~/insurance_broker_backups/media}"
+BACKUP_DIR="${BACKUP_DIR:-$HOME/insurance_broker_backups/media}"
 MEDIA_VOLUME="${MEDIA_VOLUME:-insurance_broker_media_volume}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 
@@ -253,7 +253,7 @@ usage() {
     echo ""
     echo "Environment Variables:"
     echo "  COMPOSE_FILE            Docker compose file (default: docker-compose.prod.yml)"
-    echo "  BACKUP_DIR              Backup directory (default: ~/insurance_broker_backups/media)"
+    echo "  BACKUP_DIR              Backup directory (default: $HOME/insurance_broker_backups/media)"
     echo "  MEDIA_VOLUME            Media volume name (default: insurance_broker_media_volume)"
     echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
     echo ""

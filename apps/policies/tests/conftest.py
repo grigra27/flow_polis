@@ -20,9 +20,13 @@ def client_factory(db):
     from apps.clients.models import Client
 
     def create_client(**kwargs):
+        import random
+
+        # Генерируем уникальный ИНН для каждого клиента
+        unique_inn = f"{random.randint(1000000000, 9999999999)}"
         defaults = {
             "client_name": "Test Client Company",
-            "client_inn": "1234567890",
+            "client_inn": unique_inn,
             "notes": "Test client notes",
         }
         defaults.update(kwargs)
@@ -192,10 +196,15 @@ def payment_schedule_factory(db, policy_factory, commission_rate_factory):
         if "policy" not in kwargs:
             kwargs["policy"] = policy_factory()
 
+        # Генерируем уникальную дату для каждого платежа
+        import random
+
+        days_offset = random.randint(30, 365)
+
         defaults = {
             "year_number": 1,
             "installment_number": 1,
-            "due_date": date.today() + timedelta(days=30),
+            "due_date": date.today() + timedelta(days=days_offset),
             "amount": Decimal("10000.00"),
             "insurance_sum": Decimal("1000000.00"),
             "kv_rub": Decimal("1000.00"),

@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/migrations/0009_alter_policy_policyholder.py
-# hypothesis_version: 6.141.1
-
-['0002_client_notes', 'clients', 'clients.client', 'policies', 'policy', 'policyholder', 'Страхователь']

@@ -14,6 +14,7 @@ urlpatterns = [
     path("insurers/", include("apps.insurers.urls")),
     path("policies/", include("apps.policies.urls")),
     path("reports/", include("apps.reports.urls")),
+    path("analytics/", include("apps.analytics.urls")),
 ]
 
 if settings.DEBUG:

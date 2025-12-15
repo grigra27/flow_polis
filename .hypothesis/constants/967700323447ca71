@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/accounts/migrations/0002_alter_loginattempt_attempt_time.py
-# hypothesis_version: 6.141.1
-
-['0001_initial', 'accounts', 'attempt_time', 'loginattempt', 'Время попытки']

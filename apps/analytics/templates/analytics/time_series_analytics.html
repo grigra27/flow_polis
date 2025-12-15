@@ -1,0 +1,1005 @@
+{% extends "analytics/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block analytics_title %}Временная аналитика{% endblock %}
+{% block title %}Временная аналитика - Аналитика{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-graph-up-arrow"></i> Временная аналитика
+</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .time-series-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-left: 4px solid #667eea;
+    }
+
+    .time-series-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .time-series-card.dynamics {
+        border-left-color: #667eea;
+    }
+
+    .time-series-card.seasonal {
+        border-left-color: #f093fb;
+    }
+
+    .time-series-card.trends {
+        border-left-color: #4facfe;
+    }
+
+    .time-series-card.growth {
+        border-left-color: #43e97b;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .metric-label {
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    .seasonal-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .seasonal-item:last-child {
+        border-bottom: none;
+    }
+
+    .seasonal-month {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .seasonal-value {
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .trend-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        background: #f8f9fa;
+    }
+
+    .trend-item.positive {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+    }
+
+    .trend-item.negative {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+
+    .trend-item.neutral {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+
+    .branch-trend-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 3px solid #4facfe;
+    }
+
+    .seasonal-pattern {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        background: #fff5f5;
+        border-radius: 8px;
+        border-left: 3px solid #f093fb;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .filter-applied-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        margin-left: 1rem;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .growth-positive {
+        color: #28a745;
+    }
+
+    .growth-negative {
+        color: #dc3545;
+    }
+
+    .seasonality-badge {
+        background: #e9ecef;
+        color: #495057;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+
+    .peak-month {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+
+    .low-month {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+        .metric-value {
+            font-size: 1.5rem;
+        }
+        .seasonal-item, .trend-item, .branch-trend-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block analytics_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2 mb-0">
+        <i class="bi bi-graph-up-arrow text-primary"></i>
+        Временная аналитика
+        {% if filter_applied %}
+            <span class="filter-applied-badge">
+                <i class="bi bi-funnel-fill"></i> Фильтры применены
+            </span>
+        {% endif %}
+    </h1>
+    <div class="d-flex align-items-center">
+        <div class="text-muted me-3">
+            <i class="bi bi-calendar-range"></i>
+            Анализ за {{ time_range_display }}
+        </div>
+        <button class="btn btn-success" onclick="exportData()">
+            <i class="fas fa-download me-1"></i>
+            Экспорт
+        </button>
+    </div>
+</div>
+
+<!-- Filters Section -->
+<div class="filter-card">
+    <h5 class="mb-3">
+        <i class="bi bi-funnel"></i>
+        Фильтры
+    </h5>
+    <form id="filterForm" method="get">
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label for="date_from" class="form-label">Дата с:</label>
+                <input type="date" class="form-control" id="date_from" name="date_from"
+                       value="{% if current_filter.date_from %}{{ current_filter.date_from|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="date_to" class="form-label">Дата по:</label>
+                <input type="date" class="form-control" id="date_to" name="date_to"
+                       value="{% if current_filter.date_to %}{{ current_filter.date_to|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="branches" class="form-label">Филиалы:</label>
+                <select class="form-select" id="branches" name="branches" multiple>
+                    {% for branch in branches %}
+                        <option value="{{ branch.id }}"
+                                {% if current_filter and branch.id in current_filter.branch_ids %}selected{% endif %}>
+                            {{ branch.branch_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="insurers" class="form-label">Страховщики:</label>
+                <select class="form-select" id="insurers" name="insurers" multiple>
+                    {% for insurer in insurers %}
+                        <option value="{{ insurer.id }}"
+                                {% if current_filter and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
+                            {{ insurer.insurer_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="insurance_types" class="form-label">Виды страхования:</label>
+                <select class="form-select" id="insurance_types" name="insurance_types" multiple>
+                    {% for insurance_type in insurance_types %}
+                        <option value="{{ insurance_type.id }}"
+                                {% if current_filter and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
+                            {{ insurance_type.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="clients" class="form-label">Клиенты (топ 100):</label>
+                <select class="form-select" id="clients" name="clients" multiple>
+                    {% for client in clients %}
+                        <option value="{{ client.id }}"
+                                {% if current_filter and client.id in current_filter.client_ids %}selected{% endif %}>
+                            {{ client.client_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i>
+                    Применить фильтры
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="clearFilters">
+                    <i class="bi bi-x-circle"></i>
+                    Сбросить
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Year-over-Year Growth Summary -->
+<div class="row mb-4">
+    <div class="col-lg-4">
+        <div class="time-series-card growth">
+            <h5 class="mb-3">
+                <i class="bi bi-arrow-up-circle"></i>
+                Рост количества полисов
+            </h5>
+            <div class="metric-value {% if year_over_year_growth.policy_count >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
+                {% if year_over_year_growth.policy_count >= 0 %}+{% endif %}{{ year_over_year_growth.policy_count|floatformat:1 }}%
+            </div>
+            <div class="metric-label">Год к году</div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="time-series-card growth">
+            <h5 class="mb-3">
+                <i class="bi bi-currency-exchange"></i>
+                Рост объема премий
+            </h5>
+            <div class="metric-value {% if year_over_year_growth.premium_volume >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
+                {% if year_over_year_growth.premium_volume >= 0 %}+{% endif %}{{ year_over_year_growth.premium_volume|floatformat:1 }}%
+            </div>
+            <div class="metric-label">Год к году</div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="time-series-card growth">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up"></i>
+                Рост комиссионного дохода
+            </h5>
+            <div class="metric-value {% if year_over_year_growth.commission_revenue >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
+                {% if year_over_year_growth.commission_revenue >= 0 %}+{% endif %}{{ year_over_year_growth.commission_revenue|floatformat:1 }}%
+            </div>
+            <div class="metric-label">Год к году</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Time Series Charts -->
+<div class="row">
+    <div class="col-12">
+        <div class="time-series-card dynamics">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up"></i>
+                Динамика ключевых показателей
+            </h5>
+            <div class="chart-container">
+                <div style="position: relative; height: 400px;">
+                    <canvas id="timeSeriesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Seasonal Analysis -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="time-series-card seasonal">
+            <h5 class="mb-3">
+                <i class="bi bi-calendar4-week"></i>
+                Сезонные паттерны
+            </h5>
+            <div class="chart-container">
+                <div style="position: relative; height: 400px;">
+                    <canvas id="seasonalChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="time-series-card seasonal">
+            <h5 class="mb-3">
+                <i class="bi bi-bar-chart-steps"></i>
+                Сезонность по месяцам
+            </h5>
+            <div style="max-height: 400px; overflow-y: auto;">
+                {% for month_num, avg_value in seasonal_patterns.monthly_averages.items %}
+                <div class="seasonal-item">
+                    <div>
+                        <div class="seasonal-month">
+                            {{ month_num|month_name }}
+                            {% if month_num in seasonal_patterns.peak_months %}
+                                <span class="peak-month">Пик</span>
+                            {% elif month_num in seasonal_patterns.low_months %}
+                                <span class="low-month">Спад</span>
+                            {% endif %}
+                        </div>
+                        <span class="seasonality-badge">Индекс: {{ seasonal_patterns.seasonal_indices|get_item:month_num|floatformat:2 }}</span>
+                    </div>
+                    <div class="text-end">
+                        <div class="seasonal-value">{{ avg_value|floatformat:0 }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-3 pt-3 border-top">
+                <div class="d-flex justify-content-between">
+                    <span>Сила сезонности:</span>
+                    <strong>{{ seasonal_patterns.seasonality_strength|floatformat:2 }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quarterly Analysis -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="time-series-card seasonal">
+            <h5 class="mb-3">
+                <i class="bi bi-calendar3"></i>
+                Квартальные показатели
+            </h5>
+            {% for quarter, avg_value in seasonal_patterns.quarterly_averages.items %}
+            <div class="seasonal-pattern">
+                <div>
+                    <strong>{{ quarter }} квартал</strong>
+                </div>
+                <div>
+                    <strong>{{ avg_value|floatformat:0 }}</strong>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="chart-container">
+            <h5 class="mb-3">
+                <i class="bi bi-pie-chart"></i>
+                Распределение по кварталам
+            </h5>
+            <!-- Debug info -->
+            {% if quarterly_chart_data %}
+                <small class="text-muted">Данные: {{ quarterly_chart_data }}</small>
+            {% else %}
+                <small class="text-warning">Нет данных для кварталов</small>
+            {% endif %}
+            <div style="position: relative; height: 300px;">
+                <canvas id="quarterlyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Branch Growth Trends -->
+<div class="row">
+    <div class="col-12">
+        <div class="time-series-card trends">
+            <h5 class="mb-3">
+                <i class="bi bi-building"></i>
+                Тренды роста по филиалам
+            </h5>
+            <div class="chart-container">
+                <div style="position: relative; height: 500px;">
+                    <canvas id="branchTrendsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Branch Performance Summary -->
+{% if branch_growth_trends %}
+<div class="row">
+    <div class="col-12">
+        <div class="time-series-card trends">
+            <h5 class="mb-3">
+                <i class="bi bi-list-check"></i>
+                Сводка по филиалам
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Филиал</th>
+                            <th>Общее количество полисов</th>
+                            <th>Средний рост в месяц</th>
+                            <th>Тренд</th>
+                            <th>Последний месяц</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for branch_name, trend_data in branch_growth_trends.items %}
+                        <tr>
+                            <td><strong>{{ branch_name }}</strong></td>
+                            <td>{{ trend_data|length }}</td>
+                            <td>
+                                {% with trend_data|last as last_point %}
+                                {% with trend_data|first as first_point %}
+                                {% if last_point.value > first_point.value %}
+                                    <span class="growth-positive">+{{ last_point.value|sub:first_point.value|floatformat:0 }}</span>
+                                {% else %}
+                                    <span class="growth-negative">{{ last_point.value|sub:first_point.value|floatformat:0 }}</span>
+                                {% endif %}
+                                {% endwith %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% with trend_data|last as last_point %}
+                                {% with trend_data|first as first_point %}
+                                {% if last_point.value > first_point.value %}
+                                    <i class="bi bi-arrow-up text-success"></i> Рост
+                                {% elif last_point.value < first_point.value %}
+                                    <i class="bi bi-arrow-down text-danger"></i> Снижение
+                                {% else %}
+                                    <i class="bi bi-arrow-right text-warning"></i> Стабильно
+                                {% endif %}
+                                {% endwith %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% with trend_data|last as last_point %}
+                                {{ last_point.label }}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        <div class="mt-2">Обновление временных данных...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+
+    // Handle form submission with AJAX
+    const filterForm = document.getElementById('filterForm');
+    filterForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        updateTimeSeriesAnalytics();
+    });
+
+    // Clear filters button
+    document.getElementById('clearFilters').addEventListener('click', function() {
+        filterForm.reset();
+        window.location.href = window.location.pathname;
+    });
+});
+
+function updateTimeSeriesAnalytics() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
+
+    const formData = new FormData(document.getElementById('filterForm'));
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update time series data
+            updateTimeSeriesData(data);
+            if (data.warning) {
+                showAlert('warning', data.warning);
+            }
+        } else {
+            showAlert('danger', data.error || 'Произошла ошибка при обновлении данных');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Произошла ошибка при обновлении данных');
+    })
+    .finally(() => {
+        loadingOverlay.style.display = 'none';
+    });
+}
+
+function updateTimeSeriesData(data) {
+    // This would update the time series data on the page
+    // Implementation would depend on the exact structure returned by the backend
+    console.log('Updating time series data:', data);
+}
+
+function formatNumber(num) {
+    return parseFloat(num).toLocaleString('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    const container = document.querySelector('.analytics-container');
+    container.insertBefore(alertDiv, container.firstChild);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function initializeCharts() {
+    try {
+        console.log('Initializing charts...');
+
+        // Main Time Series Chart
+        const timeSeriesCtx = document.getElementById('timeSeriesChart').getContext('2d');
+
+    // Get data from template context
+    const timeSeriesLabels = {{ policy_chart_labels|safe }};
+    const policyCountData = {{ policy_chart_data|safe }};
+    const premiumVolumeData = {{ premium_chart_data|safe }};
+    const commissionRevenueData = {{ commission_chart_data|safe }};
+
+    // Debug: log data to console
+    console.log('Time series labels:', timeSeriesLabels);
+    console.log('Policy count data:', policyCountData);
+    console.log('Premium volume data:', premiumVolumeData);
+    console.log('Commission revenue data:', commissionRevenueData);
+
+    // Check if we have data before creating chart
+    if (!timeSeriesLabels || timeSeriesLabels.length === 0) {
+        console.warn('No time series data available');
+        const timeSeriesElement = document.getElementById('timeSeriesChart');
+        const parent = timeSeriesElement.parentElement;
+        parent.innerHTML = '<div class="text-center text-muted p-4">Нет данных для отображения</div>';
+        return;
+    }
+
+    new Chart(timeSeriesCtx, {
+        type: 'line',
+        data: {
+            labels: timeSeriesLabels,
+            datasets: [{
+                label: 'Количество полисов',
+                data: policyCountData,
+                borderColor: 'rgba(102, 126, 234, 1)',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                label: 'Объем премий (₽)',
+                data: premiumVolumeData,
+                borderColor: 'rgba(240, 147, 251, 1)',
+                backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y1'
+            }, {
+                label: 'Комиссионный доход (₽)',
+                data: commissionRevenueData,
+                borderColor: 'rgba(79, 172, 254, 1)',
+                backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Количество полисов'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Сумма (₽)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('ru-RU') + ' ₽';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label + ': ';
+                            if (context.datasetIndex === 0) {
+                                label += context.parsed.y.toLocaleString('ru-RU');
+                            } else {
+                                label += context.parsed.y.toLocaleString('ru-RU') + ' ₽';
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Seasonal Patterns Chart
+    const seasonalCtx = document.getElementById('seasonalChart').getContext('2d');
+
+    // Get seasonal data from template context
+    const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    const seasonalData = {{ seasonal_chart_data|safe }};
+
+    console.log('Seasonal data:', seasonalData);
+
+    if (!seasonalData || seasonalData.length === 0 || seasonalData.every(val => val === 0)) {
+        console.warn('No seasonal data available');
+        const seasonalElement = document.getElementById('seasonalChart');
+        const parent = seasonalElement.parentElement;
+        parent.innerHTML = '<div class="text-center text-muted p-4">Нет данных для отображения</div>';
+        return;
+    }
+
+    new Chart(seasonalCtx, {
+        type: 'bar',
+        data: {
+            labels: monthNames,
+            datasets: [{
+                label: 'Средние значения по месяцам',
+                data: seasonalData,
+                backgroundColor: 'rgba(240, 147, 251, 0.8)',
+                borderColor: 'rgba(240, 147, 251, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Среднее количество полисов'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Среднее: ' + context.parsed.y.toLocaleString('ru-RU');
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Quarterly Distribution Chart
+    const quarterlyCtx = document.getElementById('quarterlyChart').getContext('2d');
+
+    // Get quarterly data from template context
+    const quarterlyLabels = ['Q1', 'Q2', 'Q3', 'Q4'];
+    const quarterlyData = {{ quarterly_chart_data|safe }};
+
+    console.log('Quarterly data:', quarterlyData);
+
+    if (!quarterlyData || quarterlyData.length === 0 || quarterlyData.every(val => val === 0)) {
+        console.warn('No quarterly data available');
+        // Show message instead of chart
+        const quarterlyCtxElement = document.getElementById('quarterlyChart');
+        const parent = quarterlyCtxElement.parentElement;
+        parent.innerHTML = '<div class="text-center text-muted p-4">Нет данных для отображения</div>';
+        return;
+    }
+
+    new Chart(quarterlyCtx, {
+        type: 'doughnut',
+        data: {
+            labels: quarterlyLabels,
+            datasets: [{
+                data: quarterlyData,
+                backgroundColor: [
+                    'rgba(102, 126, 234, 0.8)',
+                    'rgba(240, 147, 251, 0.8)',
+                    'rgba(79, 172, 254, 0.8)',
+                    'rgba(67, 233, 123, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(102, 126, 234, 1)',
+                    'rgba(240, 147, 251, 1)',
+                    'rgba(79, 172, 254, 1)',
+                    'rgba(67, 233, 123, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed.toLocaleString('ru-RU');
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Branch Trends Chart
+    const branchTrendsCtx = document.getElementById('branchTrendsChart').getContext('2d');
+
+    // Get branch trends data from template context
+    const branchTrendsData = {{ branch_trends_chart_data|safe }};
+
+    console.log('Branch trends data:', branchTrendsData);
+
+    // Extract labels and datasets from branch trends data
+    const branchTrendsLabels = Object.keys(branchTrendsData).length > 0 ?
+        Object.values(branchTrendsData)[0].labels : [];
+    const branchTrendsDatasets = Object.entries(branchTrendsData).map(([branchName, data]) => ({
+        label: branchName,
+        data: data.data
+    }));
+
+    if (!branchTrendsLabels || branchTrendsLabels.length === 0) {
+        console.warn('No branch trends data available');
+        const branchElement = document.getElementById('branchTrendsChart');
+        const parent = branchElement.parentElement;
+        parent.innerHTML = '<div class="text-center text-muted p-4">Нет данных для отображения</div>';
+        return;
+    }
+
+    // Generate colors for each branch
+    const colors = [
+        'rgba(102, 126, 234, 1)',
+        'rgba(240, 147, 251, 1)',
+        'rgba(79, 172, 254, 1)',
+        'rgba(67, 233, 123, 1)',
+        'rgba(245, 87, 108, 1)',
+        'rgba(255, 193, 7, 1)',
+        'rgba(108, 117, 125, 1)',
+        'rgba(220, 53, 69, 1)'
+    ];
+
+    const datasets = branchTrendsDatasets.map((dataset, index) => ({
+        label: dataset.label,
+        data: dataset.data,
+        borderColor: colors[index % colors.length],
+        backgroundColor: colors[index % colors.length].replace('1)', '0.1)'),
+        tension: 0.4,
+        fill: false
+    }));
+
+    new Chart(branchTrendsCtx, {
+        type: 'line',
+        data: {
+            labels: branchTrendsLabels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Количество полисов'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toLocaleString('ru-RU');
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+        showAlert('danger', 'Произошла ошибка при инициализации графиков: ' + error.message);
+    }
+}
+
+function exportData() {
+    // Show loading indicator
+    const exportBtn = event.target.closest('button');
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Экспорт...';
+    exportBtn.disabled = true;
+
+    try {
+        // Create export URL with current filters
+        const params = new URLSearchParams(window.location.search);
+        params.set('export', 'excel');
+
+        // Create temporary link and trigger download
+        const exportUrl = window.location.pathname + '?' + params.toString();
+        const link = document.createElement('a');
+        link.href = exportUrl;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Show success message
+        showAlert('success', 'Экспорт данных начат. Файл будет загружен автоматически.');
+
+    } catch (error) {
+        console.error('Export error:', error);
+        showAlert('danger', 'Произошла ошибка при экспорте данных');
+    } finally {
+        // Restore button state after delay
+        setTimeout(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+        }, 2000);
+    }
+}
+</script>
+{% endblock %}

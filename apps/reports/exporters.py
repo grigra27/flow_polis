@@ -206,7 +206,62 @@ class PolicyExporter(BaseExporter):
 
 
 # PaymentExporter был удален - используйте ScheduledPaymentsExporter вместо него
-# Старый экспортер оставлен только для обратной совместимости с тестами
+# Создаем алиас для обратной совместимости с тестами
+class PaymentExporter(BaseExporter):
+    """Алиас для ScheduledPaymentsExporter для обратной совместимости с тестами"""
+
+    def get_filename(self):
+        """Возвращает базовое имя файла"""
+        return "payments"
+
+    def get_headers(self):
+        """Возвращает список заголовков"""
+        return [
+            "Номер полиса",
+            "Клиент",
+            "Год",
+            "Платеж №",
+            "Дата платежа",
+            "Сумма",
+            "Страховая сумма",
+            "КВ %",
+            "КВ руб",
+            "Дата оплаты",
+            "Дата согласования СК",
+            "Статус",
+        ]
+
+    def get_row_data(self, payment):
+        """Возвращает данные строки для платежа"""
+        policy = payment.policy
+
+        # Определяем статус платежа
+        if payment.paid_date:
+            status = "Оплачен"
+        elif not policy.policy_active and policy.termination_date:
+            status = "Отменен"
+        else:
+            status = "Ожидается"
+
+        # Получаем КВ %
+        kv_percent = 0
+        if payment.commission_rate:
+            kv_percent = float(payment.commission_rate.kv_percent)
+
+        return [
+            policy.policy_number,
+            policy.client.client_name,
+            payment.year_number,
+            payment.installment_number,
+            self.format_value(payment.due_date),
+            self.format_value(payment.amount),
+            self.format_value(payment.insurance_sum),
+            kv_percent,
+            self.format_value(payment.kv_rub),
+            self.format_value(payment.paid_date),
+            self.format_value(payment.insurer_date),
+            status,
+        ]
 
 
 class ScheduledPaymentsExporter(BaseExporter):

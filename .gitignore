@@ -80,4 +80,7 @@ certbot/www/
 # Backups
 backups/
 
+# Hypothesis testing
+.hypothesis/
+
 fixtures/

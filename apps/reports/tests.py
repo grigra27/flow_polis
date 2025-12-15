@@ -694,6 +694,7 @@ class PaymentExporterTest(TestCase):
 
         future_date = timezone.now().date() + timedelta(days=30)
 
+        # Создаем платеж без commission_rate, чтобы избежать автоматического пересчета
         self.payment = PaymentSchedule.objects.create(
             policy=self.policy,
             year_number=1,
@@ -701,7 +702,6 @@ class PaymentExporterTest(TestCase):
             due_date=future_date,
             amount=Decimal("50000.00"),
             insurance_sum=Decimal("1000000.00"),
-            commission_rate=self.commission_rate,
             kv_rub=Decimal("7500.00"),
         )
 
@@ -739,8 +739,13 @@ class PaymentExporterTest(TestCase):
         from apps.reports.exporters import PaymentExporter
         from datetime import date
 
-        self.payment.paid_date = date(2024, 2, 1)
-        self.payment.save()
+        # Обновляем только поле paid_date без вызова save() чтобы избежать пересчета kv_rub
+        from apps.policies.models import PaymentSchedule
+
+        PaymentSchedule.objects.filter(id=self.payment.id).update(
+            paid_date=date(2024, 2, 1)
+        )
+        self.payment.refresh_from_db()
 
         exporter = PaymentExporter([], [])
         row = exporter.get_row_data(self.payment)

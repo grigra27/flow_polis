@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/accounts/admin.py
-# hypothesis_version: 6.141.1
-
-['-attempt_time', '-date_joined', '...', 'User Agent', 'attempt_time', 'classes', 'collapse', 'date_joined', 'description', 'email', 'fields', 'first_name', 'groups', 'ip_address', 'is_active', 'is_staff', 'is_superuser', 'last_login', 'last_name', 'password', 'password1', 'password2', 'success', 'success_display', 'user_agent', 'user_agent_short', 'user_permissions', 'user_type_display', 'username', 'wide', 'Важные даты', 'Основная информация', 'Персональные данные', 'Права доступа', 'Статус', 'Тип пользователя', 'Учетные данные']

@@ -1,0 +1,26 @@
+{% comment %}
+Reusable chart template for analytics
+Usage:
+{% include 'analytics/includes/chart.html' with chart_id='my-chart' chart_type='pie' chart_title='My Chart' chart_data=chart_data_object %}
+{% endcomment %}
+
+<div class="chart-container"
+     id="{{ chart_id }}"
+     data-chart-type="{{ chart_type }}"
+     data-chart-title="{{ chart_title }}"
+     {% if chart_data %}data-chart-data="{{ chart_data|safe }}"{% endif %}
+     {% if drill_down %}data-drill-down="true"{% endif %}
+     {% if exportable %}data-exportable="true"{% endif %}>
+
+    {% if chart_title %}
+    <h5 class="chart-title text-center mb-3">{{ chart_title }}</h5>
+    {% endif %}
+
+    <canvas id="{{ chart_id }}Canvas"></canvas>
+
+    {% if show_legend and chart_type == 'pie' %}
+    <div class="chart-legend mt-3">
+        <!-- Legend will be populated by Chart.js -->
+    </div>
+    {% endif %}
+</div>

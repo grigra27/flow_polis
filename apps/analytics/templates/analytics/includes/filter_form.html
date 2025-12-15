@@ -1,0 +1,124 @@
+{% comment %}
+Reusable filter form for analytics pages
+{% endcomment %}
+
+<form id="analytics-filter-form" class="analytics-filter-form" method="post">
+    {% csrf_token %}
+
+    <div class="row g-3">
+        <!-- Date Range Filters -->
+        <div class="col-md-3">
+            <label for="date_from" class="form-label">Дата с</label>
+            <input type="date"
+                   class="form-control analytics-filter"
+                   id="date_from"
+                   name="date_from"
+                   value="{{ current_filter.date_from|date:'Y-m-d'|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+            <label for="date_to" class="form-label">Дата по</label>
+            <input type="date"
+                   class="form-control analytics-filter"
+                   id="date_to"
+                   name="date_to"
+                   value="{{ current_filter.date_to|date:'Y-m-d'|default:'' }}">
+        </div>
+
+        <!-- Branch Filter -->
+        {% if branches %}
+        <div class="col-md-3">
+            <label for="branches" class="form-label">Филиалы</label>
+            <select class="form-select analytics-filter"
+                    id="branches"
+                    name="branches"
+                    multiple>
+                {% for branch in branches %}
+                <option value="{{ branch.id }}"
+                        {% if current_filter.branch_ids and branch.id in current_filter.branch_ids %}selected{% endif %}>
+                    {{ branch.branch_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Insurer Filter -->
+        {% if insurers %}
+        <div class="col-md-3">
+            <label for="insurers" class="form-label">Страховщики</label>
+            <select class="form-select analytics-filter"
+                    id="insurers"
+                    name="insurers"
+                    multiple>
+                {% for insurer in insurers %}
+                <option value="{{ insurer.id }}"
+                        {% if current_filter.insurer_ids and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
+                    {{ insurer.insurer_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Insurance Type Filter -->
+        {% if insurance_types %}
+        <div class="col-md-3">
+            <label for="insurance_types" class="form-label">Виды страхования</label>
+            <select class="form-select analytics-filter"
+                    id="insurance_types"
+                    name="insurance_types"
+                    multiple>
+                {% for insurance_type in insurance_types %}
+                <option value="{{ insurance_type.id }}"
+                        {% if current_filter.insurance_type_ids and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
+                    {{ insurance_type.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Client Filter -->
+        {% if clients and show_client_filter %}
+        <div class="col-md-3">
+            <label for="clients" class="form-label">Клиенты</label>
+            <select class="form-select analytics-filter"
+                    id="clients"
+                    name="clients"
+                    multiple>
+                {% for client in clients %}
+                <option value="{{ client.id }}"
+                        {% if current_filter.client_ids and client.id in current_filter.client_ids %}selected{% endif %}>
+                    {{ client.client_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Применить фильтры
+            </button>
+            <button type="button" id="reset-filters" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-times"></i> Сбросить
+            </button>
+            {% if filter_applied %}
+            <span class="badge bg-info ms-2">
+                <i class="fas fa-info-circle"></i> Фильтры применены
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</form>
+
+<script>
+// Initialize multi-select dropdowns
+document.addEventListener('DOMContentLoaded', function() {
+    // You can add multi-select library initialization here if needed
+    // For now, using native HTML5 multiple select
+});
+</script>

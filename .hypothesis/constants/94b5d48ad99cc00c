@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/core/logging_filters.py
-# hypothesis_version: 6.141.1
-
-['"api_key": "***"', '"api_key":\\s*"[^"]*"', '"password": "***"', '"secret": "***"', '"secret":\\s*"[^"]*"', '"token": "***"', '"token":\\s*"[^"]*"', "'api_key': '***'", "'api_key':\\s*'[^']*'", "'password': '***'", "'secret': '***'", "'secret':\\s*'[^']*'", "'token': '***'", "'token':\\s*'[^']*'", '****-****-****-****', 'INSERT', 'SELECT', 'UPDATE', '\\1***@\\2', 'api_key=***', 'args', 'msg', 'password=***', 'secret=***', 'session_key=***', 'sql', 'token=***']

@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/migrations/0010_add_termination_date.py
-# hypothesis_version: 6.141.1
-
-['policies', 'policy', 'termination_date', 'Дата расторжения']

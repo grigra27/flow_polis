@@ -151,6 +151,7 @@ INSTALLED_APPS = [
     "apps.policies",
     "apps.notifications",
     "apps.reports",
+    "apps.analytics",
 ]
 
 if DEBUG:

@@ -1,0 +1,634 @@
+{% extends "analytics/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block analytics_title %}Финансовая аналитика{% endblock %}
+{% block title %}Финансовая аналитика - Аналитика{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-currency-dollar"></i> Финансовая аналитика
+</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .financial-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-left: 4px solid #667eea;
+    }
+
+    .financial-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .financial-card.forecast {
+        border-left-color: #667eea;
+    }
+
+    .financial-card.payments {
+        border-left-color: #f093fb;
+    }
+
+
+
+
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .metric-label {
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    .forecast-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .forecast-item:last-child {
+        border-bottom: none;
+    }
+
+    .forecast-month {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .forecast-amount {
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .payment-status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        background: #f8f9fa;
+    }
+
+    .payment-status-item.paid {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+    }
+
+    .payment-status-item.pending {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+
+
+
+
+
+
+
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .filter-applied-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        margin-left: 1rem;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .variance-positive {
+        color: #28a745;
+    }
+
+    .variance-negative {
+        color: #dc3545;
+    }
+
+    .forecast-table {
+        font-size: 0.9rem;
+    }
+
+    .forecast-table th {
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .forecast-table .sticky-top {
+        background: #f8f9fa !important;
+        z-index: 10;
+    }
+
+    @media (max-width: 768px) {
+        .metric-value {
+            font-size: 1.5rem;
+        }
+        .forecast-item, .payment-status-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block analytics_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2 mb-0">
+        <i class="bi bi-graph-up text-primary"></i>
+        Финансовая аналитика
+        {% if filter_applied %}
+            <span class="filter-applied-badge">
+                <i class="bi bi-funnel-fill"></i> Фильтры применены
+            </span>
+        {% endif %}
+    </h1>
+    <div class="d-flex align-items-center">
+        <div class="text-muted me-3">
+            <i class="bi bi-calendar3"></i>
+            {{ current_year }} год
+        </div>
+        <button class="btn btn-success" onclick="exportData()">
+            <i class="fas fa-download me-1"></i>
+            Экспорт
+        </button>
+    </div>
+</div>
+
+<!-- Filters Section -->
+<div class="filter-card">
+    <h5 class="mb-3">
+        <i class="bi bi-funnel"></i>
+        Фильтры
+    </h5>
+    <form id="filterForm" method="get">
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label for="date_from" class="form-label">Дата с:</label>
+                <input type="date" class="form-control" id="date_from" name="date_from"
+                       value="{% if current_filter.date_from %}{{ current_filter.date_from|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="date_to" class="form-label">Дата по:</label>
+                <input type="date" class="form-control" id="date_to" name="date_to"
+                       value="{% if current_filter.date_to %}{{ current_filter.date_to|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="branches" class="form-label">Филиалы:</label>
+                <select class="form-select" id="branches" name="branches" multiple>
+                    {% for branch in branches %}
+                        <option value="{{ branch.id }}"
+                                {% if current_filter and branch.id in current_filter.branch_ids %}selected{% endif %}>
+                            {{ branch.branch_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="insurers" class="form-label">Страховщики:</label>
+                <select class="form-select" id="insurers" name="insurers" multiple>
+                    {% for insurer in insurers %}
+                        <option value="{{ insurer.id }}"
+                                {% if current_filter and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
+                            {{ insurer.insurer_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="insurance_types" class="form-label">Виды страхования:</label>
+                <select class="form-select" id="insurance_types" name="insurance_types" multiple>
+                    {% for insurance_type in insurance_types %}
+                        <option value="{{ insurance_type.id }}"
+                                {% if current_filter and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
+                            {{ insurance_type.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="clients" class="form-label">Клиенты (топ 100):</label>
+                <select class="form-select" id="clients" name="clients" multiple>
+                    {% for client in clients %}
+                        <option value="{{ client.id }}"
+                                {% if current_filter and client.id in current_filter.client_ids %}selected{% endif %}>
+                            {{ client.client_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i>
+                    Применить фильтры
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="clearFilters">
+                    <i class="bi bi-x-circle"></i>
+                    Сбросить
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Financial Summary Cards -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="financial-card forecast">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up-arrow"></i>
+                Прогноз поступлений
+            </h5>
+            <div class="row">
+                <div class="col-6">
+                    <div class="metric-value">{{ total_forecasted_premium|currency }}</div>
+                    <div class="metric-label">Прогноз премий</div>
+                </div>
+                <div class="col-6">
+                    <div class="metric-value">{{ total_forecasted_commission|currency }}</div>
+                    <div class="metric-label">Прогноз комиссий</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="financial-card payments">
+            <h5 class="mb-3">
+                <i class="bi bi-credit-card"></i>
+                Платежная дисциплина
+            </h5>
+            <div class="row">
+                <div class="col-6">
+                    <div class="metric-value">{{ payment_status_analysis.payment_discipline_rate|floatformat:1 }}%</div>
+                    <div class="metric-label">Дисциплина платежей</div>
+                </div>
+                <div class="col-6">
+                    <div class="metric-value">{{ payment_status_analysis.overdue_payments }}</div>
+                    <div class="metric-label">Просроченные платежи</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Forecast Section -->
+<div class="row">
+    <div class="col-lg-8 col-md-12">
+        <div class="financial-card forecast mb-3">
+            <h5 class="mb-3">
+                <i class="bi bi-calendar-month"></i>
+                Прогноз по месяцам
+            </h5>
+            <div class="chart-container">
+                <canvas id="forecastChart" width="800" height="400"></canvas>
+            </div>
+        </div>
+
+        <!-- Payment Status directly under the chart -->
+        <div class="financial-card payments">
+            <h5 class="mb-3">
+                <i class="bi bi-pie-chart"></i>
+                Статус платежей
+            </h5>
+            <div class="payment-status-item paid">
+                <div>
+                    <strong>Оплачено</strong>
+                    <div>{{ payment_status_analysis.paid_payments }} платежей</div>
+                </div>
+                <div class="text-end">
+                    <strong>{{ payment_status_analysis.paid_amount|currency }}</strong>
+                </div>
+            </div>
+            <div class="payment-status-item pending">
+                <div>
+                    <strong>Ожидает оплаты</strong>
+                    <div>{{ payment_status_analysis.pending_payments }} платежей</div>
+                </div>
+                <div class="text-end">
+                    <strong>{{ payment_status_analysis.pending_amount|currency }}</strong>
+                </div>
+            </div>
+            <div class="payment-status-item" style="background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white;">
+                <div>
+                    <strong>Просрочено</strong>
+                    <div>{{ payment_status_analysis.overdue_payments }} платежей</div>
+                </div>
+                <div class="text-end">
+                    <strong>{{ payment_status_analysis.overdue_amount|currency }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 col-md-12">
+        <div class="financial-card forecast">
+            <h5 class="mb-3">
+                <i class="bi bi-calendar-range"></i>
+                Прогноз на 24 месяца
+            </h5>
+            <div style="height: auto; max-height: none;">
+                <table class="table table-sm table-hover forecast-table">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Месяц</th>
+                            <th class="text-end">Премия</th>
+                            <th class="text-end">Комиссия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for forecast in monthly_premium_forecast|slice:":24" %}
+                        <tr>
+                            <td>
+                                <strong>{{ forecast.month|date:"M Y" }}</strong>
+                                {% if forecast.actual_premium %}
+                                    <span class="badge bg-success ms-1">Факт</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold">{{ forecast.forecasted_premium|currency }}</span>
+                                {% if forecast.actual_premium %}
+                                    <br><small class="text-muted">Факт: {{ forecast.actual_premium|currency }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold">{{ forecast.forecasted_commission|currency }}</span>
+                                {% if forecast.actual_commission %}
+                                    <br><small class="text-muted">Факт: {{ forecast.actual_commission|currency }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        <div class="mt-2">Обновление финансовых данных...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+
+    // Handle form submission - let it submit normally as GET
+    const filterForm = document.getElementById('filterForm');
+    // No preventDefault - let form submit normally
+
+    // Clear filters button
+    document.getElementById('clearFilters').addEventListener('click', function() {
+        window.location.href = window.location.pathname;
+    });
+});
+
+function updateFinancialAnalytics() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
+
+    const formData = new FormData(document.getElementById('filterForm'));
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update financial data
+            updateFinancialData(data);
+            if (data.warning) {
+                showAlert('warning', data.warning);
+            }
+        } else {
+            showAlert('danger', data.error || 'Произошла ошибка при обновлении данных');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Произошла ошибка при обновлении данных');
+    })
+    .finally(() => {
+        loadingOverlay.style.display = 'none';
+    });
+}
+
+function updateFinancialData(data) {
+    // This would update the financial data on the page
+    // Implementation would depend on the exact structure returned by the backend
+    console.log('Updating financial data:', data);
+}
+
+function formatNumber(num) {
+    return parseFloat(num).toLocaleString('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    const container = document.querySelector('.analytics-container');
+    container.insertBefore(alertDiv, container.firstChild);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function initializeCharts() {
+    // Forecast Chart
+    const forecastCtx = document.getElementById('forecastChart').getContext('2d');
+
+    // Get data from template context
+    const forecastLabels = {{ forecast_chart_labels|safe }};
+    const premiumForecastData = {{ premium_forecast_data|safe }};
+    const commissionForecastData = {{ commission_forecast_data|safe }};
+
+    new Chart(forecastCtx, {
+        type: 'line',
+        data: {
+            labels: forecastLabels,
+            datasets: [{
+                label: 'Прогноз премий (₽)',
+                data: premiumForecastData,
+                borderColor: 'rgba(102, 126, 234, 1)',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Прогноз комиссий (₽)',
+                data: commissionForecastData,
+                borderColor: 'rgba(240, 147, 251, 1)',
+                backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('ru-RU') + ' ₽';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' +
+                                   context.parsed.y.toLocaleString('ru-RU') + ' ₽';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+
+}
+
+function exportData() {
+    // Show loading indicator
+    const exportBtn = event.target.closest('button');
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Экспорт...';
+    exportBtn.disabled = true;
+
+    try {
+        // Create export URL with current filters
+        const params = new URLSearchParams(window.location.search);
+        params.set('export', 'excel');
+
+        // Create temporary link and trigger download
+        const exportUrl = window.location.pathname + '?' + params.toString();
+        const link = document.createElement('a');
+        link.href = exportUrl;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Show success message
+        showAlert('success', 'Экспорт данных начат. Файл будет загружен автоматически.');
+
+    } catch (error) {
+        console.error('Export error:', error);
+        showAlert('danger', 'Произошла ошибка при экспорте данных');
+    } finally {
+        // Restore button state after delay
+        setTimeout(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+        }, 2000);
+    }
+}
+</script>
+{% endblock %}

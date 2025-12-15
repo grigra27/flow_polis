@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/policies/filters.py
-# hypothesis_version: 6.141.1
-
-['branch', 'client__client_name', 'dfa_active', 'dfa_number', 'end_date', 'gte', 'icontains', 'insurance_type', 'insurer', 'lte', 'policy_active', 'policy_number', 'start_date', 'Дата начала от', 'Дата окончания до', 'Клиент', 'Номер ДФА', 'Номер полиса']

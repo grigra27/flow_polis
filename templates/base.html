@@ -84,6 +84,38 @@
                             <i class="bi bi-graph-up"></i> Отчеты
                         </a>
                     </li>
+                    {% if is_admin %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="analyticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bar-chart"></i> Аналитика
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="analyticsDropdown">
+                            <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">
+                                <i class="bi bi-speedometer2"></i> Панель управления
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:branch_analytics' %}">
+                                <i class="bi bi-geo-alt"></i> По филиалам
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:insurer_analytics' %}">
+                                <i class="bi bi-building"></i> По страховщикам
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:insurance_type_analytics' %}">
+                                <i class="bi bi-shield-check"></i> По видам страхования
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:client_analytics' %}">
+                                <i class="bi bi-people"></i> По клиентам
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:financial_analytics' %}">
+                                <i class="bi bi-currency-dollar"></i> Финансовая аналитика
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'analytics:time_series_analytics' %}">
+                                <i class="bi bi-graph-up-arrow"></i> Временная аналитика
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
 
                 </ul>
                 <ul class="navbar-nav">

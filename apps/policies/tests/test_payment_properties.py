@@ -423,18 +423,18 @@ class TestPaymentScheduleProperties(TestCase):
             premium_total=Decimal("50000.00"),
         )
 
-        # Test with amount = 0
+        # Test with minimal amount (0.01) and zero kv_rub
         payment_zero = PaymentSchedule.objects.create(
             policy=policy,
             year_number=1,
             installment_number=1,
             due_date=date.today() + timedelta(days=30),
-            amount=Decimal("0.00"),
+            amount=Decimal("0.01"),  # Minimal allowed amount
             insurance_sum=Decimal("1000000.00"),
-            kv_rub=Decimal("1000.00"),
+            kv_rub=Decimal("0.00"),  # Zero commission
         )
 
         # Should not raise exception and should return 0
         assert payment_zero.kv_percent_actual == Decimal(
             "0"
-        ), f"Expected kv_percent_actual to be 0 for zero amount, but got {payment_zero.kv_percent_actual}"
+        ), f"Expected kv_percent_actual to be 0 for zero kv_rub, but got {payment_zero.kv_percent_actual}"

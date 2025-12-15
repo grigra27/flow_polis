@@ -22,13 +22,23 @@ class TestCopyPolicyAction:
         """
         Test copying a single policy creates a new policy with copied data.
         """
+        # Create leasing manager
+        from apps.insurers.models import LeasingManager
+
+        leasing_manager = LeasingManager.objects.create(
+            name="Test Manager",
+            full_name="Test Manager Full Name",
+            phone="+7 (123) 456-78-90",
+            email="test@example.com",
+        )
+
         # Create original policy
         original = policy_factory(
             policy_number="TEST-2024-001",
             dfa_number="DFA-2024-001",
             property_description="Test property description",
             franchise=Decimal("5000.00"),
-            leasing_manager="Test Manager",
+            leasing_manager=leasing_manager,
             info3="Info 3 content",
             info4="Info 4 content",
             policy_active=True,

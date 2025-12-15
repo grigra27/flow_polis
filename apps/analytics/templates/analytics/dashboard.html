@@ -1,0 +1,476 @@
+{% extends "analytics/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block analytics_title %}Панель управления{% endblock %}
+{% block title %}Панель управления - Аналитика{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-speedometer2"></i> Панель управления
+</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .metric-card.premium {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .metric-card.commission {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .metric-card.policies {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .metric-card.insurance-sum {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+
+    .metric-card.active-policies {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+
+    .metric-card.commission-rate {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        color: #333;
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-label {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+
+    .metric-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+    }
+
+
+
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        height: 500px;
+        position: relative;
+    }
+
+    .chart-container canvas {
+        max-height: 450px !important;
+        height: 450px !important;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    @media (max-width: 768px) {
+        .metric-value {
+            font-size: 2rem;
+        }
+        .metric-icon {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block analytics_filters %}
+{% endblock %}
+
+{% block analytics_content %}
+
+<!-- Metrics Cards -->
+<div class="row" id="metricsContainer">
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card premium position-relative">
+            <i class="bi bi-cash-coin metric-icon"></i>
+            <div class="metric-value" id="premiumVolume">
+                {{ dashboard_metrics.total_premium_volume|rub }}
+            </div>
+            <div class="metric-label">Объем премий (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card commission position-relative">
+            <i class="bi bi-percent metric-icon"></i>
+            <div class="metric-value" id="commissionRevenue">
+                {{ dashboard_metrics.total_commission_revenue|rub }}
+            </div>
+            <div class="metric-label">Комиссионный доход (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card policies position-relative">
+            <i class="bi bi-file-earmark-text metric-icon"></i>
+            <div class="metric-value" id="policyCount">
+                {{ dashboard_metrics.total_policy_count }}
+            </div>
+            <div class="metric-label">Количество полисов</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card insurance-sum position-relative">
+            <i class="bi bi-shield-check metric-icon"></i>
+            <div class="metric-value" id="insuranceSum">
+                {{ dashboard_metrics.total_insurance_sum|rub }}
+            </div>
+            <div class="metric-label">Страховая сумма (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card active-policies position-relative">
+            <i class="bi bi-check-circle metric-icon"></i>
+            <div class="metric-value" id="activePolicies">
+                {{ dashboard_metrics.active_policies_count }}
+            </div>
+            <div class="metric-label">Активные полисы</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card commission-rate position-relative">
+            <i class="bi bi-graph-up metric-icon"></i>
+            <div class="metric-value" id="commissionRate">
+                {% if dashboard_metrics.average_commission_rate %}
+                    {{ dashboard_metrics.average_commission_rate|floatformat:2 }}%
+                {% else %}
+                    0.00%
+                {% endif %}
+            </div>
+            <div class="metric-label">Средняя ставка комиссии</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row">
+    <div class="col-lg-6">
+        {% include 'analytics/includes/chart.html' with chart_id='branch_market_share' chart_type='pie' chart_title='Доля рынка по филиалам' exportable=True %}
+    </div>
+
+    <div class="col-lg-6">
+        {% include 'analytics/includes/chart.html' with chart_id='premium_by_branch' chart_type='bar' chart_title='Объем премий по филиалам' drill_down=True exportable=True %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        {% include 'analytics/includes/chart.html' with chart_id='premium_by_insurer' chart_type='bar' chart_title='Объем премий по страховщикам' drill_down=True exportable=True %}
+    </div>
+
+    <div class="col-lg-6">
+        {% include 'analytics/includes/chart.html' with chart_id='commission_by_insurer' chart_type='bar' chart_title='Комиссионный доход по страховщикам' exportable=True %}
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        <div class="mt-2">Обновление данных...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block chart_data %}
+<script>
+// Chart data from backend
+window.chartData = {
+    {% if chart_data %}
+        {% for chart_id, chart_info in chart_data.items %}
+            '{{ chart_id }}': {{ chart_info|safe }},
+        {% endfor %}
+    {% else %}
+        // No chart data available
+    {% endif %}
+};
+
+console.log('Dashboard chart data loaded:', window.chartData);
+console.log('Chart data keys:', Object.keys(window.chartData));
+console.log('Chart data values:', Object.values(window.chartData));
+</script>
+{% endblock %}
+
+{% block analytics_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+});
+
+
+
+function formatNumber(num) {
+    return parseFloat(num).toLocaleString('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
+}
+
+function formatCurrency(num) {
+    return parseFloat(num).toLocaleString('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
+}
+
+
+
+function initializeCharts() {
+    console.log('Initializing dashboard charts...');
+    console.log('Chart data available:', window.chartData);
+    console.log('ChartUtils available:', typeof window.ChartUtils);
+    console.log('Chart.js available:', typeof window.Chart);
+
+    // Check if required libraries are available
+    if (typeof window.Chart === 'undefined') {
+        console.error('Chart.js is not loaded');
+        return;
+    }
+
+    if (typeof window.ChartUtils === 'undefined') {
+        console.error('ChartUtils is not loaded');
+        // Try to create a simple chart without ChartUtils as fallback
+        console.log('Attempting to create charts without ChartUtils...');
+        createChartsWithoutUtils();
+        return;
+    }
+
+    // Check if chart data is available
+    if (!window.chartData) {
+        console.warn('No chart data available');
+        return;
+    }
+
+    // List all canvas elements on page
+    const allCanvases = document.querySelectorAll('canvas');
+    console.log('Found canvas elements:', Array.from(allCanvases).map(c => c.id));
+
+    // Initialize each chart based on available data
+    Object.keys(window.chartData).forEach(chartId => {
+        console.log(`Processing chart: ${chartId}`);
+
+        const chartDataStr = window.chartData[chartId];
+        let chartData;
+
+        // Parse JSON string if needed
+        try {
+            chartData = typeof chartDataStr === 'string' ? JSON.parse(chartDataStr) : chartDataStr;
+            console.log(`Parsed chart data for ${chartId}:`, chartData);
+        } catch (e) {
+            console.error(`Error parsing chart data for ${chartId}:`, e);
+            return;
+        }
+
+        const canvasId = chartId + 'Canvas';
+        const canvas = document.getElementById(canvasId);
+
+        console.log(`Looking for canvas: ${canvasId}, found:`, !!canvas);
+
+        if (!canvas) {
+            console.warn(`Canvas not found for chart: ${chartId} (looking for ${canvasId})`);
+            return;
+        }
+
+        try {
+            let chart;
+            const ctx = canvas.getContext('2d');
+
+            // Create chart based on chart type
+            if (chartData.type === 'pie') {
+                chart = ChartUtils.createPieChart(canvas, chartData);
+            } else if (chartData.type === 'bar') {
+                chart = ChartUtils.createBarChart(canvas, chartData);
+            } else if (chartData.type === 'line') {
+                chart = ChartUtils.createLineChart(canvas, chartData);
+            } else {
+                console.warn(`Unknown chart type: ${chartData.type} for chart: ${chartId}`);
+                return;
+            }
+
+            console.log(`Successfully created chart: ${chartId}`);
+
+        } catch (error) {
+            console.error(`Error creating chart ${chartId}:`, error);
+        }
+    });
+}
+
+function createChartsWithoutUtils() {
+    console.log('Creating charts without ChartUtils...');
+
+    if (!window.chartData) {
+        console.warn('No chart data available');
+        return;
+    }
+
+    Object.keys(window.chartData).forEach(chartId => {
+        console.log(`Creating fallback chart: ${chartId}`);
+
+        const chartDataStr = window.chartData[chartId];
+        let chartData;
+
+        try {
+            chartData = typeof chartDataStr === 'string' ? JSON.parse(chartDataStr) : chartDataStr;
+        } catch (e) {
+            console.error(`Error parsing chart data for ${chartId}:`, e);
+            return;
+        }
+
+        const canvasId = chartId + 'Canvas';
+        const canvas = document.getElementById(canvasId);
+
+        if (!canvas) {
+            console.warn(`Canvas not found for chart: ${chartId} (looking for ${canvasId})`);
+            return;
+        }
+
+        try {
+            const ctx = canvas.getContext('2d');
+            let config;
+
+            if (chartData.type === 'pie') {
+                config = {
+                    type: 'pie',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            data: chartData.data,
+                            backgroundColor: chartData.colors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: chartData.title
+                            },
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                };
+            } else if (chartData.type === 'bar') {
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: chartData.datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: chartData.title
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+
+                                        // Format currency values
+                                        if (context.dataset.label && (
+                                            context.dataset.label.includes('премий') ||
+                                            context.dataset.label.includes('доход') ||
+                                            context.dataset.label.includes('сумма')
+                                        )) {
+                                            label += new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' ₽';
+                                        } else {
+                                            label += new Intl.NumberFormat('ru-RU').format(context.parsed.y);
+                                        }
+
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return new Intl.NumberFormat('ru-RU').format(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            if (config) {
+                new Chart(ctx, config);
+                console.log(`Successfully created fallback chart: ${chartId}`);
+            }
+
+        } catch (error) {
+            console.error(`Error creating fallback chart ${chartId}:`, error);
+        }
+    });
+}
+
+
+</script>
+{% endblock %}

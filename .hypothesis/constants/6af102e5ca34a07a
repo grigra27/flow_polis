@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/config/urls.py
-# hypothesis_version: 6.141.1
-
-['__debug__/', 'accounts/', 'admin/', 'apps.accounts.urls', 'apps.clients.urls', 'apps.core.urls', 'apps.insurers.urls', 'apps.policies.urls', 'apps.reports.urls', 'clients/', 'insurers/', 'policies/', 'reports/', 'Администрирование', 'Страховой брокер']

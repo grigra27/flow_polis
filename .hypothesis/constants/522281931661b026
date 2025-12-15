@@ -1,4 +1,0 @@
-# file: /Users/grigoriigrachev/Yandex.Disk.localized/Работа/ОнлайнБрокер/soft/onlinepolis/apps/reports/migrations/0001_initial.py
-# hypothesis_version: 6.141.1
-
-[255, '-created_at', 'CustomExportTemplate', 'ID', 'clients', 'config', 'created_at', 'data_source', 'export_templates', 'id', 'indexes', 'insurers', 'name', 'ordering', 'payments', 'policies', 'unique_together', 'updated_at', 'user', 'verbose_name', 'verbose_name_plural', 'Дата обновления', 'Дата создания', 'Источник данных', 'Клиенты', 'Конфигурация', 'Название шаблона', 'Платежи', 'Полисы', 'Пользователь', 'Страховщики', 'Шаблон экспорта', 'Шаблоны экспортов']

@@ -1017,14 +1017,34 @@ class PolicyExpirationExporter(BaseExporter):
     def get_headers(self):
         """Возвращает список заголовков"""
         return [
+            # Основные данные (заполняются автоматически)
             "Номер полиса",
             "Номер ДФА",
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
-            "Дата оконч. страхования",
+            "Дата окончания страхования",
             "Объект страхования",
-            "Страховая премия",
+            # Дополнительные столбцы для ручного заполнения
+            "Страхователь на новый период",
+            "Выгодоприобретатель",
+            "№ и дата кредитного договора / кредитной линии, банк-кредитор",
+            "№ и дата договора залога",
+            "Идентификационный признак имущества (VIN, заводской №)",
+            "ГРН для транспортных средств и спецтехники",
+            "Срок окончания ДФА (досрочного выкупа)",
+            "Необходимый срок страхования",
+            "Место нахождения имущества*",
+            "Контактные данные для осмотра*",
+            "Страховщик на новый срок",
+            "Страховая сумма на новый срок",
+            "Страховая премия на новый срок",
+            "Условия страхования на новый срок",
+            "Необходимость ПСО",
+            "Дата отправки письма ЛП с предложением",
+            "Ответ ЛП (дата и решение)",
+            "Дата заключения договора на новый срок",
+            "Примечания",
         ]
 
     def export(self):
@@ -1038,14 +1058,14 @@ class PolicyExpirationExporter(BaseExporter):
         if self.date_from and self.date_to:
             date_from_str = self.date_from.strftime("%d.%m.%Y")
             date_to_str = self.date_to.strftime("%d.%m.%Y")
-            report_title = (
-                f"ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ С {date_from_str} ПО {date_to_str}"
-            )
+            report_title = f"ДОГОВОРА СТРАХОВАНИЯ С ОКОНЧАНИЕМ СРОКА СТРАХОВАНИЯ С {date_from_str} ПО {date_to_str}"
         else:
             from datetime import date
 
             current_date = date.today().strftime("%d.%m.%Y")
-            report_title = f"ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ НА {current_date}"
+            report_title = (
+                f"ДОГОВОРА СТРАХОВАНИЯ С ОКОНЧАНИЕМ СРОКА СТРАХОВАНИЯ НА {current_date}"
+            )
 
         ws.append([report_title])
 
@@ -1071,7 +1091,7 @@ class PolicyExpirationExporter(BaseExporter):
         header_fill = PatternFill(
             start_color="366092", end_color="366092", fill_type="solid"
         )
-        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_font = Font(bold=True, color="FFFFFF", size=9)  # Уменьшили с 11 до 9
         for cell in ws[3]:
             cell.fill = header_fill
             cell.font = header_font
@@ -1081,10 +1101,117 @@ class PolicyExpirationExporter(BaseExporter):
                 wrap_text=True,  # Перенос текста в заголовках
             )
 
-        # Увеличенная высота строки заголовков столбцов
-        ws.row_dimensions[3].height = 30
+        # Увеличиваем высоту строки заголовков для длинных названий столбцов
+        ws.row_dimensions[3].height = 60  # Увеличили с 45 до 60 для лучшего переноса
 
-        # Пустая строка после заголовков столбцов
+        # Добавляем строку 4 с информацией о заполняющих
+        responsibility_row = [
+            "заполняет страховой брокер",  # A
+            "",  # B (будет объединена с A)
+            "",  # C (будет объединена с A)
+            "",  # D (будет объединена с A)
+            "",  # E (будет объединена с A)
+            "",  # F (будет объединена с A)
+            "",  # G (будет объединена с A)
+            "зап. УБТиСЛО",  # H
+            "заполняет финансовая дирекция",  # I
+            "",  # J (будет объединена с I)
+            "",  # K (будет объединена с I)
+            "заполняет УБТиСЛО",  # L
+            "",  # M (будет объединена с L)
+            "",  # N (будет объединена с L)
+            "",  # O (будет объединена с L)
+            "",  # P (будет объединена с L)
+            "",  # Q (будет объединена с L)
+            "заполняет страховой брокер",  # R
+            "",  # S (будет объединена с R)
+            "",  # T (будет объединена с R)
+            "",  # U (будет объединена с R)
+            "",  # V (будет объединена с R)
+            "заполняет УБТиСЛО",  # W
+            "",  # X (будет объединена с W)
+            "заполн. стр. брокер",  # Y
+            "заполняет УБТиСЛО",  # Z
+        ]
+        ws.append(responsibility_row)
+
+        # Форматирование строки ответственности (строка 4)
+        # Цвета для разных заполняющих (спокойные, но контрастные к синему #366092)
+        broker_fill = PatternFill(
+            start_color="D4F1D4", end_color="D4F1D4", fill_type="solid"
+        )  # Мягкий зеленый
+        ubt_fill = PatternFill(
+            start_color="F0E6FF", end_color="F0E6FF", fill_type="solid"
+        )  # Мягкий лавандовый
+        finance_fill = PatternFill(
+            start_color="FFF2E6", end_color="FFF2E6", fill_type="solid"
+        )  # Мягкий кремовый
+
+        responsibility_font = Font(bold=True, size=9, color="000000")
+
+        # Объединяем ячейки и применяем форматирование
+        # A-G: страховой брокер (зеленый)
+        ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=7)
+        for col in range(1, 8):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = broker_fill
+            cell.font = responsibility_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # H: УБТиСЛО (розовый)
+        cell_h = ws.cell(row=4, column=8)
+        cell_h.fill = ubt_fill
+        cell_h.font = responsibility_font
+        cell_h.alignment = Alignment(horizontal="center", vertical="center")
+
+        # I-K: финансовая дирекция (персиковый)
+        ws.merge_cells(start_row=4, start_column=9, end_row=4, end_column=11)
+        for col in range(9, 12):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = finance_fill
+            cell.font = responsibility_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # L-Q: УБТиСЛО (розовый)
+        ws.merge_cells(start_row=4, start_column=12, end_row=4, end_column=17)
+        for col in range(12, 18):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = ubt_fill
+            cell.font = responsibility_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # R-V: страховой брокер (зеленый)
+        ws.merge_cells(start_row=4, start_column=18, end_row=4, end_column=22)
+        for col in range(18, 23):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = broker_fill
+            cell.font = responsibility_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # W-X: УБТиСЛО (розовый)
+        ws.merge_cells(start_row=4, start_column=23, end_row=4, end_column=24)
+        for col in range(23, 25):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = ubt_fill
+            cell.font = responsibility_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Y: страховой брокер (зеленый)
+        cell_y = ws.cell(row=4, column=25)
+        cell_y.fill = broker_fill
+        cell_y.font = responsibility_font
+        cell_y.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Z: УБТиСЛО (розовый)
+        cell_z = ws.cell(row=4, column=26)
+        cell_z.fill = ubt_fill
+        cell_z.font = responsibility_font
+        cell_z.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Высота строки ответственности
+        ws.row_dimensions[4].height = 25
+
+        # Пустая строка после строки ответственности
         ws.append([""] * len(headers))
 
         # Группируем полисы по филиалам
@@ -1151,7 +1278,11 @@ class PolicyExpirationExporter(BaseExporter):
 
     def get_row_data(self, policy):
         """Возвращает данные строки для полиса"""
+        # Определяем примечание для полисов без участия брокера
+        notes = "без брокера" if not policy.broker_participation else ""
+
         return [
+            # Основные данные (заполняются автоматически)
             policy.policy_number,
             policy.dfa_number,
             policy.client.client_name,
@@ -1159,23 +1290,62 @@ class PolicyExpirationExporter(BaseExporter):
             policy.policyholder.client_name if policy.policyholder else "",
             self.format_value(policy.end_date),
             policy.property_description,
-            self.format_value(policy.premium_total),
+            # Дополнительные столбцы для ручного заполнения (пустые)
+            "",  # Страхователь на новый страховой период
+            "",  # Выгодоприобретатель
+            "",  # № и дата кредитного договора/кредитной линии, банк-кредитор
+            "",  # № и дата договора залога
+            "",  # Идентификационный признак имущества (VIN, заводской №)
+            "",  # ГРН для транспортных средств и спецтехники
+            "",  # Срок окончания ДФА (досрочного выкупа)
+            "",  # Необходимый срок страхования
+            "",  # Место нахождения имущества*
+            "",  # Контактные данные для организации осмотра*
+            "",  # Страховщик на новый срок
+            "",  # страховая сумма на новый срок
+            "",  # страховая премия на новый срок
+            "",  # условия страхования на новый срок
+            "",  # Необходимость ПСО
+            "",  # Дата отправки письма ЛП-лю с предложением
+            "",  # Ответ ЛП-ля (дата и решение)
+            "",  # Дата заключения договора страхования на новый срок
+            notes,  # Примечания (заполняется автоматически)
         ]
 
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
-        from openpyxl.styles import Alignment
+        from openpyxl.styles import Alignment, Font, PatternFill
 
-        # 1. Настройка ширины столбцов
+        # 1. Настройка ширины столбцов (оптимизировано для Times New Roman 9pt)
         column_widths = {
-            "A": 15,  # Номер полиса
-            "B": 15,  # Номер ДФА
+            # Основные столбцы
+            "A": 12,  # Номер полиса
+            "B": 12,  # Номер ДФА
             "C": None,  # Лизингополучатель - автоподгонка
             "D": None,  # Страховщик - автоподгонка
             "E": None,  # Страхователь - автоподгонка
-            "F": 13,  # Дата окончания страхования
-            "G": None,  # Объект страхования - автоподгонка с большим лимитом
-            "H": 16,  # Страховая премия
+            "F": 11,  # Дата окончания страхования
+            "G": None,  # Объект страхования - автоподгонка
+            # Дополнительные столбцы для ручного заполнения
+            "H": 20,  # Страхователь на новый страховой период
+            "I": 18,  # Выгодоприобретатель
+            "J": 25,  # № и дата кредитного договора/кредитной линии, банк-кредитор
+            "K": 20,  # № и дата договора залога
+            "L": 18,  # Идентификационный признак имущества (VIN, заводской №)
+            "M": 15,  # ГРН для транспортных средств и спецтехники
+            "N": 15,  # Срок окончания ДФА (досрочного выкупа)
+            "O": 15,  # Необходимый срок страхования
+            "P": 20,  # Место нахождения имущества*
+            "Q": 25,  # Контактные данные для организации осмотра*
+            "R": 15,  # Страховщик на новый срок
+            "S": 15,  # страховая сумма на новый срок
+            "T": 15,  # страховая премия на новый срок
+            "U": 20,  # условия страхования на новый срок
+            "V": 12,  # Необходимость ПСО
+            "W": 18,  # Дата отправки письма ЛП-лю с предложением
+            "X": 20,  # Ответ ЛП-ля (дата и решение)
+            "Y": 18,  # Дата заключения договора страхования на новый срок
+            "Z": 15,  # Примечания
         }
 
         from openpyxl.utils import get_column_letter
@@ -1197,39 +1367,137 @@ class PolicyExpirationExporter(BaseExporter):
                     if hasattr(cell, "value") and cell.value:
                         # Пропускаем заголовок отчета и заголовки филиалов
                         if isinstance(cell.value, str) and (
-                            "ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ" in cell.value
+                            "ДОГОВОРА СТРАХОВАНИЯ С ОКОНЧАНИЕМ СРОКА СТРАХОВАНИЯ"
+                            in cell.value
                             or (
                                 col_idx == 1
                                 and ws.cell(row=cell.row, column=2).value is None
-                                and cell.row > 3
+                                and cell.row > 4
                             )
                         ):
                             continue
                         max_length = max(max_length, len(str(cell.value)))
 
-                adjusted_width = max_length + 2
+                # Уменьшаем отступ для Times New Roman 9pt
+                adjusted_width = max_length + 1
 
                 if column_letter == "G":  # Объект страхования
-                    adjusted_width = min(max(adjusted_width, 12), 60)
-                else:
-                    adjusted_width = min(max(adjusted_width, 10), 50)
+                    adjusted_width = min(
+                        max(adjusted_width, 12), 45
+                    )  # Минимум 12 для описания объектов
+                elif column_letter in ["C", "E"]:  # Лизингополучатель, Страхователь
+                    adjusted_width = min(
+                        max(adjusted_width, 15), 40
+                    )  # Минимум 15 для названий компаний
+                else:  # Страховщик
+                    adjusted_width = min(
+                        max(adjusted_width, 10), 30
+                    )  # Минимум 10 для страховщиков
 
                 ws.column_dimensions[column_letter].width = adjusted_width
 
-        # 2. Перенос текста для столбца "Объект страхования" (G)
-        for cell in ws["G"]:
-            if cell.row > 3:
-                cell.alignment = Alignment(wrap_text=True, vertical="top")
+        # 2. Применяем шрифт Times New Roman 9pt ко всем ячейкам кроме заголовков
+        times_font = Font(name="Times New Roman", size=9)
+        gray_fill = PatternFill(
+            start_color="D3D3D3", end_color="D3D3D3", fill_type="solid"
+        )
 
-        # 3. Выравнивание для разных типов данных
-        for row in ws.iter_rows(
-            min_row=5
-        ):  # Начинаем с 5 строки (первая строка данных)
+        # Применяем шрифт Times New Roman 9pt ко всем строкам данных
+        for row_idx in range(1, ws.max_row + 1):
+            # Строка 1 - заголовок отчета (оставляем существующее форматирование)
+            # Строка 3 - заголовки столбцов (оставляем существующее форматирование)
+            # Строка 4 - строка ответственности (оставляем существующее форматирование)
+            if row_idx in [1, 3, 4]:
+                continue
+
+            # Проверяем, является ли строка заголовком филиала
+            first_cell = ws.cell(row=row_idx, column=1)
+            is_branch_header = (
+                first_cell.value
+                and isinstance(first_cell.value, str)
+                and ws.cell(row=row_idx, column=2).value
+                is None  # Вторая ячейка пустая (объединенная)
+                and row_idx > 4
+            )
+
+            # Заголовки филиалов - оставляем существующее форматирование
+            if is_branch_header:
+                continue
+
+            # Проверяем пустые строки-разделители
+            row_cells = [
+                ws.cell(row=row_idx, column=col) for col in range(1, ws.max_column + 1)
+            ]
+            is_empty_row = all(
+                cell.value is None or cell.value == "" for cell in row_cells
+            )
+            if is_empty_row:
+                continue
+
+            # Для всех остальных строк (строки данных) применяем Times New Roman 9pt
+            for col_idx in range(1, ws.max_column + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.font = times_font
+
+        # 3. Выделяем серым фоном строки где статус участия брокера = "Нет"
+        # Нужно получить данные о broker_participation для каждого полиса
+        current_row = 6  # Начинаем с первой строки данных (после добавления строки ответственности)
+
+        # Группируем полисы по филиалам (как в основном методе export)
+        from collections import defaultdict
+
+        policies_by_branch = defaultdict(list)
+        for policy in self.queryset:
+            branch_name = policy.branch.branch_name if policy.branch else "Без филиала"
+            policies_by_branch[branch_name].append(policy)
+
+        # Сортируем филиалы по алфавиту
+        sorted_branches = sorted(policies_by_branch.keys())
+
+        # Проходим по данным и выделяем строки без участия брокера
+        for branch_name in sorted_branches:
+            # Пропускаем заголовок филиала
+            current_row += 1
+
+            # Обрабатываем полисы филиала
+            for policy in policies_by_branch[branch_name]:
+                # Проверяем статус участия брокера
+                if not policy.broker_participation:
+                    # Выделяем всю строку серым фоном
+                    for col_idx in range(1, len(self.get_headers()) + 1):
+                        cell = ws.cell(row=current_row, column=col_idx)
+                        cell.fill = gray_fill
+                        # Применяем шрифт Times New Roman 9pt (перезаписываем)
+                        cell.font = times_font
+
+                current_row += 1
+
+            # Пропускаем пустую строку после блока филиала
+            current_row += 1
+
+        # 4. Перенос текста для столбцов с длинными заголовками и содержимым
+        wrap_text_columns = [
+            "G",
+            "J",
+            "P",
+            "Q",
+            "U",
+        ]  # Объект страхования, кредитный договор, место нахождения, контакты, условия
+        for column_letter in wrap_text_columns:
+            for cell in ws[column_letter]:
+                if cell.row > 4:  # Пропускаем заголовки и строку ответственности
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        # Перенос текста уже применен ко всем заголовкам выше
+
+        # 5. Выравнивание для разных типов данных
+        for row in ws.iter_rows(min_row=6):
             # Проверяем, является ли строка заголовком филиала
             first_cell_value = row[0].value
             is_branch_header = (
                 first_cell_value
                 and isinstance(first_cell_value, str)
+                and len(row) > 1
                 and row[1].value is None  # Вторая ячейка пустая (объединенная)
             )
 
@@ -1240,30 +1508,24 @@ class PolicyExpirationExporter(BaseExporter):
                 continue
 
             for idx, cell in enumerate(row, start=1):
-                # Столбцы с датами (F, G) - по центру
-                if idx in [6, 7]:
+                # Столбец с датой (F) - по центру
+                if idx == 6:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                # Столбец со страховой премией (I) - справа
-                elif idx == 9:
-                    cell.alignment = Alignment(horizontal="right", vertical="center")
-                    # Применяем числовой формат с разделителями тысяч
-                    cell.number_format = "#,##0.00"
                 # Остальные - слева
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
 
-        # 4. Закрепление заголовков
-        ws.freeze_panes = "A5"  # Закрепляем первые 4 строки
+        # 6. Закрепление заголовков
+        ws.freeze_panes = "A6"  # Закрепляем первые 5 строк (заголовок, пустая, столбцы, ответственность, пустая)
 
-        # 5. Автофильтры на заголовки столбцов (строка 3) с данными
-        # Устанавливаем автофильтр на весь диапазон данных, включая заголовки
+        # 7. Автофильтры на заголовки столбцов (строка 3) с данными
         if ws.max_row > 3:  # Проверяем, что есть данные
             ws.auto_filter.ref = (
                 f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
             )
 
-        # 6. Высота строк данных
-        for row in range(5, ws.max_row + 1):
+        # 8. Высота строк данных
+        for row in range(6, ws.max_row + 1):
             # Проверяем, является ли строка заголовком филиала (уже имеет высоту 25)
             cell_value = ws.cell(row=row, column=1).value
             is_branch_header = (

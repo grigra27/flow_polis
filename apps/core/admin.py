@@ -83,10 +83,17 @@ class CustomLogEntryAdmin(LogEntryAdmin):
     ordering = ["-timestamp"]
 
     def timestamp_display(self, obj):
-        """Отображение времени в удобном формате"""
-        return obj.timestamp.strftime("%d.%m.%Y %H:%M:%S")
+        """Отображение времени в удобном формате в часовом поясе Дохи"""
+        from django.utils import timezone
+        from zoneinfo import ZoneInfo
 
-    timestamp_display.short_description = "Время"
+        # Конвертируем время в часовой пояс Дохи, Катар (UTC+3)
+        qatar_tz = ZoneInfo("Asia/Qatar")
+        local_time = obj.timestamp.astimezone(qatar_tz)
+
+        return local_time.strftime("%d.%m.%Y %H:%M:%S")
+
+    timestamp_display.short_description = "Время (Доха)"
     timestamp_display.admin_order_field = "timestamp"
 
     def action_display(self, obj):

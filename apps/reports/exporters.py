@@ -301,8 +301,11 @@ class ScheduledPaymentsExporter(BaseExporter):
             "Статус рассрочки",
             "Этот взнос",
             "Дата платежа по договору",
+            "Участие брокера",
             "Филиал",
             "Контактное лицо",
+            "Крайняя дата запроса счета",
+            "Примечание",
         ]
 
     def export(self):
@@ -462,6 +465,13 @@ class ScheduledPaymentsExporter(BaseExporter):
             # Используем поле name (Фамилия менеджера)
             leasing_manager_name = policy.leasing_manager.name
 
+        # Рассчитываем крайнюю дату запроса счета (дата платежа минус 2 недели)
+        from datetime import timedelta
+
+        invoice_request_deadline = None
+        if payment.due_date:
+            invoice_request_deadline = payment.due_date - timedelta(weeks=2)
+
         return [
             policy.policy_number,
             policy.dfa_number,
@@ -478,8 +488,11 @@ class ScheduledPaymentsExporter(BaseExporter):
             installment_status,  # Статус рассрочки
             payment_position,  # "1 из 2", "2 из 3" и т.д.
             self.format_value(payment.due_date),
+            self.format_value(policy.broker_participation),  # Участие брокера
             policy.branch.branch_name if policy.branch else "",
             leasing_manager_name,  # Контактное лицо (менеджер лизинговой компании)
+            self.format_value(invoice_request_deadline),  # Крайняя дата запроса счета
+            "",  # Примечание (пустое)
         ]
 
     def apply_formatting(self, ws):
@@ -502,8 +515,11 @@ class ScheduledPaymentsExporter(BaseExporter):
             "K": 12,  # Статус рассрочки
             "L": 12,  # Этот взнос ("1 из 2")
             "M": 13,  # Дата платежа по договору
-            "N": None,  # Филиал - автоподгонка
-            "O": None,  # Контактное лицо - автоподгонка
+            "N": 12,  # Участие брокера
+            "O": None,  # Филиал - автоподгонка
+            "P": None,  # Контактное лицо - автоподгонка
+            "Q": 18,  # Крайняя дата запроса счета
+            "R": 15,  # Примечание
         }
 
         from openpyxl.utils import get_column_letter
@@ -552,6 +568,8 @@ class ScheduledPaymentsExporter(BaseExporter):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
         # 3. Выравнивание и форматирование для разных типов данных
+        from openpyxl.styles import PatternFill
+
         for row in ws.iter_rows(
             min_row=5
         ):  # Начинаем с 5 строки (первая строка данных)
@@ -568,18 +586,35 @@ class ScheduledPaymentsExporter(BaseExporter):
             if is_branch_header:
                 continue
 
+            # Проверяем значение в столбце "Участие брокера" (столбец N, индекс 14)
+            broker_participation_cell = row[13] if len(row) > 13 else None
+            is_no_broker_participation = (
+                broker_participation_cell and broker_participation_cell.value == "Нет"
+            )
+
+            # Темно-серый фон для строк где участие брокера = "Нет"
+            gray_fill = (
+                PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+                if is_no_broker_participation
+                else None
+            )
+
             for idx, cell in enumerate(row, start=1):
+                # Применяем серый фон если участие брокера = "Нет"
+                if gray_fill:
+                    cell.fill = gray_fill
+
                 # Столбцы с финансовыми данными (I - Страховая сумма, J - Очередной взнос)
                 if idx in [9, 10]:
                     cell.alignment = Alignment(horizontal="right", vertical="center")
                     # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
                     # Без символа валюты для совместимости с Excel на Mac
                     cell.number_format = "#,##0.00"
-                # Столбцы с датами (F, G, M) - по центру
-                elif idx in [6, 7, 13]:
+                # Столбцы с датами (F, G, M, Q) - по центру
+                elif idx in [6, 7, 13, 17]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                # Столбцы "Статус рассрочки" (K) и "Этот взнос" (L) - по центру
-                elif idx in [11, 12]:
+                # Столбцы "Статус рассрочки" (K), "Этот взнос" (L) и "Участие брокера" (N) - по центру
+                elif idx in [11, 12, 14]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                 # Остальные - слева
                 else:

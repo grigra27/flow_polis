@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from decimal import Decimal
 from apps.core.models import TimeStampedModel
 from apps.clients.models import Client
@@ -49,6 +49,19 @@ class Policy(TimeStampedModel):
         null=True,
         validators=[MinValueValidator(1900), MaxValueValidator(2100)],
         help_text="Год выпуска застрахованного имущества (1900-2100)",
+    )
+    vin_number = models.CharField(
+        "VIN номер",
+        max_length=17,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[A-HJ-NPR-Z0-9]{17}$",
+                message="VIN номер должен состоять из 17 символов, включающих буквы латинского алфавита (кроме I, O, Q) и цифры",
+                code="invalid_vin",
+            )
+        ],
+        help_text="VIN номер транспортного средства (17 символов, латинские буквы кроме I, O, Q и цифры)",
     )
     start_date = models.DateField("Дата начала страхования")
     end_date = models.DateField("Дата окончания страхования")

@@ -116,6 +116,7 @@ class PolicyAdmin(admin.ModelAdmin):
         "dfa_number",
         "client__client_name",
         "insurer__insurer_name",
+        "vin_number",
     ]
     autocomplete_fields = [
         "client",
@@ -149,6 +150,7 @@ class PolicyAdmin(admin.ModelAdmin):
                     "insurance_type",
                     "property_description",
                     "property_year",
+                    "vin_number",
                     "franchise",
                     "start_date",
                     "end_date",

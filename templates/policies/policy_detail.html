@@ -97,6 +97,12 @@
                                 {{ policy.property_year }}
                             </div>
                             {% endif %}
+                            {% if policy.vin_number %}
+                            <div class="mt-2">
+                                <strong>VIN номер:</strong><br>
+                                <code>{{ policy.vin_number }}</code>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">

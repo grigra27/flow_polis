@@ -157,12 +157,16 @@ def export_payments_excel(request):
 
 @login_required
 def export_thursday_report(request):
-    """Export Thursday report - policies that are NOT uploaded"""
+    """Export Thursday report - policies without documents and unpaid payments, grouped by city"""
     try:
         # Получаем все полисы, которые НЕ подгружены
-        policies = Policy.objects.select_related(
-            "client", "insurer", "branch", "insurance_type", "policyholder"
-        ).filter(policy_uploaded=False)
+        policies = (
+            Policy.objects.select_related(
+                "client", "insurer", "branch", "insurance_type", "policyholder"
+            )
+            .filter(policy_uploaded=False)
+            .order_by("branch__branch_name", "policy_number")
+        )
 
         # Применяем опциональные фильтры (если переданы)
         branch_id = request.GET.get("branch")

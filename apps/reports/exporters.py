@@ -636,16 +636,16 @@ class ScheduledPaymentsExporter(BaseExporter):
 
 
 class ThursdayReportExporter(BaseExporter):
-    """Экспортер для четвергового отчета - полисы с платежами"""
+    """Экспортер для четвергового отчета - полисы с платежами, сгруппированные по городам"""
 
     def __init__(self, queryset, fields, payment_date=None):
         """
         Инициализация экспортера
 
         Args:
-            queryset: QuerySet полисов для раздела 1
+            queryset: QuerySet полисов (полисы без документов)
             fields: Список полей (не используется, для совместимости)
-            payment_date: Дата для фильтрации платежей в разделе 2
+            payment_date: Дата для фильтрации платежей (неоплаченные платежи)
         """
         super().__init__(queryset, fields)
         self.payment_date = payment_date
@@ -673,9 +673,12 @@ class ThursdayReportExporter(BaseExporter):
         ]
 
     def export(self):
-        """Генерирует Excel файл с визуальным разделением по разделам"""
+        """Генерирует Excel файл с группировкой по городам (филиалам)"""
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.cell.text import InlineFont
+        from openpyxl.cell.rich_text import TextBlock, CellRichText
         from datetime import date
+        from collections import defaultdict
 
         wb = Workbook()
         ws = wb.active
@@ -722,23 +725,10 @@ class ThursdayReportExporter(BaseExporter):
         # Пустая строка после заголовков столбцов
         ws.append([""] * len(headers))
 
-        # РАЗДЕЛ 1: Полисы без документов
-        self._add_section_header(ws, "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ", len(headers))
-
-        for policy in self.queryset:
-            row = self.get_row_data(policy)
-            ws.append(row)
-
-        # Пустая строка между разделами
-        ws.append([])
-
-        # РАЗДЕЛ 2: Платежи без данных об оплате
-        self._add_section_header(ws, "НЕТ ДАННЫХ ОБ ОПЛАТЕ", len(headers))
-
+        # Собираем все записи (полисы без документов + платежи без оплаты)
         from apps.policies.models import PaymentSchedule
 
-        # Получаем все платежи без даты оплаты (для активных полисов)
-        # Фильтруем по дате: дата платежа <= payment_date
+        # Получаем платежи без даты оплаты (для активных полисов)
         unpaid_payments_query = PaymentSchedule.objects.filter(
             paid_date__isnull=True, policy__policy_active=True
         )
@@ -750,12 +740,99 @@ class ThursdayReportExporter(BaseExporter):
             )
 
         unpaid_payments = unpaid_payments_query.select_related(
-            "policy", "policy__client", "policy__insurer", "policy__policyholder"
+            "policy",
+            "policy__client",
+            "policy__insurer",
+            "policy__policyholder",
+            "policy__branch",
         ).order_by("due_date", "policy__policy_number")
 
+        # Группируем записи по городам и полисам для объединения дубликатов
+        records_by_branch = defaultdict(
+            lambda: defaultdict(lambda: {"reasons": set(), "data": None})
+        )
+
+        # Добавляем полисы без документов
+        for policy in self.queryset:
+            branch_name = policy.branch.branch_name if policy.branch else "Без филиала"
+            policy_key = policy.id
+            records_by_branch[branch_name][policy_key]["reasons"].add("not_uploaded")
+            if records_by_branch[branch_name][policy_key]["data"] is None:
+                records_by_branch[branch_name][policy_key]["data"] = policy
+
+        # Добавляем платежи без оплаты
         for payment in unpaid_payments:
-            row = self.get_payment_row_data(payment)
-            ws.append(row)
+            branch_name = (
+                payment.policy.branch.branch_name
+                if payment.policy.branch
+                else "Без филиала"
+            )
+            policy_key = payment.policy.id
+            records_by_branch[branch_name][policy_key]["reasons"].add("not_paid")
+            if records_by_branch[branch_name][policy_key]["data"] is None:
+                records_by_branch[branch_name][policy_key]["data"] = payment.policy
+
+        # Сортируем города по алфавиту
+        sorted_branches = sorted(records_by_branch.keys())
+
+        # Добавляем данные по городам
+        rows_with_reasons = (
+            []
+        )  # Сохраняем информацию о строках для последующего форматирования
+
+        for branch_name in sorted_branches:
+            # Добавляем заголовок города
+            self._add_section_header(ws, branch_name, len(headers))
+
+            # Добавляем записи города (сортируем по номеру полиса)
+            policies_in_branch = sorted(
+                records_by_branch[branch_name].items(),
+                key=lambda x: x[1]["data"].policy_number,
+            )
+
+            for policy_id, record_info in policies_in_branch:
+                policy = record_info["data"]
+                reasons = record_info["reasons"]
+
+                # Получаем базовые данные строки
+                row = self.get_row_data(policy)
+
+                # Формируем столбец "Причина" с форматированием
+                reason_cell_value = self._format_reasons(reasons)
+                row[-1] = reason_cell_value  # Заменяем последний элемент (причина)
+
+                current_row = ws.max_row + 1
+                ws.append(row)
+
+                # Сохраняем информацию о строке и причинах для форматирования
+                rows_with_reasons.append({"row": current_row, "reasons": reasons})
+
+                # Применяем форматирование к ячейке "Причина"
+                reason_cell = ws.cell(
+                    row=current_row, column=13
+                )  # 13-й столбец - Причина
+                reason_cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+                # Увеличиваем высоту строки если есть обе причины
+                if len(reasons) > 1:
+                    ws.row_dimensions[current_row].height = 35
+                    # Применяем цветовой фон для ячейки с двумя причинами
+                    reason_cell.fill = PatternFill(
+                        start_color="FFF3CD", end_color="FFF3CD", fill_type="solid"
+                    )  # Светло-желтый фон для привлечения внимания
+                elif "not_uploaded" in reasons:
+                    # Светло-красный фон для "не подгружены документы"
+                    reason_cell.fill = PatternFill(
+                        start_color="FFE5E5", end_color="FFE5E5", fill_type="solid"
+                    )
+                elif "not_paid" in reasons:
+                    # Светло-оранжевый фон для "нет данных об оплате"
+                    reason_cell.fill = PatternFill(
+                        start_color="FFE8CC", end_color="FFE8CC", fill_type="solid"
+                    )
+
+            # Пустая строка после блока города
+            ws.append([])
 
         # Форматирование
         self.apply_formatting(ws)
@@ -763,10 +840,10 @@ class ThursdayReportExporter(BaseExporter):
         return self.create_response(wb)
 
     def _add_section_header(self, ws, title, num_columns):
-        """Добавляет заголовок раздела с форматированием"""
+        """Добавляет заголовок города с форматированием"""
         from openpyxl.styles import Font, PatternFill, Alignment
 
-        # Добавляем строку с заголовком раздела
+        # Добавляем строку с заголовком города
         ws.append([title] + [""] * (num_columns - 1))
         current_row = ws.max_row
 
@@ -778,30 +855,46 @@ class ThursdayReportExporter(BaseExporter):
             end_column=num_columns,
         )
 
-        # Форматирование заголовка раздела
+        # Форматирование заголовка города (оранжевый фон как раньше для разделов)
         section_cell = ws.cell(row=current_row, column=1)
         section_cell.fill = PatternFill(
             start_color="FFC000", end_color="FFC000", fill_type="solid"
         )
         section_cell.font = Font(bold=True, size=13, color="000000")
-        section_cell.alignment = Alignment(horizontal="center", vertical="center")
+        section_cell.alignment = Alignment(
+            horizontal="left", vertical="center"
+        )  # Изменено на left
 
-        # Увеличенная высота строки заголовка раздела
+        # Увеличенная высота строки заголовка города
         ws.row_dimensions[current_row].height = 25
 
     def get_row_data(self, policy):
-        """Возвращает данные строки для полиса (раздел 1)"""
+        """Возвращает данные строки для полиса"""
         from apps.policies.models import PaymentSchedule
 
-        # Получаем первый платеж для полиса (если есть)
-        first_payment = (
-            PaymentSchedule.objects.filter(policy=policy)
+        # Сначала ищем первый неоплаченный платеж с учетом фильтра по дате (если задан)
+        unpaid_filter = {"policy": policy, "paid_date__isnull": True}
+
+        # Применяем фильтр по дате, если он задан
+        if self.payment_date:
+            unpaid_filter["due_date__lte"] = self.payment_date
+
+        first_unpaid_payment = (
+            PaymentSchedule.objects.filter(**unpaid_filter)
             .order_by("year_number", "installment_number")
             .first()
         )
 
+        # Если неоплаченных нет (или они не попадают в фильтр по дате), берем первый платеж вообще
+        payment_to_show = first_unpaid_payment
+        if not payment_to_show:
+            payment_to_show = (
+                PaymentSchedule.objects.filter(policy=policy)
+                .order_by("year_number", "installment_number")
+                .first()
+            )
+
         # Определяем причину только по полису (не по платежу)
-        # Для раздела 1 причина всегда связана с полисом
         reason = self.get_reason(policy, payment=None)
 
         return [
@@ -815,8 +908,8 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(policy.end_date),
             policy.property_description,
             self.format_value(policy.premium_total),
-            self.format_value(first_payment.due_date) if first_payment else "",
-            self.format_value(first_payment.paid_date) if first_payment else "",
+            self.format_value(payment_to_show.due_date) if payment_to_show else "",
+            self.format_value(payment_to_show.paid_date) if payment_to_show else "",
             reason,
         ]
 
@@ -866,6 +959,26 @@ class ThursdayReportExporter(BaseExporter):
 
         return "другая причина"
 
+    def _format_reasons(self, reasons):
+        """
+        Форматирует причины для отображения в ячейке
+
+        Args:
+            reasons: set с причинами ('not_uploaded', 'not_paid')
+
+        Returns:
+            Строка с причинами, разделенными переносом строки
+        """
+        reason_texts = []
+
+        if "not_uploaded" in reasons:
+            reason_texts.append("• не подгружены документы")
+
+        if "not_paid" in reasons:
+            reason_texts.append("• нет данных об оплате")
+
+        return "\n".join(reason_texts)
+
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
         from openpyxl.styles import Alignment
@@ -877,7 +990,7 @@ class ThursdayReportExporter(BaseExporter):
             "B": 15,  # Номер ДФА
             "C": None,  # Филиал - автоподгонка
             "D": None,  # Лизингополучатель - автоподгонка
-            "E": None,  # Страховщик - автоподгонка
+            "E": 20,  # Страховщик - фиксированная ширина
             "F": None,  # Страхователь - автоподгонка
             "G": 13,  # Дата начала страхования
             "H": 13,  # Дата окончания страхования
@@ -885,7 +998,7 @@ class ThursdayReportExporter(BaseExporter):
             "J": 16,  # Страховая премия
             "K": 13,  # Дата платежа по договору
             "L": 13,  # Дата фактической оплаты
-            "M": 22,  # Причина
+            "M": 30,  # Причина - увеличена ширина
         }
 
         from openpyxl.utils import get_column_letter
@@ -905,11 +1018,9 @@ class ThursdayReportExporter(BaseExporter):
                 for cell in column_cells:
                     # Пропускаем объединенные ячейки
                     if hasattr(cell, "value") and cell.value:
-                        # Пропускаем заголовок отчета и заголовки разделов
+                        # Пропускаем заголовок отчета и заголовки городов
                         if isinstance(cell.value, str) and (
                             "ПЕРЕЧЕНЬ ДФА" in cell.value
-                            or "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ" in cell.value
-                            or "НЕТ ДАННЫХ ОБ ОПЛАТЕ" in cell.value
                         ):
                             continue
                         max_length = max(max_length, len(str(cell.value)))
@@ -935,6 +1046,19 @@ class ThursdayReportExporter(BaseExporter):
             min_row=4
         ):  # Пропускаем заголовок отчета, пустую строку и заголовки столбцов
             for idx, cell in enumerate(row, start=1):
+                # Проверяем, является ли это заголовком города (первая ячейка заполнена, вторая пустая)
+                is_city_header = (
+                    idx == 1
+                    and cell.value
+                    and isinstance(cell.value, str)
+                    and len(row) > 1
+                    and row[1].value is None
+                    and cell.row > 4
+                )
+
+                if is_city_header:
+                    continue  # Пропускаем заголовки городов
+
                 if (
                     cell.value
                     and not isinstance(cell.value, str)
@@ -943,13 +1067,6 @@ class ThursdayReportExporter(BaseExporter):
                         and cell.value.replace(".", "").replace(",", "").isdigit()
                     )
                 ):
-                    # Пропускаем заголовки разделов
-                    if isinstance(cell.value, str) and (
-                        "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ" in cell.value
-                        or "НЕТ ДАННЫХ ОБ ОПЛАТЕ" in cell.value
-                    ):
-                        continue
-
                     # Столбцы с датами (G, H, K, L) - по центру
                     if idx in [7, 8, 11, 12]:
                         cell.alignment = Alignment(
@@ -977,19 +1094,25 @@ class ThursdayReportExporter(BaseExporter):
                 f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
             )
 
-        # 6. Высота строк данных (пропускаем заголовки)
+        # 6. Высота строк данных и форматирование столбца "Причина"
         for row in range(5, ws.max_row + 1):
-            # Пропускаем заголовки разделов (они уже имеют высоту 25)
+            # Пропускаем заголовки городов (они уже имеют высоту 25)
             cell_value = ws.cell(row=row, column=1).value
-            if (
-                cell_value
-                and isinstance(cell_value, str)
-                and (
-                    "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ" in cell_value
-                    or "НЕТ ДАННЫХ ОБ ОПЛАТЕ" in cell_value
-                )
-            ):
+            second_cell_value = ws.cell(row=row, column=2).value
+            is_city_header = (
+                cell_value and isinstance(cell_value, str) and second_cell_value is None
+            )
+            if is_city_header:
                 continue
+
+            # Проверяем ячейку "Причина" (столбец M, индекс 13)
+            reason_cell = ws.cell(row=row, column=13)
+
+            # Если высота строки уже установлена (для строк с двумя причинами), пропускаем
+            if ws.row_dimensions[row].height and ws.row_dimensions[row].height > 20:
+                continue
+
+            # Устанавливаем стандартную высоту для обычных строк
             ws.row_dimensions[row].height = 20
 
 

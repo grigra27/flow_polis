@@ -456,7 +456,7 @@ class ReadyExportsTest(TestCase):
         self.assertEqual(end_date, "31.12.2024")
 
     def test_thursday_report_export(self):
-        """Тест четвергового отчета - экспорт неподгруженных полисов"""
+        """Тест четвергового отчета - экспорт полисов без документов и неоплаченных платежей, сгруппированных по городам"""
         # Создаем дополнительный полис с policy_uploaded=True
         uploaded_policy = Policy.objects.create(
             policy_number="UPLOADED-001",
@@ -523,16 +523,20 @@ class ReadyExportsTest(TestCase):
         ]
         self.assertEqual(headers, expected_headers)
 
-        # Проверяем наличие заголовка раздела (строка 5: 1-заголовок отчета, 2-пустая, 3-заголовки столбцов, 4-пустая, 5-раздел)
-        section_header = ws.cell(row=5, column=1).value
-        self.assertEqual(section_header, "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ")
+        # Проверяем наличие заголовка города (строка 5: 1-заголовок отчета, 2-пустая, 3-заголовки столбцов, 4-пустая, 5-город)
+        city_header = ws.cell(row=5, column=1).value
+        self.assertEqual(
+            city_header, "Филиал для экспортов"
+        )  # Название филиала из setUp
 
         # Проверяем что в отчете только неподгруженные полисы
-        # Данные начинаются с 6-й строки (1-заголовок отчета, 2-пустая, 3-заголовки столбцов, 4-пустая, 5-раздел, 6+-данные)
+        # Данные начинаются с 6-й строки (1-заголовок отчета, 2-пустая, 3-заголовки столбцов, 4-пустая, 5-город, 6+-данные)
         policy_numbers = []
         for row in range(6, ws.max_row + 1):
             policy_number = ws.cell(row=row, column=1).value
-            if policy_number and policy_number != "ПОЛИСЫ БЕЗ ДОКУМЕНТОВ":
+            # Пропускаем заголовки городов (первая ячейка заполнена, вторая пустая)
+            second_cell = ws.cell(row=row, column=2).value
+            if policy_number and second_cell is not None:
                 policy_numbers.append(policy_number)
 
         # Проверяем что READY-001 есть в отчете (policy_uploaded=False)
@@ -541,34 +545,16 @@ class ReadyExportsTest(TestCase):
         # Проверяем что UPLOADED-001 НЕТ в отчете (policy_uploaded=True)
         self.assertNotIn("UPLOADED-001", policy_numbers)
 
-        # Проверяем столбец "Причина" в разделе 1
-        # Находим строку с READY-001 в разделе 1 (до пустой строки или второго раздела)
+        # Проверяем столбец "Причина" для полиса без документов
+        # Находим строку с READY-001
         for row in range(6, ws.max_row + 1):
             cell_value = ws.cell(row=row, column=1).value
-            # Прекращаем поиск если дошли до пустой строки или нового раздела
-            if not cell_value or "НЕТ ДАННЫХ" in str(cell_value):
-                break
             if cell_value == "READY-001":
-                reason = ws.cell(
-                    row=row, column=13
-                ).value  # 13-й столбец - Причина (после добавления Филиала)
-                self.assertEqual(reason, "не подгружены документы")
+                reason = ws.cell(row=row, column=13).value  # 13-й столбец - Причина
+                self.assertIn("не подгружены документы", reason)
                 break
 
-        # Проверяем наличие второго раздела "НЕТ ДАННЫХ ОБ ОПЛАТЕ"
-        section_2_found = False
-        section_2_row = None
-        for row in range(1, ws.max_row + 1):
-            if ws.cell(row=row, column=1).value == "НЕТ ДАННЫХ ОБ ОПЛАТЕ":
-                section_2_found = True
-                section_2_row = row
-                break
-
-        self.assertTrue(
-            section_2_found, "Раздел 'НЕТ ДАННЫХ ОБ ОПЛАТЕ' должен присутствовать"
-        )
-
-        # Проверяем что в разделе 2 есть платежи без даты оплаты
+        # Проверяем что неоплаченные платежи также попадают в отчет (в том же городе)
         # (payment из setUp имеет paid_date, поэтому создадим неоплаченный)
         from apps.policies.models import PaymentSchedule
 
@@ -592,25 +578,24 @@ class ReadyExportsTest(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
 
-        # Проверяем что неоплаченный платеж есть в разделе 2
-        found_unpaid = False
-        for row in range(section_2_row + 1 if section_2_row else 1, ws.max_row + 1):
+        # Проверяем что неоплаченный платеж добавлен к той же записи (объединение)
+        # Теперь должна быть только одна строка с READY-001, но с двумя причинами
+        ready_001_count = 0
+        for row in range(6, ws.max_row + 1):
             cell_value = ws.cell(row=row, column=1).value
             if cell_value == "READY-001":
-                # Проверяем что это строка с неоплаченным платежом
-                paid_date = ws.cell(
-                    row=row, column=12
-                ).value  # 12-й столбец - Дата факт. оплаты (после добавления Филиала)
-                if not paid_date or paid_date == "":
-                    found_unpaid = True
-                    # Проверяем причину для раздела 2
-                    reason = ws.cell(
-                        row=row, column=13
-                    ).value  # 13-й столбец - Причина (после добавления Филиала)
-                    self.assertEqual(reason, "нет данных об оплате")
-                    break
+                ready_001_count += 1
+                # Проверяем причину - должны быть обе причины
+                reason = ws.cell(row=row, column=13).value  # 13-й столбец - Причина
+                self.assertIn("не подгружены документы", reason)
+                self.assertIn("нет данных об оплате", reason)
 
-        self.assertTrue(found_unpaid, "Неоплаченный платеж должен быть в разделе 2")
+        # Должна быть только одна строка с READY-001 (объединенная)
+        self.assertEqual(
+            ready_001_count,
+            1,
+            "Должна быть только одна строка с READY-001 (без дубликатов)",
+        )
 
         # Проверяем фильтрацию по дате: платеж с датой 2025-01-01 не должен попасть в отчет с датой 2024-12-31
         response_filtered = self.test_client.get(
@@ -620,24 +605,16 @@ class ReadyExportsTest(TestCase):
         wb_filtered = load_workbook(excel_file_filtered)
         ws_filtered = wb_filtered.active
 
-        # Ищем раздел 2 в отфильтрованном отчете
-        section_2_row_filtered = None
-        for row in range(1, ws_filtered.max_row + 1):
-            if ws_filtered.cell(row=row, column=1).value == "НЕТ ДАННЫХ ОБ ОПЛАТЕ":
-                section_2_row_filtered = row
-                break
-
         # Проверяем что платеж с датой 2025-01-01 НЕ попал в отчет
         found_future_payment = False
-        if section_2_row_filtered:
-            for row in range(section_2_row_filtered + 1, ws_filtered.max_row + 1):
-                cell_value = ws_filtered.cell(row=row, column=1).value
-                if cell_value == "READY-001":
-                    # Проверяем дату платежа (11-й столбец - Дата платежа по договору, после добавления Филиала)
-                    payment_date_cell = ws_filtered.cell(row=row, column=11).value
-                    if payment_date_cell == "01.01.2025":
-                        found_future_payment = True
-                        break
+        for row in range(6, ws_filtered.max_row + 1):
+            cell_value = ws_filtered.cell(row=row, column=1).value
+            if cell_value == "READY-001":
+                # Проверяем дату платежа (11-й столбец - Дата платежа по договору)
+                payment_date_cell = ws_filtered.cell(row=row, column=11).value
+                if payment_date_cell == "01.01.2025":
+                    found_future_payment = True
+                    break
 
         self.assertFalse(
             found_future_payment,

@@ -51,17 +51,17 @@ class Policy(TimeStampedModel):
         help_text="Год выпуска застрахованного имущества (1900-2100)",
     )
     vin_number = models.CharField(
-        "VIN номер",
+        "Идентификатор (обычно VIN)",
         max_length=17,
         blank=True,
         validators=[
             RegexValidator(
-                regex=r"^[A-HJ-NPR-Z0-9]{17}$",
-                message="VIN номер должен состоять из 17 символов, включающих буквы латинского алфавита (кроме I, O, Q) и цифры",
-                code="invalid_vin",
+                regex=r"^[A-Z0-9]{3,17}$",
+                message="Идентификатор должен состоять из 3-17 символов, включающих латинские буквы и цифры",
+                code="invalid_identifier",
             )
         ],
-        help_text="VIN номер транспортного средства (17 символов, латинские буквы кроме I, O, Q и цифры)",
+        help_text="Идентификатор транспортного средства (3-17 символов, латинские буквы и цифры)",
     )
     start_date = models.DateField("Дата начала страхования")
     end_date = models.DateField("Дата окончания страхования")

@@ -51,10 +51,22 @@ else
         -e POSTGRES_DB=$LOCAL_DB_NAME \
         -p $LOCAL_PORT:5432 \
         postgres:15-alpine
-    echo "Waiting for PostgreSQL to start..."
-    sleep 5
 fi
-echo "✓ PostgreSQL is running"
+
+# Wait for PostgreSQL to be ready (for both new and existing containers)
+echo "Waiting for PostgreSQL to be ready..."
+for i in {1..30}; do
+    if docker exec $LOCAL_CONTAINER pg_isready -U $LOCAL_DB_USER -h localhost > /dev/null 2>&1; then
+        echo "✓ PostgreSQL is ready"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "✗ PostgreSQL failed to start within 30 seconds"
+        exit 1
+    fi
+    echo "Waiting... ($i/30)"
+    sleep 1
+done
 echo ""
 
 # Step 4: Drop and recreate database (to ensure clean import)

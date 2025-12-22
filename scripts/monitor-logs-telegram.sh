@@ -113,18 +113,18 @@ send_error_notification() {
     local log_timestamp=$(echo "$error_line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
     local error_message=$(echo "$error_line" | sed 's/^[^]]*] *//' | cut -c1-300)
 
-    local message="🚨 <b>Log Error Detected</b>
+    local message="🚨 Log Error Detected
 
-📁 <b>Log File:</b> $log_name
-📊 <b>Level:</b> $error_level
-🕐 <b>Detected:</b> $timestamp
-📝 <b>Log Time:</b> ${log_timestamp:-Unknown}
-🖥 <b>Server:</b> $(hostname)
+📁 Log File: $log_name
+📊 Level: $error_level
+🕐 Detected: $timestamp
+📝 Log Time: ${log_timestamp:-Unknown}
+🖥 Server: $(hostname)
 
-❗ <b>Error Message:</b>
-<code>$(echo "$error_message" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</code>
+❗ Error Message:
+$error_message
 
-📋 <b>Rate Limit:</b> $last_error_count/$MAX_ERRORS_PER_HOUR per hour"
+📋 Rate Limit: $last_error_count/$MAX_ERRORS_PER_HOUR per hour"
 
     send_telegram_message "$message"
 }
@@ -201,12 +201,12 @@ run_daemon() {
 
     # Send startup notification
     if check_telegram_enabled; then
-        local message="🔍 <b>Log Monitor Started</b>
+        local message="🔍 Log Monitor Started
 
-🕐 <b>Time:</b> $(date '+%Y-%m-%d %H:%M:%S UTC')
-⏱ <b>Check Interval:</b> ${CHECK_INTERVAL}s
-📊 <b>Rate Limit:</b> $MAX_ERRORS_PER_HOUR errors/hour
-🖥 <b>Server:</b> $(hostname)
+🕐 Time: $(date '+%Y-%m-%d %H:%M:%S UTC')
+⏱ Check Interval: ${CHECK_INTERVAL}s
+📊 Rate Limit: $MAX_ERRORS_PER_HOUR errors/hour
+🖥 Server: $(hostname)
 
 Monitoring logs for ERROR and CRITICAL messages..."
 

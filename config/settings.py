@@ -337,19 +337,24 @@ LOGGING = {
             "formatter": "security",
             "filters": ["sensitive_data"],
         },
+        "telegram": {
+            "class": "apps.core.telegram_handler.TelegramHandler",
+            "level": "ERROR",
+            "filters": ["sensitive_data"],
+        },
     },
     "root": {
-        "handlers": ["console"] if DEBUG else ["console", "file"],
+        "handlers": ["console"] if DEBUG else ["console", "file", "telegram"],
         "level": "DEBUG" if DEBUG else "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console"] if DEBUG else ["console", "file"],
+            "handlers": ["console"] if DEBUG else ["console", "file", "telegram"],
             "level": "INFO",
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["console"] if DEBUG else ["console", "file"],
+            "handlers": ["console"] if DEBUG else ["console", "file", "telegram"],
             "level": "ERROR",
             "propagate": False,
         },
@@ -360,12 +365,12 @@ LOGGING = {
             "propagate": False,
         },
         "apps.reports": {
-            "handlers": ["console"] if DEBUG else ["console", "file"],
+            "handlers": ["console"] if DEBUG else ["console", "file", "telegram"],
             "level": "INFO",
             "propagate": False,
         },
         "security": {
-            "handlers": ["security_file", "console"],
+            "handlers": ["security_file", "console", "telegram"],
             "level": "INFO",
             "propagate": False,
         },

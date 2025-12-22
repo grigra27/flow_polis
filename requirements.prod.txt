@@ -27,3 +27,6 @@ whitenoise==6.6.0
 
 # Error monitoring
 sentry-sdk[django]==1.38.0
+
+# System monitoring for Telegram error notifications
+psutil==5.9.6

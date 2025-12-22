@@ -716,6 +716,171 @@ Sets up the following cron jobs:
 
 See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and restore guide.
 
+### Telegram Integration for Backups
+
+#### telegram-config.sh
+
+Configuration file for Telegram bot credentials and settings.
+
+**Configuration:**
+- `TELEGRAM_BOT_TOKEN` - Bot token from @BotFather
+- `TELEGRAM_CHAT_ID` - Chat or channel ID for notifications
+- `TELEGRAM_ENABLED` - Enable/disable notifications (true/false)
+- `TELEGRAM_UPLOAD_FILES` - Enable/disable file uploads (true/false)
+- `TELEGRAM_MAX_FILE_SIZE` - Maximum file size for upload in MB (default: 45)
+
+#### telegram-notify.sh
+
+Core Telegram notification functions for backup scripts.
+
+**Purpose:**
+Provides functions to send messages and files to Telegram.
+
+**Usage:**
+
+```bash
+# Test Telegram connection
+./scripts/telegram-notify.sh test
+
+# Send a test message
+./scripts/telegram-notify.sh send "Test message"
+
+# Upload a test file
+./scripts/telegram-notify.sh upload /path/to/file.txt "Test file"
+```
+
+**Functions:**
+- `send_telegram_message` - Send text messages with HTML formatting
+- `send_telegram_file` - Upload files to Telegram (up to 50MB)
+- `notify_backup_start` - Send backup start notification
+- `notify_backup_success` - Send backup success notification with file
+- `notify_backup_error` - Send backup error notification
+- `notify_cleanup_result` - Send cleanup results notification
+- `test_telegram_connection` - Test Telegram bot connection
+
+#### backup-db-telegram.sh
+
+Database backup script with Telegram notifications.
+
+**Purpose:**
+Same as backup-db.sh but with integrated Telegram notifications and file uploads.
+
+**Usage:**
+
+```bash
+# Create backup with Telegram notifications
+./scripts/backup-db-telegram.sh
+
+# Test Telegram connection
+./scripts/backup-db-telegram.sh --test-telegram
+
+# List backups
+./scripts/backup-db-telegram.sh --list
+
+# Cleanup old backups
+./scripts/backup-db-telegram.sh --cleanup
+```
+
+**Notifications:**
+- 🔄 Backup start notification
+- ✅ Backup success with file upload
+- ❌ Error notifications with details
+- 🧹 Cleanup results
+
+#### backup-media-telegram.sh
+
+Media files backup script with Telegram notifications.
+
+**Purpose:**
+Same as backup-media.sh but with integrated Telegram notifications and file uploads.
+
+**Usage:**
+
+```bash
+# Create backup with Telegram notifications
+./scripts/backup-media-telegram.sh
+
+# Test Telegram connection
+./scripts/backup-media-telegram.sh --test-telegram
+
+# List backups
+./scripts/backup-media-telegram.sh --list
+
+# Cleanup old backups
+./scripts/backup-media-telegram.sh --cleanup
+```
+
+**Notifications:**
+- 🔄 Backup start notification
+- ✅ Backup success with file upload
+- ❌ Error notifications with details
+- 🧹 Cleanup results
+
+#### Setting Up Telegram Backups
+
+**Step 1: Create Telegram Bot**
+1. Find @BotFather in Telegram
+2. Send `/newbot` command
+3. Follow instructions to create bot
+4. Save the bot token (keep it secure!)
+
+**Step 2: Get Chat ID**
+1. Create a private channel for backups
+2. Add bot as administrator
+3. Send a message to the channel
+4. Get chat ID from `https://api.telegram.org/bot<TOKEN>/getUpdates`
+
+**Step 3: Configure Securely**
+Use the setup script for secure configuration:
+```bash
+./scripts/setup-telegram.sh
+```
+
+This script will:
+- Prompt for bot token and chat ID
+- Update your `.env.prod` file securely
+- Test the Telegram connection
+- Provide next steps
+
+**Manual Configuration (Alternative):**
+1. Edit `.env.prod` file (NOT committed to Git)
+2. Add Telegram variables:
+   ```bash
+   TELEGRAM_BOT_TOKEN=your-bot-token-here
+   TELEGRAM_CHAT_ID=your-chat-id-here
+   TELEGRAM_ENABLED=true
+   TELEGRAM_UPLOAD_FILES=true
+   TELEGRAM_MAX_FILE_SIZE=45
+   ```
+
+**Step 4: Test**
+```bash
+./scripts/telegram-notify.sh test
+```
+
+**Step 5: Update Cron Jobs**
+Replace backup scripts in crontab with Telegram versions:
+```bash
+# Edit crontab
+crontab -e
+
+# Replace:
+# /path/to/backup-db.sh
+# With:
+# /path/to/backup-db-telegram.sh
+
+# Replace:
+# /path/to/backup-media.sh
+# With:
+# /path/to/backup-media-telegram.sh
+```
+
+**Security Notes:**
+- Bot token and chat ID are stored in `.env.prod` (not in Git)
+- Use environment variables for production deployment
+- Never commit credentials to version control
+- The setup script helps configure credentials securely
+
 ### view-logs.sh
 
 Convenient script for viewing Docker container logs with filtering and formatting options.

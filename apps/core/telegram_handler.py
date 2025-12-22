@@ -5,13 +5,19 @@ Telegram Logging Handler for Django
 import logging
 import json
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from threading import Thread
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 from django.conf import settings
 from decouple import config
+
+
+def get_moscow_time():
+    """Получает текущее время в московском часовом поясе"""
+    moscow_tz = timezone(timedelta(hours=3))
+    return datetime.now(moscow_tz)
 
 
 class TelegramHandler(logging.Handler):
@@ -111,9 +117,10 @@ class TelegramHandler(logging.Handler):
         """
         Форматирует сообщение для Telegram
         """
-        timestamp = datetime.fromtimestamp(record.created).strftime(
-            "%Y-%m-%d %H:%M:%S UTC"
-        )
+        # Конвертируем время записи в московское время
+        moscow_tz = timezone(timedelta(hours=3))
+        record_time = datetime.fromtimestamp(record.created, tz=moscow_tz)
+        timestamp = record_time.strftime("%Y-%m-%d %H:%M:%S MSK")
 
         # Базовая информация
         message_parts = [
@@ -247,7 +254,7 @@ class TelegramErrorNotifier:
         if not handler.enabled:
             return False
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = get_moscow_time().strftime("%Y-%m-%d %H:%M:%S MSK")
 
         message_parts = [
             f"🚨 {title}",
@@ -287,7 +294,7 @@ class TelegramErrorNotifier:
         if not handler.enabled:
             return False
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = get_moscow_time().strftime("%Y-%m-%d %H:%M:%S MSK")
         status_emoji = (
             "✅" if status == "healthy" else "⚠️" if status == "warning" else "❌"
         )

@@ -106,7 +106,7 @@ send_error_notification() {
         return 0
     fi
 
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
     local log_name=$(basename "$log_file")
 
     # Extract relevant parts from log line
@@ -203,7 +203,7 @@ run_daemon() {
     if check_telegram_enabled; then
         local message="🔍 Log Monitor Started
 
-🕐 Time: $(date '+%Y-%m-%d %H:%M:%S UTC')
+🕐 Time: $(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 ⏱ Check Interval: ${CHECK_INTERVAL}s
 📊 Rate Limit: $MAX_ERRORS_PER_HOUR errors/hour
 🖥 Server: $(hostname)

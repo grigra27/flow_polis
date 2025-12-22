@@ -54,12 +54,13 @@ init_state_file() {
 read_state() {
     if [ -f "$STATE_FILE" ]; then
         source "$STATE_FILE"
-    else
-        django_log_position=0
-        security_log_position=0
-        last_error_count=0
-        last_error_time=0
     fi
+
+    # Initialize variables if not set
+    django_log_position=${django_log_position:-0}
+    security_log_position=${security_log_position:-0}
+    last_error_count=${last_error_count:-0}
+    last_error_time=${last_error_time:-0}
 }
 
 # Write state to file
@@ -74,6 +75,10 @@ write_state() {
 should_notify() {
     local current_time=$(date +%s)
     local hour_ago=$((current_time - 3600))
+
+    # Initialize variables if empty
+    last_error_time=${last_error_time:-0}
+    last_error_count=${last_error_count:-0}
 
     # Reset counter if more than an hour passed
     if [ "$last_error_time" -lt "$hour_ago" ]; then

@@ -57,11 +57,11 @@ fi
 # Step 2: Check Python dependencies
 log_step "2. Проверка зависимостей Python..."
 
-# Check if psutil is available
-if python -c "import psutil" 2>/dev/null; then
-    log_info "✅ psutil уже установлен"
+# Check if psutil is available in Docker container
+if docker-compose -f docker-compose.prod.yml exec web python -c "import psutil" 2>/dev/null; then
+    log_info "✅ psutil доступен в контейнере"
 else
-    log_error "❌ psutil не найден!"
+    log_error "❌ psutil не найден в контейнере!"
     log_error "   Убедитесь что requirements.txt содержит psutil>=5.9.0"
     log_error "   И пересоберите Docker контейнер:"
     log_error "   docker-compose -f docker-compose.prod.yml build web"
@@ -73,7 +73,7 @@ log_step "3. Тестирование Django мониторинга ошибок
 
 cd "$PROJECT_DIR"
 
-if python manage.py test_telegram_errors --test-custom; then
+if docker-compose -f docker-compose.prod.yml exec web python manage.py test_telegram_errors --test-custom; then
     log_info "✅ Django мониторинг ошибок работает"
 else
     log_error "❌ Ошибка в Django мониторинге"
@@ -83,7 +83,7 @@ fi
 # Step 4: Test system health check
 log_step "4. Тестирование проверки системы..."
 
-if python manage.py system_health_check --check-all --notify-telegram; then
+if docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram; then
     log_info "✅ Проверка системы работает"
 else
     log_warn "⚠️ Проблемы с проверкой системы (не критично)"
@@ -152,7 +152,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Add health check job if not exists
     if ! grep -q "system_health_check" "$TEMP_CRON"; then
         echo "# Insurance Broker - System Health Check (every 30 minutes)" >> "$TEMP_CRON"
-        echo "*/30 * * * * cd $PROJECT_DIR && python manage.py system_health_check --check-all --notify-telegram >> $PROJECT_DIR/logs/health-check.log 2>&1" >> "$TEMP_CRON"
+        echo "*/30 * * * * cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml exec -T web python manage.py system_health_check --check-all --notify-telegram >> $PROJECT_DIR/logs/health-check.log 2>&1" >> "$TEMP_CRON"
         echo "" >> "$TEMP_CRON"
     fi
 

@@ -117,12 +117,12 @@ class TelegramHandler(logging.Handler):
 
         # Базовая информация
         message_parts = [
-            "🚨 <b>Critical Error Detected</b>",
+            "🚨 Critical Error Detected",
             "",
-            f"🕐 <b>Time:</b> {timestamp}",
-            f"📊 <b>Level:</b> {record.levelname}",
-            f"📁 <b>Module:</b> {record.module or 'unknown'}",
-            f"🖥 <b>Server:</b> {self._get_hostname()}",
+            f"🕐 Time: {timestamp}",
+            f"📊 Level: {record.levelname}",
+            f"📁 Module: {record.module or 'unknown'}",
+            f"🖥 Server: {self._get_hostname()}",
         ]
 
         # Добавляем информацию о пользователе если есть
@@ -134,9 +134,9 @@ class TelegramHandler(logging.Handler):
 
             message_parts.extend(
                 [
-                    f"👤 <b>User:</b> {user_info}",
-                    f"🌐 <b>URL:</b> {request.get_full_path()[:100]}",
-                    f"📱 <b>Method:</b> {request.method}",
+                    f"👤 User: {user_info}",
+                    f"🌐 URL: {request.get_full_path()[:100]}",
+                    f"📱 Method: {request.method}",
                 ]
             )
 
@@ -148,8 +148,8 @@ class TelegramHandler(logging.Handler):
         message_parts.extend(
             [
                 "",
-                f"❗ <b>Error:</b>",
-                f"<code>{self._escape_html(error_message)}</code>",
+                f"❗ Error:",
+                f"{error_message}",
             ]
         )
 
@@ -165,8 +165,8 @@ class TelegramHandler(logging.Handler):
             message_parts.extend(
                 [
                     "",
-                    f"📋 <b>Traceback:</b>",
-                    f"<pre>{self._escape_html(tb_text)}</pre>",
+                    f"📋 Traceback:",
+                    f"{tb_text}",
                 ]
             )
 
@@ -197,7 +197,6 @@ class TelegramHandler(logging.Handler):
             data = {
                 "chat_id": self.chat_id,
                 "text": message,
-                "parse_mode": "HTML",
                 "disable_web_page_preview": True,
             }
 
@@ -251,21 +250,21 @@ class TelegramErrorNotifier:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         message_parts = [
-            f"🚨 <b>{title}</b>",
+            f"🚨 {title}",
             "",
-            f"🕐 <b>Time:</b> {timestamp}",
-            f"🖥 <b>Server:</b> {handler._get_hostname()}",
+            f"🕐 Time: {timestamp}",
+            f"🖥 Server: {handler._get_hostname()}",
             "",
-            f"📝 <b>Message:</b>",
-            f"{handler._escape_html(message)}",
+            f"📝 Message:",
+            f"{message}",
         ]
 
         if details:
             message_parts.extend(
                 [
                     "",
-                    f"📋 <b>Details:</b>",
-                    f"<pre>{handler._escape_html(str(details))}</pre>",
+                    f"📋 Details:",
+                    f"{str(details)}",
                 ]
             )
 
@@ -294,16 +293,16 @@ class TelegramErrorNotifier:
         )
 
         message_parts = [
-            f"{status_emoji} <b>System Health Check</b>",
+            f"{status_emoji} System Health Check",
             "",
-            f"🕐 <b>Time:</b> {timestamp}",
-            f"📊 <b>Status:</b> {status.upper()}",
-            f"🖥 <b>Server:</b> {handler._get_hostname()}",
+            f"🕐 Time: {timestamp}",
+            f"📊 Status: {status.upper()}",
+            f"🖥 Server: {handler._get_hostname()}",
         ]
 
         if metrics:
             message_parts.append("")
-            message_parts.append("📈 <b>Metrics:</b>")
+            message_parts.append("📈 Metrics:")
             for key, value in metrics.items():
                 message_parts.append(f"• {key}: {value}")
 

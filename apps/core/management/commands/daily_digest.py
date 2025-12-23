@@ -2,13 +2,15 @@
 Django management команда для отправки ежедневного дайджеста в Telegram
 """
 import logging
-from datetime import datetime, timedelta, timezone as dt_timezone
+import subprocess
+import os
+from datetime import datetime, timedelta
+from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.contrib.contenttypes.models import ContentType
 from auditlog.models import LogEntry
 from apps.accounts.models import LoginAttempt
 from apps.policies.models import Policy, PaymentSchedule
-from apps.core.telegram_handler import TelegramErrorNotifier
 
 
 logger = logging.getLogger(__name__)
@@ -69,10 +71,9 @@ class Command(BaseCommand):
             # Формируем сообщение
             message = self._format_message(period_name, logins_data, policies_data)
 
-            # Отправляем в Telegram
-            success = TelegramErrorNotifier.notify_critical_error(
-                title=f"📊 Дайджест за {period_name}", message=message
-            )
+            # Отправляем в Telegram через telegram-notify.sh
+            full_message = f"📊 Дайджест за {period_name}\n\n{message}"
+            success = self._send_telegram_message(full_message)
 
             if success:
                 self.stdout.write(self.style.SUCCESS("✅ Дайджест отправлен в Telegram"))
@@ -84,6 +85,39 @@ class Command(BaseCommand):
         except Exception as e:
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
+
+    def _send_telegram_message(self, message):
+        """Отправляет сообщение через telegram-notify.sh"""
+        try:
+            # Путь к скрипту telegram-notify.sh
+            script_path = os.path.join(
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                ),
+                "scripts",
+                "telegram-notify.sh",
+            )
+
+            # Запускаем скрипт
+            result = subprocess.run(
+                [script_path, "send", message],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode == 0:
+                return True
+            else:
+                logger.error(f"Telegram script failed: {result.stderr}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            logger.error("Telegram script timeout")
+            return False
+        except Exception as e:
+            logger.error(f"Error calling telegram script: {e}")
+            return False
 
     def _get_logins_data(self, start_time, end_time):
         """Получает данные о логинах пользователей"""
@@ -99,7 +133,7 @@ class Command(BaseCommand):
         logins_list = []
         for login in successful_logins:
             # Конвертируем в московское время
-            moscow_tz = dt_timezone(timedelta(hours=3))
+            moscow_tz = timezone.get_current_timezone()
             moscow_time = login.attempt_time.astimezone(moscow_tz)
 
             logins_list.append(

@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
 from django.core.management.base import BaseCommand
 from django.contrib.contenttypes.models import ContentType
-from django_auditlog.models import LogEntry
+from auditlog.models import LogEntry
 from apps.accounts.models import LoginAttempt
 from apps.policies.models import Policy, PaymentSchedule
 from apps.core.telegram_handler import TelegramErrorNotifier

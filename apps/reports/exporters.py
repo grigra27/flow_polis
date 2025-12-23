@@ -659,14 +659,13 @@ class ThursdayReportExporter(BaseExporter):
         return [
             "Номер полиса",
             "Номер ДФА",
-            "Филиал",
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
             "Дата начала страхования",
             "Дата оконч. страхования",
             "Объект страхования",
-            "Страховая премия",
+            "Очередной взнос",
             "Дата платежа по договору",
             "Дата факт. оплаты",
             "Причина",
@@ -809,8 +808,8 @@ class ThursdayReportExporter(BaseExporter):
 
                 # Применяем форматирование к ячейке "Причина"
                 reason_cell = ws.cell(
-                    row=current_row, column=13
-                )  # 13-й столбец - Причина
+                    row=current_row, column=12
+                )  # 12-й столбец - Причина
                 reason_cell.alignment = Alignment(wrap_text=True, vertical="top")
 
                 # Увеличиваем высоту строки если есть обе причины
@@ -838,6 +837,21 @@ class ThursdayReportExporter(BaseExporter):
         self.apply_formatting(ws)
 
         return self.create_response(wb)
+
+    def format_financial_value(self, value):
+        """Форматирует финансовые данные с пробелами для лучшей читабельности"""
+        from decimal import Decimal
+
+        if value is None:
+            return ""
+
+        # Преобразуем в строку и убираем десятичные нули если они есть
+        if isinstance(value, (int, float, Decimal)):
+            # Форматируем число с разделителями тысяч (пробелами)
+            formatted = f"{value:,.0f}".replace(",", " ")
+            return formatted
+
+        return str(value)
 
     def _add_section_header(self, ws, title, num_columns):
         """Добавляет заголовок города с форматированием"""
@@ -900,14 +914,15 @@ class ThursdayReportExporter(BaseExporter):
         return [
             policy.policy_number,
             policy.dfa_number,
-            policy.branch.branch_name if policy.branch else "",
             policy.client.client_name,
             policy.insurer.insurer_name,
             policy.policyholder.client_name if policy.policyholder else "",
             self.format_value(policy.start_date),
             self.format_value(policy.end_date),
             policy.property_description,
-            self.format_value(policy.premium_total),
+            self.format_financial_value(payment_to_show.amount)
+            if payment_to_show
+            else "",
             self.format_value(payment_to_show.due_date) if payment_to_show else "",
             self.format_value(payment_to_show.paid_date) if payment_to_show else "",
             reason,
@@ -923,14 +938,13 @@ class ThursdayReportExporter(BaseExporter):
         return [
             policy.policy_number,
             policy.dfa_number,
-            policy.branch.branch_name if policy.branch else "",
             policy.client.client_name,
             policy.insurer.insurer_name,
             policy.policyholder.client_name if policy.policyholder else "",
             self.format_value(policy.start_date),
             self.format_value(policy.end_date),
             policy.property_description,
-            self.format_value(policy.premium_total),
+            self.format_financial_value(payment.amount),
             self.format_value(payment.due_date),
             self.format_value(payment.paid_date),
             reason,
@@ -977,7 +991,8 @@ class ThursdayReportExporter(BaseExporter):
         if "not_paid" in reasons:
             reason_texts.append("• нет данных об оплате")
 
-        return "\n".join(reason_texts)
+        # Используем chr(10) для корректного отображения переноса строки в Excel
+        return chr(10).join(reason_texts)
 
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
@@ -988,17 +1003,16 @@ class ThursdayReportExporter(BaseExporter):
         column_widths = {
             "A": 15,  # Номер полиса
             "B": 15,  # Номер ДФА
-            "C": None,  # Филиал - автоподгонка
-            "D": None,  # Лизингополучатель - автоподгонка
-            "E": 20,  # Страховщик - фиксированная ширина
-            "F": None,  # Страхователь - автоподгонка
-            "G": 13,  # Дата начала страхования
-            "H": 13,  # Дата окончания страхования
-            "I": None,  # Объект страхования - автоподгонка с большим лимитом
-            "J": 16,  # Страховая премия
-            "K": 13,  # Дата платежа по договору
-            "L": 13,  # Дата фактической оплаты
-            "M": 30,  # Причина - увеличена ширина
+            "C": None,  # Лизингополучатель - автоподгонка
+            "D": 20,  # Страховщик - фиксированная ширина
+            "E": None,  # Страхователь - автоподгонка
+            "F": 13,  # Дата начала страхования
+            "G": 13,  # Дата окончания страхования
+            "H": None,  # Объект страхования - автоподгонка с большим лимитом
+            "I": 16,  # Очередной взнос
+            "J": 13,  # Дата платежа по договору
+            "K": 13,  # Дата фактической оплаты
+            "L": 30,  # Причина - увеличена ширина
         }
 
         from openpyxl.utils import get_column_letter
@@ -1027,15 +1041,15 @@ class ThursdayReportExporter(BaseExporter):
 
                 adjusted_width = max_length + 2
 
-                if column_letter == "I":  # Объект страхования (теперь столбец I)
+                if column_letter == "H":  # Объект страхования (теперь столбец H)
                     adjusted_width = min(max(adjusted_width, 12), 60)
                 else:
                     adjusted_width = min(max(adjusted_width, 10), 50)
 
                 ws.column_dimensions[column_letter].width = adjusted_width
 
-        # 2. Перенос текста для столбца "Объект страхования" (I)
-        for cell in ws["I"]:
+        # 2. Перенос текста для столбца "Объект страхования" (H)
+        for cell in ws["H"]:
             if (
                 cell.row > 3
             ):  # Пропускаем заголовок отчета, пустую строку и заголовки столбцов
@@ -1067,13 +1081,13 @@ class ThursdayReportExporter(BaseExporter):
                         and cell.value.replace(".", "").replace(",", "").isdigit()
                     )
                 ):
-                    # Столбцы с датами (G, H, K, L) - по центру
-                    if idx in [7, 8, 11, 12]:
+                    # Столбцы с датами (F, G, J, K) - по центру
+                    if idx in [6, 7, 10, 11]:
                         cell.alignment = Alignment(
                             horizontal="center", vertical="center"
                         )
-                    # Столбцы с суммами (J) - справа
-                    elif idx == 10:
+                    # Столбцы с суммами (I) - справа
+                    elif idx == 9:
                         cell.alignment = Alignment(
                             horizontal="right", vertical="center"
                         )

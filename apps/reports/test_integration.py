@@ -509,14 +509,13 @@ class ReadyExportsTest(TestCase):
         expected_headers = [
             "Номер полиса",
             "Номер ДФА",
-            "Филиал",
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
             "Дата начала страхования",
             "Дата оконч. страхования",
             "Объект страхования",
-            "Страховая премия",
+            "Очередной взнос",
             "Дата платежа по договору",
             "Дата факт. оплаты",
             "Причина",
@@ -550,7 +549,7 @@ class ReadyExportsTest(TestCase):
         for row in range(6, ws.max_row + 1):
             cell_value = ws.cell(row=row, column=1).value
             if cell_value == "READY-001":
-                reason = ws.cell(row=row, column=13).value  # 13-й столбец - Причина
+                reason = ws.cell(row=row, column=12).value  # 12-й столбец - Причина
                 self.assertIn("не подгружены документы", reason)
                 break
 
@@ -586,7 +585,7 @@ class ReadyExportsTest(TestCase):
             if cell_value == "READY-001":
                 ready_001_count += 1
                 # Проверяем причину - должны быть обе причины
-                reason = ws.cell(row=row, column=13).value  # 13-й столбец - Причина
+                reason = ws.cell(row=row, column=12).value  # 12-й столбец - Причина
                 self.assertIn("не подгружены документы", reason)
                 self.assertIn("нет данных об оплате", reason)
 

@@ -156,12 +156,20 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "" >> "$TEMP_CRON"
     fi
 
+    # Add daily digest job if not exists
+    if ! grep -q "daily_digest" "$TEMP_CRON"; then
+        echo "# Insurance Broker - Daily Digest (every day at 6:00 AM MSK)" >> "$TEMP_CRON"
+        echo "0 3 * * * cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml exec -T web python manage.py daily_digest >> $PROJECT_DIR/logs/daily-digest.log 2>&1" >> "$TEMP_CRON"
+        echo "" >> "$TEMP_CRON"
+    fi
+
     # Install new crontab
     crontab "$TEMP_CRON"
     rm "$TEMP_CRON"
 
     log_info "✅ Cron задачи добавлены"
     log_info "   Проверка системы каждые 30 минут"
+    log_info "   Ежедневный дайджест в 6:00 МСК"
 else
     log_info "Пропускаем настройку cron задач"
 fi
@@ -194,12 +202,14 @@ echo "   • Django logging handler для автоматических увед
 echo "   • Команды для тестирования и мониторинга системы"
 echo "   • Мониторинг файлов логов в реальном времени"
 echo "   • Rate limiting для предотвращения спама"
+echo "   • Ежедневный дайджест в 6:00 МСК"
 echo ""
 
 log_info "📋 Полезные команды:"
 echo "   # Тестирование"
-echo "   python manage.py test_telegram_errors --test-error"
-echo "   python manage.py system_health_check --check-all --notify-telegram"
+echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py test_telegram_errors --test-error"
+echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram"
+echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py daily_digest --test"
 echo "   ./scripts/monitor-logs-telegram.sh --status"
 echo ""
 echo "   # Мониторинг"

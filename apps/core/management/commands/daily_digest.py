@@ -108,6 +108,7 @@ class Command(BaseCommand):
             data = {
                 "chat_id": chat_id,
                 "text": message,
+                "parse_mode": "Markdown",
                 "disable_web_page_preview": True,
             }
 
@@ -290,10 +291,11 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Делаем номер ДФА кликабельной ссылкой
+                policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
-                message_parts.append(f"  👉 {item['url']}")
 
         # Обновленные полисы
         if policies_data["updated"]:
@@ -305,10 +307,11 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Делаем номер ДФА кликабельной ссылкой
+                policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
-                message_parts.append(f"  👉 {item['url']}")
 
         # Изменения платежей
         if policies_data["payment_changes"]:
@@ -320,10 +323,11 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Делаем номер ДФА кликабельной ссылкой
+                policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
-                message_parts.append(f"  👉 {item['url']}")
                 # Показываем количество измененных платежей
                 changes_count = len(item["changes"])
                 message_parts.append(f"  💳 Платежей изменено: {changes_count}")

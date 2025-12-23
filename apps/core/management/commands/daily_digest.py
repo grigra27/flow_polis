@@ -283,7 +283,7 @@ class Command(BaseCommand):
             for item in policies_data["created"]:
                 policy = item["policy"]
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.name}"
+                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
 
@@ -294,7 +294,7 @@ class Command(BaseCommand):
             for item in policies_data["updated"]:
                 policy = item["policy"]
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.name}"
+                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
 
@@ -305,7 +305,7 @@ class Command(BaseCommand):
             for item in policies_data["payment_changes"]:
                 policy = item["policy"]
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.name}"
+                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
                 # Показываем количество измененных платежей

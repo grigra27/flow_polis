@@ -2,8 +2,6 @@
 Django management команда для отправки ежедневного дайджеста в Telegram
 """
 import logging
-import subprocess
-import os
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.management.base import BaseCommand
@@ -87,30 +85,53 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
 
     def _send_telegram_message(self, message):
-        """Отправляет сообщение через telegram-notify.sh"""
+        """Отправляет сообщение в Telegram через Python (без curl)"""
         try:
-            # Путь к скрипту telegram-notify.sh (из контейнера)
-            script_path = "/app/scripts/telegram-notify.sh"
+            from urllib.parse import urlencode
+            from urllib.request import urlopen, Request
+            from decouple import config
 
-            # Запускаем скрипт
-            result = subprocess.run(
-                [script_path, "send", message],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+            # Получаем настройки Telegram
+            bot_token = config("TELEGRAM_BOT_TOKEN", default="")
+            chat_id = config("TELEGRAM_CHAT_ID", default="")
+            enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
 
-            if result.returncode == 0:
-                return True
-            else:
-                logger.error(f"Telegram script failed: {result.stderr}")
+            if not enabled or not bot_token or not chat_id:
+                logger.error("Telegram not configured")
                 return False
 
-        except subprocess.TimeoutExpired:
-            logger.error("Telegram script timeout")
-            return False
+            # Подготавливаем данные
+            data = {
+                "chat_id": chat_id,
+                "text": message,
+                "disable_web_page_preview": True,
+            }
+
+            # Кодируем данные
+            encoded_data = urlencode(data).encode("utf-8")
+
+            # Создаем запрос
+            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            request = Request(
+                api_url,
+                data=encoded_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+            # Отправляем запрос
+            with urlopen(request, timeout=10) as response:
+                import json
+
+                result = json.loads(response.read().decode("utf-8"))
+
+                if result.get("ok"):
+                    return True
+                else:
+                    logger.error(f"Telegram API error: {result}")
+                    return False
+
         except Exception as e:
-            logger.error(f"Error calling telegram script: {e}")
+            logger.error(f"Error sending telegram message: {e}")
             return False
 
     def _get_logins_data(self, start_time, end_time):

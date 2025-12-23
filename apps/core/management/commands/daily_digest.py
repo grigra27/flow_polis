@@ -42,7 +42,9 @@ class Command(BaseCommand):
             # Конкретная дата
             try:
                 target_date = datetime.strptime(options["date"], "%Y-%m-%d").date()
-                start_time = datetime.combine(target_date, datetime.min.time())
+                start_time = timezone.make_aware(
+                    datetime.combine(target_date, datetime.min.time())
+                )
                 end_time = start_time + timedelta(days=1)
                 period_name = target_date.strftime("%d.%m.%Y")
             except ValueError:
@@ -52,8 +54,10 @@ class Command(BaseCommand):
                 return
         else:
             # По умолчанию - вчерашний день
-            yesterday = datetime.now().date() - timedelta(days=1)
-            start_time = datetime.combine(yesterday, datetime.min.time())
+            yesterday = timezone.now().date() - timedelta(days=1)
+            start_time = timezone.make_aware(
+                datetime.combine(yesterday, datetime.min.time())
+            )
             end_time = start_time + timedelta(days=1)
             period_name = yesterday.strftime("%d.%m.%Y")
 
@@ -282,8 +286,12 @@ class Command(BaseCommand):
             message_parts.append("🆕 Созданы:")
             for item in policies_data["created"]:
                 policy = item["policy"]
+                # Используем номер ДФА если есть, иначе номер полиса
+                policy_number = (
+                    policy.dfa_number if policy.dfa_number else policy.policy_number
+                )
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
 
@@ -293,8 +301,12 @@ class Command(BaseCommand):
             message_parts.append("✏️ Изменены:")
             for item in policies_data["updated"]:
                 policy = item["policy"]
+                # Используем номер ДФА если есть, иначе номер полиса
+                policy_number = (
+                    policy.dfa_number if policy.dfa_number else policy.policy_number
+                )
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
 
@@ -304,8 +316,12 @@ class Command(BaseCommand):
             message_parts.append("💰 Изменены платежи:")
             for item in policies_data["payment_changes"]:
                 policy = item["policy"]
+                # Используем номер ДФА если есть, иначе номер полиса
+                policy_number = (
+                    policy.dfa_number if policy.dfa_number else policy.policy_number
+                )
                 message_parts.append(
-                    f"• {policy.policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_number} | {policy.client.client_name} | {policy.insurer.insurer_name}"
                 )
                 message_parts.append(f"  👉 {item['url']}")
                 # Показываем количество измененных платежей

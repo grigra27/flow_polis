@@ -45,21 +45,16 @@ check_telegram_enabled() {
 # Send text message to Telegram
 send_telegram_message() {
     local message="$1"
-    local parse_mode="${2:-HTML}"
+    local parse_mode="${2:-}"
 
     if ! check_telegram_enabled; then
         return 0
     fi
 
-    # Escape special characters for HTML
-    if [ "$parse_mode" = "HTML" ]; then
-        message=$(echo "$message" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
-    fi
-
+    # Use simple text format to avoid HTML parsing issues
     local response=$(curl -s -X POST "$TELEGRAM_API_URL/sendMessage" \
         -d "chat_id=$TELEGRAM_CHAT_ID" \
         -d "text=$message" \
-        -d "parse_mode=$parse_mode" \
         -d "disable_web_page_preview=true")
 
     if echo "$response" | grep -q '"ok":true'; then
@@ -155,13 +150,13 @@ send_telegram_file() {
 # Send backup start notification
 notify_backup_start() {
     local backup_type="$1"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
 
-    local message="🔄 <b>Backup Started</b>
+    local message="🔄 Backup Started
 
-📋 <b>Type:</b> $backup_type
-🕐 <b>Time:</b> $timestamp
-🖥 <b>Server:</b> $(hostname)
+📋 Type: $backup_type
+🕐 Time: $timestamp
+🖥 Server: $(hostname)
 
 Starting backup process..."
 
@@ -174,16 +169,16 @@ notify_backup_success() {
     local file_path="$2"
     local file_size="$3"
     local duration="$4"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
 
-    local message="✅ <b>Backup Completed Successfully</b>
+    local message="✅ Backup Completed Successfully
 
-📋 <b>Type:</b> $backup_type
-🕐 <b>Completed:</b> $timestamp
-📁 <b>File:</b> $(basename "$file_path")
-📊 <b>Size:</b> $file_size
-⏱ <b>Duration:</b> $duration
-🖥 <b>Server:</b> $(hostname)"
+📋 Type: $backup_type
+🕐 Completed: $timestamp
+📁 File: $(basename "$file_path")
+📊 Size: $file_size
+⏱ Duration: $duration
+🖥 Server: $(hostname)"
 
     send_telegram_message "$message"
 
@@ -198,14 +193,14 @@ notify_backup_success() {
 notify_backup_error() {
     local backup_type="$1"
     local error_message="$2"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
 
-    local message="❌ <b>Backup Failed</b>
+    local message="❌ Backup Failed
 
-📋 <b>Type:</b> $backup_type
-🕐 <b>Time:</b> $timestamp
-🖥 <b>Server:</b> $(hostname)
-❗ <b>Error:</b> $error_message
+📋 Type: $backup_type
+🕐 Time: $timestamp
+🖥 Server: $(hostname)
+❗ Error: $error_message
 
 Please check the logs for more details."
 
@@ -217,15 +212,15 @@ notify_cleanup_result() {
     local backup_type="$1"
     local deleted_count="$2"
     local retention_days="$3"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
 
-    local message="🧹 <b>Cleanup Completed</b>
+    local message="🧹 Cleanup Completed
 
-📋 <b>Type:</b> $backup_type
-🕐 <b>Time:</b> $timestamp
-🗑 <b>Deleted:</b> $deleted_count old backup(s)
-📅 <b>Retention:</b> $retention_days days
-🖥 <b>Server:</b> $(hostname)"
+📋 Type: $backup_type
+🕐 Time: $timestamp
+🗑 Deleted: $deleted_count old backup(s)
+📅 Retention: $retention_days days
+🖥 Server: $(hostname)"
 
     send_telegram_message "$message"
 }
@@ -239,12 +234,12 @@ test_telegram_connection() {
         return 1
     fi
 
-    local test_message="🧪 <b>Test Message</b>
+    local test_message="🧪 Test Message
 
 This is a test message from Insurance Broker backup system.
 
-🕐 <b>Time:</b> $(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
-🖥 <b>Server:</b> $(hostname)
+🕐 Time: $(date '+%Y-%m-%d %H:%M:%S UTC')
+🖥 Server: $(hostname)
 
 If you receive this message, Telegram notifications are working correctly! ✅"
 

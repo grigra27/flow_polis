@@ -89,14 +89,8 @@ class Command(BaseCommand):
     def _send_telegram_message(self, message):
         """Отправляет сообщение через telegram-notify.sh"""
         try:
-            # Путь к скрипту telegram-notify.sh
-            script_path = os.path.join(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                ),
-                "scripts",
-                "telegram-notify.sh",
-            )
+            # Путь к скрипту telegram-notify.sh (из контейнера)
+            script_path = "/app/scripts/telegram-notify.sh"
 
             # Запускаем скрипт
             result = subprocess.run(

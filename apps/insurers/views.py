@@ -53,16 +53,27 @@ class InsurerListView(LoginRequiredMixin, ListView):
 
         # Calculate percentages for insurance types
         type_distribution = []
-        colors = ["#0d6efd", "#198754", "#ffc107", "#dc3545", "#6610f2", "#20c997"]
 
-        for idx, stat in enumerate(type_stats):
+        # Фиксированные цвета для видов страхования
+        insurance_type_colors = {
+            "КАСКО": "#3498db",  # синий (оставляем как есть)
+            "Спецтехника": "#ff8c00",  # оранжевый
+            "Имущество": "#dc3545",  # красный
+            "Грузы": "#228b22",  # темно-зеленый
+        }
+        default_color = "#95a5a6"  # серый цвет для неизвестных видов
+
+        for stat in type_stats:
             percentage = (stat["count"] / active_count * 100) if active_count > 0 else 0
+            insurance_type_name = stat["insurance_type__name"]
+            color = insurance_type_colors.get(insurance_type_name, default_color)
+
             type_distribution.append(
                 {
-                    "name": stat["insurance_type__name"],
+                    "name": insurance_type_name,
                     "count": stat["count"],
                     "percentage": round(percentage, 1),
-                    "color": colors[idx % len(colors)],
+                    "color": color,
                 }
             )
 

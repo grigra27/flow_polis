@@ -150,7 +150,7 @@ send_telegram_file() {
 # Send backup start notification
 notify_backup_start() {
     local backup_type="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 
     local message="🔄 Backup Started
 
@@ -169,7 +169,7 @@ notify_backup_success() {
     local file_path="$2"
     local file_size="$3"
     local duration="$4"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 
     local message="✅ Backup Completed Successfully
 
@@ -193,7 +193,7 @@ notify_backup_success() {
 notify_backup_error() {
     local backup_type="$1"
     local error_message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 
     local message="❌ Backup Failed
 
@@ -212,7 +212,7 @@ notify_cleanup_result() {
     local backup_type="$1"
     local deleted_count="$2"
     local retention_days="$3"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 
     local message="🧹 Cleanup Completed
 
@@ -238,7 +238,7 @@ test_telegram_connection() {
 
 This is a test message from Insurance Broker backup system.
 
-🕐 Time: $(date '+%Y-%m-%d %H:%M:%S UTC')
+🕐 Time: $(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 🖥 Server: $(hostname)
 
 If you receive this message, Telegram notifications are working correctly! ✅"

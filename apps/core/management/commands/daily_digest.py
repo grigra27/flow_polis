@@ -88,89 +88,17 @@ class Command(BaseCommand):
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
 
-    def _escape_markdown(self, text):
-        """Экранирует специальные символы для Markdown"""
+    def _escape_markdown_text(self, text):
+        """Экранирует специальные символы для Markdown (только для обычного текста)"""
         if not text:
             return text
 
-        # Экранируем символы которые имеют специальное значение в Markdown
-        escape_chars = [
-            "_",
-            "*",
-            "[",
-            "]",
-            "(",
-            ")",
-            "~",
-            "`",
-            ">",
-            "#",
-            "+",
-            "-",
-            "=",
-            "|",
-            "{",
-            "}",
-            ".",
-            "!",
-        ]
+        # Экранируем только критически важные символы
+        escape_chars = ["_", "*", "`", "[", "]"]
+        result = str(text)
         for char in escape_chars:
-            text = str(text).replace(char, f"\\{char}")
-        return text
-
-    def _send_telegram_message(self, message):
-        """Отправляет сообщение в Telegram через Python (без curl)"""
-        try:
-            from urllib.parse import urlencode
-            from urllib.request import urlopen, Request
-            from decouple import config
-
-            # Получаем настройки Telegram
-            bot_token = config("TELEGRAM_BOT_TOKEN", default="")
-            chat_id = config("TELEGRAM_CHAT_ID", default="")
-            enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
-
-            if not enabled or not bot_token or not chat_id:
-                logger.error("Telegram not configured")
-                return False
-
-            # Логируем сообщение для отладки
-            logger.info(f"Sending message to Telegram (length: {len(message)})")
-
-            # Подготавливаем данные
-            data = {
-                "chat_id": chat_id,
-                "text": message,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True,
-            }
-
-            # Кодируем данные
-            encoded_data = urlencode(data).encode("utf-8")
-
-            # Создаем запрос
-            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            request = Request(
-                api_url,
-                data=encoded_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-
-            # Отправляем запрос
-            with urlopen(request, timeout=10) as response:
-                import json
-
-                result = json.loads(response.read().decode("utf-8"))
-
-                if result.get("ok"):
-                    return True
-                else:
-                    logger.error(f"Telegram API error: {result}")
-                    return False
-
-        except Exception as e:
-            logger.error(f"Error sending telegram message: {e}")
-            return False
+            result = result.replace(char, f"\\{char}")
+        return result
 
     def _get_logins_data(self, start_time, end_time):
         """Получает данные о логинах пользователей"""
@@ -298,7 +226,13 @@ class Command(BaseCommand):
         return policies_data
 
     def _format_message(self, period_name, logins_data, policies_data):
-        """Форматирует сообщение для отправки"""
+        """Форматирует сообщение для отправки с отладкой"""
+        print(f"DEBUG: Formatting message for period: {period_name}")
+        print(f"DEBUG: Logins count: {len(logins_data)}")
+        print(f"DEBUG: Policies created: {len(policies_data['created'])}")
+        print(f"DEBUG: Policies updated: {len(policies_data['updated'])}")
+        print(f"DEBUG: Payment changes: {len(policies_data['payment_changes'])}")
+
         message_parts = []
 
         # Логины пользователей
@@ -318,64 +252,98 @@ class Command(BaseCommand):
         if policies_data["created"]:
             message_parts.append("")
             message_parts.append("🆕 Созданы:")
-            for item in policies_data["created"]:
+            for i, item in enumerate(policies_data["created"]):
                 policy = item["policy"]
+                print(f"DEBUG: Processing created policy {i+1}: ID={policy.pk}")
+
                 # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в номере ДФА и именах
-                escaped_policy_number = self._escape_markdown(policy_number)
-                client_name = self._escape_markdown(policy.client.client_name)
-                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+                # Защита от None значений
+                policy_number = policy_number or f"Policy-{policy.pk}"
+                client_name = policy.client.client_name or "Неизвестный клиент"
+                insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{escaped_policy_number}]({item['url']})"
-                message_parts.append(
-                    f"• {policy_link} | {client_name} | {insurer_name}"
+                print(
+                    f"DEBUG: Policy number: '{policy_number}' (type: {type(policy_number)})"
                 )
+                print(f"DEBUG: Client name: '{client_name}'")
+                print(f"DEBUG: Insurer name: '{insurer_name}'")
+
+                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
+                client_name = self._escape_markdown_text(client_name)
+                insurer_name = self._escape_markdown_text(insurer_name)
+
+                print(f"DEBUG: Escaped client name: '{client_name}'")
+                print(f"DEBUG: Escaped insurer name: '{insurer_name}'")
+
+                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
+                policy_link = f"[{policy_number}]({item['url']})"
+                print(f"DEBUG: Policy link: '{policy_link}'")
+
+                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                print(f"DEBUG: Final line: '{line}'")
+                message_parts.append(line)
 
         # Обновленные полисы
         if policies_data["updated"]:
             message_parts.append("")
             message_parts.append("✏️ Изменены:")
-            for item in policies_data["updated"]:
+            for i, item in enumerate(policies_data["updated"]):
                 policy = item["policy"]
+                print(f"DEBUG: Processing updated policy {i+1}: ID={policy.pk}")
+
                 # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в номере ДФА и именах
-                escaped_policy_number = self._escape_markdown(policy_number)
-                client_name = self._escape_markdown(policy.client.client_name)
-                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+                # Защита от None значений
+                policy_number = policy_number or f"Policy-{policy.pk}"
+                client_name = policy.client.client_name or "Неизвестный клиент"
+                insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{escaped_policy_number}]({item['url']})"
-                message_parts.append(
-                    f"• {policy_link} | {client_name} | {insurer_name}"
-                )
+                print(f"DEBUG: Policy number: '{policy_number}'")
+
+                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
+                client_name = self._escape_markdown_text(client_name)
+                insurer_name = self._escape_markdown_text(insurer_name)
+
+                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
+                policy_link = f"[{policy_number}]({item['url']})"
+                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                print(f"DEBUG: Updated policy line: '{line}'")
+                message_parts.append(line)
 
         # Изменения платежей
         if policies_data["payment_changes"]:
             message_parts.append("")
             message_parts.append("💰 Изменены платежи:")
-            for item in policies_data["payment_changes"]:
+            for i, item in enumerate(policies_data["payment_changes"]):
                 policy = item["policy"]
+                print(f"DEBUG: Processing payment change {i+1}: ID={policy.pk}")
+
                 # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в номере ДФА и именах
-                escaped_policy_number = self._escape_markdown(policy_number)
-                client_name = self._escape_markdown(policy.client.client_name)
-                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+                # Защита от None значений
+                policy_number = policy_number or f"Policy-{policy.pk}"
+                client_name = policy.client.client_name or "Неизвестный клиент"
+                insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{escaped_policy_number}]({item['url']})"
-                message_parts.append(
-                    f"• {policy_link} | {client_name} | {insurer_name}"
-                )
+                print(f"DEBUG: Payment policy number: '{policy_number}'")
+
+                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
+                client_name = self._escape_markdown_text(client_name)
+                insurer_name = self._escape_markdown_text(insurer_name)
+
+                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
+                policy_link = f"[{policy_number}]({item['url']})"
+                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                print(f"DEBUG: Payment change line: '{line}'")
+                message_parts.append(line)
+
                 # Показываем количество измененных платежей
                 changes_count = len(item["changes"])
                 message_parts.append(f"  💳 Платежей изменено: {changes_count}")
@@ -390,4 +358,106 @@ class Command(BaseCommand):
         ):
             message_parts.append("Изменений не было")
 
-        return "\n".join(message_parts)
+        final_message = "\n".join(message_parts)
+        print(f"DEBUG: Final message length: {len(final_message)}")
+        print(f"DEBUG: Final message preview: {repr(final_message[:300])}")
+
+        return final_message
+
+    def _send_telegram_message(self, message):
+        """Отправляет сообщение в Telegram через Python с детальной отладкой"""
+        try:
+            from urllib.parse import urlencode
+            from urllib.request import urlopen, Request, HTTPError
+            from decouple import config
+            import json
+
+            # Получаем настройки Telegram
+            bot_token = config("TELEGRAM_BOT_TOKEN", default="")
+            chat_id = config("TELEGRAM_CHAT_ID", default="")
+            enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
+
+            print(
+                f"DEBUG: Telegram config - enabled: {enabled}, has_token: {bool(bot_token)}, has_chat_id: {bool(chat_id)}"
+            )
+
+            if not enabled or not bot_token or not chat_id:
+                logger.error("Telegram not configured")
+                return False
+
+            # Детальная отладка сообщения
+            print(f"DEBUG: Message length: {len(message)}")
+            print(f"DEBUG: Message preview (first 200 chars): {repr(message[:200])}")
+
+            # Проверяем на проблемные символы
+            problematic_chars = []
+            for i, char in enumerate(message):
+                if ord(char) > 127:  # Non-ASCII символы
+                    problematic_chars.append((i, char, ord(char)))
+
+            if problematic_chars:
+                print(f"DEBUG: Found {len(problematic_chars)} non-ASCII characters")
+                for pos, char, code in problematic_chars[:10]:  # Показываем первые 10
+                    print(f"  Position {pos}: '{char}' (code: {code})")
+
+            # Подготавливаем данные
+            data = {
+                "chat_id": chat_id,
+                "text": message,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True,
+            }
+
+            print(f"DEBUG: Request data keys: {list(data.keys())}")
+            print(f"DEBUG: Parse mode: {data['parse_mode']}")
+
+            # Кодируем данные
+            encoded_data = urlencode(data).encode("utf-8")
+            print(f"DEBUG: Encoded data length: {len(encoded_data)}")
+
+            # Создаем запрос
+            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            request = Request(
+                api_url,
+                data=encoded_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+
+            print(f"DEBUG: API URL: {api_url[:50]}...")
+            print(f"DEBUG: Request headers: {request.headers}")
+
+            # Отправляем запрос
+            try:
+                with urlopen(request, timeout=10) as response:
+                    response_data = response.read().decode("utf-8")
+                    print(f"DEBUG: Response status: {response.status}")
+                    print(f"DEBUG: Response data: {response_data}")
+
+                    result = json.loads(response_data)
+
+                    if result.get("ok"):
+                        print("DEBUG: Message sent successfully!")
+                        return True
+                    else:
+                        print(f"DEBUG: Telegram API returned error: {result}")
+                        logger.error(f"Telegram API error: {result}")
+                        return False
+
+            except HTTPError as e:
+                print(f"DEBUG: HTTP Error {e.code}: {e.reason}")
+                if hasattr(e, "read"):
+                    error_body = e.read().decode("utf-8")
+                    print(f"DEBUG: Error response body: {error_body}")
+                    try:
+                        error_json = json.loads(error_body)
+                        print(f"DEBUG: Parsed error JSON: {error_json}")
+                    except:
+                        pass
+                raise e
+
+        except Exception as e:
+            print(
+                f"DEBUG: Exception in _send_telegram_message: {type(e).__name__}: {e}"
+            )
+            logger.error(f"Error sending telegram message: {e}")
+            return False

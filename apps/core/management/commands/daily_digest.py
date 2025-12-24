@@ -100,6 +100,19 @@ class Command(BaseCommand):
             result = result.replace(char, f"\\{char}")
         return result
 
+    def _escape_html_text(self, text):
+        """Экранирует специальные символы для HTML"""
+        if not text:
+            return text
+
+        # Экранируем HTML символы
+        result = str(text)
+        result = result.replace("&", "&amp;")
+        result = result.replace("<", "&lt;")
+        result = result.replace(">", "&gt;")
+        result = result.replace('"', "&quot;")
+        return result
+
     def _clean_policy_number_for_link(self, policy_number):
         """Очищает номер ДФА для использования в Markdown ссылке"""
         if not policy_number:
@@ -313,23 +326,18 @@ class Command(BaseCommand):
                 print(f"DEBUG: Client name: '{client_name}'")
                 print(f"DEBUG: Insurer name: '{insurer_name}'")
 
-                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
-                client_name = self._escape_markdown_text(client_name)
-                insurer_name = self._escape_markdown_text(insurer_name)
+                # НЕ экранируем имена - используем plain text как в остальном проекте
+                client_name = client_name
+                insurer_name = insurer_name
 
-                print(f"DEBUG: Escaped client name: '{client_name}'")
-                print(f"DEBUG: Escaped insurer name: '{insurer_name}'")
+                print(f"DEBUG: Client name: '{client_name}'")
+                print(f"DEBUG: Insurer name: '{insurer_name}'")
 
-                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
-                cleaned_policy_number = self._clean_policy_number_for_link(
-                    policy_number
-                )
-                policy_link = f"[{cleaned_policy_number}]({item['url']})"
-                print(f"DEBUG: Policy link: '{policy_link}'")
-
-                # Временно убираем Markdown ссылки для тестирования
+                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
-                print(f"DEBUG: Final line: '{line}'")
+                print(f"DEBUG: Policy line: '{line}'")
+                print(f"DEBUG: Policy URL: '{item['url']}'")
+
                 message_parts.append(line)
                 message_parts.append(f"  🔗 {item['url']}")
 
@@ -352,16 +360,11 @@ class Command(BaseCommand):
 
                 print(f"DEBUG: Policy number: '{policy_number}'")
 
-                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
-                client_name = self._escape_markdown_text(client_name)
-                insurer_name = self._escape_markdown_text(insurer_name)
+                # НЕ экранируем имена - используем plain text как в остальном проекте
+                client_name = client_name
+                insurer_name = insurer_name
 
-                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
-                cleaned_policy_number = self._clean_policy_number_for_link(
-                    policy_number
-                )
-                policy_link = f"[{cleaned_policy_number}]({item['url']})"
-                # Временно убираем Markdown ссылки для тестирования
+                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Updated policy line: '{line}'")
                 message_parts.append(line)
@@ -386,16 +389,11 @@ class Command(BaseCommand):
 
                 print(f"DEBUG: Payment policy number: '{policy_number}'")
 
-                # Экранируем только имена клиентов и страховщиков (не номер ДФА в ссылке)
-                client_name = self._escape_markdown_text(client_name)
-                insurer_name = self._escape_markdown_text(insurer_name)
+                # НЕ экранируем имена - используем plain text как в остальном проекте
+                client_name = client_name
+                insurer_name = insurer_name
 
-                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
-                cleaned_policy_number = self._clean_policy_number_for_link(
-                    policy_number
-                )
-                policy_link = f"[{cleaned_policy_number}]({item['url']})"
-                # Временно убираем Markdown ссылки для тестирования
+                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Payment change line: '{line}'")
                 message_parts.append(line)
@@ -473,16 +471,20 @@ class Command(BaseCommand):
                 for pos, char, code in problematic_chars[:10]:  # Показываем первые 10
                     print(f"  Position {pos}: '{char}' (code: {code})")
 
-            # Подготавливаем данные БЕЗ Markdown для тестирования
+            # Подготавливаем данные БЕЗ parse_mode (как в остальном проекте)
             data = {
                 "chat_id": chat_id,
                 "text": message,
-                # "parse_mode": "Markdown",  # Временно отключаем
                 "disable_web_page_preview": True,
             }
 
             print(f"DEBUG: Request data keys: {list(data.keys())}")
-            print(f"DEBUG: Parse mode: {data['parse_mode']}")
+            if "parse_mode" in data:
+                print(f"DEBUG: Parse mode: {data['parse_mode']}")
+            else:
+                print(
+                    f"DEBUG: No parse mode (plain text) - совместимо с остальным проектом"
+                )
 
             # Кодируем данные
             encoded_data = urlencode(data).encode("utf-8")

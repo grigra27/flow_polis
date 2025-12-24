@@ -267,7 +267,9 @@ class PaymentSchedule(TimeStampedModel):
     )
 
     paid_date = models.DateField("Фактическая дата оплаты", blank=True, null=True)
-    insurer_date = models.DateField("Дата согласования СК", blank=True, null=True)
+    insurer_date = models.DateField(
+        "Дата согласования акта с СК", blank=True, null=True
+    )
     payment_info = models.TextField("Дополнительная информация", blank=True)
 
     class Meta:
@@ -341,7 +343,7 @@ class PaymentSchedule(TimeStampedModel):
             if self.insurer_date and previous_payment.insurer_date:
                 if self.insurer_date <= previous_payment.insurer_date:
                     errors["insurer_date"] = (
-                        f"Дата согласования СК ({self.insurer_date}) не может быть раньше или равна "
+                        f"Дата согласования акта с СК ({self.insurer_date}) не может быть раньше или равна "
                         f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
                         f"Предыдущий платеж: Год {previous_payment.year_number}, "
                         f"Платеж {previous_payment.installment_number}."

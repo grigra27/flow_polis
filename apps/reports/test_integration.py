@@ -763,7 +763,7 @@ class ReadyExportsTest(TestCase):
             commission_rate=self.commission_rate,
             kv_rub=Decimal("2500.00"),
             paid_date=date(2024, 7, 5),  # Есть дата оплаты
-            insurer_date=date(2024, 7, 10),  # Есть дата согласования СК
+            insurer_date=date(2024, 7, 10),  # Есть дата согласования акта с СК
         )
 
         # 3. Не оплачен (НЕ должен попасть в отчет)

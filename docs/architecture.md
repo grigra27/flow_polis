@@ -79,7 +79,7 @@
 - **kv_percent** *(FK → CommissionRate.id)* - процент комиссии.
 - **kv_rub** *(numeric)* — сумма комиссии (по умолчанию как **amount*****kv_percent**).
 - **paid_date** *(date, nullable)* — фактическая дата оплаты.
-- **insurer_date** *(date, nullable)* —  дата согласования СК.
+- **insurer_date** *(date, nullable)* —  дата согласования акта с СК.
 - **payment_info** (*varchar*) - свободное текстовое поле.
 - **created_at** *(timestamp)*
 - **updated_at** *(timestamp)*

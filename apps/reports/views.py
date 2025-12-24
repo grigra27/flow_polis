@@ -568,7 +568,7 @@ class CustomExportView(LoginRequiredMixin, FormView):
                     ("insurance_sum", "Страховая сумма"),
                     ("kv_rub", "КВ руб"),
                     ("paid_date", "Дата оплаты"),
-                    ("insurer_date", "Дата согласования СК"),
+                    ("insurer_date", "Дата согласования акта с СК"),
                 ],
                 "related": [
                     ("policy__policy_number", "Номер полиса"),

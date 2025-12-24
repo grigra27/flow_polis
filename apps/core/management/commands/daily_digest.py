@@ -100,8 +100,37 @@ class Command(BaseCommand):
             result = result.replace(char, f"\\{char}")
         return result
 
+    def _clean_policy_number_for_link(self, policy_number):
+        """Очищает номер ДФА для использования в Markdown ссылке"""
+        if not policy_number:
+            return policy_number
+
+        # Заменяем проблемные символы в номерах ДФА для ссылок
+        cleaned = str(policy_number)
+
+        # Убираем лишние пробелы и заменяем на дефисы
+        cleaned = cleaned.strip()
+
+        # Заменяем запятые и точки на дефисы
+        cleaned = cleaned.replace(",", "-").replace(".", "-")
+
+        # Заменяем множественные пробелы на один дефис
+        import re
+
+        cleaned = re.sub(r"\s+", "-", cleaned)
+
+        # Убираем множественные дефисы
+        cleaned = re.sub(r"-+", "-", cleaned)
+
+        # Убираем дефисы в начале и конце
+        cleaned = cleaned.strip("-")
+
+        return cleaned
+
     def _get_logins_data(self, start_time, end_time):
         """Получает данные о логинах пользователей"""
+        print(f"DEBUG: Getting logins from {start_time} to {end_time}")
+
         # Успешные логины за период
         successful_logins = (
             LoginAttempt.objects.filter(
@@ -111,19 +140,26 @@ class Command(BaseCommand):
             .order_by("attempt_time")
         )
 
+        print(f"DEBUG: Found {successful_logins.count()} successful logins")
+
         logins_list = []
-        for login in successful_logins:
+        for i, login in enumerate(successful_logins):
+            print(
+                f"DEBUG: Raw login {i+1}: username='{login.username}', time={login.attempt_time}"
+            )
+
             # Конвертируем в московское время
             moscow_tz = timezone.get_current_timezone()
             moscow_time = login.attempt_time.astimezone(moscow_tz)
 
-            logins_list.append(
-                {
-                    "time": moscow_time.strftime("%H:%M"),
-                    "username": login.username,
-                    "ip": login.ip_address,
-                }
-            )
+            login_data = {
+                "time": moscow_time.strftime("%H:%M"),
+                "username": login.username,
+                "ip": login.ip_address,
+            }
+
+            print(f"DEBUG: Processed login {i+1}: {login_data}")
+            logins_list.append(login_data)
 
         return logins_list
 
@@ -238,8 +274,14 @@ class Command(BaseCommand):
         # Логины пользователей
         if logins_data:
             message_parts.append("👥 ЛОГИНЫ:")
-            for login in logins_data:
-                message_parts.append(f"• {login['time']} - {login['username']}")
+            for i, login in enumerate(logins_data):
+                print(
+                    f"DEBUG: Processing login {i+1}: '{login['username']}' at {login['time']}"
+                )
+                # НЕ экранируем логины - они не в ссылках и должны отображаться как есть
+                login_line = f"• {login['time']} - {login['username']}"
+                print(f"DEBUG: Login line: '{login_line}'")
+                message_parts.append(login_line)
         else:
             message_parts.append("👥 ЛОГИНЫ: нет активности")
 
@@ -278,8 +320,11 @@ class Command(BaseCommand):
                 print(f"DEBUG: Escaped client name: '{client_name}'")
                 print(f"DEBUG: Escaped insurer name: '{insurer_name}'")
 
-                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
-                policy_link = f"[{policy_number}]({item['url']})"
+                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
+                cleaned_policy_number = self._clean_policy_number_for_link(
+                    policy_number
+                )
+                policy_link = f"[{cleaned_policy_number}]({item['url']})"
                 print(f"DEBUG: Policy link: '{policy_link}'")
 
                 line = f"• {policy_link} | {client_name} | {insurer_name}"
@@ -309,8 +354,11 @@ class Command(BaseCommand):
                 client_name = self._escape_markdown_text(client_name)
                 insurer_name = self._escape_markdown_text(insurer_name)
 
-                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
-                policy_link = f"[{policy_number}]({item['url']})"
+                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
+                cleaned_policy_number = self._clean_policy_number_for_link(
+                    policy_number
+                )
+                policy_link = f"[{cleaned_policy_number}]({item['url']})"
                 line = f"• {policy_link} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Updated policy line: '{line}'")
                 message_parts.append(line)
@@ -338,8 +386,11 @@ class Command(BaseCommand):
                 client_name = self._escape_markdown_text(client_name)
                 insurer_name = self._escape_markdown_text(insurer_name)
 
-                # Создаем Markdown ссылку (номер ДФА НЕ экранируем внутри ссылки)
-                policy_link = f"[{policy_number}]({item['url']})"
+                # Создаем Markdown ссылку (очищаем номер ДФА для ссылки)
+                cleaned_policy_number = self._clean_policy_number_for_link(
+                    policy_number
+                )
+                policy_link = f"[{cleaned_policy_number}]({item['url']})"
                 line = f"• {policy_link} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Payment change line: '{line}'")
                 message_parts.append(line)
@@ -361,6 +412,22 @@ class Command(BaseCommand):
         final_message = "\n".join(message_parts)
         print(f"DEBUG: Final message length: {len(final_message)}")
         print(f"DEBUG: Final message preview: {repr(final_message[:300])}")
+
+        # Показываем секцию логинов отдельно для отладки
+        logins_section = []
+        in_logins = False
+        for line in message_parts:
+            if line.startswith("👥 ЛОГИНЫ"):
+                in_logins = True
+                logins_section.append(line)
+            elif in_logins and line.startswith("📋 ПОЛИСЫ"):
+                break
+            elif in_logins:
+                logins_section.append(line)
+
+        print(f"DEBUG: Logins section:")
+        for line in logins_section:
+            print(f"  '{line}'")
 
         return final_message
 

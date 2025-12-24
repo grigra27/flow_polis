@@ -110,7 +110,7 @@ class CustomExporter(BaseExporter):
             "commission_rate__kv_percent": "КВ %",
             "kv_rub": "КВ руб",
             "paid_date": "Дата оплаты",
-            "insurer_date": "Дата согласования СК",
+            "insurer_date": "Дата согласования акта с СК",
         },
         "clients": {
             "client_name": "Название клиента",
@@ -227,7 +227,7 @@ class PaymentExporter(BaseExporter):
             "КВ %",
             "КВ руб",
             "Дата оплаты",
-            "Дата согласования СК",
+            "Дата согласования акта с СК",
             "Статус",
         ]
 

@@ -136,9 +136,6 @@ class Command(BaseCommand):
 
             # Логируем сообщение для отладки
             logger.info(f"Sending message to Telegram (length: {len(message)})")
-            print(f"DEBUG: Message content for date 2025-12-23:")
-            print(repr(message))
-            print("=" * 50)
 
             # Подготавливаем данные
             data = {
@@ -327,12 +324,13 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в именах
+                # Экранируем специальные символы в номере ДФА и именах
+                escaped_policy_number = self._escape_markdown(policy_number)
                 client_name = self._escape_markdown(policy.client.client_name)
                 insurer_name = self._escape_markdown(policy.insurer.insurer_name)
 
                 # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{policy_number}]({item['url']})"
+                policy_link = f"[{escaped_policy_number}]({item['url']})"
                 message_parts.append(
                     f"• {policy_link} | {client_name} | {insurer_name}"
                 )
@@ -347,12 +345,13 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в именах
+                # Экранируем специальные символы в номере ДФА и именах
+                escaped_policy_number = self._escape_markdown(policy_number)
                 client_name = self._escape_markdown(policy.client.client_name)
                 insurer_name = self._escape_markdown(policy.insurer.insurer_name)
 
                 # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{policy_number}]({item['url']})"
+                policy_link = f"[{escaped_policy_number}]({item['url']})"
                 message_parts.append(
                     f"• {policy_link} | {client_name} | {insurer_name}"
                 )
@@ -367,12 +366,13 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Экранируем специальные символы в именах
+                # Экранируем специальные символы в номере ДФА и именах
+                escaped_policy_number = self._escape_markdown(policy_number)
                 client_name = self._escape_markdown(policy.client.client_name)
                 insurer_name = self._escape_markdown(policy.insurer.insurer_name)
 
                 # Делаем номер ДФА кликабельной ссылкой
-                policy_link = f"[{policy_number}]({item['url']})"
+                policy_link = f"[{escaped_policy_number}]({item['url']})"
                 message_parts.append(
                     f"• {policy_link} | {client_name} | {insurer_name}"
                 )

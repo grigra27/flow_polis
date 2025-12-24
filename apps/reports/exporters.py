@@ -838,21 +838,6 @@ class ThursdayReportExporter(BaseExporter):
 
         return self.create_response(wb)
 
-    def format_financial_value(self, value):
-        """Форматирует финансовые данные с пробелами для лучшей читабельности"""
-        from decimal import Decimal
-
-        if value is None:
-            return ""
-
-        # Преобразуем в строку и убираем десятичные нули если они есть
-        if isinstance(value, (int, float, Decimal)):
-            # Форматируем число с разделителями тысяч (пробелами)
-            formatted = f"{value:,.0f}".replace(",", " ")
-            return formatted
-
-        return str(value)
-
     def _add_section_header(self, ws, title, num_columns):
         """Добавляет заголовок города с форматированием"""
         from openpyxl.styles import Font, PatternFill, Alignment
@@ -920,9 +905,7 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(policy.start_date),
             self.format_value(policy.end_date),
             policy.property_description,
-            self.format_financial_value(payment_to_show.amount)
-            if payment_to_show
-            else "",
+            self.format_value(payment_to_show.amount) if payment_to_show else "",
             self.format_value(payment_to_show.due_date) if payment_to_show else "",
             self.format_value(payment_to_show.paid_date) if payment_to_show else "",
             reason,
@@ -944,7 +927,7 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(policy.start_date),
             self.format_value(policy.end_date),
             policy.property_description,
-            self.format_financial_value(payment.amount),
+            self.format_value(payment.amount),
             self.format_value(payment.due_date),
             self.format_value(payment.paid_date),
             reason,
@@ -991,8 +974,8 @@ class ThursdayReportExporter(BaseExporter):
         if "not_paid" in reasons:
             reason_texts.append("• нет данных об оплате")
 
-        # Используем chr(10) для корректного отображения переноса строки в Excel
-        return chr(10).join(reason_texts)
+        # Используем \r\n для корректного отображения переноса строки в Excel
+        return "\r\n".join(reason_texts)
 
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
@@ -1086,11 +1069,14 @@ class ThursdayReportExporter(BaseExporter):
                         cell.alignment = Alignment(
                             horizontal="center", vertical="center"
                         )
-                    # Столбцы с суммами (I) - справа
+                    # Столбцы с суммами (I) - справа + числовое форматирование
                     elif idx == 9:
                         cell.alignment = Alignment(
                             horizontal="right", vertical="center"
                         )
+                        # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
+                        # Копируем точно такой же формат как в ScheduledPaymentsExporter
+                        cell.number_format = "#,##0.00"
                     # Остальные текстовые - слева
                     else:
                         cell.alignment = Alignment(horizontal="left", vertical="center")

@@ -30,9 +30,11 @@
 ```bash
 # Обычный дайджест за вчера
 python manage.py daily_digest
+docker-compose -f docker-compose.prod.yml exec web python manage.py daily_digest
 
 # Дайджест за конкретную дату
 python manage.py daily_digest --date 2024-12-22
+docker-compose -f docker-compose.prod.yml exec web python manage.py daily_digest --date 2025-12-19
 
 # Тестовый дайджест за последние 2 часа
 python manage.py daily_digest --test

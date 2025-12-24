@@ -88,6 +88,36 @@ class Command(BaseCommand):
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
 
+    def _escape_markdown(self, text):
+        """Экранирует специальные символы для Markdown"""
+        if not text:
+            return text
+
+        # Экранируем символы которые имеют специальное значение в Markdown
+        escape_chars = [
+            "_",
+            "*",
+            "[",
+            "]",
+            "(",
+            ")",
+            "~",
+            "`",
+            ">",
+            "#",
+            "+",
+            "-",
+            "=",
+            "|",
+            "{",
+            "}",
+            ".",
+            "!",
+        ]
+        for char in escape_chars:
+            text = str(text).replace(char, f"\\{char}")
+        return text
+
     def _send_telegram_message(self, message):
         """Отправляет сообщение в Telegram через Python (без curl)"""
         try:
@@ -103,6 +133,10 @@ class Command(BaseCommand):
             if not enabled or not bot_token or not chat_id:
                 logger.error("Telegram not configured")
                 return False
+
+            # Логируем сообщение для отладки
+            logger.info(f"Sending message to Telegram (length: {len(message)})")
+            logger.debug(f"Message content: {repr(message)}")
 
             # Подготавливаем данные
             data = {
@@ -291,10 +325,14 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Экранируем специальные символы в именах
+                client_name = self._escape_markdown(policy.client.client_name)
+                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+
                 # Делаем номер ДФА кликабельной ссылкой
                 policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {client_name} | {insurer_name}"
                 )
 
         # Обновленные полисы
@@ -307,10 +345,14 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Экранируем специальные символы в именах
+                client_name = self._escape_markdown(policy.client.client_name)
+                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+
                 # Делаем номер ДФА кликабельной ссылкой
                 policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {client_name} | {insurer_name}"
                 )
 
         # Изменения платежей
@@ -323,10 +365,14 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
+                # Экранируем специальные символы в именах
+                client_name = self._escape_markdown(policy.client.client_name)
+                insurer_name = self._escape_markdown(policy.insurer.insurer_name)
+
                 # Делаем номер ДФА кликабельной ссылкой
                 policy_link = f"[{policy_number}]({item['url']})"
                 message_parts.append(
-                    f"• {policy_link} | {policy.client.client_name} | {policy.insurer.insurer_name}"
+                    f"• {policy_link} | {client_name} | {insurer_name}"
                 )
                 # Показываем количество измененных платежей
                 changes_count = len(item["changes"])

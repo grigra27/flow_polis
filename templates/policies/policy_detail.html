@@ -170,7 +170,7 @@
                                 <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                                 <td>
                                     {% if payment.is_approved %}
-                                        <span class="badge bg-success">Согласовано с СК</span>
+                                        <span class="badge bg-success">Акт согласован СК</span>
                                     {% elif payment.is_paid %}
                                         <span class="badge bg-primary">Оплачен</span>
                                     {% elif payment.is_cancelled %}

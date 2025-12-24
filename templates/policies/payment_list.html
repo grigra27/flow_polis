@@ -101,7 +101,7 @@
         <div class="btn-group" role="group">
             <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-success {% if request.GET.status == 'approved' %}active{% endif %}">
-                <i class="bi bi-check2-circle"></i> Согласовано с СК
+                <i class="bi bi-check2-circle"></i> Акт согласован СК
             </a>
             <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
                class="btn btn-outline-primary {% if request.GET.status == 'paid' %}active{% endif %}">
@@ -137,14 +137,14 @@
 
         <small class="text-muted ms-auto" style="cursor: help;"
                title="Статусы платежей (по приоритету):
-• Согласовано с СК — есть дата согласования
+• Акт согласован СК — есть дата согласования
 • Оплачен — есть дата оплаты
 • Отменен — полис расторгнут
 • Не оплачен — дата платежа прошла
 • Ожидается — остальные
 
 Срезы:
-• Согласовано с СК / Оплаченные / Не оплаченные — прошедшие платежи
+• Акт согласован СК / Оплаченные / Не оплаченные — прошедшие платежи
 • Предстоит в ближ. 30 дней — от сегодня до +30 дней
 • Будущие — более чем через 30 дней">
             <i class="bi bi-info-circle"></i> Пояснение
@@ -208,7 +208,7 @@
                         </td>
                         <td>
                             {% if payment.is_approved %}
-                                <span class="badge bg-success">Согласовано с СК</span>
+                                <span class="badge bg-success">Акт согласован СК</span>
                             {% elif payment.is_paid %}
                                 <span class="badge bg-primary">Оплачен</span>
                             {% elif payment.is_cancelled %}

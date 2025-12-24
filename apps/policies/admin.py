@@ -362,7 +362,7 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
 
     def payment_status(self, obj):
         if obj.is_approved:
-            return format_html('<span style="color: green;">✓ Согласовано с СК</span>')
+            return format_html('<span style="color: green;">✓ Акт согласован СК</span>')
         elif obj.is_paid:
             return format_html('<span style="color: blue;">✓ Оплачен</span>')
         elif obj.is_cancelled:

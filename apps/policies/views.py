@@ -123,7 +123,7 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                 queryset = queryset.filter(insurer_date__isnull=False)
             elif status == "paid":
                 # Оплаченные: платежи с указанной датой оплаты (дата платежа <= сегодня)
-                # но БЕЗ даты согласования СК (иначе они попадают в "Согласовано с СК")
+                # но БЕЗ даты согласования СК (иначе они попадают в "Акт согласован СК")
                 from django.utils import timezone
 
                 queryset = queryset.filter(

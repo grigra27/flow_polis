@@ -327,9 +327,11 @@ class Command(BaseCommand):
                 policy_link = f"[{cleaned_policy_number}]({item['url']})"
                 print(f"DEBUG: Policy link: '{policy_link}'")
 
-                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                # Временно убираем Markdown ссылки для тестирования
+                line = f"• {policy_number} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Final line: '{line}'")
                 message_parts.append(line)
+                message_parts.append(f"  🔗 {item['url']}")
 
         # Обновленные полисы
         if policies_data["updated"]:
@@ -359,9 +361,11 @@ class Command(BaseCommand):
                     policy_number
                 )
                 policy_link = f"[{cleaned_policy_number}]({item['url']})"
-                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                # Временно убираем Markdown ссылки для тестирования
+                line = f"• {policy_number} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Updated policy line: '{line}'")
                 message_parts.append(line)
+                message_parts.append(f"  🔗 {item['url']}")
 
         # Изменения платежей
         if policies_data["payment_changes"]:
@@ -391,9 +395,11 @@ class Command(BaseCommand):
                     policy_number
                 )
                 policy_link = f"[{cleaned_policy_number}]({item['url']})"
-                line = f"• {policy_link} | {client_name} | {insurer_name}"
+                # Временно убираем Markdown ссылки для тестирования
+                line = f"• {policy_number} | {client_name} | {insurer_name}"
                 print(f"DEBUG: Payment change line: '{line}'")
                 message_parts.append(line)
+                message_parts.append(f"  🔗 {item['url']}")
 
                 # Показываем количество измененных платежей
                 changes_count = len(item["changes"])
@@ -467,11 +473,11 @@ class Command(BaseCommand):
                 for pos, char, code in problematic_chars[:10]:  # Показываем первые 10
                     print(f"  Position {pos}: '{char}' (code: {code})")
 
-            # Подготавливаем данные
+            # Подготавливаем данные БЕЗ Markdown для тестирования
             data = {
                 "chat_id": chat_id,
                 "text": message,
-                "parse_mode": "Markdown",
+                # "parse_mode": "Markdown",  # Временно отключаем
                 "disable_web_page_preview": True,
             }
 

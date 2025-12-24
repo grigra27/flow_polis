@@ -136,7 +136,9 @@ class Command(BaseCommand):
 
             # Логируем сообщение для отладки
             logger.info(f"Sending message to Telegram (length: {len(message)})")
-            logger.debug(f"Message content: {repr(message)}")
+            print(f"DEBUG: Message content for date 2025-12-23:")
+            print(repr(message))
+            print("=" * 50)
 
             # Подготавливаем данные
             data = {

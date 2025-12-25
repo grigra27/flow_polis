@@ -65,7 +65,8 @@ class BaseExporter:
     def format_value(self, value):
         """Форматирует значение для Excel"""
         if isinstance(value, date):
-            return value.strftime("%d.%m.%Y")
+            # Возвращаем объект date как есть, чтобы Excel распознал его как дату
+            return value
         elif isinstance(value, Decimal):
             return float(value)
         elif isinstance(value, bool):
@@ -610,9 +611,14 @@ class ScheduledPaymentsExporter(BaseExporter):
                     # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
                     # Без символа валюты для совместимости с Excel на Mac
                     cell.number_format = "#,##0.00"
-                # Столбцы с датами (F, G, M, Q) - по центру
+                # Столбцы с датами (F, G, M, Q) - по центру + форматирование дат
                 elif idx in [6, 7, 13, 17]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                    # Применяем форматирование дат для Excel
+                    from datetime import date
+
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
                 # Столбцы "Статус рассрочки" (K), "Этот взнос" (L) и "Участие брокера" (N) - по центру
                 elif idx in [11, 12, 14]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -974,8 +980,8 @@ class ThursdayReportExporter(BaseExporter):
         if "not_paid" in reasons:
             reason_texts.append("• нет данных об оплате")
 
-        # Используем \r\n для корректного отображения переноса строки в Excel
-        return "\r\n".join(reason_texts)
+        # Используем \n для универсальной совместимости с Excel на всех платформах
+        return "\n".join(reason_texts)
 
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
@@ -1064,11 +1070,16 @@ class ThursdayReportExporter(BaseExporter):
                         and cell.value.replace(".", "").replace(",", "").isdigit()
                     )
                 ):
-                    # Столбцы с датами (F, G, J, K) - по центру
+                    # Столбцы с датами (F, G, J, K) - по центру + форматирование дат
                     if idx in [6, 7, 10, 11]:
                         cell.alignment = Alignment(
                             horizontal="center", vertical="center"
                         )
+                        # Применяем форматирование дат для Excel
+                        from datetime import date
+
+                        if isinstance(cell.value, date):
+                            cell.number_format = "DD.MM.YYYY"
                     # Столбцы с суммами (I) - справа + числовое форматирование
                     elif idx == 9:
                         cell.alignment = Alignment(
@@ -1651,9 +1662,14 @@ class PolicyExpirationExporter(BaseExporter):
                 continue
 
             for idx, cell in enumerate(row, start=1):
-                # Столбец с датой (F) - по центру
+                # Столбец с датой (F) - по центру + форматирование дат
                 if idx == 6:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                    # Применяем форматирование дат для Excel
+                    from datetime import date
+
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
                 # Остальные - слева
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
@@ -1881,9 +1897,14 @@ class CommissionReportExporter(BaseExporter):
                 # Столбец КВ % (H) - по центру
                 elif idx == 8:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                # Столбцы с датами (C, D, J, K) - по центру
+                # Столбцы с датами (C, D, J, K) - по центру + форматирование дат
                 elif idx in [3, 4, 10, 11]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                    # Применяем форматирование дат для Excel
+                    from datetime import date
+
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
                 # Остальные - слева
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")

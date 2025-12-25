@@ -397,7 +397,10 @@ class ReadyExportsTest(TestCase):
         """Тест готового экспорта платежей"""
         self.test_client.login(username="testuser", password="testpass123")
 
-        response = self.test_client.get("/reports/export/payments/")
+        # Добавляем обязательные параметры дат
+        response = self.test_client.get(
+            "/reports/export/payments/?date_from=2024-01-01&date_to=2024-12-31"
+        )
 
         # Проверяем что получили Excel файл
         self.assertEqual(response.status_code, 200)
@@ -412,21 +415,32 @@ class ReadyExportsTest(TestCase):
         wb = load_workbook(excel_file)
         ws = wb.active
 
-        # Проверяем заголовки (12 колонок)
-        headers = [cell.value for cell in ws[1]]
-        self.assertEqual(len(headers), 12)
+        # Проверяем заголовки (18 колонок для ScheduledPaymentsExporter)
+        headers = [cell.value for cell in ws[3]]  # Заголовки в 3-й строке
+        self.assertEqual(len(headers), 18)
         self.assertIn("Номер полиса", headers)
-        self.assertIn("Клиент", headers)
-        self.assertIn("Статус", headers)
+        self.assertIn("Лизингополучатель", headers)
+        self.assertIn("Дата платежа по договору", headers)
 
         # Проверяем данные
-        self.assertGreaterEqual(ws.max_row, 2)  # Минимум заголовок + 1 платеж
+        self.assertGreaterEqual(
+            ws.max_row, 6
+        )  # Минимум заголовок отчета + пустая строка + заголовки + пустая строка + заголовок филиала + 1 платеж
 
-        # Проверяем первую строку данных
-        row_data = [cell.value for cell in ws[2]]
-        self.assertEqual(row_data[0], "READY-001")
-        self.assertEqual(row_data[1], "Клиент для готовых экспортов")
-        self.assertEqual(row_data[11], "Оплачен")  # Статус
+        # Ищем первую строку с данными платежа (пропускаем заголовки филиалов)
+        payment_row = None
+        for row_num in range(5, ws.max_row + 1):
+            row_data = [cell.value for cell in ws[row_num]]
+            # Заголовок филиала имеет только первую ячейку заполненную, остальные пустые
+            if row_data[0] and row_data[1]:  # Если есть и номер полиса, и номер ДФА
+                payment_row = row_data
+                break
+
+        self.assertIsNotNone(payment_row, "Не найдена строка с данными платежа")
+        self.assertEqual(payment_row[0], "READY-001")  # Номер полиса
+        self.assertEqual(
+            payment_row[2], "Клиент для готовых экспортов"
+        )  # Лизингополучатель
 
     def test_ready_export_date_formatting(self):
         """Тест форматирования дат в готовых экспортах"""
@@ -443,17 +457,20 @@ class ReadyExportsTest(TestCase):
         start_date = ws.cell(row=2, column=7).value  # Дата начала
         end_date = ws.cell(row=2, column=8).value  # Дата окончания
 
-        # Проверяем формат ДД.ММ.ГГГГ
-        import re
+        # Проверяем, что это объекты date или datetime
+        from datetime import date, datetime
 
-        date_pattern = r"^\d{2}\.\d{2}\.\d{4}$"
+        self.assertTrue(isinstance(start_date, (date, datetime)))
+        self.assertTrue(isinstance(end_date, (date, datetime)))
 
-        self.assertRegex(start_date, date_pattern)
-        self.assertRegex(end_date, date_pattern)
+        # Проверяем конкретные значения (преобразуем datetime в date если нужно)
+        start_date_value = (
+            start_date.date() if isinstance(start_date, datetime) else start_date
+        )
+        end_date_value = end_date.date() if isinstance(end_date, datetime) else end_date
 
-        # Проверяем конкретные значения
-        self.assertEqual(start_date, "01.01.2024")
-        self.assertEqual(end_date, "31.12.2024")
+        self.assertEqual(start_date_value, date(2024, 1, 1))
+        self.assertEqual(end_date_value, date(2024, 12, 31))
 
     def test_thursday_report_export(self):
         """Тест четвергового отчета - экспорт полисов без документов и неоплаченных платежей, сгруппированных по городам"""
@@ -589,6 +606,14 @@ class ReadyExportsTest(TestCase):
                 self.assertIn("не подгружены документы", reason)
                 self.assertIn("нет данных об оплате", reason)
 
+                # Проверяем что причины разделены переносом строки
+                self.assertIn(
+                    "\n", reason, "Причины должны быть разделены переносом строки"
+                )
+
+                # Проверяем что нет \r\n (только \n для универсальности)
+                self.assertNotIn("\r\n", reason, "Не должно быть \\r\\n, только \\n")
+
         # Должна быть только одна строка с READY-001 (объединенная)
         self.assertEqual(
             ready_001_count,
@@ -622,6 +647,8 @@ class ReadyExportsTest(TestCase):
 
     def test_policy_expiration_export(self):
         """Тест экспорта полисов с окончанием страхования в заданном периоде"""
+        from datetime import date, datetime
+
         # Создаем дополнительные полисы с разными датами окончания
         policy_in_range = Policy.objects.create(
             policy_number="EXPIRING-001",
@@ -669,7 +696,9 @@ class ReadyExportsTest(TestCase):
         # Проверяем заголовок отчета (строка 1)
         report_title = ws.cell(row=1, column=1).value
         self.assertIsNotNone(report_title)
-        self.assertIn("ПОЛИСЫ С ОКОНЧАНИЕМ СТРАХОВАНИЯ С", report_title)
+        self.assertIn(
+            "ДОГОВОРА СТРАХОВАНИЯ С ОКОНЧАНИЕМ СРОКА СТРАХОВАНИЯ С", report_title
+        )
         self.assertIn("01.06.2024", report_title)
         self.assertIn("30.06.2024", report_title)
 
@@ -682,26 +711,42 @@ class ReadyExportsTest(TestCase):
         expected_headers = [
             "Номер полиса",
             "Номер ДФА",
-            "Филиал",
             "Лизингополучатель",
             "Страховщик",
             "Страхователь",
-            "Дата начала страхования",
-            "Дата оконч. страхования",
+            "Дата окончания страхования",
             "Объект страхования",
-            "Страховая премия",
-            "Контактное лицо",
+            "Страхователь на новый период",
+            "Выгодоприобретатель",
+            "№ и дата кредитного договора / кредитной линии, банк-кредитор",
+            "№ и дата договора залога",
+            "Идентификатор (обычно VIN)",
+            "ГРН для транспортных средств и спецтехники",
+            "Срок окончания ДФА (досрочного выкупа)",
+            "Необходимый срок страхования",
+            "Место нахождения имущества*",
+            "Контактные данные для осмотра*",
+            "Страховщик на новый срок",
+            "Страховая сумма на новый срок",
+            "Страховая премия на новый срок",
+            "Условия страхования на новый срок",
+            "Необходимость ПСО",
+            "Дата отправки письма ЛП с предложением",
+            "Ответ ЛП (дата и решение)",
+            "Дата заключения договора на новый срок",
+            "Примечания",
         ]
         self.assertEqual(headers, expected_headers)
 
-        # Проверяем что строка 4 пустая
-        empty_row_4 = ws.cell(row=4, column=1).value
-        self.assertTrue(empty_row_4 is None or empty_row_4 == "")
+        # Проверяем что строка 4 содержит информацию о заполняющих
+        responsibility_row = ws.cell(row=4, column=1).value
+        self.assertIsNotNone(responsibility_row)
+        self.assertIn("заполняет", responsibility_row)
 
         # Проверяем что в отчете только полисы с окончанием в заданном диапазоне
-        # Данные начинаются с 5-й строки
+        # Данные начинаются с 6-й строки (после строки ответственности и пустой строки)
         policy_numbers = []
-        for row in range(5, ws.max_row + 1):
+        for row in range(6, ws.max_row + 1):
             policy_number = ws.cell(row=row, column=1).value
             if policy_number:
                 policy_numbers.append(policy_number)
@@ -713,14 +758,18 @@ class ReadyExportsTest(TestCase):
         self.assertNotIn("EXPIRING-002", policy_numbers)
 
         # Проверяем данные в строке с EXPIRING-001
-        for row in range(5, ws.max_row + 1):
+        for row in range(6, ws.max_row + 1):
             if ws.cell(row=row, column=1).value == "EXPIRING-001":
-                # Проверяем дату окончания (8-й столбец)
-                end_date = ws.cell(row=row, column=8).value
-                self.assertEqual(end_date, "15.06.2024")
-                # Проверяем страховую премию (10-й столбец)
-                premium = ws.cell(row=row, column=10).value
-                self.assertEqual(float(premium), 75000.00)
+                # Проверяем дату окончания (6-й столбец)
+                end_date = ws.cell(row=row, column=6).value
+                # Преобразуем дату для сравнения
+                if isinstance(end_date, datetime):
+                    end_date_value = end_date.date()
+                elif isinstance(end_date, date):
+                    end_date_value = end_date
+                else:
+                    end_date_value = None
+                self.assertEqual(end_date_value, date(2024, 6, 15))
                 break
 
         # Проверяем что без параметров дат возвращается ошибка
@@ -736,6 +785,7 @@ class ReadyExportsTest(TestCase):
     def test_commission_report_export(self):
         """Тест отчета по КВ - платежи оплаченные но не согласованные СК"""
         from apps.policies.models import PaymentSchedule
+        from datetime import date, datetime
 
         # Создаем платежи с разными статусами
         # 1. Оплачен, но не согласован СК (должен попасть в отчет)
@@ -846,13 +896,25 @@ class ReadyExportsTest(TestCase):
                 payment_dates.append(payment_date)
 
         # Проверяем что платеж с датой 01.06.2024 есть в отчете (оплачен, но не согласован)
-        self.assertIn("01.06.2024", payment_dates)
+        from datetime import date, datetime
+
+        target_date = date(2024, 6, 1)
+
+        # Преобразуем datetime в date если нужно для сравнения
+        payment_dates_as_dates = []
+        for pd in payment_dates:
+            if isinstance(pd, datetime):
+                payment_dates_as_dates.append(pd.date())
+            elif isinstance(pd, date):
+                payment_dates_as_dates.append(pd)
+
+        self.assertIn(target_date, payment_dates_as_dates)
 
         # Проверяем что платеж с датой 01.07.2024 НЕТ в отчете (оплачен и согласован)
-        self.assertNotIn("01.07.2024", payment_dates)
+        self.assertNotIn(date(2024, 7, 1), payment_dates_as_dates)
 
         # Проверяем что платеж с датой 01.08.2024 НЕТ в отчете (не оплачен)
-        self.assertNotIn("01.08.2024", payment_dates)
+        self.assertNotIn(date(2024, 8, 1), payment_dates_as_dates)
 
         # Проверяем данные в строке с платежом по дате факт. оплаты 05.06.2024
         # Примечание: в отчете kv_rub может отличаться от созданного в тесте
@@ -860,22 +922,38 @@ class ReadyExportsTest(TestCase):
         found_june_payment = False
         for row in range(5, ws.max_row + 1):
             paid_date = ws.cell(row=row, column=11).value  # Дата факт. оплаты
-            if paid_date == "05.06.2024":
-                # Проверяем номер полиса (1-й столбец)
-                policy_number = ws.cell(row=row, column=1).value
-                self.assertEqual(policy_number, "READY-001")
-                # Проверяем очередной взнос (7-й столбец)
-                amount = ws.cell(row=row, column=7).value
-                self.assertEqual(float(amount), 25000.00)
-                # Проверяем КВ руб (9-й столбец) - проверяем что значение есть
-                kv_rub = ws.cell(row=row, column=9).value
-                self.assertIsNotNone(kv_rub)
-                self.assertGreater(float(kv_rub), 0)
-                # Проверяем дату платежа по договору (10-й столбец)
-                due_date = ws.cell(row=row, column=10).value
-                self.assertEqual(due_date, "01.06.2024")
-                found_june_payment = True
-                break
+
+            # Преобразуем дату для сравнения
+            if paid_date:
+                if isinstance(paid_date, datetime):
+                    paid_date_value = paid_date.date()
+                elif isinstance(paid_date, date):
+                    paid_date_value = paid_date
+                else:
+                    continue
+
+                if paid_date_value == date(2024, 6, 5):
+                    # Проверяем номер полиса (1-й столбец)
+                    policy_number = ws.cell(row=row, column=1).value
+                    self.assertEqual(policy_number, "READY-001")
+                    # Проверяем очередной взнос (7-й столбец)
+                    amount = ws.cell(row=row, column=7).value
+                    self.assertEqual(float(amount), 25000.00)
+                    # Проверяем КВ руб (9-й столбец) - проверяем что значение есть
+                    kv_rub = ws.cell(row=row, column=9).value
+                    self.assertIsNotNone(kv_rub)
+                    self.assertGreater(float(kv_rub), 0)
+                    # Проверяем дату платежа по договору (10-й столбец)
+                    due_date = ws.cell(row=row, column=10).value
+                    if isinstance(due_date, datetime):
+                        due_date_value = due_date.date()
+                    elif isinstance(due_date, date):
+                        due_date_value = due_date
+                    else:
+                        due_date_value = None
+                    self.assertEqual(due_date_value, date(2024, 6, 1))
+                    found_june_payment = True
+                    break
 
         self.assertTrue(
             found_june_payment,
@@ -886,12 +964,22 @@ class ReadyExportsTest(TestCase):
         found_march_payment = False
         for row in range(5, ws.max_row + 1):
             paid_date = ws.cell(row=row, column=11).value  # Дата факт. оплаты
-            if paid_date == "28.02.2024":
-                # Проверяем КВ руб (9-й столбец)
-                kv_rub = ws.cell(row=row, column=9).value
-                self.assertEqual(float(kv_rub), 10000.00)
-                found_march_payment = True
-                break
+
+            # Преобразуем дату для сравнения
+            if paid_date:
+                if isinstance(paid_date, datetime):
+                    paid_date_value = paid_date.date()
+                elif isinstance(paid_date, date):
+                    paid_date_value = paid_date
+                else:
+                    continue
+
+                if paid_date_value == date(2024, 2, 28):
+                    # Проверяем КВ руб (9-й столбец)
+                    kv_rub = ws.cell(row=row, column=9).value
+                    self.assertEqual(float(kv_rub), 10000.00)
+                    found_march_payment = True
+                    break
 
         self.assertTrue(
             found_march_payment,

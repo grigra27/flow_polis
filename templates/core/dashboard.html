@@ -84,6 +84,7 @@
                 <thead>
                     <tr>
                         <th>Полис</th>
+                        <th>Номер ДФА</th>
                         <th>Лизингополучатель</th>
                         <th>Дата платежа (по договору)</th>
                         <th>Очередной взнос, ₽</th>
@@ -94,6 +95,7 @@
                     {% for payment in upcoming_payments %}
                     <tr class="clickable-row" data-href="{% url 'policies:detail' payment.policy.pk %}">
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
+                        <td>{{ payment.policy.dfa_number }}</td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                         <td>{{ payment.amount|rub }}</td>
@@ -120,6 +122,7 @@
                 <thead>
                     <tr>
                         <th>Полис</th>
+                        <th>Номер ДФА</th>
                         <th>Лизингополучатель</th>
                         <th>Дата платежа</th>
                         <th>Сумма, ₽</th>
@@ -130,6 +133,7 @@
                     {% for payment in overdue_payments %}
                     <tr class="clickable-row" data-href="{% url 'policies:detail' payment.policy.pk %}">
                         <td><a href="{% url 'policies:detail' payment.policy.pk %}">{{ payment.policy.policy_number }}</a></td>
+                        <td>{{ payment.policy.dfa_number }}</td>
                         <td>{{ payment.policy.client.client_name }}</td>
                         <td>{{ payment.due_date|date:"d.m.Y" }}</td>
                         <td>{{ payment.amount|rub }}</td>
@@ -155,28 +159,22 @@
                 <thead>
                     <tr>
                         <th>Номер полиса</th>
+                        <th>Номер ДФА</th>
                         <th>Филиал</th>
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Период</th>
-                        <th>Статус</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for policy in recent_policies %}
                     <tr class="clickable-row" data-href="{% url 'policies:detail' policy.pk %}">
                         <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
+                        <td>{{ policy.dfa_number }}</td>
                         <td>{% branch_logo policy.branch size='small' %}</td>
                         <td>{{ policy.client.client_name }}</td>
                         <td>{% insurer_logo policy.insurer size='small' %}</td>
                         <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
-                        <td>
-                            {% if policy.policy_active %}
-                                <span class="badge bg-success">Активен</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Закрыт</span>
-                            {% endif %}
-                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -198,22 +196,22 @@
                 <thead>
                     <tr>
                         <th>Номер полиса</th>
+                        <th>Номер ДФА</th>
                         <th>Филиал</th>
                         <th>Лизингополучатель</th>
                         <th>Страховщик</th>
                         <th>Период</th>
-                        <th>Дата создания</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for policy in not_uploaded_policies %}
                     <tr class="clickable-row" data-href="{% url 'policies:detail' policy.pk %}">
                         <td><a href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a></td>
+                        <td>{{ policy.dfa_number }}</td>
                         <td>{% branch_logo policy.branch size='small' %}</td>
                         <td>{{ policy.client.client_name }}</td>
                         <td>{% insurer_logo policy.insurer size='small' %}</td>
                         <td>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</td>
-                        <td>{{ policy.created_at|date:"d.m.Y H:i" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

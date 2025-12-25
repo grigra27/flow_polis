@@ -613,6 +613,21 @@ class CustomExportView(LoginRequiredMixin, FormView):
         """Генерирует и возвращает Excel файл"""
         data_source = request.POST.get("data_source")
         selected_fields = request.POST.getlist("fields")
+        fields_order = request.POST.get("fields_order")
+
+        # Если есть порядок полей, используем его, иначе используем порядок из checkbox
+        if fields_order:
+            try:
+                import json
+
+                ordered_fields = json.loads(fields_order)
+                # Проверяем, что все поля из порядка есть в выбранных полях
+                selected_fields = [
+                    field for field in ordered_fields if field in selected_fields
+                ]
+            except (json.JSONDecodeError, TypeError):
+                # Если не удалось парсить порядок, используем обычный список
+                pass
 
         if not selected_fields:
             messages.error(request, "Выберите хотя бы одно поле для экспорта")
@@ -692,6 +707,7 @@ class CustomExportView(LoginRequiredMixin, FormView):
         name = request.POST.get("template_name")
         data_source = request.POST.get("data_source")
         selected_fields = request.POST.getlist("fields")
+        fields_order = request.POST.get("fields_order")
 
         if not name:
             messages.error(request, "Укажите название шаблона")
@@ -702,6 +718,20 @@ class CustomExportView(LoginRequiredMixin, FormView):
                 request, "Выберите хотя бы одно поле для сохранения в шаблон"
             )
             return redirect("reports:custom_export")
+
+        # Если есть порядок полей, используем его
+        if fields_order:
+            try:
+                import json
+
+                ordered_fields = json.loads(fields_order)
+                # Проверяем, что все поля из порядка есть в выбранных полях
+                selected_fields = [
+                    field for field in ordered_fields if field in selected_fields
+                ]
+            except (json.JSONDecodeError, TypeError):
+                # Если не удалось парсить порядок, используем обычный список
+                pass
 
         # Собираем фильтры - все поля, которые начинаются с названий полей фильтров
         filters = {}

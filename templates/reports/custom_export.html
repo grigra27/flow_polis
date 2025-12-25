@@ -2,6 +2,88 @@
 
 {% block title %}Кастомный экспорт{% endblock %}
 
+{% block extra_css %}
+<style>
+.sortable-list {
+    min-height: 60px;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #f8f9fa;
+}
+
+.sortable-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.sortable-item:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.sortable-item.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.sortable-item .drag-handle {
+    color: #6c757d;
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.sortable-item .field-label {
+    flex-grow: 1;
+    font-weight: 500;
+}
+
+.sortable-item .remove-field {
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.sortable-item .remove-field:hover {
+    background-color: #f8d7da;
+}
+
+.sortable-list.drag-over {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+
+.sortable-list.empty {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 30px;
+}
+
+.field-counter {
+    background: #0d6efd;
+    color: white;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 8px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Кастомный экспорт</h1>
@@ -84,6 +166,20 @@
                         {% endif %}
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+
+            <!-- Шаг 2.5: Порядок полей -->
+            <div class="card mb-3" id="fieldsOrderCard" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0">2.5. Настройте порядок полей</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Перетащите поля для изменения их порядка в экспорте:</p>
+                    <div id="sortableFields" class="sortable-list">
+                        <!-- Сюда динамически добавляются выбранные поля -->
+                    </div>
+                    <input type="hidden" name="fields_order" id="fieldsOrder" value="">
                 </div>
             </div>
 
@@ -177,6 +273,10 @@
 // Данные для фильтров
 const filterData = {{ filter_data|safe }};
 
+// Глобальные переменные для drag & drop
+let draggedElement = null;
+let selectedFields = new Map(); // field_name -> field_label
+
 // Переключение источника данных
 document.querySelectorAll('input[name="data_source"]').forEach(radio => {
     radio.addEventListener('change', function() {
@@ -187,13 +287,187 @@ document.querySelectorAll('input[name="data_source"]').forEach(radio => {
             group.style.display = group.dataset.source === source ? 'block' : 'none';
         });
 
-        // Сбрасываем выбранные поля
+        // Сбрасываем выбранные поля и порядок
         document.querySelectorAll('input[name="fields"]').forEach(cb => cb.checked = false);
+        selectedFields.clear();
+        updateSortableFields();
+        hideFieldsOrderCard();
 
         // Обновляем фильтры
         updateFilters(source);
     });
 });
+
+// Обработка изменения checkbox полей
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'fields') {
+        const fieldName = e.target.value;
+        const fieldLabel = e.target.labels[0].textContent.trim();
+
+        if (e.target.checked) {
+            selectedFields.set(fieldName, fieldLabel);
+        } else {
+            selectedFields.delete(fieldName);
+        }
+
+        updateSortableFields();
+
+        if (selectedFields.size > 0) {
+            showFieldsOrderCard();
+        } else {
+            hideFieldsOrderCard();
+        }
+    }
+});
+
+function showFieldsOrderCard() {
+    document.getElementById('fieldsOrderCard').style.display = 'block';
+}
+
+function hideFieldsOrderCard() {
+    document.getElementById('fieldsOrderCard').style.display = 'none';
+}
+
+function updateSortableFields() {
+    const container = document.getElementById('sortableFields');
+
+    if (selectedFields.size === 0) {
+        container.innerHTML = '<div class="empty">Выберите поля для настройки их порядка</div>';
+        container.classList.add('empty');
+        updateFieldsOrder();
+        return;
+    }
+
+    container.classList.remove('empty');
+
+    // Сохраняем текущий порядок если он есть
+    const currentOrder = Array.from(container.children).map(item => item.dataset.field);
+    const newFields = Array.from(selectedFields.keys()).filter(field => !currentOrder.includes(field));
+    const finalOrder = [...currentOrder.filter(field => selectedFields.has(field)), ...newFields];
+
+    container.innerHTML = '';
+
+    finalOrder.forEach((fieldName, index) => {
+        const fieldLabel = selectedFields.get(fieldName);
+        const item = createSortableItem(fieldName, fieldLabel, index + 1);
+        container.appendChild(item);
+    });
+
+    updateFieldsOrder();
+}
+
+function createSortableItem(fieldName, fieldLabel, position) {
+    const item = document.createElement('div');
+    item.className = 'sortable-item';
+    item.dataset.field = fieldName;
+    item.draggable = true;
+
+    item.innerHTML = `
+        <span class="drag-handle">⋮⋮</span>
+        <span class="field-label">${fieldLabel}</span>
+        <span class="field-counter">${position}</span>
+        <span class="remove-field" onclick="removeField('${fieldName}')" title="Убрать поле">×</span>
+    `;
+
+    // Drag events
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragend', handleDragEnd);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragenter', handleDragEnter);
+    item.addEventListener('dragleave', handleDragLeave);
+
+    return item;
+}
+
+function removeField(fieldName) {
+    // Снимаем галочку с checkbox
+    const checkbox = document.querySelector(`input[name="fields"][value="${fieldName}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+    }
+
+    // Удаляем из выбранных полей
+    selectedFields.delete(fieldName);
+    updateSortableFields();
+
+    if (selectedFields.size === 0) {
+        hideFieldsOrderCard();
+    }
+}
+
+function handleDragStart(e) {
+    draggedElement = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.outerHTML);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedElement = null;
+
+    // Обновляем номера позиций
+    updatePositionNumbers();
+    updateFieldsOrder();
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    this.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+
+    this.classList.remove('drag-over');
+
+    if (draggedElement !== this) {
+        const container = this.parentNode;
+        const draggedIndex = Array.from(container.children).indexOf(draggedElement);
+        const targetIndex = Array.from(container.children).indexOf(this);
+
+        if (draggedIndex < targetIndex) {
+            container.insertBefore(draggedElement, this.nextSibling);
+        } else {
+            container.insertBefore(draggedElement, this);
+        }
+    }
+
+    return false;
+}
+
+function updatePositionNumbers() {
+    const items = document.querySelectorAll('.sortable-item');
+    items.forEach((item, index) => {
+        const counter = item.querySelector('.field-counter');
+        if (counter) {
+            counter.textContent = index + 1;
+        }
+    });
+}
+
+function updateFieldsOrder() {
+    const container = document.getElementById('sortableFields');
+    const order = Array.from(container.children)
+        .filter(item => item.dataset.field)
+        .map(item => item.dataset.field);
+
+    document.getElementById('fieldsOrder').value = JSON.stringify(order);
+}
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', function() {
@@ -471,12 +745,26 @@ function loadTemplate(templateId) {
             document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).checked = true;
             document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).dispatchEvent(new Event('change'));
 
-            // Устанавливаем выбранные поля
+            // Устанавливаем выбранные поля в правильном порядке
             setTimeout(() => {
+                selectedFields.clear();
+
+                // Загружаем поля в том порядке, в котором они сохранены
                 data.fields.forEach(field => {
                     const checkbox = document.querySelector(`input[name="fields"][value="${field}"]`);
-                    if (checkbox) checkbox.checked = true;
+                    if (checkbox) {
+                        checkbox.checked = true;
+                        const fieldLabel = checkbox.labels[0].textContent.trim();
+                        selectedFields.set(field, fieldLabel);
+                    }
                 });
+
+                // Обновляем sortable список с сохраненным порядком
+                updateSortableFieldsWithOrder(data.fields);
+
+                if (selectedFields.size > 0) {
+                    showFieldsOrderCard();
+                }
 
                 // Устанавливаем фильтры
                 if (data.filters) {
@@ -487,7 +775,7 @@ function loadTemplate(templateId) {
                         }
                     });
                 }
-            }, 200); // Увеличиваем задержку для загрузки фильтров
+            }, 200);
 
             alert('Шаблон загружен');
         } else {
@@ -498,6 +786,30 @@ function loadTemplate(templateId) {
         console.error('Error:', error);
         alert('Ошибка при загрузке шаблона');
     });
+}
+
+function updateSortableFieldsWithOrder(fieldsOrder) {
+    const container = document.getElementById('sortableFields');
+
+    if (fieldsOrder.length === 0) {
+        container.innerHTML = '<div class="empty">Выберите поля для настройки их порядка</div>';
+        container.classList.add('empty');
+        updateFieldsOrder();
+        return;
+    }
+
+    container.classList.remove('empty');
+    container.innerHTML = '';
+
+    fieldsOrder.forEach((fieldName, index) => {
+        if (selectedFields.has(fieldName)) {
+            const fieldLabel = selectedFields.get(fieldName);
+            const item = createSortableItem(fieldName, fieldLabel, index + 1);
+            container.appendChild(item);
+        }
+    });
+
+    updateFieldsOrder();
 }
 </script>
 {% endblock %}

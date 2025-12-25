@@ -7,8 +7,6 @@ class CustomExportForm(forms.Form):
     DATA_SOURCE_CHOICES = [
         ("policies", "Полисы"),
         ("payments", "Платежи"),
-        ("clients", "Клиенты"),
-        ("insurers", "Страховщики"),
     ]
 
     data_source = forms.ChoiceField(

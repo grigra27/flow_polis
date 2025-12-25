@@ -89,7 +89,6 @@ class CustomExporter(BaseExporter):
             "branch__branch_name": "Филиал",
             "start_date": "Дата начала",
             "end_date": "Дата окончания",
-            "property_value": "Стоимость имущества",
             "premium_total": "Общая премия",
             "franchise": "Франшиза",
             "policy_active": "Статус полиса",
@@ -112,20 +111,6 @@ class CustomExporter(BaseExporter):
             "kv_rub": "КВ руб",
             "paid_date": "Дата оплаты",
             "insurer_date": "Дата согласования акта с СК",
-        },
-        "clients": {
-            "client_name": "Название клиента",
-            "client_inn": "ИНН",
-            "client_address": "Адрес",
-            "client_phone": "Телефон",
-            "client_email": "Email",
-        },
-        "insurers": {
-            "insurer_name": "Название страховщика",
-            "insurer_inn": "ИНН",
-            "insurer_address": "Адрес",
-            "insurer_phone": "Телефон",
-            "insurer_email": "Email",
         },
     }
 

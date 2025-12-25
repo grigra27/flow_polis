@@ -174,6 +174,9 @@
 </div>
 
 <script>
+// Данные для фильтров
+const filterData = {{ filter_data|safe }};
+
 // Переключение источника данных
 document.querySelectorAll('input[name="data_source"]').forEach(radio => {
     radio.addEventListener('change', function() {
@@ -202,10 +205,217 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function updateFilters(source) {
     const container = document.getElementById('filtersContainer');
+    let filtersHtml = '';
 
-    // Здесь можно добавить динамическую загрузку фильтров через AJAX
-    // Пока просто показываем заглушку
-    container.innerHTML = '<p class="text-muted">Фильтры для источника: ' + source + '</p>';
+    switch(source) {
+        case 'policies':
+            filtersHtml = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Номер полиса</label>
+                            <input type="text" class="form-control" name="policy_number" placeholder="Поиск по части номера">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Номер ДФА</label>
+                            <input type="text" class="form-control" name="dfa_number" placeholder="Поиск по части номера">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Клиент</label>
+                            <input type="text" class="form-control" name="client__client_name" placeholder="Поиск по названию">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Страховщик</label>
+                            <select class="form-select" name="insurer">
+                                <option value="">Все страховщики</option>
+                                ${filterData.insurers.map(insurer =>
+                                    `<option value="${insurer.id}">${insurer.insurer_name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Филиал</label>
+                            <select class="form-select" name="branch">
+                                <option value="">Все филиалы</option>
+                                ${filterData.branches.map(branch =>
+                                    `<option value="${branch.id}">${branch.branch_name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Тип страхования</label>
+                            <select class="form-select" name="insurance_type">
+                                <option value="">Все типы</option>
+                                ${filterData.insurance_types.map(type =>
+                                    `<option value="${type.id}">${type.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата начала от</label>
+                            <input type="date" class="form-control" name="start_date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата начала до</label>
+                            <input type="date" class="form-control" name="start_date_to">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата окончания от</label>
+                            <input type="date" class="form-control" name="end_date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата окончания до</label>
+                            <input type="date" class="form-control" name="end_date_to">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Статус полиса</label>
+                            <select class="form-select" name="policy_active">
+                                <option value="">Любой</option>
+                                <option value="true">Активен</option>
+                                <option value="false">Неактивен</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Статус ДФА</label>
+                            <select class="form-select" name="dfa_active">
+                                <option value="">Любой</option>
+                                <option value="true">Активен</option>
+                                <option value="false">Закрыт</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Участие брокера</label>
+                            <select class="form-select" name="broker_participation">
+                                <option value="">Любое</option>
+                                <option value="true">Да</option>
+                                <option value="false">Нет</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'payments':
+            filtersHtml = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Номер полиса</label>
+                            <input type="text" class="form-control" name="policy__policy_number" placeholder="Поиск по части номера">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Клиент</label>
+                            <input type="text" class="form-control" name="policy__client__client_name" placeholder="Поиск по названию">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Страховщик</label>
+                            <select class="form-select" name="policy__insurer">
+                                <option value="">Все страховщики</option>
+                                ${filterData.insurers.map(insurer =>
+                                    `<option value="${insurer.id}">${insurer.insurer_name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Филиал</label>
+                            <select class="form-select" name="policy__branch">
+                                <option value="">Все филиалы</option>
+                                ${filterData.branches.map(branch =>
+                                    `<option value="${branch.id}">${branch.branch_name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата платежа от</label>
+                            <input type="date" class="form-control" name="due_date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата платежа до</label>
+                            <input type="date" class="form-control" name="due_date_to">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Год платежа</label>
+                            <input type="number" class="form-control" name="year_number" min="1" max="10" placeholder="1-10">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Номер платежа</label>
+                            <input type="number" class="form-control" name="installment_number" min="1" max="12" placeholder="1-12">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Статус оплаты</label>
+                            <select class="form-select" name="is_paid">
+                                <option value="">Любой</option>
+                                <option value="true">Оплачен</option>
+                                <option value="false">Не оплачен</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+
+        default:
+            filtersHtml = '<p class="text-muted">Выберите источник данных для отображения доступных фильтров</p>';
+    }
+
+    container.innerHTML = filtersHtml;
 }
 
 function setAction(action) {
@@ -218,6 +428,19 @@ function saveTemplate() {
         alert('Введите название шаблона');
         return;
     }
+
+    // Собираем значения фильтров
+    const filterInputs = document.querySelectorAll('#filtersContainer input, #filtersContainer select');
+    filterInputs.forEach(input => {
+        if (input.value) {
+            // Создаем скрытое поле для каждого фильтра
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = input.name;
+            hiddenInput.value = input.value;
+            document.getElementById('exportForm').appendChild(hiddenInput);
+        }
+    });
 
     // Добавляем скрытое поле с названием шаблона
     const form = document.getElementById('exportForm');
@@ -254,7 +477,17 @@ function loadTemplate(templateId) {
                     const checkbox = document.querySelector(`input[name="fields"][value="${field}"]`);
                     if (checkbox) checkbox.checked = true;
                 });
-            }, 100);
+
+                // Устанавливаем фильтры
+                if (data.filters) {
+                    Object.keys(data.filters).forEach(filterName => {
+                        const filterInput = document.querySelector(`[name="${filterName}"]`);
+                        if (filterInput) {
+                            filterInput.value = data.filters[filterName];
+                        }
+                    });
+                }
+            }, 200); // Увеличиваем задержку для загрузки фильтров
 
             alert('Шаблон загружен');
         } else {

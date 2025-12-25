@@ -1,7 +1,5 @@
 import django_filters
 from apps.policies.models import Policy, PaymentSchedule
-from apps.clients.models import Client
-from apps.insurers.models import Insurer
 
 
 class PolicyExportFilter(django_filters.FilterSet):
@@ -72,30 +70,3 @@ class PaymentExportFilter(django_filters.FilterSet):
             "year_number",
             "installment_number",
         ]
-
-
-class ClientExportFilter(django_filters.FilterSet):
-    """Фильтр для экспорта клиентов"""
-
-    client_name = django_filters.CharFilter(
-        field_name="client_name", lookup_expr="icontains", label="Название клиента"
-    )
-    client_inn = django_filters.CharFilter(
-        field_name="client_inn", lookup_expr="icontains", label="ИНН"
-    )
-
-    class Meta:
-        model = Client
-        fields = []
-
-
-class InsurerExportFilter(django_filters.FilterSet):
-    """Фильтр для экспорта страховщиков"""
-
-    insurer_name = django_filters.CharFilter(
-        field_name="insurer_name", lookup_expr="icontains", label="Название страховщика"
-    )
-
-    class Meta:
-        model = Insurer
-        fields = []

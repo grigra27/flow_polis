@@ -13,8 +13,6 @@ from .forms import CustomExportForm
 from .filters import (
     PolicyExportFilter,
     PaymentExportFilter,
-    ClientExportFilter,
-    InsurerExportFilter,
 )
 from .exporters import CustomExporter, PolicyExporter
 import logging
@@ -358,7 +356,6 @@ def export_policies_csv(request):
             "Филиал",
             "Дата начала",
             "Дата окончания",
-            "Стоимость имущества",
             "Общая премия",
             "Франшиза",
             "Страхователь",
@@ -381,7 +378,6 @@ def export_policies_csv(request):
                 policy.branch.branch_name if policy.branch else "",
                 policy.start_date.strftime("%d.%m.%Y") if policy.start_date else "",
                 policy.end_date.strftime("%d.%m.%Y") if policy.end_date else "",
-                str(policy.property_value) if policy.property_value else "",
                 str(policy.premium_total) if policy.premium_total else "",
                 str(policy.franchise) if policy.franchise else "",
                 policy.policyholder.client_name if policy.policyholder else "",
@@ -533,6 +529,8 @@ class CustomExportView(LoginRequiredMixin, FormView):
         context["templates"] = CustomExportTemplate.objects.filter(
             user=self.request.user
         )
+        # Получаем данные для фильтров
+        context["filter_data"] = self.get_filter_data()
         return context
 
     def get_available_fields(self):
@@ -544,7 +542,6 @@ class CustomExportView(LoginRequiredMixin, FormView):
                     ("dfa_number", "Номер ДФА"),
                     ("start_date", "Дата начала"),
                     ("end_date", "Дата окончания"),
-                    ("property_value", "Стоимость имущества"),
                     ("premium_total", "Общая премия"),
                     ("franchise", "Франшиза"),
                     ("policy_active", "Статус полиса"),
@@ -579,27 +576,25 @@ class CustomExportView(LoginRequiredMixin, FormView):
                     ("commission_rate__kv_percent", "КВ %"),
                 ],
             },
-            "clients": {
-                "basic": [
-                    ("client_name", "Название клиента"),
-                    ("client_inn", "ИНН"),
-                    ("client_address", "Адрес"),
-                    ("client_phone", "Телефон"),
-                    ("client_email", "Email"),
-                ],
-                "related": [],
-            },
-            "insurers": {
-                "basic": [
-                    ("insurer_name", "Название страховщика"),
-                    ("insurer_inn", "ИНН"),
-                    ("insurer_address", "Адрес"),
-                    ("insurer_phone", "Телефон"),
-                    ("insurer_email", "Email"),
-                ],
-                "related": [],
-            },
         }
+
+    def get_filter_data(self):
+        """Возвращает данные для фильтров"""
+        try:
+            from apps.insurers.models import Branch, InsuranceType
+            import json
+
+            data = {
+                "branches": list(Branch.objects.all().values("id", "branch_name")),
+                "insurers": list(Insurer.objects.all().values("id", "insurer_name")),
+                "insurance_types": list(
+                    InsuranceType.objects.all().values("id", "name")
+                ),
+            }
+            return json.dumps(data)
+        except Exception as e:
+            logger.error(f"Error getting filter data: {e}")
+            return json.dumps({"branches": [], "insurers": [], "insurance_types": []})
 
     def post(self, request, *args, **kwargs):
         """Обработка POST запросов"""
@@ -661,14 +656,10 @@ class CustomExportView(LoginRequiredMixin, FormView):
         model_map = {
             "policies": Policy,
             "payments": PaymentSchedule,
-            "clients": Client,
-            "insurers": Insurer,
         }
         filter_map = {
             "policies": PolicyExportFilter,
             "payments": PaymentExportFilter,
-            "clients": ClientExportFilter,
-            "insurers": InsurerExportFilter,
         }
 
         model = model_map[data_source]
@@ -712,12 +703,39 @@ class CustomExportView(LoginRequiredMixin, FormView):
             )
             return redirect("reports:custom_export")
 
-        # Собираем фильтры
+        # Собираем фильтры - все поля, которые начинаются с названий полей фильтров
         filters = {}
-        for key, value in request.POST.items():
-            if key.startswith("filter_") and value:
-                filter_name = key.replace("filter_", "")
-                filters[filter_name] = value
+        filter_fields = [
+            # Для полисов
+            "policy_number",
+            "dfa_number",
+            "client__client_name",
+            "start_date_from",
+            "start_date_to",
+            "end_date_from",
+            "end_date_to",
+            "insurer",
+            "branch",
+            "insurance_type",
+            "policy_active",
+            "dfa_active",
+            "broker_participation",
+            # Для платежей
+            "policy__policy_number",
+            "policy__client__client_name",
+            "due_date_from",
+            "due_date_to",
+            "is_paid",
+            "policy__insurer",
+            "policy__branch",
+            "year_number",
+            "installment_number",
+        ]
+
+        for field in filter_fields:
+            value = request.POST.get(field)
+            if value:
+                filters[field] = value
 
         config = {"fields": selected_fields, "filters": filters}
 

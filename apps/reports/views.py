@@ -290,7 +290,7 @@ def export_policy_expiration(request):
 
 @login_required
 def export_policies_csv(request):
-    """Export policies to CSV format by year"""
+    """Export payments to CSV format by date range"""
     # Проверяем права администратора
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "У вас нет прав для выполнения этого действия")
@@ -299,46 +299,56 @@ def export_policies_csv(request):
     try:
         import csv
         from django.utils import timezone
+        from datetime import datetime
 
-        # Получаем параметр года из запроса
-        year_param = request.GET.get("year")
+        # Получаем параметры периода из запроса
+        start_date_param = request.GET.get("start_date")
+        end_date_param = request.GET.get("end_date")
 
-        # Проверяем наличие обязательного параметра
-        if not year_param:
-            messages.error(request, "Необходимо выбрать год")
+        # Проверяем наличие обязательных параметров
+        if not start_date_param or not end_date_param:
+            messages.error(
+                request, "Необходимо указать дату начала и дату окончания периода"
+            )
             return redirect("reports:index")
 
-        # Получаем полисы с оптимизированными запросами
-        policies = Policy.objects.select_related(
-            "client",
-            "insurer",
-            "branch",
-            "insurance_type",
-            "policyholder",
-            "leasing_manager",
-        ).all()
+        # Парсим даты
+        try:
+            start_date = datetime.strptime(start_date_param, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_param, "%Y-%m-%d").date()
+        except ValueError:
+            messages.error(request, "Неверный формат даты")
+            return redirect("reports:index")
 
-        # Применяем фильтр по году, если не выбрано "Все годы"
-        if year_param != "all":
-            try:
-                year = int(year_param)
-                policies = policies.filter(start_date__year=year)
-            except ValueError:
-                messages.error(request, "Неверный формат года")
-                return redirect("reports:index")
+        # Проверяем корректность периода
+        if start_date > end_date:
+            messages.error(request, "Дата начала не может быть больше даты окончания")
+            return redirect("reports:index")
+
+        # Получаем платежи с оптимизированными запросами
+        payments = (
+            PaymentSchedule.objects.select_related(
+                "policy__client",
+                "policy__insurer",
+                "policy__branch",
+                "policy__insurance_type",
+                "policy__policyholder",
+            )
+            .filter(due_date__gte=start_date, due_date__lte=end_date)
+            .order_by("due_date")
+        )
 
         # Проверяем наличие данных
-        if not policies.exists():
+        if not payments.exists():
             messages.warning(
                 request,
-                f"Нет полисов для выбранного периода",
+                f"Нет платежей для выбранного периода ({start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')})",
             )
             return redirect("reports:index")
 
         # Создаем HTTP ответ с CSV
         response = HttpResponse(content_type="text/csv; charset=utf-8")
-        year_str = year_param if year_param == "all" else f"{year_param}"
-        filename = f"policies_{year_str}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"payments_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
         # Добавляем BOM для корректного отображения в Excel
@@ -346,60 +356,51 @@ def export_policies_csv(request):
 
         writer = csv.writer(response, delimiter=";")
 
-        # Заголовки
+        # Заголовки в требуемом порядке
         headers = [
-            "Номер полиса",
             "Номер ДФА",
-            "Клиент",
+            "Лизингополучатель",
             "Страховщик",
+            "Страхователь",
+            "Описание застрахованного имущества",
+            "Страховая сумма",
+            "Страховая премия",
+            "КВ в рублях",
             "Вид страхования",
             "Филиал",
-            "Дата начала",
-            "Дата окончания",
-            "Общая премия",
-            "Франшиза",
-            "Страхователь",
-            "Менеджер по лизингу",
-            "Статус полиса",
-            "Статус ДФА",
+            "Месяц",
             "Участие брокера",
-            "Дата расторжения",
         ]
         writer.writerow(headers)
 
         # Данные
-        for policy in policies:
+        for payment in payments:
+            policy = payment.policy
             row = [
-                policy.policy_number or "",
                 policy.dfa_number or "",
                 policy.client.client_name if policy.client else "",
                 policy.insurer.insurer_name if policy.insurer else "",
+                policy.policyholder.client_name if policy.policyholder else "",
+                policy.property_description or "",
+                str(payment.insurance_sum) if payment.insurance_sum else "",
+                str(payment.amount) if payment.amount else "",
+                str(payment.kv_rub) if payment.kv_rub else "",
                 policy.insurance_type.name if policy.insurance_type else "",
                 policy.branch.branch_name if policy.branch else "",
-                policy.start_date.strftime("%d.%m.%Y") if policy.start_date else "",
-                policy.end_date.strftime("%d.%m.%Y") if policy.end_date else "",
-                str(policy.premium_total) if policy.premium_total else "",
-                str(policy.franchise) if policy.franchise else "",
-                policy.policyholder.client_name if policy.policyholder else "",
-                policy.leasing_manager.manager_name if policy.leasing_manager else "",
-                "Активен" if policy.policy_active else "Неактивен",
-                "Активен" if policy.dfa_active else "Неактивен",
+                str(payment.due_date.month) if payment.due_date else "",
                 "Да" if policy.broker_participation else "Нет",
-                policy.termination_date.strftime("%d.%m.%Y")
-                if policy.termination_date
-                else "",
             ]
             writer.writerow(row)
 
         # Логируем
         logger.info(
-            f"User {request.user.username} exported policies to CSV (year: {year_param}, count: {policies.count()})"
+            f"User {request.user.username} exported payments to CSV (period: {start_date} - {end_date}, count: {payments.count()})"
         )
 
         return response
 
     except Exception as e:
-        logger.error(f"Error exporting policies to CSV: {e}")
+        logger.error(f"Error exporting payments to CSV: {e}")
         messages.error(request, "Ошибка при создании CSV файла")
         return redirect("reports:index")
 

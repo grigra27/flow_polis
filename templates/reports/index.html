@@ -363,10 +363,10 @@
             </div>
             <div class="card-body">
                 <p class="mb-2">
-                    <strong>Выгрузка данных по полисам</strong>
+                    <strong>Выгрузка платежей по периоду</strong>
                 </p>
                 <p class="text-muted small mb-3">
-                    Экспорт полисов по годам в формате CSV для анализа данных
+                    Экспорт всех платежей за указанный период в формате CSV для анализа данных
                 </p>
 
                 <!-- Ключевые особенности -->
@@ -380,13 +380,13 @@
                     <div class="col-6">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-check-circle-fill text-secondary me-2"></i>
-                            <small>Фильтр по годам</small>
+                            <small>Фильтр по периоду</small>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-check-circle-fill text-secondary me-2"></i>
-                            <small>Все поля полисов</small>
+                            <small>Данные по платежам</small>
                         </div>
                     </div>
                     <div class="col-6">
@@ -397,39 +397,49 @@
                     </div>
                 </div>
 
-                <!-- Форма с выбором года -->
+                <!-- Форма с выбором периода -->
                 <form method="get" action="{% url 'reports:export_policies_csv' %}" class="needs-validation" novalidate>
-                    <div class="mb-3">
-                        <label for="year" class="form-label small mb-1 fw-semibold">
-                            <i class="bi bi-calendar3"></i> Год
-                        </label>
-                        <select class="form-select form-select-sm"
-                                id="year"
-                                name="year"
-                                required>
-                            <option value="">Выберите год</option>
-                            <option value="all">Все годы</option>
-                            {% for year in years %}
-                            <option value="{{ year }}" {% if request.GET.year == year|stringformat:"s" %}selected{% endif %}>
-                                {{ year }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">
-                            Выберите год или "Все годы" для полной выгрузки
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label small mb-1 fw-semibold">
+                                <i class="bi bi-calendar3"></i> Дата начала
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   id="start_date"
+                                   name="start_date"
+                                   value="{{ request.GET.start_date }}"
+                                   required>
+                            <div class="form-text">
+                                Начало периода для выгрузки
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label small mb-1 fw-semibold">
+                                <i class="bi bi-calendar3"></i> Дата окончания
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   id="end_date"
+                                   name="end_date"
+                                   value="{{ request.GET.end_date }}"
+                                   required>
+                            <div class="form-text">
+                                Окончание периода для выгрузки
+                            </div>
                         </div>
                     </div>
 
                     <div class="alert alert-light border py-2 px-3 mb-3" role="alert">
                         <small class="text-muted">
                             <i class="bi bi-info-circle"></i>
-                            Фильтр по году начала страхования
+                            Фильтр по дате платежа (по договору). Каждая строка = один платеж
                         </small>
                     </div>
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-secondary">
-                            <i class="bi bi-filetype-csv"></i> Экспортировать в CSV
+                            <i class="bi bi-filetype-csv"></i> Экспортировать платежи в CSV
                         </button>
                     </div>
                 </form>

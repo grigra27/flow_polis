@@ -15,13 +15,13 @@ from .exporters import AnalyticsExporter
 from apps.insurers.models import Branch, Insurer
 from apps.policies.models import InsuranceType
 from apps.clients.models import Client
-from apps.accounts.mixins import AdminRequiredMixin
+from apps.accounts.mixins import SuperuserRequiredMixin
 
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
 
 
-class DashboardView(AdminRequiredMixin, TemplateView):
+class DashboardView(SuperuserRequiredMixin, TemplateView):
     """
     Main dashboard view displaying key performance indicators.
 
@@ -333,7 +333,7 @@ class DashboardView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class BranchAnalyticsView(AdminRequiredMixin, TemplateView):
+class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Branch analytics view displaying detailed metrics by branch.
 
@@ -659,7 +659,7 @@ class BranchAnalyticsView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class InsurerAnalyticsView(AdminRequiredMixin, TemplateView):
+class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Insurer analytics view displaying detailed metrics by insurer.
 
@@ -1020,7 +1020,7 @@ class InsurerAnalyticsView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class InsuranceTypeAnalyticsView(AdminRequiredMixin, TemplateView):
+class InsuranceTypeAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Insurance type analytics view displaying detailed metrics by insurance type.
 
@@ -1398,7 +1398,7 @@ class InsuranceTypeAnalyticsView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class ClientAnalyticsView(AdminRequiredMixin, TemplateView):
+class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Client analytics view displaying detailed metrics by client.
 
@@ -1790,7 +1790,7 @@ class ClientAnalyticsView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class FinancialAnalyticsView(AdminRequiredMixin, TemplateView):
+class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Financial analytics view displaying forecasting and payment analysis.
 
@@ -2203,7 +2203,7 @@ class FinancialAnalyticsView(AdminRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
-class TimeSeriesAnalyticsView(AdminRequiredMixin, TemplateView):
+class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Time series analytics view displaying trends and seasonal patterns.
 

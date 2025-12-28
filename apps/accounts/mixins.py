@@ -2,6 +2,51 @@ from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMi
 from django.shortcuts import redirect
 
 
+class SuperuserRequiredMixin(UserPassesTestMixin):
+    """
+    Mixin for class-based views that requires the user to be a superuser.
+
+    - If the user is not authenticated, redirects to the login page
+    - If the user is authenticated but not a superuser, redirects to the access_denied page
+    - Only superusers have access to views using this mixin
+
+    Usage:
+        class AnalyticsView(SuperuserRequiredMixin, View):
+            ...
+
+    Requirements: Enhanced security for sensitive analytics data
+    """
+
+    def test_func(self):
+        """
+        Test if the user is a superuser.
+
+        Returns:
+            bool: True if user is authenticated and is superuser, False otherwise
+        """
+        user = self.request.user
+
+        # User must be authenticated and be a superuser
+        return user.is_authenticated and user.is_superuser
+
+    def handle_no_permission(self):
+        """
+        Handle the case when the user doesn't have permission.
+
+        - If user is not authenticated, redirect to login page (handled by parent class)
+        - If user is authenticated but not superuser, redirect to access_denied page
+
+        Returns:
+            HttpResponse: Redirect to appropriate page
+        """
+        if self.request.user.is_authenticated:
+            # User is authenticated but not a superuser
+            return redirect("accounts:access_denied")
+
+        # User is not authenticated, let parent class handle (redirect to login)
+        return super().handle_no_permission()
+
+
 class AdminRequiredMixin(UserPassesTestMixin):
     """
     Mixin for class-based views that requires the user to be an administrator.

@@ -501,10 +501,18 @@ function updateFilters(source) {
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Клиент</label>
+                            <label class="form-label">Лизингополучатель</label>
                             <input type="text" class="form-control" name="client__client_name" placeholder="Поиск по названию">
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Страхователь</label>
+                            <input type="text" class="form-control" name="policyholder__client_name" placeholder="Поиск по названию">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Страховщик</label>
@@ -615,12 +623,18 @@ function updateFilters(source) {
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Клиент</label>
+                            <label class="form-label">Лизингополучатель</label>
                             <input type="text" class="form-control" name="policy__client__client_name" placeholder="Поиск по названию">
                         </div>
                     </div>
                 </div>
                 <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Страхователь</label>
+                            <input type="text" class="form-control" name="policy__policyholder__client_name" placeholder="Поиск по названию">
+                        </div>
+                    </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Страховщик</label>
@@ -655,6 +669,34 @@ function updateFilters(source) {
                         <div class="mb-3">
                             <label class="form-label">Дата платежа до</label>
                             <input type="date" class="form-control" name="due_date_to">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата факт. оплаты от</label>
+                            <input type="date" class="form-control" name="paid_date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата факт. оплаты до</label>
+                            <input type="date" class="form-control" name="paid_date_to">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата согласования акта с СК от</label>
+                            <input type="date" class="form-control" name="insurer_date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Дата согласования акта с СК до</label>
+                            <input type="date" class="form-control" name="insurer_date_to">
                         </div>
                     </div>
                 </div>

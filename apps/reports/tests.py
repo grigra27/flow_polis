@@ -316,7 +316,7 @@ class CustomExporterTest(TestCase):
 
         self.assertEqual(len(headers), 3)
         self.assertEqual(headers[0], "Номер полиса")
-        self.assertEqual(headers[1], "Клиент")
+        self.assertEqual(headers[1], "Лизингополучатель")
         self.assertEqual(headers[2], "Общая премия")
 
     def test_custom_exporter_get_field_value(self):

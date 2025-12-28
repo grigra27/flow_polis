@@ -1,6 +1,9 @@
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment, NamedStyle
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from datetime import date
 from decimal import Decimal
 import logging
@@ -18,7 +21,10 @@ class BaseExporter:
     def export(self):
         """Генерирует Excel файл и возвращает HttpResponse"""
         wb = Workbook()
+
+        # Создаем основной лист с данными
         ws = wb.active
+        ws.title = "Данные"
 
         # Заголовки
         headers = self.get_headers()
@@ -29,8 +35,15 @@ class BaseExporter:
             row = self.get_row_data(obj)
             ws.append(row)
 
-        # Форматирование
+        # Применяем все улучшения
         self.apply_formatting(ws)
+        self.auto_adjust_columns(ws)
+        self.add_autofilter(ws)
+        self.freeze_panes(ws)
+
+        # Добавляем дополнительные листы
+        self.add_summary_sheet(wb)
+        self.add_legend_sheet(wb)
 
         return self.create_response(wb)
 
@@ -43,8 +56,188 @@ class BaseExporter:
         raise NotImplementedError("Subclasses must implement get_row_data()")
 
     def apply_formatting(self, ws):
-        """Применяет форматирование к листу"""
-        # Базовое форматирование можно добавить здесь
+        """Применяет стилизацию к листу"""
+        if ws.max_row < 1:
+            return
+
+        # Стиль для заголовков
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(
+            start_color="366092", end_color="366092", fill_type="solid"
+        )
+        header_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+        header_alignment = Alignment(horizontal="center", vertical="center")
+
+        # Применяем стиль к заголовкам
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = header_border
+            cell.alignment = header_alignment
+
+        # Стиль для данных
+        data_border = Border(
+            left=Side(style="thin", color="D3D3D3"),
+            right=Side(style="thin", color="D3D3D3"),
+            top=Side(style="thin", color="D3D3D3"),
+            bottom=Side(style="thin", color="D3D3D3"),
+        )
+
+        # Чередующиеся строки (зебра-стиль)
+        light_fill = PatternFill(
+            start_color="F8F9FA", end_color="F8F9FA", fill_type="solid"
+        )
+
+        # Применяем стиль к данным
+        for row_num in range(2, ws.max_row + 1):
+            for col_num in range(1, ws.max_column + 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.border = data_border
+
+                # Чередующиеся строки
+                if row_num % 2 == 0:
+                    cell.fill = light_fill
+
+                # Форматирование по типу данных
+                self.format_cell_by_type(cell)
+
+    def format_cell_by_type(self, cell):
+        """Форматирует ячейку в зависимости от типа данных"""
+        value = cell.value
+
+        if isinstance(value, date):
+            # Форматирование дат
+            cell.number_format = "DD.MM.YYYY"
+            cell.alignment = Alignment(horizontal="center")
+        elif isinstance(value, (int, float, Decimal)):
+            # Форматирование чисел
+            if str(value).replace(".", "").replace(",", "").isdigit() and "." in str(
+                value
+            ):
+                # Денежные суммы
+                cell.number_format = "#,##0.00"
+            else:
+                # Обычные числа
+                cell.number_format = "#,##0"
+            cell.alignment = Alignment(horizontal="right")
+        elif isinstance(value, str):
+            # Текстовые данные
+            cell.alignment = Alignment(horizontal="left", wrap_text=True)
+
+    def auto_adjust_columns(self, ws):
+        """Автоматически настраивает ширину столбцов"""
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+
+            for cell in column:
+                try:
+                    if cell.value:
+                        # Учитываем длину текста
+                        cell_length = len(str(cell.value))
+                        if cell_length > max_length:
+                            max_length = cell_length
+                except:
+                    pass
+
+            # Устанавливаем ширину с ограничениями
+            adjusted_width = min(max(max_length + 2, 10), 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+    def add_autofilter(self, ws):
+        """Добавляет автофильтр к заголовкам"""
+        if ws.max_row > 1 and ws.max_column > 0:
+            ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+
+    def freeze_panes(self, ws):
+        """Замораживает панели (заголовки и первые столбцы)"""
+        if ws.max_row > 1:
+            # Замораживаем первую строку (заголовки)
+            ws.freeze_panes = "A2"
+
+    def add_summary_sheet(self, wb):
+        """Добавляет сводный лист с общей статистикой"""
+        summary_ws = wb.create_sheet("Сводка")
+
+        # Заголовок
+        summary_ws["A1"] = "Сводная информация по экспорту"
+        summary_ws["A1"].font = Font(bold=True, size=14)
+
+        # Информация об экспорте
+        row = 3
+        summary_ws[f"A{row}"] = "Дата создания:"
+        summary_ws[f"B{row}"] = timezone.now().strftime("%d.%m.%Y %H:%M:%S")
+
+        row += 1
+        summary_ws[f"A{row}"] = "Количество записей:"
+        summary_ws[f"B{row}"] = (
+            self.queryset.count()
+            if hasattr(self.queryset, "count")
+            else len(list(self.queryset))
+        )
+
+        row += 1
+        summary_ws[f"A{row}"] = "Тип отчета:"
+        summary_ws[f"B{row}"] = self.get_report_type()
+
+        # Добавляем специфичную для отчета статистику
+        self.add_custom_summary(summary_ws, row + 2)
+
+        # Автоподбор ширины для сводки
+        for column in summary_ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            for cell in column:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            summary_ws.column_dimensions[column_letter].width = max_length + 2
+
+    def add_legend_sheet(self, wb):
+        """Добавляет лист с легендой и расшифровками"""
+        legend_ws = wb.create_sheet("Легенда")
+
+        # Заголовок
+        legend_ws["A1"] = "Легенда и расшифровки"
+        legend_ws["A1"].font = Font(bold=True, size=14)
+
+        row = 3
+
+        # Общие расшифровки
+        legend_ws[f"A{row}"] = "Общие обозначения:"
+        legend_ws[f"A{row}"].font = Font(bold=True)
+        row += 1
+
+        legend_ws[f"A{row}"] = "• Да/Нет - логические значения"
+        row += 1
+        legend_ws[f"A{row}"] = "• Пустые ячейки - данные отсутствуют"
+        row += 1
+        legend_ws[f"A{row}"] = "• Даты в формате ДД.ММ.ГГГГ"
+        row += 2
+
+        # Добавляем специфичную для отчета легенду
+        self.add_custom_legend(legend_ws, row)
+
+        # Автоподбор ширины
+        legend_ws.column_dimensions["A"].width = 50
+
+    def get_report_type(self):
+        """Возвращает тип отчета для сводки"""
+        return "Общий отчет"
+
+    def add_custom_summary(self, ws, start_row):
+        """Добавляет специфичную для отчета статистику (переопределяется в наследниках)"""
+        pass
+
+    def add_custom_legend(self, ws, start_row):
+        """Добавляет специфичную для отчета легенду (переопределяется в наследниках)"""
         pass
 
     def create_response(self, wb):
@@ -83,12 +276,13 @@ class CustomExporter(BaseExporter):
         "policies": {
             "policy_number": "Номер полиса",
             "dfa_number": "Номер ДФА",
-            "client__client_name": "Клиент",
+            "client__client_name": "Лизингополучатель",
+            "policyholder__client_name": "Страхователь",
             "insurer__insurer_name": "Страховщик",
             "insurance_type__name": "Вид страхования",
             "branch__branch_name": "Филиал",
-            "start_date": "Дата начала",
-            "end_date": "Дата окончания",
+            "start_date": "Дата начала страхования",
+            "end_date": "Дата окончания страхования",
             "premium_total": "Общая премия",
             "franchise": "Франшиза",
             "policy_active": "Статус полиса",
@@ -99,17 +293,19 @@ class CustomExporter(BaseExporter):
         "payments": {
             "policy__policy_number": "Номер полиса",
             "policy__dfa_number": "Номер ДФА",
-            "policy__client__client_name": "Клиент",
+            "policy__client__client_name": "Лизингополучатель",
+            "policy__policyholder__client_name": "Страхователь",
             "policy__insurer__insurer_name": "Страховщик",
+            "policy__insurance_type__name": "Вид страхования",
             "policy__branch__branch_name": "Филиал",
-            "year_number": "Год",
-            "installment_number": "Платеж №",
-            "due_date": "Дата платежа",
-            "amount": "Сумма",
+            "year_number": "Год (в связке год/платеж)",
+            "installment_number": "Платеж (в связке год/платеж)",
+            "due_date": "Дата платежа (по договору)",
+            "amount": "Страховая премия",
             "insurance_sum": "Страховая сумма",
-            "commission_rate__kv_percent": "КВ %",
-            "kv_rub": "КВ руб",
-            "paid_date": "Дата оплаты",
+            "commission_rate__kv_percent": "КВ в %",
+            "kv_rub": "КВ (в руб)",
+            "paid_date": "Дата фактической оплаты",
             "insurer_date": "Дата согласования акта с СК",
         },
     }
@@ -143,6 +339,50 @@ class CustomExporter(BaseExporter):
     def get_filename(self):
         """Возвращает базовое имя файла на основе источника данных"""
         return f"custom_export_{self.data_source}"
+
+    def get_report_type(self):
+        """Возвращает тип отчета для сводки"""
+        return f"Кастомный экспорт - {self.data_source}"
+
+    def add_custom_summary(self, ws, start_row):
+        """Добавляет специфичную статистику для кастомного экспорта"""
+        row = start_row
+
+        ws[f"A{row}"] = "Источник данных:"
+        ws[f"B{row}"] = "Полисы" if self.data_source == "policies" else "Платежи"
+
+        row += 1
+        ws[f"A{row}"] = "Количество полей:"
+        ws[f"B{row}"] = len(self.fields)
+
+        row += 1
+        ws[f"A{row}"] = "Выбранные поля:"
+        row += 1
+
+        for field in self.fields:
+            ws[f"A{row}"] = f"• {self.FIELD_LABELS[self.data_source].get(field, field)}"
+            row += 1
+
+    def add_custom_legend(self, ws, start_row):
+        """Добавляет специфичную легенду для кастомного экспорта"""
+        row = start_row
+
+        ws[f"A{row}"] = "Специфичные обозначения:"
+        ws[f"A{row}"].font = Font(bold=True)
+        row += 1
+
+        if self.data_source == "policies":
+            ws[f"A{row}"] = "• Статус полиса: Активен/Неактивен"
+            row += 1
+            ws[f"A{row}"] = "• Статус ДФА: Активен/Закрыт"
+            row += 1
+            ws[f"A{row}"] = "• Участие брокера: Да/Нет"
+        else:
+            ws[f"A{row}"] = "• Год - порядковый номер года в полисе"
+            row += 1
+            ws[f"A{row}"] = "• Платеж № - номер платежа в году"
+            row += 1
+            ws[f"A{row}"] = "• КВ - комиссионное вознаграждение"
 
 
 class PolicyExporter(BaseExporter):

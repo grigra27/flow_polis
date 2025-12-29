@@ -77,12 +77,29 @@ class Command(BaseCommand):
                 period_name, logins_data, policies_data, payments_data
             )
 
-            # Отправляем в Telegram через telegram-notify.sh
+            # Отправляем в Telegram (разделяем на части если нужно)
             full_message = f"📊 Дайджест за {period_name}\n\n{message}"
-            success = self._send_telegram_message(full_message)
+
+            # Разделяем на части если сообщение слишком длинное
+            message_parts = self._split_message_into_parts(full_message)
+
+            print(f"DEBUG: Message split into {len(message_parts)} parts")
+            for i, part in enumerate(message_parts):
+                print(f"DEBUG: Part {i+1} length: {len(part)}")
+
+            success = self._send_telegram_messages(message_parts)
 
             if success:
-                self.stdout.write(self.style.SUCCESS("✅ Дайджест отправлен в Telegram"))
+                if len(message_parts) > 1:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"✅ Дайджест отправлен в Telegram ({len(message_parts)} частей)"
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS("✅ Дайджест отправлен в Telegram")
+                    )
             else:
                 self.stdout.write(
                     self.style.WARNING("⚠️ Не удалось отправить дайджест в Telegram")
@@ -953,7 +970,93 @@ class Command(BaseCommand):
 
         return result
 
-    def _send_telegram_message(self, message):
+    def _split_message_into_parts(self, message, max_length=3900):
+        """Разделяет длинное сообщение на несколько частей по логическим разделам"""
+        if len(message) <= max_length:
+            return [message]
+
+        lines = message.split("\n")
+        parts = []
+        current_part = []
+        current_length = 0
+
+        # Определяем разделители секций
+        section_headers = [
+            "📊 СВОДНАЯ СТАТИСТИКА:",
+            "👥 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ:",
+            "💰 ДЕТАЛИ ПО ПЛАТЕЖАМ:",
+            "📋 ДЕТАЛИ ПО ПОЛИСАМ:",
+            "🆕 СОЗДАНЫ:",
+            "✏️ ИЗМЕНЕНЫ:",
+            "💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:",
+        ]
+
+        for i, line in enumerate(lines):
+            line_length = len(line)
+
+            # Проверяем, является ли строка заголовком новой секции
+            is_section_header = any(
+                line.startswith(header) for header in section_headers
+            )
+
+            # Если добавление строки превысит лимит и у нас уже есть контент
+            if current_length + line_length + 1 > max_length and current_part:
+                # Сохраняем текущую часть
+                if current_part:
+                    parts.append("\n".join(current_part))
+
+                # Начинаем новую часть
+                current_part = [line]
+                current_length = line_length
+            else:
+                # Добавляем строку к текущей части
+                current_part.append(line)
+                current_length += line_length + 1  # +1 для \n
+
+        # Добавляем последнюю часть
+        if current_part:
+            parts.append("\n".join(current_part))
+
+        return parts
+
+    def _send_telegram_messages(self, messages):
+        """Отправляет несколько сообщений в Telegram с задержкой между ними"""
+        import time
+
+        success_count = 0
+        total_messages = len(messages)
+
+        for i, message in enumerate(messages):
+            print(
+                f"DEBUG: Sending message {i+1}/{total_messages} (length: {len(message)})"
+            )
+
+            # Добавляем номер части если сообщений больше одного
+            if total_messages > 1:
+                if i == 0:
+                    message = f"{message}\n\n📄 Часть 1/{total_messages}"
+                else:
+                    message = f"📄 Часть {i+1}/{total_messages}\n\n{message}"
+
+            success = self._send_single_telegram_message(message)
+
+            if success:
+                success_count += 1
+                print(f"DEBUG: Message {i+1}/{total_messages} sent successfully")
+
+                # Задержка между сообщениями (кроме последнего)
+                if i < total_messages - 1:
+                    time.sleep(1)  # 1 секунда между сообщениями
+            else:
+                print(f"ERROR: Failed to send message {i+1}/{total_messages}")
+                # Продолжаем отправку остальных сообщений
+
+        print(f"DEBUG: Successfully sent {success_count}/{total_messages} messages")
+        return (
+            success_count > 0
+        )  # Возвращаем True если хотя бы одно сообщение отправлено
+
+    def _send_single_telegram_message(self, message):
         """Отправляет сообщение в Telegram через Python с детальной отладкой"""
         try:
             from urllib.parse import urlencode

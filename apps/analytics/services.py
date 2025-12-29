@@ -11,6 +11,43 @@ from django.db.models.functions import Coalesce
 from .chart_providers import ChartDataProvider
 
 
+def sort_insurance_types(insurance_type_distribution: Dict[str, int]) -> Dict[str, int]:
+    """
+    Sort insurance types in the preferred order: КАСКО, Спецтехника, Имущество, Грузы, others.
+
+    Args:
+        insurance_type_distribution: Dictionary with insurance type names as keys and counts as values
+
+    Returns:
+        Sorted dictionary with insurance types in the preferred order
+    """
+    # Define the preferred order
+    preferred_order = ["КАСКО", "Спецтехника", "Имущество", "Грузы"]
+
+    sorted_distribution = {}
+
+    # First, add items in the preferred order
+    for insurance_type in preferred_order:
+        # Look for exact match or case-insensitive match
+        for key, value in insurance_type_distribution.items():
+            if key and insurance_type.lower() in key.lower():
+                sorted_distribution[key] = value
+                break
+
+    # Then add remaining items alphabetically
+    remaining_items = {
+        k: v
+        for k, v in insurance_type_distribution.items()
+        if k not in sorted_distribution
+    }
+
+    # Sort remaining items alphabetically
+    for key in sorted(remaining_items.keys()):
+        sorted_distribution[key] = remaining_items[key]
+
+    return sorted_distribution
+
+
 class MetricsCalculator:
     """
     Calculator for basic business metrics.
@@ -435,6 +472,11 @@ class AnalyticsService:
                     .values_list("insurance_type__name", "count")
                 )
 
+                # Sort insurance types in preferred order
+                insurance_type_distribution = sort_insurance_types(
+                    insurance_type_distribution
+                )
+
                 branch_metrics.append(
                     {
                         "branch": {"id": branch.id, "name": branch.branch_name},
@@ -540,6 +582,11 @@ class AnalyticsService:
                     insurer_policies.values("insurance_type__name")
                     .annotate(count=Count("id"))
                     .values_list("insurance_type__name", "count")
+                )
+
+                # Sort insurance types in preferred order
+                insurance_type_distribution = sort_insurance_types(
+                    insurance_type_distribution
                 )
 
                 insurer_metrics.append(
@@ -775,6 +822,11 @@ class AnalyticsService:
                     client_policies.values("insurance_type__name")
                     .annotate(count=Count("id"))
                     .values_list("insurance_type__name", "count")
+                )
+
+                # Sort insurance types in preferred order
+                insurance_type_distribution = sort_insurance_types(
+                    insurance_type_distribution
                 )
 
                 # Get branch distribution for this client

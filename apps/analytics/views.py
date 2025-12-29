@@ -721,7 +721,7 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
             # Always show all data in market_share_distribution for the table
             for metric in insurer_metrics:
-                market_share_distribution[metric["insurer"]["name"]] = metric[
+                market_share_distribution[metric["insurer"].insurer_name] = metric[
                     "market_share"
                 ]
 
@@ -732,7 +732,7 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 # If 6 or fewer insurers, show all
                 for metric in insurer_metrics:
                     if metric["market_share"] > 0:
-                        chart_data_for_pie[metric["insurer"]["name"]] = metric[
+                        chart_data_for_pie[metric["insurer"].insurer_name] = metric[
                             "market_share"
                         ]
             else:
@@ -741,7 +741,7 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 others_share = Decimal("0")
 
                 for metric in top_6_metrics:
-                    chart_data_for_pie[metric["insurer"]["name"]] = metric[
+                    chart_data_for_pie[metric["insurer"].insurer_name] = metric[
                         "market_share"
                     ]
 
@@ -764,6 +764,7 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "top_performing_insurer": top_insurer,
                     "market_share_distribution": market_share_distribution,
                     "chart_data_for_pie": chart_data_for_pie,
+                    "policy_status": self.request.GET.get("policy_status", "all"),
                     "total_premium_volume": total_premium,
                     "total_commission_revenue": total_commission,
                     "total_policy_count": total_policies,
@@ -903,6 +904,11 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if self.request.GET.get("date_to"):
                 filter_data["date_to"] = self.request.GET.get("date_to")
 
+            # Policy status filter
+            policy_status = self.request.GET.get("policy_status", "all")
+            if policy_status in ["active", "inactive"]:
+                filter_data["policy_active"] = policy_status == "active"
+
             # Multi-select filters
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
@@ -915,7 +921,8 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if self.request.GET.getlist("clients"):
                 filter_data["client_ids"] = self.request.GET.getlist("clients")
 
-            if filter_data:
+            # Always create filter if we have policy_status or other data
+            if filter_data or policy_status != "all":
                 return self.analytics_service.validate_filter_input(filter_data)
 
             return None

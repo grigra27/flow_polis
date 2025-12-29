@@ -901,6 +901,58 @@ class Command(BaseCommand):
 
         return final_message
 
+    def _truncate_message(self, message, max_length):
+        """Сокращает сообщение до указанной длины, сохраняя важную информацию"""
+        if len(message) <= max_length:
+            return message
+
+        lines = message.split("\n")
+        result_lines = []
+        current_length = 0
+
+        # Резервируем место для информации о сокращении
+        truncate_info = "... (сообщение сокращено из-за лимита Telegram)"
+        reserve_length = len(truncate_info) + 10  # +10 для безопасности
+        effective_max_length = max_length - reserve_length
+
+        # Всегда включаем сводную статистику (первые строки)
+        for i, line in enumerate(lines):
+            line_length = len(line)
+
+            # Проверяем, поместится ли строка
+            if current_length + line_length + 1 > effective_max_length:
+                # Добавляем информацию о сокращении
+                remaining_lines = len(lines) - i
+                if remaining_lines > 0:
+                    result_lines.append(
+                        f"... и еще {remaining_lines} строк {truncate_info}"
+                    )
+                break
+
+            result_lines.append(line)
+            current_length += line_length + 1  # +1 для \n
+
+            # Прерываем после сводной статистики и активности пользователей если места мало
+            if (
+                line.startswith("📋 ДЕТАЛИ ПО ПОЛИСАМ:")
+                and current_length > effective_max_length * 0.6
+            ):  # Если уже использовано 60% места
+                remaining_lines = len(lines) - i - 1
+                if remaining_lines > 0:
+                    result_lines.append(
+                        f"... детали по {remaining_lines} элементам {truncate_info}"
+                    )
+                break
+
+        result = "\n".join(result_lines)
+
+        # Финальная проверка длины и принудительное сокращение если нужно
+        if len(result) > max_length:
+            # Принудительно сокращаем до нужной длины
+            result = result[: max_length - len(truncate_info)] + truncate_info
+
+        return result
+
     def _send_telegram_message(self, message):
         """Отправляет сообщение в Telegram через Python с детальной отладкой"""
         try:
@@ -936,6 +988,21 @@ class Command(BaseCommand):
                 print(f"DEBUG: Found {len(problematic_chars)} non-ASCII characters")
                 for pos, char, code in problematic_chars[:10]:  # Показываем первые 10
                     print(f"  Position {pos}: '{char}' (code: {code})")
+
+            # Проверяем длину сообщения и сокращаем если нужно
+            MAX_MESSAGE_LENGTH = (
+                3900  # Консервативный лимит с запасом для заголовка и кодировки
+            )
+
+            if len(message) > MAX_MESSAGE_LENGTH:
+                print(
+                    f"DEBUG: Message too long ({len(message)} chars), truncating to {MAX_MESSAGE_LENGTH}..."
+                )
+                message = self._truncate_message(message, MAX_MESSAGE_LENGTH)
+                print(f"DEBUG: Truncated message length: {len(message)}")
+                print(
+                    f"DEBUG: Truncated message preview: {repr(message[-200:])}"
+                )  # Показываем конец
 
             # Подготавливаем данные БЕЗ parse_mode (как в остальном проекте)
             data = {

@@ -162,6 +162,7 @@ class AnalyticsFilter:
         insurer_ids: Optional[list] = None,
         insurance_type_ids: Optional[list] = None,
         client_ids: Optional[list] = None,
+        policy_active: Optional[bool] = None,
     ):
         self.date_from = date_from
         self.date_to = date_to
@@ -169,6 +170,7 @@ class AnalyticsFilter:
         self.insurer_ids = insurer_ids or []
         self.insurance_type_ids = insurance_type_ids or []
         self.client_ids = client_ids or []
+        self.policy_active = policy_active
 
     def apply_to_policies(self, queryset: QuerySet) -> QuerySet:
         """
@@ -201,6 +203,10 @@ class AnalyticsFilter:
         # Client filtering
         if self.client_ids:
             queryset = queryset.filter(client_id__in=self.client_ids)
+
+        # Policy active filtering
+        if self.policy_active is not None:
+            queryset = queryset.filter(policy_active=self.policy_active)
 
         return queryset
 
@@ -238,6 +244,10 @@ class AnalyticsFilter:
         if self.client_ids:
             queryset = queryset.filter(policy__client_id__in=self.client_ids)
 
+        # Policy active filtering through policy relationship
+        if self.policy_active is not None:
+            queryset = queryset.filter(policy__policy_active=self.policy_active)
+
         return queryset
 
     def get_date_range_dict(self) -> Optional[Dict[str, date]]:
@@ -272,6 +282,7 @@ class AnalyticsFilter:
             or self.insurer_ids
             or self.insurance_type_ids
             or self.client_ids
+            or self.policy_active is not None
         )
 
 
@@ -533,7 +544,7 @@ class AnalyticsService:
 
                 insurer_metrics.append(
                     {
-                        "insurer": {"id": insurer.id, "name": insurer.insurer_name},
+                        "insurer": insurer,  # Передаем полный объект модели
                         "premium_volume": premium_volume,
                         "commission_revenue": commission_revenue,
                         "policy_count": policy_count,
@@ -1614,6 +1625,11 @@ class AnalyticsService:
             if client_ids:
                 client_ids = [int(id) for id in client_ids]
 
+            # Parse policy_active
+            policy_active = filter_data.get("policy_active")
+            if policy_active is not None and not isinstance(policy_active, bool):
+                policy_active = str(policy_active).lower() in ["true", "1", "yes"]
+
             return AnalyticsFilter(
                 date_from=date_from,
                 date_to=date_to,
@@ -1621,6 +1637,7 @@ class AnalyticsService:
                 insurer_ids=insurer_ids,
                 insurance_type_ids=insurance_type_ids,
                 client_ids=client_ids,
+                policy_active=policy_active,
             )
 
         except (ValueError, TypeError) as e:

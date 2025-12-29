@@ -2,10 +2,11 @@
 Django management команда для отправки ежедневного дайджеста в Telegram
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from auditlog.models import LogEntry
 from apps.accounts.models import LoginAttempt
 from apps.policies.models import Policy, PaymentSchedule
@@ -69,9 +70,12 @@ class Command(BaseCommand):
             # Собираем данные
             logins_data = self._get_logins_data(start_time, end_time)
             policies_data = self._get_policies_data(start_time, end_time)
+            payments_data = self._get_payments_data(start_time, end_time)
 
             # Формируем сообщение
-            message = self._format_message(period_name, logins_data, policies_data)
+            message = self._format_message(
+                period_name, logins_data, policies_data, payments_data
+            )
 
             # Отправляем в Telegram через telegram-notify.sh
             full_message = f"📊 Дайджест за {period_name}\n\n{message}"
@@ -87,6 +91,93 @@ class Command(BaseCommand):
         except Exception as e:
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
+
+    def _analyze_policy_changes(self, changes):
+        """Анализирует изменения полиса и возвращает важные изменения"""
+        import json
+
+        # Поля которые считаем важными для отображения
+        important_fields = {
+            "premium_total": {"name": "Премия", "emoji": "💰", "format": "money"},
+            "start_date": {"name": "Дата начала", "emoji": "📅", "format": "date"},
+            "end_date": {"name": "Дата окончания", "emoji": "📅", "format": "date"},
+            "franchise": {"name": "Франшиза", "emoji": "🛡️", "format": "money"},
+            "policy_active": {
+                "name": "Статус полиса",
+                "emoji": "🔄",
+                "format": "boolean",
+            },
+            "dfa_active": {"name": "Статус ДФА", "emoji": "📋", "format": "boolean"},
+            "client": {"name": "Клиент", "emoji": "👤", "format": "text"},
+            "insurer": {"name": "Страховщик", "emoji": "🏢", "format": "text"},
+        }
+
+        important_changes = []
+
+        for change in changes:
+            if change.action == LogEntry.Action.UPDATE and change.changes:
+                try:
+                    # Парсим JSON с изменениями
+                    if isinstance(change.changes, str):
+                        changes_dict = json.loads(change.changes)
+                    else:
+                        changes_dict = change.changes
+
+                    for field_name, (old_value, new_value) in changes_dict.items():
+                        if field_name in important_fields:
+                            field_info = important_fields[field_name]
+
+                            # Форматируем значения
+                            formatted_change = self._format_field_change(
+                                field_info, old_value, new_value
+                            )
+
+                            if formatted_change:
+                                important_changes.append(formatted_change)
+
+                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                    # Если не удалось распарсить изменения, пропускаем
+                    continue
+
+        return important_changes
+
+    def _format_field_change(self, field_info, old_value, new_value):
+        """Форматирует изменение поля для отображения"""
+        from decimal import Decimal
+
+        if old_value == new_value:
+            return None
+
+        emoji = field_info["emoji"]
+        name = field_info["name"]
+        format_type = field_info["format"]
+
+        if format_type == "money":
+            try:
+                old_val = Decimal(str(old_value)) if old_value else Decimal("0")
+                new_val = Decimal(str(new_value)) if new_value else Decimal("0")
+
+                # Показываем изменение
+                diff = new_val - old_val
+                if diff > 0:
+                    return f"{emoji} {name}: +{diff:,.0f}₽ ({old_val:,.0f}₽ → {new_val:,.0f}₽)"
+                elif diff < 0:
+                    return f"{emoji} {name}: {diff:,.0f}₽ ({old_val:,.0f}₽ → {new_val:,.0f}₽)"
+                else:
+                    return None
+            except (ValueError, TypeError):
+                return f"{emoji} {name}: {old_value} → {new_value}"
+
+        elif format_type == "date":
+            return f"{emoji} {name}: {old_value} → {new_value}"
+
+        elif format_type == "boolean":
+            old_status = "Активен" if old_value else "Неактивен"
+            new_status = "Активен" if new_value else "Неактивен"
+            return f"{emoji} {name}: {old_status} → {new_status}"
+
+        else:  # text
+            return f"{emoji} {name}: {old_value} → {new_value}"
 
     def _escape_markdown_text(self, text):
         """Экранирует специальные символы для Markdown (только для обычного текста)"""
@@ -177,7 +268,9 @@ class Command(BaseCommand):
         return logins_list
 
     def _get_policies_data(self, start_time, end_time):
-        """Получает данные об изменениях полисов"""
+        """Получает данные об изменениях полисов с расширенной статистикой"""
+        from decimal import Decimal
+
         # Получаем ContentType для моделей
         policy_ct = ContentType.objects.get_for_model(Policy)
         payment_ct = ContentType.objects.get_for_model(PaymentSchedule)
@@ -205,7 +298,20 @@ class Command(BaseCommand):
         )
 
         # Обрабатываем изменения полисов
-        policies_data = {"created": [], "updated": [], "payment_changes": []}
+        policies_data = {
+            "created": [],
+            "updated": [],
+            "payment_changes": [],
+            "statistics": {
+                "total_created": 0,
+                "total_updated": 0,
+                "total_payment_changes": 0,
+                "premium_sum_created": Decimal("0"),
+                "kv_sum_created": Decimal("0"),
+                "premium_sum_payments": Decimal("0"),
+                "kv_sum_payments": Decimal("0"),
+            },
+        }
 
         # Группируем изменения полисов по ID
         policy_changes_by_id = {}
@@ -230,16 +336,35 @@ class Command(BaseCommand):
                     change.action == LogEntry.Action.UPDATE for change in changes
                 )
 
+                # Анализируем изменения для умного отображения
+                change_details = self._analyze_policy_changes(changes)
+
                 policy_info = {
                     "policy": policy,
                     "url": f"https://polis.insflow.ru/policies/{policy.pk}/",
                     "changes": changes,
+                    "change_details": change_details,
                 }
 
                 if has_create:
                     policies_data["created"].append(policy_info)
+                    policies_data["statistics"]["total_created"] += 1
+
+                    # Добавляем премию и КВ для новых полисов
+                    if policy.premium_total:
+                        policies_data["statistics"][
+                            "premium_sum_created"
+                        ] += policy.premium_total
+
+                    # Считаем КВ по всем платежам нового полиса
+                    kv_sum = policy.payment_schedule.aggregate(
+                        total_kv=models.Sum("kv_rub")
+                    )["total_kv"] or Decimal("0")
+                    policies_data["statistics"]["kv_sum_created"] += kv_sum
+
                 elif has_update:
                     policies_data["updated"].append(policy_info)
+                    policies_data["statistics"]["total_updated"] += 1
 
             except Policy.DoesNotExist:
                 # Полис был удален
@@ -263,6 +388,13 @@ class Command(BaseCommand):
                     {"payment": payment, "change": change}
                 )
 
+                # Добавляем статистику по платежам
+                if change.action == LogEntry.Action.CREATE:
+                    policies_data["statistics"][
+                        "premium_sum_payments"
+                    ] += payment.amount
+                    policies_data["statistics"]["kv_sum_payments"] += payment.kv_rub
+
             except PaymentSchedule.DoesNotExist:
                 continue
 
@@ -271,11 +403,74 @@ class Command(BaseCommand):
             if str(policy_id) not in policy_changes_by_id:  # Полис сам не менялся
                 payment_data["url"] = f"https://polis.insflow.ru/policies/{policy_id}/"
                 policies_data["payment_changes"].append(payment_data)
+                policies_data["statistics"]["total_payment_changes"] += 1
 
         return policies_data
 
-    def _format_message(self, period_name, logins_data, policies_data):
-        """Форматирует сообщение для отправки с отладкой"""
+    def _get_payments_data(self, start_time, end_time):
+        """Получает данные о платежах за период"""
+        from decimal import Decimal
+        from datetime import date
+
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+
+        # Платежи которые должны были быть оплачены в этот период
+        due_payments = PaymentSchedule.objects.filter(
+            due_date__gte=start_time.date(), due_date__lt=end_time.date()
+        ).select_related("policy__client", "policy__insurer")
+
+        # Платежи которые были фактически оплачены в этот период
+        paid_payments = PaymentSchedule.objects.filter(
+            paid_date__gte=start_time.date(), paid_date__lt=end_time.date()
+        ).select_related("policy__client", "policy__insurer")
+
+        # Просроченные платежи (должны были быть оплачены до сегодня, но не оплачены)
+        overdue_payments = PaymentSchedule.objects.filter(
+            due_date__lt=today,
+            paid_date__isnull=True,
+            policy__policy_active=True,  # Только по активным полисам
+        ).select_related("policy__client", "policy__insurer")
+
+        # Платежи на завтра
+        tomorrow_payments = PaymentSchedule.objects.filter(
+            due_date=tomorrow, paid_date__isnull=True, policy__policy_active=True
+        ).select_related("policy__client", "policy__insurer")
+
+        # Считаем суммы
+        paid_sum = paid_payments.aggregate(total=models.Sum("amount"))[
+            "total"
+        ] or Decimal("0")
+        paid_kv_sum = paid_payments.aggregate(total=models.Sum("kv_rub"))[
+            "total"
+        ] or Decimal("0")
+
+        overdue_sum = overdue_payments.aggregate(total=models.Sum("amount"))[
+            "total"
+        ] or Decimal("0")
+        tomorrow_sum = tomorrow_payments.aggregate(total=models.Sum("amount"))[
+            "total"
+        ] or Decimal("0")
+
+        return {
+            "due_payments": list(due_payments),
+            "paid_payments": list(paid_payments),
+            "overdue_payments": list(overdue_payments),
+            "tomorrow_payments": list(tomorrow_payments),
+            "statistics": {
+                "due_count": due_payments.count(),
+                "paid_count": paid_payments.count(),
+                "paid_sum": paid_sum,
+                "paid_kv_sum": paid_kv_sum,
+                "overdue_count": overdue_payments.count(),
+                "overdue_sum": overdue_sum,
+                "tomorrow_count": tomorrow_payments.count(),
+                "tomorrow_sum": tomorrow_sum,
+            },
+        }
+
+    def _format_message(self, period_name, logins_data, policies_data, payments_data):
+        """Форматирует сообщение для отправки с расширенной статистикой и улучшенным форматированием"""
         print(f"DEBUG: Formatting message for period: {period_name}")
         print(f"DEBUG: Logins count: {len(logins_data)}")
         print(f"DEBUG: Policies created: {len(policies_data['created'])}")
@@ -283,30 +478,191 @@ class Command(BaseCommand):
         print(f"DEBUG: Payment changes: {len(policies_data['payment_changes'])}")
 
         message_parts = []
+        stats = policies_data["statistics"]
+        payment_stats = payments_data["statistics"]
 
-        # Логины пользователей
-        if logins_data:
-            message_parts.append("👥 ЛОГИНЫ:")
-            for i, login in enumerate(logins_data):
-                print(
-                    f"DEBUG: Processing login {i+1}: '{login['username']}' at {login['time']}"
+        # 📊 СВОДНАЯ СТАТИСТИКА (новое!)
+        message_parts.append("📊 СВОДНАЯ СТАТИСТИКА:")
+
+        # Общие цифры по полисам
+        total_policies = stats["total_created"] + stats["total_updated"]
+        message_parts.append(
+            f"📋 Всего полисов: {total_policies} (создано: {stats['total_created']}, изменено: {stats['total_updated']})"
+        )
+
+        if stats["total_payment_changes"] > 0:
+            message_parts.append(
+                f"💳 Изменений платежей: {stats['total_payment_changes']}"
+            )
+
+        # Суммы по новым полисам
+        if stats["premium_sum_created"] > 0:
+            message_parts.append(
+                f"💰 Премии по новым полисам: {stats['premium_sum_created']:,.0f}₽"
+            )
+
+        if stats["kv_sum_created"] > 0:
+            message_parts.append(
+                f"🤝 КВ по новым полисам: {stats['kv_sum_created']:,.0f}₽"
+            )
+
+        # Суммы по новым платежам
+        if stats["premium_sum_payments"] > 0:
+            message_parts.append(
+                f"💸 Премии по новым платежам: {stats['premium_sum_payments']:,.0f}₽"
+            )
+
+        if stats["kv_sum_payments"] > 0:
+            message_parts.append(
+                f"💼 КВ по новым платежам: {stats['kv_sum_payments']:,.0f}₽"
+            )
+
+        # Статистика по платежам (новое!)
+        if payment_stats["paid_count"] > 0:
+            message_parts.append(
+                f"✅ Оплачено платежей: {payment_stats['paid_count']} на сумму {payment_stats['paid_sum']:,.0f}₽"
+            )
+            if payment_stats["paid_kv_sum"] > 0:
+                message_parts.append(
+                    f"💼 КВ с оплаченных: {payment_stats['paid_kv_sum']:,.0f}₽"
                 )
-                # НЕ экранируем логины - они не в ссылках и должны отображаться как есть
-                login_line = f"• {login['time']} - {login['username']}"
-                print(f"DEBUG: Login line: '{login_line}'")
-                message_parts.append(login_line)
+
+        # Предупреждения о просрочке и завтрашних платежах
+        if payment_stats["overdue_count"] > 0:
+            message_parts.append(
+                f"⚠️ Просрочено: {payment_stats['overdue_count']} платежей на {payment_stats['overdue_sum']:,.0f}₽"
+            )
+
+        if payment_stats["tomorrow_count"] > 0:
+            message_parts.append(
+                f"📅 Завтра к оплате: {payment_stats['tomorrow_count']} платежей на {payment_stats['tomorrow_sum']:,.0f}₽"
+            )
+
+        # Если никакой активности не было
+        if (
+            total_policies == 0
+            and stats["total_payment_changes"] == 0
+            and payment_stats["paid_count"] == 0
+        ):
+            message_parts.append("📭 Активности не было")
+
+        message_parts.append("")  # Разделитель
+
+        # 👥 ЛОГИНЫ ПОЛЬЗОВАТЕЛЕЙ (улучшенное форматирование)
+        message_parts.append("👥 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ:")
+        if logins_data:
+            # Группируем логины по пользователям
+            user_logins = {}
+            for login in logins_data:
+                username = login["username"]
+                if username not in user_logins:
+                    user_logins[username] = []
+                user_logins[username].append(login["time"])
+
+            # Показываем сгруппированно
+            for username, times in user_logins.items():
+                if len(times) == 1:
+                    message_parts.append(f"• {times[0]} - {username}")
+                else:
+                    times_str = ", ".join(times)
+                    message_parts.append(
+                        f"• {username}: {times_str} ({len(times)} входов)"
+                    )
         else:
-            message_parts.append("👥 ЛОГИНЫ: нет активности")
+            message_parts.append("• Входов не было")
 
-        message_parts.append("")  # Пустая строка
+        message_parts.append("")  # Разделитель
 
-        # Полисы
-        message_parts.append("📋 ПОЛИСЫ:")
+        # 💰 ИНФОРМАЦИЯ О ПЛАТЕЖАХ (новое!)
+        if (
+            payment_stats["paid_count"] > 0
+            or payment_stats["overdue_count"] > 0
+            or payment_stats["tomorrow_count"] > 0
+        ):
+            message_parts.append("💰 ДЕТАЛИ ПО ПЛАТЕЖАМ:")
 
-        # Созданные полисы
+            # Оплаченные платежи
+            if payment_stats["paid_count"] > 0:
+                message_parts.append("")
+                message_parts.append("✅ ОПЛАЧЕНО:")
+                # Показываем только первые 5 оплаченных платежей, чтобы не перегружать
+                for payment in payments_data["paid_payments"][:5]:
+                    policy_number = (
+                        payment.policy.dfa_number
+                        or payment.policy.policy_number
+                        or f"Policy-{payment.policy.pk}"
+                    )
+                    client_name = (
+                        payment.policy.client.client_name or "Неизвестный клиент"
+                    )
+                    message_parts.append(
+                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽"
+                    )
+
+                if len(payments_data["paid_payments"]) > 5:
+                    remaining = len(payments_data["paid_payments"]) - 5
+                    message_parts.append(f"• ... и еще {remaining} платежей")
+
+            # Просроченные платежи (показываем только если их немного)
+            if (
+                payment_stats["overdue_count"] > 0
+                and payment_stats["overdue_count"] <= 10
+            ):
+                message_parts.append("")
+                message_parts.append("⚠️ ПРОСРОЧЕНО:")
+                for payment in payments_data["overdue_payments"]:
+                    policy_number = (
+                        payment.policy.dfa_number
+                        or payment.policy.policy_number
+                        or f"Policy-{payment.policy.pk}"
+                    )
+                    client_name = (
+                        payment.policy.client.client_name or "Неизвестный клиент"
+                    )
+                    days_overdue = (date.today() - payment.due_date).days
+                    message_parts.append(
+                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽ ({days_overdue} дн.)"
+                    )
+            elif payment_stats["overdue_count"] > 10:
+                message_parts.append("")
+                message_parts.append(
+                    f"⚠️ ПРОСРОЧЕНО: {payment_stats['overdue_count']} платежей (слишком много для детального отображения)"
+                )
+
+            # Завтрашние платежи (показываем только если их немного)
+            if (
+                payment_stats["tomorrow_count"] > 0
+                and payment_stats["tomorrow_count"] <= 10
+            ):
+                message_parts.append("")
+                message_parts.append("📅 ЗАВТРА К ОПЛАТЕ:")
+                for payment in payments_data["tomorrow_payments"]:
+                    policy_number = (
+                        payment.policy.dfa_number
+                        or payment.policy.policy_number
+                        or f"Policy-{payment.policy.pk}"
+                    )
+                    client_name = (
+                        payment.policy.client.client_name or "Неизвестный клиент"
+                    )
+                    message_parts.append(
+                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽"
+                    )
+            elif payment_stats["tomorrow_count"] > 10:
+                message_parts.append("")
+                message_parts.append(
+                    f"📅 ЗАВТРА К ОПЛАТЕ: {payment_stats['tomorrow_count']} платежей (слишком много для детального отображения)"
+                )
+
+            message_parts.append("")  # Разделитель
+
+        # 📋 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ ПО ПОЛИСАМ
+        message_parts.append("📋 ДЕТАЛИ ПО ПОЛИСАМ:")
+
+        # Созданные полисы (улучшенное форматирование)
         if policies_data["created"]:
             message_parts.append("")
-            message_parts.append("🆕 Созданы:")
+            message_parts.append("🆕 СОЗДАНЫ:")
             for i, item in enumerate(policies_data["created"]):
                 policy = item["policy"]
                 print(f"DEBUG: Processing created policy {i+1}: ID={policy.pk}")
@@ -315,95 +671,96 @@ class Command(BaseCommand):
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Защита от None значений
                 policy_number = policy_number or f"Policy-{policy.pk}"
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                print(
-                    f"DEBUG: Policy number: '{policy_number}' (type: {type(policy_number)})"
-                )
-                print(f"DEBUG: Client name: '{client_name}'")
-                print(f"DEBUG: Insurer name: '{insurer_name}'")
-
-                # НЕ экранируем имена - используем plain text как в остальном проекте
-                client_name = client_name
-                insurer_name = insurer_name
-
-                print(f"DEBUG: Client name: '{client_name}'")
-                print(f"DEBUG: Insurer name: '{insurer_name}'")
-
-                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
+                # Основная информация
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
-                print(f"DEBUG: Policy line: '{line}'")
-                print(f"DEBUG: Policy URL: '{item['url']}'")
-
                 message_parts.append(line)
+
+                # Дополнительная информация о новом полисе
+                if policy.premium_total:
+                    message_parts.append(f"  💰 Премия: {policy.premium_total:,.0f}₽")
+
+                # КВ по полису
+                kv_sum = policy.payment_schedule.aggregate(
+                    total_kv=models.Sum("kv_rub")
+                )["total_kv"]
+                if kv_sum:
+                    message_parts.append(f"  🤝 КВ: {kv_sum:,.0f}₽")
+
                 message_parts.append(f"  🔗 {item['url']}")
 
-        # Обновленные полисы
+        # Обновленные полисы (с отображением изменений!)
         if policies_data["updated"]:
             message_parts.append("")
-            message_parts.append("✏️ Изменены:")
+            message_parts.append("✏️ ИЗМЕНЕНЫ:")
             for i, item in enumerate(policies_data["updated"]):
                 policy = item["policy"]
                 print(f"DEBUG: Processing updated policy {i+1}: ID={policy.pk}")
 
-                # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Защита от None значений
                 policy_number = policy_number or f"Policy-{policy.pk}"
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                print(f"DEBUG: Policy number: '{policy_number}'")
-
-                # НЕ экранируем имена - используем plain text как в остальном проекте
-                client_name = client_name
-                insurer_name = insurer_name
-
-                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
+                # Основная информация
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
-                print(f"DEBUG: Updated policy line: '{line}'")
                 message_parts.append(line)
+
+                # Показываем важные изменения (новое!)
+                if item.get("change_details"):
+                    for change_detail in item["change_details"]:
+                        message_parts.append(f"  {change_detail}")
+                else:
+                    # Если нет детальной информации, показываем количество изменений
+                    changes_count = len(item["changes"])
+                    message_parts.append(f"  📝 Изменений: {changes_count}")
+
                 message_parts.append(f"  🔗 {item['url']}")
 
-        # Изменения платежей
+        # Изменения платежей (улучшенное форматирование)
         if policies_data["payment_changes"]:
             message_parts.append("")
-            message_parts.append("💰 Изменены платежи:")
+            message_parts.append("💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:")
             for i, item in enumerate(policies_data["payment_changes"]):
                 policy = item["policy"]
                 print(f"DEBUG: Processing payment change {i+1}: ID={policy.pk}")
 
-                # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
                 )
-                # Защита от None значений
                 policy_number = policy_number or f"Policy-{policy.pk}"
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                print(f"DEBUG: Payment policy number: '{policy_number}'")
-
-                # НЕ экранируем имена - используем plain text как в остальном проекте
-                client_name = client_name
-                insurer_name = insurer_name
-
-                # Используем plain text с отдельной строкой URL (как в telegram-notify.sh)
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
-                print(f"DEBUG: Payment change line: '{line}'")
                 message_parts.append(line)
+
+                # Детализация по платежам
+                changes_count = len(item["changes"])
+                created_count = sum(
+                    1
+                    for change in item["changes"]
+                    if change["change"].action == LogEntry.Action.CREATE
+                )
+                updated_count = changes_count - created_count
+
+                if created_count > 0 and updated_count > 0:
+                    message_parts.append(
+                        f"  💳 Создано: {created_count}, изменено: {updated_count}"
+                    )
+                elif created_count > 0:
+                    message_parts.append(f"  💳 Создано платежей: {created_count}")
+                else:
+                    message_parts.append(f"  💳 Изменено платежей: {updated_count}")
+
                 message_parts.append(f"  🔗 {item['url']}")
 
-                # Показываем количество измененных платежей
-                changes_count = len(item["changes"])
-                message_parts.append(f"  💳 Платежей изменено: {changes_count}")
-
-        # Если никаких изменений не было
+        # Если никаких изменений полисов не было
         if not any(
             [
                 policies_data["created"],
@@ -411,27 +768,11 @@ class Command(BaseCommand):
                 policies_data["payment_changes"],
             ]
         ):
-            message_parts.append("Изменений не было")
+            message_parts.append("📭 Изменений полисов не было")
 
         final_message = "\n".join(message_parts)
         print(f"DEBUG: Final message length: {len(final_message)}")
         print(f"DEBUG: Final message preview: {repr(final_message[:300])}")
-
-        # Показываем секцию логинов отдельно для отладки
-        logins_section = []
-        in_logins = False
-        for line in message_parts:
-            if line.startswith("👥 ЛОГИНЫ"):
-                in_logins = True
-                logins_section.append(line)
-            elif in_logins and line.startswith("📋 ПОЛИСЫ"):
-                break
-            elif in_logins:
-                logins_section.append(line)
-
-        print(f"DEBUG: Logins section:")
-        for line in logins_section:
-            print(f"  '{line}'")
 
         return final_message
 

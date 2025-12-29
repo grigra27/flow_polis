@@ -92,6 +92,120 @@ class Command(BaseCommand):
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))
 
+    def _analyze_payment_changes(self, changes):
+        """Анализирует изменения платежа и возвращает важные изменения"""
+        import json
+
+        # Поля которые считаем важными для отображения в платежах
+        important_fields = {
+            "paid_date": {
+                "name": "Дата оплаты",
+                "emoji": "✅",
+                "format": "date_payment",
+            },
+            "insurer_date": {
+                "name": "Согласование СК",
+                "emoji": "📋",
+                "format": "date_payment",
+            },
+            "amount": {"name": "Сумма платежа", "emoji": "💰", "format": "money"},
+            "kv_rub": {"name": "КВ", "emoji": "🤝", "format": "money"},
+            "due_date": {"name": "Дата по договору", "emoji": "📅", "format": "date"},
+            "insurance_sum": {
+                "name": "Страховая сумма",
+                "emoji": "🏦",
+                "format": "money",
+            },
+        }
+
+        important_changes = []
+
+        for change in changes:
+            if (
+                change["change"].action == LogEntry.Action.UPDATE
+                and change["change"].changes
+            ):
+                try:
+                    # Парсим JSON с изменениями
+                    changes_data = change["change"].changes
+                    if isinstance(changes_data, str):
+                        changes_dict = json.loads(changes_data)
+                    else:
+                        changes_dict = changes_data
+
+                    for field_name, (old_value, new_value) in changes_dict.items():
+                        if field_name in important_fields:
+                            field_info = important_fields[field_name]
+
+                            # Форматируем значения
+                            formatted_change = self._format_payment_field_change(
+                                field_info, old_value, new_value
+                            )
+
+                            if formatted_change:
+                                important_changes.append(formatted_change)
+
+                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                    # Если не удалось распарсить изменения, пропускаем
+                    continue
+
+        return important_changes
+
+    def _format_payment_field_change(self, field_info, old_value, new_value):
+        """Форматирует изменение поля платежа для отображения"""
+        from decimal import Decimal
+
+        if old_value == new_value:
+            return None
+
+        emoji = field_info["emoji"]
+        name = field_info["name"]
+        format_type = field_info["format"]
+
+        if format_type == "date_payment":
+            # Специальная обработка для дат платежей
+            if old_value in [None, "None", ""] and new_value not in [None, "None", ""]:
+                # Дата была добавлена
+                return f"{emoji} {name}: {new_value}"
+            elif old_value not in [None, "None", ""] and new_value in [
+                None,
+                "None",
+                "",
+            ]:
+                # Дата была удалена
+                return f"{emoji} {name}: удалена ({old_value})"
+            elif old_value not in [None, "None", ""] and new_value not in [
+                None,
+                "None",
+                "",
+            ]:
+                # Дата была изменена
+                return f"{emoji} {name}: {old_value} → {new_value}"
+            else:
+                return None
+
+        elif format_type == "money":
+            try:
+                old_val = Decimal(str(old_value)) if old_value else Decimal("0")
+                new_val = Decimal(str(new_value)) if new_value else Decimal("0")
+
+                # Показываем изменение
+                diff = new_val - old_val
+                if diff > 0:
+                    return f"{emoji} {name}: +{diff:,.0f}₽ ({old_val:,.0f}₽ → {new_val:,.0f}₽)"
+                elif diff < 0:
+                    return f"{emoji} {name}: {diff:,.0f}₽ ({old_val:,.0f}₽ → {new_val:,.0f}₽)"
+                else:
+                    return None
+            except (ValueError, TypeError):
+                return f"{emoji} {name}: {old_value} → {new_value}"
+
+        elif format_type == "date":
+            return f"{emoji} {name}: {old_value} → {new_value}"
+
+        else:  # text
+            return f"{emoji} {name}: {old_value} → {new_value}"
+
     def _analyze_policy_changes(self, changes):
         """Анализирует изменения полиса и возвращает важные изменения"""
         import json
@@ -402,6 +516,12 @@ class Command(BaseCommand):
         for policy_id, payment_data in payment_changes_by_policy.items():
             if str(policy_id) not in policy_changes_by_id:  # Полис сам не менялся
                 payment_data["url"] = f"https://polis.insflow.ru/policies/{policy_id}/"
+
+                # Анализируем изменения платежей (новое!)
+                payment_data["change_details"] = self._analyze_payment_changes(
+                    payment_data["changes"]
+                )
+
                 policies_data["payment_changes"].append(payment_data)
                 policies_data["statistics"]["total_payment_changes"] += 1
 
@@ -722,7 +842,7 @@ class Command(BaseCommand):
 
                 message_parts.append(f"  🔗 {item['url']}")
 
-        # Изменения платежей (улучшенное форматирование)
+        # Изменения платежей (улучшенное форматирование с деталями изменений)
         if policies_data["payment_changes"]:
             message_parts.append("")
             message_parts.append("💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:")
@@ -740,23 +860,28 @@ class Command(BaseCommand):
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
                 message_parts.append(line)
 
-                # Детализация по платежам
-                changes_count = len(item["changes"])
-                created_count = sum(
-                    1
-                    for change in item["changes"]
-                    if change["change"].action == LogEntry.Action.CREATE
-                )
-                updated_count = changes_count - created_count
-
-                if created_count > 0 and updated_count > 0:
-                    message_parts.append(
-                        f"  💳 Создано: {created_count}, изменено: {updated_count}"
-                    )
-                elif created_count > 0:
-                    message_parts.append(f"  💳 Создано платежей: {created_count}")
+                # Показываем важные изменения платежей (новое!)
+                if item.get("change_details"):
+                    for change_detail in item["change_details"]:
+                        message_parts.append(f"  {change_detail}")
                 else:
-                    message_parts.append(f"  💳 Изменено платежей: {updated_count}")
+                    # Если нет детальной информации, показываем количество изменений
+                    changes_count = len(item["changes"])
+                    created_count = sum(
+                        1
+                        for change in item["changes"]
+                        if change["change"].action == LogEntry.Action.CREATE
+                    )
+                    updated_count = changes_count - created_count
+
+                    if created_count > 0 and updated_count > 0:
+                        message_parts.append(
+                            f"  💳 Создано: {created_count}, изменено: {updated_count}"
+                        )
+                    elif created_count > 0:
+                        message_parts.append(f"  💳 Создано платежей: {created_count}")
+                    else:
+                        message_parts.append(f"  💳 Изменено платежей: {updated_count}")
 
                 message_parts.append(f"  🔗 {item['url']}")
 

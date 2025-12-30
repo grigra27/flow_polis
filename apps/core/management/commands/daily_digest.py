@@ -829,7 +829,7 @@ class Command(BaseCommand):
 
                 message_parts.append(f"  🔗 {item['url']}")
 
-        # Обновленные полисы (с отображением изменений!)
+        # Обновленные полисы (с расширенной детализацией изменений!)
         if policies_data["updated"]:
             message_parts.append("")
             message_parts.append("✏️ ИЗМЕНЕНЫ:")
@@ -848,18 +848,23 @@ class Command(BaseCommand):
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
                 message_parts.append(line)
 
-                # Показываем важные изменения (новое!)
+                # Показываем расширенную детализацию изменений
                 if item.get("change_details"):
+                    # Добавляем счетчик изменений
+                    changes_count = len(item["change_details"])
+                    message_parts.append(f"  📝 Изменений: {changes_count}")
+
+                    # Показываем каждое изменение с отступом
                     for change_detail in item["change_details"]:
                         message_parts.append(f"  {change_detail}")
                 else:
-                    # Если нет детальной информации, показываем количество изменений
+                    # Если нет детальной информации, показываем общее количество изменений
                     changes_count = len(item["changes"])
                     message_parts.append(f"  📝 Изменений: {changes_count}")
 
                 message_parts.append(f"  🔗 {item['url']}")
 
-        # Изменения платежей (улучшенное форматирование с деталями изменений)
+        # Изменения платежей (улучшенное форматирование с расширенной детализацией)
         if policies_data["payment_changes"]:
             message_parts.append("")
             message_parts.append("💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:")
@@ -877,8 +882,13 @@ class Command(BaseCommand):
                 line = f"• {policy_number} | {client_name} | {insurer_name}"
                 message_parts.append(line)
 
-                # Показываем важные изменения платежей (новое!)
+                # Показываем расширенную детализацию изменений платежей
                 if item.get("change_details"):
+                    # Добавляем счетчик изменений платежей
+                    changes_count = len(item["change_details"])
+                    message_parts.append(f"  📝 Изменений платежей: {changes_count}")
+
+                    # Показываем каждое изменение с отступом
                     for change_detail in item["change_details"]:
                         message_parts.append(f"  {change_detail}")
                 else:
@@ -893,12 +903,12 @@ class Command(BaseCommand):
 
                     if created_count > 0 and updated_count > 0:
                         message_parts.append(
-                            f"  💳 Создано: {created_count}, изменено: {updated_count}"
+                            f"  📝 Изменений: {changes_count} (создано: {created_count}, изменено: {updated_count})"
                         )
                     elif created_count > 0:
-                        message_parts.append(f"  💳 Создано платежей: {created_count}")
+                        message_parts.append(f"  📝 Создано платежей: {created_count}")
                     else:
-                        message_parts.append(f"  💳 Изменено платежей: {updated_count}")
+                        message_parts.append(f"  📝 Изменено платежей: {updated_count}")
 
                 message_parts.append(f"  🔗 {item['url']}")
 

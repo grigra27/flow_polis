@@ -224,11 +224,11 @@ class Command(BaseCommand):
             return f"{emoji} {name}: {old_value} → {new_value}"
 
     def _analyze_policy_changes(self, changes):
-        """Анализирует изменения полиса и возвращает важные изменения"""
+        """Анализирует изменения полиса и возвращает ВСЕ изменения"""
         import json
 
-        # Поля которые считаем важными для отображения
-        important_fields = {
+        # Поля с красивым форматированием
+        field_formatting = {
             "premium_total": {"name": "Премия", "emoji": "💰", "format": "money"},
             "start_date": {"name": "Дата начала", "emoji": "📅", "format": "date"},
             "end_date": {"name": "Дата окончания", "emoji": "📅", "format": "date"},
@@ -241,9 +241,23 @@ class Command(BaseCommand):
             "dfa_active": {"name": "Статус ДФА", "emoji": "📋", "format": "boolean"},
             "client": {"name": "Клиент", "emoji": "👤", "format": "text"},
             "insurer": {"name": "Страховщик", "emoji": "🏢", "format": "text"},
+            "policy_number": {"name": "Номер полиса", "emoji": "📄", "format": "text"},
+            "dfa_number": {"name": "Номер ДФА", "emoji": "📋", "format": "text"},
+            "insurance_sum": {
+                "name": "Страховая сумма",
+                "emoji": "🏦",
+                "format": "money",
+            },
+            "comment": {"name": "Комментарий", "emoji": "📝", "format": "text"},
+            "created_at": {"name": "Дата создания", "emoji": "📅", "format": "datetime"},
+            "updated_at": {
+                "name": "Дата обновления",
+                "emoji": "🔄",
+                "format": "datetime",
+            },
         }
 
-        important_changes = []
+        all_changes = []
 
         for change in changes:
             if change.action == LogEntry.Action.UPDATE and change.changes:
@@ -254,23 +268,69 @@ class Command(BaseCommand):
                     else:
                         changes_dict = change.changes
 
-                    for field_name, (old_value, new_value) in changes_dict.items():
-                        if field_name in important_fields:
-                            field_info = important_fields[field_name]
+                    print(
+                        f"DEBUG: Processing changes for policy: {changes_dict.keys()}"
+                    )
 
-                            # Форматируем значения
+                    for field_name, (old_value, new_value) in changes_dict.items():
+                        # Пропускаем служебные поля
+                        if field_name in [
+                            "id",
+                            "created_at",
+                            "updated_at",
+                        ] and field_name not in ["created_at", "updated_at"]:
+                            continue
+
+                        # Используем красивое форматирование если есть, иначе базовое
+                        if field_name in field_formatting:
+                            field_info = field_formatting[field_name]
                             formatted_change = self._format_field_change(
                                 field_info, old_value, new_value
                             )
+                        else:
+                            # Базовое форматирование для неизвестных полей
+                            formatted_change = self._format_unknown_field_change(
+                                field_name, old_value, new_value
+                            )
 
-                            if formatted_change:
-                                important_changes.append(formatted_change)
+                        if formatted_change:
+                            all_changes.append(formatted_change)
+                            print(f"DEBUG: Added change: {formatted_change}")
 
                 except (json.JSONDecodeError, TypeError, ValueError) as e:
-                    # Если не удалось распарсить изменения, пропускаем
+                    print(f"DEBUG: Error parsing changes: {e}")
                     continue
 
-        return important_changes
+        print(f"DEBUG: Total changes found: {len(all_changes)}")
+        return all_changes
+
+    def _format_unknown_field_change(self, field_name, old_value, new_value):
+        """Форматирует изменение неизвестного поля"""
+        if old_value == new_value:
+            return None
+
+        # Переводим техническое название поля в читаемое
+        field_translations = {
+            "policy_number": "Номер полиса",
+            "dfa_number": "Номер ДФА",
+            "insurance_sum": "Страховая сумма",
+            "comment": "Комментарий",
+            "client_id": "ID клиента",
+            "insurer_id": "ID страховщика",
+            "agent_id": "ID агента",
+            "status": "Статус",
+            "type": "Тип",
+        }
+
+        readable_name = field_translations.get(
+            field_name, field_name.replace("_", " ").title()
+        )
+
+        # Сокращаем длинные значения
+        old_str = str(old_value)[:50] + ("..." if len(str(old_value)) > 50 else "")
+        new_str = str(new_value)[:50] + ("..." if len(str(new_value)) > 50 else "")
+
+        return f"📝 {readable_name}: {old_str} → {new_str}"
 
     def _format_field_change(self, field_info, old_value, new_value):
         """Форматирует изменение поля для отображения"""
@@ -301,6 +361,27 @@ class Command(BaseCommand):
 
         elif format_type == "date":
             return f"{emoji} {name}: {old_value} → {new_value}"
+
+        elif format_type == "datetime":
+            # Форматируем datetime более читаемо
+            try:
+                from datetime import datetime
+
+                if isinstance(old_value, str):
+                    old_dt = datetime.fromisoformat(old_value.replace("Z", "+00:00"))
+                    old_formatted = old_dt.strftime("%d.%m.%Y %H:%M")
+                else:
+                    old_formatted = str(old_value)
+
+                if isinstance(new_value, str):
+                    new_dt = datetime.fromisoformat(new_value.replace("Z", "+00:00"))
+                    new_formatted = new_dt.strftime("%d.%m.%Y %H:%M")
+                else:
+                    new_formatted = str(new_value)
+
+                return f"{emoji} {name}: {old_formatted} → {new_formatted}"
+            except:
+                return f"{emoji} {name}: {old_value} → {new_value}"
 
         elif format_type == "boolean":
             old_status = "Активен" if old_value else "Неактивен"

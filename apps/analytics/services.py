@@ -591,7 +591,7 @@ class AnalyticsService:
 
                 insurer_metrics.append(
                     {
-                        "insurer": insurer,  # Передаем полный объект модели
+                        "insurer": insurer,  # Полный объект для страницы аналитики
                         "premium_volume": premium_volume,
                         "commission_revenue": commission_revenue,
                         "policy_count": policy_count,
@@ -622,6 +622,121 @@ class AnalyticsService:
 
             logger = logging.getLogger(__name__)
             logger.error(f"Error calculating insurer analytics: {e}")
+
+            return {
+                "insurer_metrics": [],
+                "total_insurers": 0,
+                "filter_applied": False,
+                "error": str(e),
+            }
+
+    def get_insurer_analytics_for_charts(
+        self, analytics_filter: Optional[AnalyticsFilter] = None
+    ) -> Dict[str, Any]:
+        """
+        Get analytics data grouped by insurer formatted for charts.
+        Returns simplified insurer data (id, name only) for chart generation.
+
+        Args:
+            analytics_filter: Optional filter to apply to the data
+
+        Returns:
+            Dictionary containing insurer analytics with simplified insurer data
+        """
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+            from apps.insurers.models import Insurer
+            from django.db.models import Count
+
+            # Get base querysets
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            # Apply filters if provided
+            if analytics_filter:
+                policies_qs = analytics_filter.apply_to_policies(policies_qs)
+                payments_qs = analytics_filter.apply_to_payments(payments_qs)
+                date_range = analytics_filter.get_date_range_dict()
+            else:
+                date_range = None
+
+            # Get insurers that have policies
+            insurers_with_data = Insurer.objects.filter(
+                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
+            )
+
+            insurer_metrics = []
+            total_premium = Decimal("0")
+
+            for insurer in insurers_with_data:
+                # Filter data for this insurer
+                insurer_policies = policies_qs.filter(insurer=insurer)
+                insurer_payments = payments_qs.filter(policy__insurer=insurer)
+
+                # Calculate metrics for this insurer
+                premium_volume = self.calculator.calculate_premium_volume(
+                    insurer_payments, date_range
+                )
+                commission_revenue = self.calculator.calculate_commission_revenue(
+                    insurer_payments, date_range
+                )
+                policy_count = self.calculator.calculate_policy_count(
+                    insurer_policies, date_range
+                )
+                insurance_sum = self.calculator.calculate_insurance_sum(
+                    insurer_payments, date_range
+                )
+
+                total_premium += premium_volume
+
+                # Get insurance type distribution for this insurer
+                insurance_type_distribution = dict(
+                    insurer_policies.values("insurance_type__name")
+                    .annotate(count=Count("id"))
+                    .values_list("insurance_type__name", "count")
+                )
+
+                # Sort insurance types in preferred order
+                insurance_type_distribution = sort_insurance_types(
+                    insurance_type_distribution
+                )
+
+                insurer_metrics.append(
+                    {
+                        "insurer": {
+                            "id": insurer.id,
+                            "name": insurer.insurer_name,
+                        },  # Упрощенные данные для графиков
+                        "premium_volume": premium_volume,
+                        "commission_revenue": commission_revenue,
+                        "policy_count": policy_count,
+                        "insurance_sum": insurance_sum,
+                        "insurance_type_distribution": insurance_type_distribution,
+                    }
+                )
+
+            # Calculate market share
+            for metric in insurer_metrics:
+                if total_premium > 0:
+                    metric["market_share"] = (
+                        metric["premium_volume"] / total_premium
+                    ) * Decimal("100")
+                else:
+                    metric["market_share"] = Decimal("0")
+
+            return {
+                "insurer_metrics": insurer_metrics,
+                "total_insurers": len(insurer_metrics),
+                "filter_applied": analytics_filter.has_filters()
+                if analytics_filter
+                else False,
+            }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating insurer analytics for charts: {e}")
 
             return {
                 "insurer_metrics": [],
@@ -1715,7 +1830,7 @@ class AnalyticsService:
             # Get raw analytics data
             dashboard_data = self.get_dashboard_metrics(analytics_filter)
             branch_data = self.get_branch_analytics(analytics_filter)
-            insurer_data = self.get_insurer_analytics(analytics_filter)
+            insurer_data = self.get_insurer_analytics_for_charts(analytics_filter)
 
             charts = {}
 
@@ -1787,11 +1902,10 @@ class AnalyticsService:
         logger = logging.getLogger(__name__)
 
         try:
-            insurer_data = self.get_insurer_analytics(analytics_filter)
+            insurer_data = self.get_insurer_analytics_for_charts(analytics_filter)
             return self.chart_provider.format_insurer_analytics_charts(insurer_data)
 
         except Exception as e:
-            logger = logging.getLogger(__name__)
             logger.error(f"Error generating insurer charts: {e}")
             return {}
 

@@ -14,110 +14,6 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/analytics.css' %}">
 <style>
-    .branch-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
-        background: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: box-shadow 0.3s ease;
-    }
-
-    .branch-card:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-
-    .branch-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #f0f0f0;
-    }
-
-    .branch-name {
-        font-size: 1.4em;
-        font-weight: bold;
-        color: #2c3e50;
-    }
-
-    .market-share-badge {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.9em;
-        font-weight: bold;
-    }
-
-    .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
-        margin-bottom: 20px;
-    }
-
-    .metric-item {
-        text-align: center;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 6px;
-        border-left: 4px solid #007bff;
-    }
-
-    .metric-value {
-        font-size: 1.5em;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-bottom: 5px;
-    }
-
-    .metric-label {
-        font-size: 0.9em;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .insurance-distribution {
-        margin-top: 20px;
-    }
-
-    .distribution-title {
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: #495057;
-    }
-
-    .distribution-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #e9ecef;
-    }
-
-    .distribution-item:last-child {
-        border-bottom: none;
-    }
-
-    .distribution-bar {
-        width: 60%;
-        height: 8px;
-        background: #e9ecef;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-left: 10px;
-    }
-
-    .distribution-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #28a745, #20c997);
-        transition: width 0.3s ease;
-    }
-
     .summary-cards {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -139,12 +35,275 @@
     .summary-card.policies { border-top-color: #dc3545; }
     .summary-card.branches { border-top-color: #6f42c1; }
 
+    .metric-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .metric-label {
+        font-size: 0.9em;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
     .chart-container {
         background: white;
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         margin-bottom: 30px;
+        height: 400px;
+    }
+
+    .chart-container canvas {
+        max-height: 320px !important;
+    }
+
+    .branch-table-container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+        transition: all 0.3s ease;
+    }
+
+    .branch-table-container.expanded {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        z-index: 1050;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .policy-status-filter-enhanced {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+        padding: 12px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .policy-status-filter-enhanced .form-label {
+        font-weight: 700;
+        color: white;
+        white-space: nowrap;
+        margin-bottom: 0;
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .policy-status-filter-enhanced .enhanced-select {
+        min-width: 180px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.95);
+        color: #2c3e50;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:focus {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        background: white;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:hover {
+        background: white;
+        transform: translateY(-1px);
+    }
+
+    .branch-table {
+        margin-bottom: 0;
+        font-size: 1.1em;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .branch-table thead th {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 2px solid #e74c3c;
+        border-right: 1px solid #dee2e6;
+        font-weight: 600;
+        font-size: 1em;
+        padding: 15px 10px;
+        white-space: nowrap;
+        color: #495057;
+    }
+
+    .branch-table thead th:last-child {
+        border-right: none;
+    }
+
+    .branch-table tbody tr {
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .branch-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .branch-table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .branch-table tbody tr.top-performer {
+        background: linear-gradient(135deg, #fff5f5 0%, #fef7f7 100%);
+        border-left: 4px solid #f39c12;
+        border-right: 4px solid #f39c12;
+        border-top: 2px solid #f39c12;
+        border-bottom: 2px solid #f39c12;
+    }
+
+    .branch-table tbody tr.top-performer:hover {
+        background: linear-gradient(135deg, #fff0f0 0%, #fef2f2 100%);
+    }
+
+    .branch-table td {
+        padding: 15px 10px;
+        vertical-align: middle;
+        border-right: 1px solid #dee2e6;
+    }
+
+    .branch-table td:last-child {
+        border-right: none;
+    }
+
+    .branch-logo-table {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        margin-right: 12px;
+        border-radius: 6px;
+        background: #f8f9fa;
+        padding: 3px;
+        border: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+
+    .branch-logo-fallback {
+        width: 40px;
+        height: 40px;
+        margin-right: 12px;
+        border-radius: 6px;
+        background: #f8f9fa;
+        padding: 3px;
+        border: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+
+    .branch-info {
+        flex-grow: 1;
+    }
+
+    .branch-name-table {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 1.1em;
+        line-height: 1.3;
+    }
+
+    .leader-badge {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.75em;
+        font-weight: 600;
+        margin-top: 3px;
+        display: inline-block;
+    }
+
+    .market-share-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .market-share-bar {
+        width: 70px;
+        height: 10px;
+        background: #e9ecef;
+        border-radius: 5px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .market-share-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #e74c3c, #c0392b);
+        transition: width 0.3s ease;
+        border-radius: 4px;
+    }
+
+    .market-share-text {
+        font-weight: 600;
+        color: #e74c3c;
+        font-size: 1em;
+        min-width: 40px;
+    }
+
+    .metric-value-table {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 1.05em;
+    }
+
+    .insurance-types-mini {
+        max-height: 90px;
+        overflow-y: auto;
+        font-size: 0.95em;
+    }
+
+    .insurance-type-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+
+    .insurance-type-item:last-child {
+        border-bottom: none;
+    }
+
+    .type-name {
+        color: #495057;
+        flex-grow: 1;
+        font-size: 0.9em;
+    }
+
+    .type-count {
+        background: #e74c3c;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .table-controls {
+        display: flex;
+        gap: 8px;
     }
 
     .no-data {
@@ -161,18 +320,50 @@
     }
 
     @media (max-width: 768px) {
-        .branch-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-        }
-
-        .metrics-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
         .summary-cards {
             grid-template-columns: 1fr;
+        }
+
+        .chart-container {
+            height: 300px;
+            padding: 15px;
+        }
+
+        .chart-container canvas {
+            max-height: 250px !important;
+        }
+
+        .branch-logo-table {
+            width: 32px;
+            height: 32px;
+            margin-right: 8px;
+        }
+
+        .branch-logo-fallback {
+            width: 32px;
+            height: 32px;
+            margin-right: 8px;
+        }
+
+        .branch-table {
+            font-size: 0.9em;
+        }
+
+        .branch-table thead th {
+            padding: 10px 6px;
+            font-size: 0.85em;
+        }
+
+        .branch-table td {
+            padding: 10px 6px;
+        }
+
+        .branch-name-table {
+            font-size: 0.9em;
+        }
+
+        .metric-value-table {
+            font-size: 0.85em;
         }
     }
 </style>
@@ -184,21 +375,18 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
-                    <i class="fas fa-building me-2"></i>
+                    <i class="fas fa-map-marker-alt me-2"></i>
                     Аналитика по филиалам
                 </h1>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
-                        <i class="fas fa-filter me-1"></i>
-                        Фильтры
-                        {% if filter_applied %}
-                            <span class="badge bg-primary ms-1">активны</span>
-                        {% endif %}
-                    </button>
-                    <button class="btn btn-success" onclick="exportData()">
-                        <i class="fas fa-download me-1"></i>
-                        Экспорт
-                    </button>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="policy-status-filter-enhanced">
+                        <label for="policyStatus" class="form-label mb-0 me-2">Статус полисов:</label>
+                        <select class="form-select form-select-sm enhanced-select" id="policyStatus" onchange="updateAnalytics()">
+                            <option value="all" {% if policy_status == 'all' %}selected{% endif %}>Все полисы</option>
+                            <option value="active" {% if not policy_status or policy_status == 'active' %}selected{% endif %}>Только активные</option>
+                            <option value="inactive" {% if policy_status == 'inactive' %}selected{% endif %}>Только неактивные</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -223,180 +411,153 @@
             <div class="metric-label">Активных филиалов</div>
         </div>
     </div>
+
     <!-- Charts Section -->
     {% if branch_metrics %}
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-lg-6">
             <div class="chart-container">
-                <h5 class="mb-3">Распределение премий по филиалам</h5>
-                <canvas id="premiumChart" width="400" height="300"></canvas>
+                <h5 class="mb-3">Рыночная доля по премиям</h5>
+                <canvas id="marketShareChart" width="400" height="300"></canvas>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-lg-6">
             <div class="chart-container">
                 <h5 class="mb-3">Количество полисов по филиалам</h5>
                 <canvas id="policyChart" width="400" height="300"></canvas>
             </div>
         </div>
     </div>
-    {% endif %}
 
-    <!-- Branch Details -->
+    <!-- Branch Details Section -->
     <div class="row">
         <div class="col-12">
-            {% if branch_metrics %}
-                {% for metric in branch_metrics %}
-                <div class="branch-card">
-                    <div class="branch-header">
-                        <div class="branch-name">{{ metric.branch.name }}</div>
-                        <div class="market-share-badge">
-                            {{ metric.market_share|floatformat:1 }}% рынка
-                        </div>
+            <div class="branch-table-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-map-marker-alt me-2"></i>
+                        Детальная информация по филиалам
+                    </h5>
+                    <div class="table-controls">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleTableView()">
+                            <i class="fas fa-expand-alt me-1"></i>
+                            Развернуть
+                        </button>
                     </div>
-
-                    <div class="metrics-grid">
-                        <div class="metric-item">
-                            <div class="metric-value">{{ metric.premium_volume|currency }}</div>
-                            <div class="metric-label">Объем премий</div>
-                        </div>
-                        <div class="metric-item">
-                            <div class="metric-value">{{ metric.commission_revenue|currency }}</div>
-                            <div class="metric-label">Комиссионный доход</div>
-                        </div>
-                        <div class="metric-item">
-                            <div class="metric-value">{{ metric.policy_count }}</div>
-                            <div class="metric-label">Количество полисов</div>
-                        </div>
-                        <div class="metric-item">
-                            <div class="metric-value">{{ metric.insurance_sum|currency }}</div>
-                            <div class="metric-label">Страховая сумма</div>
-                        </div>
-                    </div>
-
-                    {% if metric.insurance_type_distribution %}
-                    <div class="insurance-distribution">
-                        <div class="distribution-title">Распределение по видам страхования</div>
-                        {% for insurance_type, count in metric.insurance_type_distribution.items %}
-                        <div class="distribution-item">
-                            <span>{{ insurance_type|default:"Не указан" }}</span>
-                            <div class="d-flex align-items-center">
-                                <span class="me-2">{{ count }}</span>
-                                <div class="distribution-bar">
-                                    <div class="distribution-fill" style="width: {% widthratio count metric.policy_count 100 %}%"></div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
                 </div>
-                {% endfor %}
-            {% else %}
-                <div class="no-data">
-                    <i class="fas fa-chart-bar"></i>
-                    <div>Нет данных для отображения</div>
-                    <small>Попробуйте изменить параметры фильтрации или проверьте наличие данных в системе</small>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
 
-<!-- Filter Modal -->
-<div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="filterModalLabel">Фильтры аналитики</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="table-responsive">
+                    <table class="table branch-table">
+                        <thead>
+                            <tr>
+                                <th class="branch-col">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    Филиал
+                                </th>
+                                <th class="market-share-col">
+                                    <i class="fas fa-chart-pie me-1"></i>
+                                    Доля рынка
+                                </th>
+                                <th class="premium-col">
+                                    <i class="fas fa-money-bill-wave me-1"></i>
+                                    Объем премий
+                                </th>
+                                <th class="commission-col">
+                                    <i class="fas fa-percentage me-1"></i>
+                                    Комиссия
+                                </th>
+                                <th class="policies-col">
+                                    <i class="fas fa-file-contract me-1"></i>
+                                    Полисы
+                                </th>
+                                <th class="insurance-sum-col">
+                                    <i class="fas fa-shield-alt me-1"></i>
+                                    Страх. сумма
+                                </th>
+                                <th class="distribution-col">
+                                    <i class="fas fa-chart-bar me-1"></i>
+                                    Виды страхования
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for metric in branch_metrics %}
+                            <tr class="branch-row {% if forloop.first %}top-performer{% endif %}">
+                                <td class="branch-cell">
+                                    <div class="d-flex align-items-center">
+                                        {% if metric.branch.logo %}
+                                            <img src="{{ metric.branch.logo.url }}"
+                                                 alt="{{ metric.branch }}"
+                                                 class="branch-logo-table"
+                                                 onerror="this.outerHTML='<div class=&quot;branch-logo-fallback d-flex align-items-center justify-content-center&quot;><i class=&quot;bi bi-geo-alt text-muted&quot; style=&quot;font-size: 14px;&quot;></i></div>';">
+                                        {% else %}
+                                            <div class="branch-logo-fallback d-flex align-items-center justify-content-center">
+                                                <i class="bi bi-geo-alt text-muted" style="font-size: 14px;"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div class="branch-info">
+                                            <div class="branch-name-table">{{ metric.branch }}</div>
+                                            {% if forloop.first %}
+                                                <span class="leader-badge">Лидер по объему</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="market-share-cell">
+                                    <div class="market-share-wrapper">
+                                        <div class="market-share-bar">
+                                            <div class="market-share-fill" style="width: {{ metric.market_share|floatformat:1 }}%"></div>
+                                        </div>
+                                        <span class="market-share-text">{{ metric.market_share|floatformat:1 }}%</span>
+                                    </div>
+                                </td>
+                                <td class="premium-cell">
+                                    <div class="metric-value-table">{{ metric.premium_volume|currency }}</div>
+                                </td>
+                                <td class="commission-cell">
+                                    <div class="metric-value-table">{{ metric.commission_revenue|currency }}</div>
+                                </td>
+                                <td class="policies-cell">
+                                    <div class="metric-value-table">{{ metric.policy_count }}</div>
+                                </td>
+                                <td class="insurance-sum-cell">
+                                    <div class="metric-value-table">{{ metric.insurance_sum|currency }}</div>
+                                </td>
+                                <td class="distribution-cell">
+                                    {% if metric.insurance_type_distribution %}
+                                        <div class="insurance-types-mini">
+                                            {% for insurance_type, count in metric.insurance_type_distribution.items %}
+                                                <div class="insurance-type-item" title="{{ insurance_type|default:'Не указан' }}: {{ count }} полисов">
+                                                    <span class="type-name">{{ insurance_type|default:"Не указан"|truncatechars:15 }}</span>
+                                                    <span class="type-count">{{ count }}</span>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <form id="filterForm" method="post">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_from" class="form-label">Дата с</label>
-                                <input type="date" class="form-control" id="date_from" name="date_from"
-                                       value="{% if current_filter.date_from %}{{ current_filter.date_from|date:'Y-m-d' }}{% endif %}">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_to" class="form-label">Дата по</label>
-                                <input type="date" class="form-control" id="date_to" name="date_to"
-                                       value="{% if current_filter.date_to %}{{ current_filter.date_to|date:'Y-m-d' }}{% endif %}">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="branches" class="form-label">Филиалы</label>
-                                <select class="form-select" id="branches" name="branches" multiple>
-                                    {% for branch in branches %}
-                                    <option value="{{ branch.id }}"
-                                            {% if current_filter.branch_ids and branch.id in current_filter.branch_ids %}selected{% endif %}>
-                                        {{ branch.branch_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="insurers" class="form-label">Страховщики</label>
-                                <select class="form-select" id="insurers" name="insurers" multiple>
-                                    {% for insurer in insurers %}
-                                    <option value="{{ insurer.id }}"
-                                            {% if current_filter.insurer_ids and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
-                                        {{ insurer.insurer_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="insurance_types" class="form-label">Виды страхования</label>
-                                <select class="form-select" id="insurance_types" name="insurance_types" multiple>
-                                    {% for insurance_type in insurance_types %}
-                                    <option value="{{ insurance_type.id }}"
-                                            {% if current_filter.insurance_type_ids and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
-                                        {{ insurance_type.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="clients" class="form-label">Клиенты</label>
-                                <select class="form-select" id="clients" name="clients" multiple>
-                                    {% for client in clients %}
-                                    <option value="{{ client.id }}"
-                                            {% if current_filter.client_ids and client.id in current_filter.client_ids %}selected{% endif %}>
-                                        {{ client.client_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="clearFilters()">Сбросить</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                </div>
-            </form>
         </div>
     </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="no-data">
+                <i class="fas fa-map-marker-alt"></i>
+                <div>Нет данных для отображения</div>
+                <small>Попробуйте изменить параметры фильтрации или проверьте наличие данных в системе</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -406,38 +567,125 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize charts
     initializeCharts();
 
-    // Initialize filter form
-    initializeFilterForm();
+    // Add escape key handler for expanded table
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const container = document.querySelector('.branch-table-container');
+            if (container && container.classList.contains('expanded')) {
+                toggleTableView();
+            }
+        }
+    });
 });
 
+// Global chart instances to prevent duplicates
+let marketShareChart = null;
+let policyChart = null;
+let chartsInitialized = false;
+
 function initializeCharts() {
+    // PREVENT MULTIPLE CALLS
+    if (chartsInitialized) {
+        console.log('Charts already initialized, skipping...');
+        return;
+    }
+
+    console.log('=== INITIALIZING CHARTS (FIRST TIME) ===');
+    chartsInitialized = true;
+
     {% if branch_metrics %}
-    // Premium distribution chart
-    const premiumCtx = document.getElementById('premiumChart').getContext('2d');
-    const premiumData = {
-        labels: [{% for metric in branch_metrics %}'{{ metric.branch.name }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-            data: [{% for metric in branch_metrics %}{{ metric.premium_volume }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
-            ]
-        }]
+
+    // COMPLETELY CLEAR AND RECREATE CANVAS
+    const oldCanvas = document.getElementById('marketShareChart');
+    const canvasContainer = oldCanvas.parentNode;
+
+    // Remove old canvas completely
+    oldCanvas.remove();
+
+    // Create brand new canvas
+    const newCanvas = document.createElement('canvas');
+    newCanvas.id = 'marketShareChart';
+    newCanvas.width = 400;
+    newCanvas.height = 300;
+    canvasContainer.appendChild(newCanvas);
+
+    // Get context from new canvas
+    const marketShareCtx = newCanvas.getContext('2d');
+
+    // Prepare branch data for pie chart (TOP-10)
+    const branchData = {
+        {% for metric in branch_metrics %}
+        {% if forloop.counter <= 10 %}
+        '{{ metric.branch|escapejs }}': parseFloat('{{ metric.market_share|floatformat:1 }}'.replace(',', '.')){% if not forloop.last and forloop.counter < 10 %},{% endif %}
+        {% endif %}
+        {% endfor %}
     };
 
-    new Chart(premiumCtx, {
-        type: 'doughnut',
-        data: premiumData,
+    // Convert to arrays and take TOP-10
+    const allLabelsFromBranch = Object.keys(branchData);
+    const allValuesFromBranch = Object.values(branchData);
+
+    const chartLabels = allLabelsFromBranch.slice(0, 10);
+    const chartValues = allValuesFromBranch.slice(0, 10);
+
+    console.log('=== TOP-10 FROM BRANCH DATA ===');
+    console.log('Branch data object:', branchData);
+    console.log('Chart labels (TOP-10):', chartLabels);
+    console.log('Chart values (TOP-10):', chartValues);
+    console.log('Labels length:', chartLabels.length);
+    console.log('Values length:', chartValues.length);
+    console.log('Canvas element:', newCanvas);
+    console.log('===============================');
+
+    // Colors for TOP-10 branches - orange monochrome palette (different depths)
+    const allColors = [
+        '#C2410C', '#DC2626', '#EA580C', '#F97316', '#FB923C',
+        '#FDBA74', '#FED7AA', '#FFEDD5', '#FFF7ED', '#FFFBF5'
+    ];
+    const colors = chartLabels.map((label, index) => allColors[index % allColors.length]);
+
+    console.log('Colors assigned:', colors);
+
+    // Create completely new chart - PIE CHART
+    marketShareChart = new Chart(marketShareCtx, {
+        type: 'pie',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Доля рынка (%)',
+                data: chartValues,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: false,
+                        font: {
+                            size: 12
+                        },
+                        generateLabels: function(chart) {
+                            return chart.data.labels.map((label, index) => ({
+                                text: label,
+                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                hidden: false,
+                                index: index
+                            }));
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.label + ': ' + context.parsed.toLocaleString() + ' ₽';
+                            return context.label + ': ' + context.parsed.toFixed(1) + '%';
                         }
                     }
                 }
@@ -445,29 +693,96 @@ function initializeCharts() {
         }
     });
 
-    // Policy count chart
+    // Policy count chart (top 10) with orange gradient and logos
     const policyCtx = document.getElementById('policyChart').getContext('2d');
+
+    // Prepare data with logos
+    const policyLabels = [{% for metric in branch_metrics %}{% if forloop.counter <= 10 %}'{{ metric.branch|escapejs }}'{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+    const policyValues = [{% for metric in branch_metrics %}{% if forloop.counter <= 10 %}{{ metric.policy_count }}{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+    const branchLogoUrls = [{% for metric in branch_metrics %}{% if forloop.counter <= 10 %}{% if metric.branch.logo %}'{{ metric.branch.logo.url }}'{% else %}null{% endif %}{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+
+    console.log('Branch chart logos:', branchLogoUrls);
+
     const policyData = {
-        labels: [{% for metric in branch_metrics %}'{{ metric.branch.name }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        labels: policyLabels,
         datasets: [{
             label: 'Количество полисов',
-            data: [{% for metric in branch_metrics %}{{ metric.policy_count }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(54, 162, 235, 0.8)',
-            borderColor: 'rgba(54, 162, 235, 1)',
+            data: policyValues,
+            backgroundColor: [
+                '#C2410C', '#DC2626', '#EA580C', '#F97316', '#FB923C',
+                '#FDBA74', '#FED7AA', '#FFEDD5', '#FFF7ED', '#FFFBF5'
+            ], // Orange gradient palette
+            borderColor: [
+                '#C2410C', '#DC2626', '#EA580C', '#F97316', '#FB923C',
+                '#FDBA74', '#FED7AA', '#FFEDD5', '#FFF7ED', '#FFFBF5'
+            ], // Same colors for borders
             borderWidth: 1
         }]
     };
 
-    new Chart(policyCtx, {
+    // Custom plugin to draw branch logos
+    const branchLogoPlugin = {
+        id: 'branchLogoPlugin',
+        beforeInit: function(chart) {
+            // Preload all images
+            chart.logoImages = [];
+            branchLogoUrls.forEach((logoUrl, index) => {
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.logoImages[index] = img;
+                        chart.update('none'); // Update without animation
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.logoImages[index] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+
+            // Draw preloaded logos
+            chart.logoImages.forEach((img, index) => {
+                if (img && img.complete) {
+                    const x = xAxis.getPixelForValue(index);
+                    const y = yAxis.bottom + 10;
+                    const size = 24;
+
+                    ctx.drawImage(img, x - size/2, y, size, size);
+                }
+            });
+        }
+    };
+
+    policyChart = new Chart(policyCtx, {
         type: 'bar',
         data: policyData,
+        plugins: [branchLogoPlugin], // Add our custom plugin
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            hover: {
+                animationDuration: 0
+            },
+            layout: {
+                padding: {
+                    bottom: 40 // Extra space for logos
+                }
+            },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
                         stepSize: 1
+                    }
+                },
+                x: {
+                    ticks: {
+                        display: false // Hide text labels since we show logos
                     }
                 }
             },
@@ -477,6 +792,9 @@ function initializeCharts() {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function(context) {
+                            return policyLabels[context[0].dataIndex]; // Show branch name in tooltip
+                        },
                         label: function(context) {
                             return 'Полисов: ' + context.parsed.y;
                         }
@@ -488,72 +806,56 @@ function initializeCharts() {
     {% endif %}
 }
 
-function initializeFilterForm() {
-    const form = document.getElementById('filterForm');
+function toggleTableView() {
+    const container = document.querySelector('.branch-table-container');
+    const button = event.target.closest('button');
+    const icon = button.querySelector('i');
+    const textNode = button.childNodes[button.childNodes.length - 1];
 
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
+    if (container.classList.contains('expanded')) {
+        // Свернуть таблицу
+        container.classList.remove('expanded');
+        icon.className = 'fas fa-expand-alt me-1';
+        textNode.textContent = ' Развернуть';
+        document.body.style.overflow = '';
 
-        const formData = new FormData(form);
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
+        // Убираем backdrop
+        const backdrop = document.querySelector('.table-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+    } else {
+        // Развернуть таблицу на весь экран
+        container.classList.add('expanded');
+        icon.className = 'fas fa-compress-alt me-1';
+        textNode.textContent = ' Свернуть';
+        document.body.style.overflow = 'hidden';
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Применение...';
+        // Добавляем backdrop для закрытия по клику вне таблицы
+        const backdrop = document.createElement('div');
+        backdrop.className = 'table-backdrop';
+        backdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        `;
+        backdrop.onclick = () => toggleTableView();
+        document.body.appendChild(backdrop);
 
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Reload page with new data
-                window.location.reload();
-            } else {
-                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Произошла ошибка при применении фильтров');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-        });
-    });
-}
-function clearFilters() {
-    const form = document.getElementById('filterForm');
-    form.reset();
-
-    // Clear all select elements
-    const selects = form.querySelectorAll('select[multiple]');
-    selects.forEach(select => {
-        Array.from(select.options).forEach(option => {
-            option.selected = false;
-        });
-    });
+        // Прокручиваем к началу таблицы
+        container.scrollTop = 0;
+    }
 }
 
-function exportData() {
-    // Create export URL with current filters
-    const params = new URLSearchParams(window.location.search);
-    params.set('export', 'excel');
-
-    // Create temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = window.location.pathname + '?' + params.toString();
-    link.download = 'branch_analytics_' + new Date().toISOString().split('T')[0] + '.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+function updateAnalytics() {
+    const policyStatus = document.getElementById('policyStatus').value;
+    const url = new URL(window.location);
+    url.searchParams.set('policy_status', policyStatus);
+    window.location.href = url.toString();
 }
-
-
 </script>
 {% endblock %}

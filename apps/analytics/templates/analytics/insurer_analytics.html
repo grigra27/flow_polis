@@ -88,22 +88,46 @@
         overflow-y: auto;
     }
 
-    .policy-status-filter {
+    .policy-status-filter-enhanced {
         display: flex;
         align-items: center;
+        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+        padding: 12px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.2);
     }
 
-    .policy-status-filter .form-select {
-        min-width: 160px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.9em;
-    }
-
-    .policy-status-filter .form-label {
-        font-weight: 600;
-        color: #495057;
+    .policy-status-filter-enhanced .form-label {
+        font-weight: 700;
+        color: white;
         white-space: nowrap;
+        margin-bottom: 0;
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .policy-status-filter-enhanced .enhanced-select {
+        min-width: 180px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.95);
+        color: #2c3e50;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:focus {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        background: white;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:hover {
+        background: white;
+        transform: translateY(-1px);
     }
 
     .insurer-table {
@@ -477,18 +501,14 @@
                     Аналитика по страховщикам
                 </h1>
                 <div class="d-flex align-items-center gap-3">
-                    <div class="policy-status-filter">
+                    <div class="policy-status-filter-enhanced">
                         <label for="policyStatus" class="form-label mb-0 me-2">Статус полисов:</label>
-                        <select class="form-select form-select-sm" id="policyStatus" onchange="updateAnalytics()">
-                            <option value="all" {% if not policy_status or policy_status == 'all' %}selected{% endif %}>Все полисы</option>
-                            <option value="active" {% if policy_status == 'active' %}selected{% endif %}>Только активные</option>
+                        <select class="form-select form-select-sm enhanced-select" id="policyStatus" onchange="updateAnalytics()">
+                            <option value="all" {% if policy_status == 'all' %}selected{% endif %}>Все полисы</option>
+                            <option value="active" {% if not policy_status or policy_status == 'active' %}selected{% endif %}>Только активные</option>
                             <option value="inactive" {% if policy_status == 'inactive' %}selected{% endif %}>Только неактивные</option>
                         </select>
                     </div>
-                    <button class="btn btn-success" onclick="exportData()">
-                        <i class="fas fa-download me-1"></i>
-                        Экспорт
-                    </button>
                 </div>
             </div>
         </div>
@@ -683,55 +703,214 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Global chart instances to prevent duplicates
+let marketShareChart = null;
+let policyChart = null;
+let chartsInitialized = false;
+
 function initializeCharts() {
+    // PREVENT MULTIPLE CALLS
+    if (chartsInitialized) {
+        console.log('Charts already initialized, skipping...');
+        return;
+    }
+
+    console.log('=== INITIALIZING CHARTS (FIRST TIME) ===');
+    chartsInitialized = true;
     {% if insurer_metrics %}
-    // Market share chart
-    const marketShareCtx = document.getElementById('marketShareChart').getContext('2d');
 
-    // Debug: log chart data
-    const chartLabels = [{% for name, share in chart_data_for_pie.items %}'{{ name|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}];
-    const chartValues = [{% for name, share in chart_data_for_pie.items %}{{ share }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    // COMPLETELY CLEAR AND RECREATE CANVAS
+    const oldCanvas = document.getElementById('marketShareChart');
+    const canvasContainer = oldCanvas.parentNode;
 
-    console.log('=== CHART DEBUG ===');
-    console.log('Chart labels:', chartLabels);
-    console.log('Chart values:', chartValues);
-    console.log('Total segments:', chartLabels.length);
-    console.log('Expected max segments: 7 (top 6 + others)');
-    console.log('==================');
+    // Remove old canvas completely
+    oldCanvas.remove();
 
-    // Generate colors - gray for "Others", bright colors for insurers
-    const backgroundColors = chartLabels.map((label, index) => {
-        if (label === 'Прочие') {
-            return '#95a5a6';  // Gray for "Others"
-        }
-        const colors = ['#e74c3c', '#3498db', '#f39c12', '#2ecc71', '#9b59b6', '#e67e22'];
-        return colors[index % colors.length];
-    });
+    // Create brand new canvas
+    const newCanvas = document.createElement('canvas');
+    newCanvas.id = 'marketShareChart';
+    newCanvas.width = 400;
+    newCanvas.height = 300;
+    canvasContainer.appendChild(newCanvas);
 
-    const marketShareData = {
-        labels: chartLabels,
-        datasets: [{
-            data: chartValues,
-            backgroundColor: backgroundColors,
-            borderWidth: 2,
-            borderColor: '#ffffff'
-        }]
+    // Get context from new canvas
+    const marketShareCtx = newCanvas.getContext('2d');
+
+    // DEBUG: Let's see what data we actually have in metric object
+    console.log('=== DEBUGGING METRIC OBJECT ===');
+    {% for metric in insurer_metrics %}
+    {% if forloop.counter <= 3 %}
+    console.log('Metric {{ forloop.counter }}:');
+    console.log('  insurer_name: {{ metric.insurer.insurer_name|escapejs }}');
+    console.log('  market_share: {{ metric.market_share }}');
+    console.log('  premium_volume: {{ metric.premium_volume }}');
+    console.log('  policy_count: {{ metric.policy_count }}');
+    {% endif %}
+    {% endfor %}
+    console.log('===============================');
+
+    // Use chart_data_for_pie which has correct values - SAFE PARSING
+    const pieData = {
+        {% for name, share in chart_data_for_pie.items %}
+        '{{ name|escapejs }}': parseFloat('{{ share|floatformat:1 }}'.replace(',', '.')){% if not forloop.last %},{% endif %}
+        {% endfor %}
     };
 
-    new Chart(marketShareCtx, {
-        type: 'doughnut',
-        data: marketShareData,
+    // Prepare logo URLs for pie chart (TOP-10)
+    const pieLogoUrls = {
+        {% for metric in insurer_metrics %}
+        {% if forloop.counter <= 10 %}
+        '{{ metric.insurer.insurer_name|escapejs }}': {% if metric.insurer.logo %}'{{ metric.insurer.logo.url }}'{% else %}null{% endif %}{% if not forloop.last and forloop.counter < 10 %},{% endif %}
+        {% endif %}
+        {% endfor %}
+    };
+
+    // Convert to arrays and take TOP-10
+    const allLabelsFromPie = Object.keys(pieData);
+    const allValuesFromPie = Object.values(pieData);
+
+    const chartLabels = allLabelsFromPie.slice(0, 10);
+    const chartValues = allValuesFromPie.slice(0, 10);
+
+    // DEBUG: Check what's in chart_data_for_pie
+    console.log('=== CHART_DATA_FOR_PIE ===');
+    {% for name, share in chart_data_for_pie.items %}
+    console.log('{{ name|escapejs }}: {{ share }}%');
+    {% endfor %}
+    console.log('==========================');
+
+    console.log('=== TOP-10 FROM PIE DATA ===');
+    console.log('Pie data object:', pieData);
+    console.log('Chart labels (TOP-10):', chartLabels);
+    console.log('Chart values (TOP-10):', chartValues);
+    console.log('Labels length:', chartLabels.length);
+    console.log('Values length:', chartValues.length);
+    console.log('Canvas element:', newCanvas);
+    console.log('============================');
+
+    // Colors for TOP-10 companies - blue monochrome palette (different depths)
+    const allColors = [
+        '#1E3A8A', '#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA',
+        '#93C5FD', '#BFDBFE', '#DBEAFE', '#EBF8FF', '#F0F9FF'
+    ];
+    const colors = chartLabels.map((label, index) => allColors[index % allColors.length]);
+
+    console.log('Colors assigned:', colors);
+
+    // Custom legend plugin with logos
+    const legendWithLogosPlugin = {
+        id: 'legendWithLogos',
+        beforeInit: function(chart) {
+            // Preload legend images
+            chart.legendImages = {};
+            chartLabels.forEach((label) => {
+                const logoUrl = pieLogoUrls[label];
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.legendImages[label] = img;
+                        chart.update('none');
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.legendImages[label] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const legendArea = chart.legend;
+
+            if (!legendArea || !legendArea.legendItems) return;
+
+            // Clear default legend area
+            const legendBox = legendArea.legendHitBoxes;
+            if (legendBox && legendBox.length > 0) {
+                const startX = legendBox[0].left;
+                const startY = legendBox[0].top - 10;
+                const width = Math.max(...legendBox.map(box => box.left + box.width)) - startX + 50;
+                const height = Math.max(...legendBox.map(box => box.top + box.height)) - startY + 20;
+
+                ctx.clearRect(startX - 10, startY, width, height);
+
+                // Draw custom legend with logos in single column
+                const itemHeight = 30;
+
+                legendArea.legendItems.forEach((item, index) => {
+                    const x = startX;
+                    const y = startY + (index * itemHeight) + 15;
+
+                    // Draw color indicator (small rectangle)
+                    ctx.fillStyle = item.fillStyle;
+                    ctx.fillRect(x, y - 8, 16, 16);
+                    ctx.strokeStyle = '#ccc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y - 8, 16, 16);
+
+                    // Draw logo if available
+                    const img = chart.legendImages[item.text];
+                    if (img && img.complete) {
+                        ctx.drawImage(img, x + 20, y - 10, 20, 20);
+                    } else {
+                        // Fallback: draw colored circle
+                        ctx.fillStyle = item.fillStyle;
+                        ctx.beginPath();
+                        ctx.arc(x + 30, y, 8, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    // Draw company name
+                    ctx.fillStyle = '#333';
+                    ctx.font = '12px Arial';
+                    const companyName = item.text;
+                    ctx.fillText(companyName, x + 45, y + 4);
+
+                    // Draw percentage (after company name)
+                    const percentage = chartValues[chartLabels.indexOf(item.text)];
+                    const nameWidth = ctx.measureText(companyName).width;
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText(' - ' + percentage.toFixed(1) + '%', x + 45 + nameWidth, y + 4);
+                });
+            }
+        }
+    };
+
+    // Create completely new chart - PIE CHART
+    marketShareChart = new Chart(marketShareCtx, {
+        type: 'pie',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Доля рынка (%)',
+                data: chartValues,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        plugins: [legendWithLogosPlugin], // Add custom legend plugin
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
-                    position: 'bottom',
+                    position: 'right',
                     labels: {
                         padding: 20,
-                        usePointStyle: true,
+                        usePointStyle: false, // We'll draw custom logos
                         font: {
                             size: 12
+                        },
+                        generateLabels: function(chart) {
+                            // Generate labels without text (we'll draw custom)
+                            return chart.data.labels.map((label, index) => ({
+                                text: label,
+                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                hidden: false,
+                                index: index
+                            }));
                         }
                     }
                 },
@@ -742,30 +921,90 @@ function initializeCharts() {
                         }
                     }
                 }
-            },
-            cutout: '50%'
+            }
         }
     });
 
-    // Policy count chart (top 10)
+    // Policy count chart (top 10) with logos
     const policyCtx = document.getElementById('policyChart').getContext('2d');
+
+    // Prepare data with logos
+    const policyLabels = [{% for metric in insurer_metrics %}{% if forloop.counter <= 10 %}'{{ metric.insurer.insurer_name|escapejs }}'{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+    const policyValues = [{% for metric in insurer_metrics %}{% if forloop.counter <= 10 %}{{ metric.policy_count }}{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+    const logoUrls = [{% for metric in insurer_metrics %}{% if forloop.counter <= 10 %}{% if metric.insurer.logo %}'{{ metric.insurer.logo.url }}'{% else %}null{% endif %}{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}];
+
+    console.log('Policy chart logos:', logoUrls);
+
     const policyData = {
-        labels: [{% for metric in insurer_metrics %}{% if forloop.counter <= 10 %}'{{ metric.insurer.insurer_name|escapejs }}'{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}],
+        labels: policyLabels,
         datasets: [{
             label: 'Количество полисов',
-            data: [{% for metric in insurer_metrics %}{% if forloop.counter <= 10 %}{{ metric.policy_count }}{% if not forloop.last and forloop.counter < 10 %},{% endif %}{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(231, 76, 60, 0.8)',
-            borderColor: 'rgba(231, 76, 60, 1)',
+            data: policyValues,
+            backgroundColor: [
+                '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
+                '#4ADE80', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#ECFDF5'
+            ], // Green gradient palette
+            borderColor: [
+                '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
+                '#4ADE80', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#ECFDF5'
+            ], // Same colors for borders
             borderWidth: 1
         }]
     };
 
-    new Chart(policyCtx, {
+    // Custom plugin to draw logos - IMPROVED VERSION
+    const logoPlugin = {
+        id: 'logoPlugin',
+        beforeInit: function(chart) {
+            // Preload all images
+            chart.logoImages = [];
+            logoUrls.forEach((logoUrl, index) => {
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.logoImages[index] = img;
+                        chart.update('none'); // Update without animation
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.logoImages[index] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+
+            // Draw preloaded logos
+            chart.logoImages.forEach((img, index) => {
+                if (img && img.complete) {
+                    const x = xAxis.getPixelForValue(index);
+                    const y = yAxis.bottom + 10;
+                    const size = 24;
+
+                    ctx.drawImage(img, x - size/2, y, size, size);
+                }
+            });
+        }
+    };
+
+    policyChart = new Chart(policyCtx, {
         type: 'bar',
         data: policyData,
+        plugins: [logoPlugin], // Add our custom plugin
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // Disable animations to prevent flickering
+            hover: {
+                animationDuration: 0 // Disable hover animations
+            },
+            layout: {
+                padding: {
+                    bottom: 40 // Extra space for logos
+                }
+            },
             scales: {
                 y: {
                     beginAtZero: true,
@@ -775,8 +1014,7 @@ function initializeCharts() {
                 },
                 x: {
                     ticks: {
-                        maxRotation: 45,
-                        minRotation: 0
+                        display: false // Hide text labels since we show logos
                     }
                 }
             },
@@ -786,6 +1024,9 @@ function initializeCharts() {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function(context) {
+                            return policyLabels[context[0].dataIndex]; // Show company name in tooltip
+                        },
                         label: function(context) {
                             return 'Полисов: ' + context.parsed.y;
                         }
@@ -847,20 +1088,6 @@ function updateAnalytics() {
     const url = new URL(window.location);
     url.searchParams.set('policy_status', policyStatus);
     window.location.href = url.toString();
-}
-
-function exportData() {
-    // Create export URL with current policy status
-    const params = new URLSearchParams(window.location.search);
-    params.set('export', 'excel');
-
-    // Create temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = window.location.pathname + '?' + params.toString();
-    link.download = 'insurer_analytics_' + new Date().toISOString().split('T')[0] + '.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 }
 </script>
 {% endblock %}

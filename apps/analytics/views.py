@@ -373,6 +373,23 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Process branch metrics for better template usage
             branch_metrics = branch_data.get("branch_metrics", [])
 
+            # Convert branch dictionaries to Branch objects for template
+            for metric in branch_metrics:
+                if isinstance(metric.get("branch"), dict):
+                    branch_id = metric["branch"].get("id")
+                    if branch_id:
+                        try:
+                            metric["branch"] = Branch.objects.get(id=branch_id)
+                        except Branch.DoesNotExist:
+                            # Fallback: create a simple object with branch_name
+                            class SimpleBranch:
+                                def __init__(self, name):
+                                    self.branch_name = name
+
+                            metric["branch"] = SimpleBranch(
+                                metric["branch"].get("name", "Неизвестный филиал")
+                            )
+
             # Calculate additional metrics for display
             total_premium = sum(metric["premium_volume"] for metric in branch_metrics)
             total_commission = sum(
@@ -401,6 +418,7 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "branch_metrics": branch_metrics,
                     "total_branches": branch_data.get("total_branches", 0),
                     "top_performing_branch": top_branch,
+                    "policy_status": self.request.GET.get("policy_status", "active"),
                     "total_premium_volume": total_premium,
                     "total_commission_revenue": total_commission,
                     "total_policy_count": total_policies,
@@ -544,6 +562,11 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if self.request.GET.get("date_to"):
                 filter_data["date_to"] = self.request.GET.get("date_to")
 
+            # Policy status filter - default to "active" for branches
+            policy_status = self.request.GET.get("policy_status", "active")
+            if policy_status in ["active", "inactive"]:
+                filter_data["policy_active"] = policy_status == "active"
+
             # Multi-select filters
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
@@ -556,7 +579,8 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if self.request.GET.getlist("clients"):
                 filter_data["client_ids"] = self.request.GET.getlist("clients")
 
-            if filter_data:
+            # Always create filter if we have policy_status or other data
+            if filter_data or policy_status != "all":
                 return self.analytics_service.validate_filter_input(filter_data)
 
             return None
@@ -716,41 +740,35 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
             top_insurer = insurer_metrics[0] if insurer_metrics else None
 
             # Calculate market share distribution for pie chart
-            market_share_distribution = {}
+            # TOP-10 insurers + Others from real table data
             chart_data_for_pie = {}
 
-            # Always show all data in market_share_distribution for the table
+            # Take TOP-10 insurers from table
+            count = 0
+            others_share = 0
+
             for metric in insurer_metrics:
-                market_share_distribution[metric["insurer"].insurer_name] = metric[
-                    "market_share"
-                ]
+                market_share = float(metric["market_share"])
+                if market_share > 0:
+                    if count < 10:  # TOP-10 insurers
+                        insurer_name = metric["insurer"].insurer_name
+                        chart_data_for_pie[insurer_name] = round(market_share, 1)
+                        count += 1
+                    else:
+                        others_share += market_share
 
-            # For pie chart, limit to top 6 + others for better readability
-            logger.info(f"Total insurers: {len(insurer_metrics)}")
+            # Add "Others" for remaining insurers
+            if others_share > 0:
+                chart_data_for_pie["Другие"] = round(others_share, 1)
 
-            if len(insurer_metrics) <= 6:
-                # If 6 or fewer insurers, show all
-                for metric in insurer_metrics:
-                    if metric["market_share"] > 0:
-                        chart_data_for_pie[metric["insurer"].insurer_name] = metric[
-                            "market_share"
-                        ]
-            else:
-                # Show top 6 + "Others"
-                top_6_metrics = insurer_metrics[:6]  # Already sorted by premium volume
-                others_share = Decimal("0")
-
-                for metric in top_6_metrics:
-                    chart_data_for_pie[metric["insurer"].insurer_name] = metric[
-                        "market_share"
-                    ]
-
-                # Calculate "Others" share
-                for metric in insurer_metrics[6:]:
-                    others_share += metric["market_share"]
-
-                if others_share > 0:
-                    chart_data_for_pie["Прочие"] = others_share
+            # Debug: log what we're sending to the chart
+            logger.info(f"=== TOP-10 + OTHERS ===")
+            logger.info(f"Chart data keys: {list(chart_data_for_pie.keys())}")
+            logger.info(f"Chart data values: {list(chart_data_for_pie.values())}")
+            logger.info(f"Total segments: {len(chart_data_for_pie)}")
+            total_chart_percentage = sum(chart_data_for_pie.values())
+            logger.info(f"Total percentage: {total_chart_percentage}%")
+            logger.info(f"=======================")
 
             logger.info(f"Chart data for pie: {list(chart_data_for_pie.keys())}")
             logger.info(f"Chart data values: {list(chart_data_for_pie.values())}")
@@ -762,9 +780,8 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "insurer_metrics": insurer_metrics,
                     "total_insurers": insurer_data.get("total_insurers", 0),
                     "top_performing_insurer": top_insurer,
-                    "market_share_distribution": market_share_distribution,
                     "chart_data_for_pie": chart_data_for_pie,
-                    "policy_status": self.request.GET.get("policy_status", "all"),
+                    "policy_status": self.request.GET.get("policy_status", "active"),
                     "total_premium_volume": total_premium,
                     "total_commission_revenue": total_commission,
                     "total_policy_count": total_policies,
@@ -801,7 +818,6 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "insurer_metrics": [],
                     "total_insurers": 0,
                     "top_performing_insurer": None,
-                    "market_share_distribution": {},
                     "chart_data_for_pie": {},
                     "total_premium_volume": Decimal("0"),
                     "total_commission_revenue": Decimal("0"),
@@ -904,8 +920,8 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if self.request.GET.get("date_to"):
                 filter_data["date_to"] = self.request.GET.get("date_to")
 
-            # Policy status filter
-            policy_status = self.request.GET.get("policy_status", "all")
+            # Policy status filter - default to "active"
+            policy_status = self.request.GET.get("policy_status", "active")
             if policy_status in ["active", "inactive"]:
                 filter_data["policy_active"] = policy_status == "active"
 

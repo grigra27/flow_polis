@@ -1,5 +1,6 @@
 {% extends "analytics/base.html" %}
 {% load static %}
+{% load currency_filters %}
 
 {% block analytics_title %}Аналитика по клиентам{% endblock %}
 {% block title %}Аналитика по клиентам - Система аналитики{% endblock %}
@@ -144,13 +145,13 @@
         border-radius: 10px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         text-align: center;
-        border-top: 4px solid #27ae60;
+        border-top: 4px solid #007bff;
     }
 
-    .summary-card.premium { border-top-color: #27ae60; }
-    .summary-card.commission { border-top-color: #f39c12; }
-    .summary-card.policies { border-top-color: #8e44ad; }
-    .summary-card.clients { border-top-color: #3498db; }
+    .summary-card.premium { border-top-color: #28a745; }
+    .summary-card.commission { border-top-color: #ffc107; }
+    .summary-card.policies { border-top-color: #dc3545; }
+    .summary-card.clients { border-top-color: #6f42c1; }
 
     .top-lists-section {
         margin-bottom: 30px;
@@ -238,6 +239,53 @@
         border-radius: 10px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         margin-bottom: 30px;
+        height: 400px;
+    }
+
+    .chart-container canvas {
+        max-height: 320px !important;
+    }
+
+    .policy-status-filter-enhanced {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+        padding: 12px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .policy-status-filter-enhanced .form-label {
+        font-weight: 700;
+        color: white;
+        white-space: nowrap;
+        margin-bottom: 0;
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .policy-status-filter-enhanced .enhanced-select {
+        min-width: 180px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.95);
+        color: #2c3e50;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:focus {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        background: white;
+    }
+
+    .policy-status-filter-enhanced .enhanced-select:hover {
+        background: white;
+        transform: translateY(-1px);
     }
 
     .no-data {
@@ -268,6 +316,15 @@
             grid-template-columns: 1fr;
         }
 
+        .chart-container {
+            height: 300px;
+            padding: 15px;
+        }
+
+        .chart-container canvas {
+            max-height: 250px !important;
+        }
+
         .top-list-tabs {
             flex-direction: column;
         }
@@ -290,18 +347,15 @@
                     <i class="fas fa-users me-2"></i>
                     Аналитика по клиентам
                 </h1>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
-                        <i class="fas fa-filter me-1"></i>
-                        Фильтры
-                        {% if filter_applied %}
-                            <span class="badge bg-primary ms-1">активны</span>
-                        {% endif %}
-                    </button>
-                    <button class="btn btn-success" onclick="exportData()">
-                        <i class="fas fa-download me-1"></i>
-                        Экспорт
-                    </button>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="policy-status-filter-enhanced">
+                        <label for="policyStatus" class="form-label mb-0 me-2">Статус полисов:</label>
+                        <select class="form-select form-select-sm enhanced-select" id="policyStatus" onchange="updateAnalytics()">
+                            <option value="all" {% if policy_status == 'all' %}selected{% endif %}>Все полисы</option>
+                            <option value="active" {% if not policy_status or policy_status == 'active' %}selected{% endif %}>Только активные</option>
+                            <option value="inactive" {% if policy_status == 'inactive' %}selected{% endif %}>Только неактивные</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -310,11 +364,11 @@
     <!-- Summary Cards -->
     <div class="summary-cards">
         <div class="summary-card premium">
-            <div class="metric-value">{{ total_premium_volume|floatformat:0 }} ₽</div>
+            <div class="metric-value">{{ total_premium_volume|currency }}</div>
             <div class="metric-label">Общий объем премий</div>
         </div>
         <div class="summary-card commission">
-            <div class="metric-value">{{ total_commission_revenue|floatformat:0 }} ₽</div>
+            <div class="metric-value">{{ total_commission_revenue|currency }}</div>
             <div class="metric-label">Общая комиссия</div>
         </div>
         <div class="summary-card policies">
@@ -327,8 +381,31 @@
         </div>
     </div>
 
+    <!-- Charts Section -->
+    {% if client_distribution_by_branch or client_distribution_by_insurance_type %}
+    <div class="row mb-4">
+        {% if client_distribution_by_branch %}
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <h5 class="mb-3">Распределение клиентов по филиалам</h5>
+                <canvas id="branchDistributionChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if client_distribution_by_insurance_type %}
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <h5 class="mb-3">Распределение клиентов по видам страхования</h5>
+                <canvas id="insuranceTypeDistributionChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Top Lists Section -->
-    {% if top_clients_by_insurance_sum or top_clients_by_commission or top_clients_by_policy_count %}
+    {% if top_clients_by_insurance_sum or top_clients_by_premium or top_clients_by_commission or top_clients_by_policy_count %}
     <div class="top-lists-section">
         <h4 class="mb-3">Рейтинги клиентов</h4>
 
@@ -336,6 +413,10 @@
             <button class="top-list-tab active" onclick="showTopList('insurance_sum')">
                 <i class="fas fa-shield-alt me-1"></i>
                 По страховой сумме
+            </button>
+            <button class="top-list-tab" onclick="showTopList('premium')">
+                <i class="fas fa-money-bill-wave me-1"></i>
+                По страховой премии
             </button>
             <button class="top-list-tab" onclick="showTopList('commission')">
                 <i class="fas fa-coins me-1"></i>
@@ -357,12 +438,40 @@
                     <div class="top-client-details">
                         {% if client.client.inn %}ИНН: {{ client.client.inn }} | {% endif %}
                         Полисов: {{ client.policy_count }} |
-                        Средняя стоимость: {{ client.average_policy_value|floatformat:0 }} ₽
+                        Средняя стоимость: {{ client.average_policy_value|currency }}{% if client.primary_branch %} |
+                        Филиал: {{ client.primary_branch }}{% endif %}
                     </div>
                 </div>
                 <div class="top-client-value">
-                    <div>{{ client.insurance_sum|floatformat:0 }} ₽</div>
+                    <div>{{ client.insurance_sum|currency }}</div>
                     <small class="text-muted">страховая сумма</small>
+                </div>
+            </div>
+            {% empty %}
+            <div class="no-data">
+                <i class="fas fa-users"></i>
+                <div>Нет данных по клиентам</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Top by Premium -->
+        <div id="top-premium" class="top-list-content">
+            {% for client in top_clients_by_premium %}
+            <div class="top-client-item">
+                <div class="top-client-rank">{{ forloop.counter }}</div>
+                <div class="top-client-info">
+                    <div class="top-client-name">{{ client.client.name }}</div>
+                    <div class="top-client-details">
+                        {% if client.client.inn %}ИНН: {{ client.client.inn }} | {% endif %}
+                        Полисов: {{ client.policy_count }} |
+                        Страховая сумма: {{ client.insurance_sum|currency }}{% if client.primary_branch %} |
+                        Филиал: {{ client.primary_branch }}{% endif %}
+                    </div>
+                </div>
+                <div class="top-client-value">
+                    <div>{{ client.premium_volume|currency }}</div>
+                    <small class="text-muted">страховая премия</small>
                 </div>
             </div>
             {% empty %}
@@ -383,11 +492,12 @@
                     <div class="top-client-details">
                         {% if client.client.inn %}ИНН: {{ client.client.inn }} | {% endif %}
                         Полисов: {{ client.policy_count }} |
-                        Премии: {{ client.premium_volume|floatformat:0 }} ₽
+                        Премии: {{ client.premium_volume|currency }}{% if client.primary_branch %} |
+                        Филиал: {{ client.primary_branch }}{% endif %}
                     </div>
                 </div>
                 <div class="top-client-value">
-                    <div>{{ client.commission_revenue|floatformat:0 }} ₽</div>
+                    <div>{{ client.commission_revenue|currency }}</div>
                     <small class="text-muted">комиссия</small>
                 </div>
             </div>
@@ -408,8 +518,9 @@
                     <div class="top-client-name">{{ client.client.name }}</div>
                     <div class="top-client-details">
                         {% if client.client.inn %}ИНН: {{ client.client.inn }} | {% endif %}
-                        Страховая сумма: {{ client.insurance_sum|floatformat:0 }} ₽ |
-                        Комиссия: {{ client.commission_revenue|floatformat:0 }} ₽
+                        Страховая сумма: {{ client.insurance_sum|currency }} |
+                        Комиссия: {{ client.commission_revenue|currency }}{% if client.primary_branch %} |
+                        Филиал: {{ client.primary_branch }}{% endif %}
                     </div>
                 </div>
                 <div class="top-client-value">
@@ -427,31 +538,8 @@
     </div>
     {% endif %}
 
-    <!-- Charts Section -->
-    {% if client_distribution_by_branch or client_distribution_by_insurance_type %}
-    <div class="row mb-4">
-        {% if client_distribution_by_branch %}
-        <div class="col-md-6">
-            <div class="chart-container">
-                <h5 class="mb-3">Распределение клиентов по филиалам</h5>
-                <canvas id="branchDistributionChart" width="400" height="300"></canvas>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if client_distribution_by_insurance_type %}
-        <div class="col-md-6">
-            <div class="chart-container">
-                <h5 class="mb-3">Распределение клиентов по видам страхования</h5>
-                <canvas id="insuranceTypeDistributionChart" width="400" height="300"></canvas>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
     <!-- No Data Message -->
-    {% if not top_clients_by_insurance_sum and not top_clients_by_commission and not top_clients_by_policy_count %}
+    {% if not top_clients_by_insurance_sum and not top_clients_by_premium and not top_clients_by_commission and not top_clients_by_policy_count %}
     <div class="no-data">
         <i class="fas fa-users"></i>
         <div>Нет данных для отображения</div>
@@ -460,101 +548,6 @@
     {% endif %}
 </div>
 
-<!-- Filter Modal -->
-<div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="filterModalLabel">Фильтры аналитики</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="filterForm" method="post">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_from" class="form-label">Дата с</label>
-                                <input type="date" class="form-control" id="date_from" name="date_from"
-                                       value="{% if current_filter.date_from %}{{ current_filter.date_from|date:'Y-m-d' }}{% endif %}">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_to" class="form-label">Дата по</label>
-                                <input type="date" class="form-control" id="date_to" name="date_to"
-                                       value="{% if current_filter.date_to %}{{ current_filter.date_to|date:'Y-m-d' }}{% endif %}">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="branches" class="form-label">Филиалы</label>
-                                <select class="form-select" id="branches" name="branches" multiple>
-                                    {% for branch in branches %}
-                                    <option value="{{ branch.id }}"
-                                            {% if current_filter.branch_ids and branch.id in current_filter.branch_ids %}selected{% endif %}>
-                                        {{ branch.branch_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="insurers" class="form-label">Страховщики</label>
-                                <select class="form-select" id="insurers" name="insurers" multiple>
-                                    {% for insurer in insurers %}
-                                    <option value="{{ insurer.id }}"
-                                            {% if current_filter.insurer_ids and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
-                                        {{ insurer.insurer_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="insurance_types" class="form-label">Виды страхования</label>
-                                <select class="form-select" id="insurance_types" name="insurance_types" multiple>
-                                    {% for insurance_type in insurance_types %}
-                                    <option value="{{ insurance_type.id }}"
-                                            {% if current_filter.insurance_type_ids and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
-                                        {{ insurance_type.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="clients" class="form-label">Клиенты</label>
-                                <select class="form-select" id="clients" name="clients" multiple>
-                                    {% for client in clients %}
-                                    <option value="{{ client.id }}"
-                                            {% if current_filter.client_ids and client.id in current_filter.client_ids %}selected{% endif %}>
-                                        {{ client.client_name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="clearFilters()">Сбросить</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -563,9 +556,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize charts
     initializeCharts();
-
-    // Initialize filter form
-    initializeFilterForm();
 });
 
 function showTopList(listType) {
@@ -583,6 +573,9 @@ function showTopList(listType) {
     if (listType === 'insurance_sum') {
         document.getElementById('top-insurance-sum').classList.add('active');
         document.querySelector('[onclick="showTopList(\'insurance_sum\')"]').classList.add('active');
+    } else if (listType === 'premium') {
+        document.getElementById('top-premium').classList.add('active');
+        document.querySelector('[onclick="showTopList(\'premium\')"]').classList.add('active');
     } else if (listType === 'commission') {
         document.getElementById('top-commission').classList.add('active');
         document.querySelector('[onclick="showTopList(\'commission\')"]').classList.add('active');
@@ -592,29 +585,95 @@ function showTopList(listType) {
     }
 }
 
+// Global chart instances to prevent duplicates
+let branchDistributionChart = null;
+let insuranceTypeChart = null;
+let chartsInitialized = false;
+
 function initializeCharts() {
+    // PREVENT MULTIPLE CALLS
+    if (chartsInitialized) {
+        console.log('Charts already initialized, skipping...');
+        return;
+    }
+
+    console.log('=== INITIALIZING CHARTS (FIRST TIME) ===');
+    chartsInitialized = true;
+
     {% if client_distribution_by_branch %}
-    // Branch distribution chart
+    // Branch distribution chart (pie chart)
     const branchCtx = document.getElementById('branchDistributionChart').getContext('2d');
+
+    // Prepare data with blue monochrome palette
+    const branchLabels = [{% for branch, count in client_distribution_by_branch.items %}'{{ branch|default:"Не указан" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const branchValues = [{% for branch, count in client_distribution_by_branch.items %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    // Bright colorful palette for branch distribution
+    const branchColors = [
+        '#FF3030', // Bright Red
+        '#00CED1', // Dark Turquoise
+        '#1E90FF', // Dodger Blue
+        '#32CD32', // Lime Green
+        '#FFD700', // Gold
+        '#DA70D6', // Orchid
+        '#00FA9A', // Medium Spring Green
+        '#FFA500', // Orange
+        '#9370DB', // Medium Purple
+        '#00BFFF', // Deep Sky Blue
+        '#FF69B4', // Hot Pink
+        '#7FFF00', // Chartreuse
+        '#FF4500', // Orange Red
+        '#20B2AA', // Light Sea Green
+        '#BA55D3'  // Medium Orchid
+    ];
+
     const branchData = {
-        labels: [{% for branch, count in client_distribution_by_branch.items %}'{{ branch|default:"Не указан" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        labels: branchLabels,
         datasets: [{
-            data: [{% for branch, count in client_distribution_by_branch.items %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: [
-                '#27ae60', '#3498db', '#f39c12', '#e74c3c', '#9b59b6',
-                '#e67e22', '#1abc9c', '#34495e', '#f1c40f', '#2ecc71'
-            ]
+            label: 'Количество клиентов',
+            data: branchValues,
+            backgroundColor: branchColors.slice(0, branchLabels.length),
+            borderWidth: 2,
+            borderColor: '#ffffff'
         }]
     };
 
-    new Chart(branchCtx, {
-        type: 'doughnut',
+    branchDistributionChart = new Chart(branchCtx, {
+        type: 'pie',
         data: branchData,
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'right',
+                    labels: {
+                        padding: 12,
+                        usePointStyle: false,
+                        font: {
+                            size: 13
+                        },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                return data.labels.map((label, index) => {
+                                    const value = data.datasets[0].data[index];
+                                    // Truncate long branch names to fit better
+                                    const truncatedLabel = label.length > 15 ? label.substring(0, 15) + '...' : label;
+                                    return {
+                                        text: truncatedLabel + ': ' + value,
+                                        fillStyle: data.datasets[0].backgroundColor[index],
+                                        strokeStyle: data.datasets[0].backgroundColor[index],
+                                        lineWidth: 0,
+                                        hidden: false,
+                                        index: index
+                                    };
+                                });
+                            }
+                            return [];
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -629,24 +688,39 @@ function initializeCharts() {
     {% endif %}
 
     {% if client_distribution_by_insurance_type %}
-    // Insurance type distribution chart
+    // Insurance type distribution chart (bar chart)
     const insuranceTypeCtx = document.getElementById('insuranceTypeDistributionChart').getContext('2d');
+
+    const insuranceTypeLabels = [{% for insurance_type, count in client_distribution_by_insurance_type.items %}'{{ insurance_type|default:"Не указан" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const insuranceTypeValues = [{% for insurance_type, count in client_distribution_by_insurance_type.items %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    // Green monochrome palette for insurance types
+    const insuranceTypeColors = [
+        '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
+        '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7', '#F0FDF4'
+    ];
+
     const insuranceTypeData = {
-        labels: [{% for insurance_type, count in client_distribution_by_insurance_type.items %}'{{ insurance_type|default:"Не указан" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        labels: insuranceTypeLabels,
         datasets: [{
             label: 'Количество клиентов',
-            data: [{% for insurance_type, count in client_distribution_by_insurance_type.items %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(39, 174, 96, 0.8)',
-            borderColor: 'rgba(39, 174, 96, 1)',
+            data: insuranceTypeValues,
+            backgroundColor: insuranceTypeColors.slice(0, insuranceTypeLabels.length),
+            borderColor: insuranceTypeColors.slice(0, insuranceTypeLabels.length),
             borderWidth: 1
         }]
     };
 
-    new Chart(insuranceTypeCtx, {
+    insuranceTypeChart = new Chart(insuranceTypeCtx, {
         type: 'bar',
         data: insuranceTypeData,
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            hover: {
+                animationDuration: 0
+            },
             scales: {
                 y: {
                     beginAtZero: true,
@@ -672,71 +746,32 @@ function initializeCharts() {
     {% endif %}
 }
 
-function initializeFilterForm() {
-    const form = document.getElementById('filterForm');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const formData = new FormData(form);
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Применение...';
-
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Reload page with new data
-                window.location.reload();
-            } else {
-                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Произошла ошибка при применении фильтров');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-        });
-    });
+function updateAnalytics() {
+    const policyStatus = document.getElementById('policyStatus').value;
+    const url = new URL(window.location);
+    url.searchParams.set('policy_status', policyStatus);
+    window.location.href = url.toString();
 }
 
-function clearFilters() {
-    const form = document.getElementById('filterForm');
-    form.reset();
+function showSuccessMessage(message) {
+    // Create and show success alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
 
-    // Clear all select elements
-    const selects = form.querySelectorAll('select[multiple]');
-    selects.forEach(select => {
-        Array.from(select.options).forEach(option => {
-            option.selected = false;
-        });
-    });
-}
+    // Insert at the top of the container
+    const container = document.querySelector('.container-fluid');
+    container.insertBefore(alertDiv, container.firstChild);
 
-function exportData() {
-    // Create export URL with current filters
-    const params = new URLSearchParams(window.location.search);
-    params.set('export', 'excel');
-
-    // Create temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = window.location.pathname + '?' + params.toString();
-    link.download = 'client_analytics_' + new Date().toISOString().split('T')[0] + '.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
 }
 </script>
 {% endblock %}

@@ -951,6 +951,13 @@ class AnalyticsService:
                     .values_list("branch__branch_name", "count")
                 )
 
+                # Determine primary branch (branch with most policies)
+                primary_branch = None
+                if branch_distribution:
+                    primary_branch = max(
+                        branch_distribution.items(), key=lambda x: x[1]
+                    )[0]
+
                 client_metrics.append(
                     {
                         "client": {
@@ -966,12 +973,19 @@ class AnalyticsService:
                         "average_policy_value": average_policy_value,
                         "insurance_type_distribution": insurance_type_distribution,
                         "branch_distribution": branch_distribution,
+                        "primary_branch": primary_branch,
                     }
                 )
 
             # Create top lists by different criteria
             top_clients_by_insurance_sum = sorted(
                 client_metrics, key=lambda x: x["insurance_sum"], reverse=True
+            )[
+                :20
+            ]  # Top 20 clients
+
+            top_clients_by_premium = sorted(
+                client_metrics, key=lambda x: x["premium_volume"], reverse=True
             )[
                 :20
             ]  # Top 20 clients
@@ -997,12 +1011,16 @@ class AnalyticsService:
                     else:
                         client_distribution_by_branch[branch_name] = 1
 
-            # Calculate client distribution by insurance type
+            # Calculate client distribution by insurance type (unique clients per type)
             client_distribution_by_insurance_type = {}
             for client_metric in client_metrics:
-                for insurance_type_name, count in client_metric[
-                    "insurance_type_distribution"
-                ].items():
+                # Get all insurance types for this client (unique)
+                client_insurance_types = set(
+                    client_metric["insurance_type_distribution"].keys()
+                )
+
+                # Count this client once for each insurance type they have
+                for insurance_type_name in client_insurance_types:
                     if insurance_type_name in client_distribution_by_insurance_type:
                         client_distribution_by_insurance_type[insurance_type_name] += 1
                     else:
@@ -1010,10 +1028,12 @@ class AnalyticsService:
 
             return {
                 "top_clients_by_insurance_sum": top_clients_by_insurance_sum,
+                "top_clients_by_premium": top_clients_by_premium,
                 "top_clients_by_commission": top_clients_by_commission,
                 "top_clients_by_policy_count": top_clients_by_policy_count,
                 "client_distribution_by_branch": client_distribution_by_branch,
                 "client_distribution_by_insurance_type": client_distribution_by_insurance_type,
+                "all_client_metrics": client_metrics,  # Add all client metrics for correct totals
                 "total_clients": len(client_metrics),
                 "filter_applied": analytics_filter.has_filters()
                 if analytics_filter
@@ -1028,10 +1048,12 @@ class AnalyticsService:
 
             return {
                 "top_clients_by_insurance_sum": [],
+                "top_clients_by_premium": [],
                 "top_clients_by_commission": [],
                 "top_clients_by_policy_count": [],
                 "client_distribution_by_branch": {},
                 "client_distribution_by_insurance_type": {},
+                "all_client_metrics": [],  # Add empty list for error case
                 "total_clients": 0,
                 "filter_applied": False,
                 "error": str(e),

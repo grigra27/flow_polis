@@ -1462,6 +1462,7 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
             top_clients_by_insurance_sum = client_data.get(
                 "top_clients_by_insurance_sum", []
             )
+            top_clients_by_premium = client_data.get("top_clients_by_premium", [])
             top_clients_by_commission = client_data.get("top_clients_by_commission", [])
             top_clients_by_policy_count = client_data.get(
                 "top_clients_by_policy_count", []
@@ -1478,15 +1479,17 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 "client_distribution_by_insurance_type", {}
             )
 
-            # Calculate totals for percentage calculations
+            # Calculate totals from all clients, not just top lists
+            all_client_metrics = client_data.get("all_client_metrics", [])
+
             total_premium_volume = sum(
-                client["premium_volume"] for client in top_clients_by_insurance_sum
+                client["premium_volume"] for client in all_client_metrics
             )
             total_commission_revenue = sum(
-                client["commission_revenue"] for client in top_clients_by_commission
+                client["commission_revenue"] for client in all_client_metrics
             )
             total_policy_count = sum(
-                client["policy_count"] for client in top_clients_by_policy_count
+                client["policy_count"] for client in all_client_metrics
             )
 
             # Add percentage calculations for top clients
@@ -1520,6 +1523,7 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
             context.update(
                 {
                     "top_clients_by_insurance_sum": top_clients_by_insurance_sum,
+                    "top_clients_by_premium": top_clients_by_premium,
                     "top_clients_by_commission": top_clients_by_commission,
                     "top_clients_by_policy_count": top_clients_by_policy_count,
                     "client_distribution_by_branch": client_distribution_by_branch,
@@ -1538,6 +1542,7 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "filter_applied": analytics_filter.has_filters()
                     if analytics_filter
                     else False,
+                    "policy_status": self.request.GET.get("policy_status", "active"),
                     "current_year": datetime.now().year,
                 }
             )
@@ -1559,6 +1564,7 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
             context.update(
                 {
                     "top_clients_by_insurance_sum": [],
+                    "top_clients_by_premium": [],
                     "top_clients_by_commission": [],
                     "top_clients_by_policy_count": [],
                     "client_distribution_by_branch": {},
@@ -1579,109 +1585,6 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
         return context
 
-    def post(self, request, *args, **kwargs):
-        """
-        Handle POST requests for filtering client analytics data.
-
-        Returns:
-            JsonResponse with updated client metrics or error message
-        """
-        try:
-            # Get filter parameters from POST data
-            analytics_filter = self._get_analytics_filter_from_post()
-
-            # Get updated client analytics
-            client_data = self.analytics_service.get_client_analytics(analytics_filter)
-
-            # Process metrics for JSON response
-            top_clients_by_insurance_sum = client_data.get(
-                "top_clients_by_insurance_sum", []
-            )
-            top_clients_by_commission = client_data.get("top_clients_by_commission", [])
-            top_clients_by_policy_count = client_data.get(
-                "top_clients_by_policy_count", []
-            )
-
-            # Format for JSON response
-            formatted_top_by_insurance_sum = []
-            for client in top_clients_by_insurance_sum:
-                formatted_top_by_insurance_sum.append(
-                    {
-                        "client": client["client"],
-                        "premium_volume": str(client["premium_volume"]),
-                        "commission_revenue": str(client["commission_revenue"]),
-                        "policy_count": client["policy_count"],
-                        "insurance_sum": str(client["insurance_sum"]),
-                        "average_policy_value": str(client["average_policy_value"]),
-                        "insurance_type_distribution": client[
-                            "insurance_type_distribution"
-                        ],
-                        "branch_distribution": client["branch_distribution"],
-                    }
-                )
-
-            formatted_top_by_commission = []
-            for client in top_clients_by_commission:
-                formatted_top_by_commission.append(
-                    {
-                        "client": client["client"],
-                        "premium_volume": str(client["premium_volume"]),
-                        "commission_revenue": str(client["commission_revenue"]),
-                        "policy_count": client["policy_count"],
-                        "insurance_sum": str(client["insurance_sum"]),
-                        "average_policy_value": str(client["average_policy_value"]),
-                        "insurance_type_distribution": client[
-                            "insurance_type_distribution"
-                        ],
-                        "branch_distribution": client["branch_distribution"],
-                    }
-                )
-
-            formatted_top_by_policy_count = []
-            for client in top_clients_by_policy_count:
-                formatted_top_by_policy_count.append(
-                    {
-                        "client": client["client"],
-                        "premium_volume": str(client["premium_volume"]),
-                        "commission_revenue": str(client["commission_revenue"]),
-                        "policy_count": client["policy_count"],
-                        "insurance_sum": str(client["insurance_sum"]),
-                        "average_policy_value": str(client["average_policy_value"]),
-                        "insurance_type_distribution": client[
-                            "insurance_type_distribution"
-                        ],
-                        "branch_distribution": client["branch_distribution"],
-                    }
-                )
-
-            # Format response data
-            response_data = {
-                "success": True,
-                "top_clients_by_insurance_sum": formatted_top_by_insurance_sum,
-                "top_clients_by_commission": formatted_top_by_commission,
-                "top_clients_by_policy_count": formatted_top_by_policy_count,
-                "client_distribution_by_branch": client_data.get(
-                    "client_distribution_by_branch", {}
-                ),
-                "client_distribution_by_insurance_type": client_data.get(
-                    "client_distribution_by_insurance_type", {}
-                ),
-                "total_clients": client_data.get("total_clients", 0),
-                "filter_applied": client_data.get("filter_applied", False),
-            }
-
-            if "error" in client_data:
-                response_data["warning"] = f"Предупреждение: {client_data['error']}"
-
-            return JsonResponse(response_data)
-
-        except Exception as e:
-            logger.error(f"Error in ClientAnalyticsView.post: {e}")
-            return JsonResponse(
-                {"success": False, "error": "Произошла ошибка при применении фильтров"},
-                status=500,
-            )
-
     def _get_analytics_filter(self):
         """
         Get AnalyticsFilter from GET parameters.
@@ -1692,25 +1595,13 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
         try:
             filter_data = {}
 
-            # Date filters
-            if self.request.GET.get("date_from"):
-                filter_data["date_from"] = self.request.GET.get("date_from")
-            if self.request.GET.get("date_to"):
-                filter_data["date_to"] = self.request.GET.get("date_to")
+            # Policy status filter - default to "active" for clients
+            policy_status = self.request.GET.get("policy_status", "active")
+            if policy_status in ["active", "inactive"]:
+                filter_data["policy_active"] = policy_status == "active"
 
-            # Multi-select filters
-            if self.request.GET.getlist("branches"):
-                filter_data["branch_ids"] = self.request.GET.getlist("branches")
-            if self.request.GET.getlist("insurers"):
-                filter_data["insurer_ids"] = self.request.GET.getlist("insurers")
-            if self.request.GET.getlist("insurance_types"):
-                filter_data["insurance_type_ids"] = self.request.GET.getlist(
-                    "insurance_types"
-                )
-            if self.request.GET.getlist("clients"):
-                filter_data["client_ids"] = self.request.GET.getlist("clients")
-
-            if filter_data:
+            # Always create filter if we have policy_status or other data
+            if filter_data or policy_status != "all":
                 return self.analytics_service.validate_filter_input(filter_data)
 
             return None
@@ -1718,43 +1609,6 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
         except Exception as e:
             logger.error(f"Error creating analytics filter from GET: {e}")
             return None
-
-    def _get_analytics_filter_from_post(self):
-        """
-        Get AnalyticsFilter from POST parameters.
-
-        Returns:
-            AnalyticsFilter instance or None if no filters applied
-        """
-        try:
-            filter_data = {}
-
-            # Date filters
-            if self.request.POST.get("date_from"):
-                filter_data["date_from"] = self.request.POST.get("date_from")
-            if self.request.POST.get("date_to"):
-                filter_data["date_to"] = self.request.POST.get("date_to")
-
-            # Multi-select filters
-            if self.request.POST.getlist("branches"):
-                filter_data["branch_ids"] = self.request.POST.getlist("branches")
-            if self.request.POST.getlist("insurers"):
-                filter_data["insurer_ids"] = self.request.POST.getlist("insurers")
-            if self.request.POST.getlist("insurance_types"):
-                filter_data["insurance_type_ids"] = self.request.POST.getlist(
-                    "insurance_types"
-                )
-            if self.request.POST.getlist("clients"):
-                filter_data["client_ids"] = self.request.POST.getlist("clients")
-
-            if filter_data:
-                return self.analytics_service.validate_filter_input(filter_data)
-
-            return None
-
-        except Exception as e:
-            logger.error(f"Error creating analytics filter from POST: {e}")
-            raise ValueError(f"Некорректные параметры фильтра: {e}")
 
     def get(self, request, *args, **kwargs):
         """Handle GET requests including export requests."""

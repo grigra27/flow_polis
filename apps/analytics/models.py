@@ -124,50 +124,6 @@ class InsurerAnalytics:
 
 
 @dataclass
-class InsuranceTypeMetric:
-    """
-    Metrics for a single insurance type.
-
-    Attributes:
-        insurance_type: Insurance type information
-        premium_volume: Total premium volume for this insurance type
-        commission_revenue: Total commission revenue for this insurance type
-        policy_count: Number of policies for this insurance type
-        insurance_sum: Total insurance sum for this insurance type
-        average_commission_per_policy: Average commission per policy
-        branch_distribution: Distribution of policies by branch
-        insurer_distribution: Distribution of policies by insurer
-    """
-
-    insurance_type: Dict[str, Any]  # Insurance type info as dict
-    premium_volume: Decimal
-    commission_revenue: Decimal
-    policy_count: int
-    insurance_sum: Decimal
-    average_commission_per_policy: Decimal
-    branch_distribution: Dict[str, int]
-    insurer_distribution: Dict[str, int]
-
-
-@dataclass
-class InsuranceTypeAnalytics:
-    """
-    Complete analytics data for insurance types.
-
-    Attributes:
-        insurance_type_metrics: List of metrics for each insurance type
-        total_insurance_types: Total number of insurance types with data
-        most_profitable_type: Insurance type with highest profitability
-        filter_applied: Whether any filters are currently applied
-    """
-
-    insurance_type_metrics: List[InsuranceTypeMetric]
-    total_insurance_types: int
-    most_profitable_type: Optional[InsuranceTypeMetric] = None
-    filter_applied: bool = False
-
-
-@dataclass
 class ClientMetric:
     """
     Metrics for a single client.

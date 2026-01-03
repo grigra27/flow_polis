@@ -7,11 +7,6 @@ urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
     path("branches/", views.BranchAnalyticsView.as_view(), name="branch_analytics"),
     path("insurers/", views.InsurerAnalyticsView.as_view(), name="insurer_analytics"),
-    path(
-        "insurance-types/",
-        views.InsuranceTypeAnalyticsView.as_view(),
-        name="insurance_type_analytics",
-    ),
     path("clients/", views.ClientAnalyticsView.as_view(), name="client_analytics"),
     path(
         "financial/", views.FinancialAnalyticsView.as_view(), name="financial_analytics"

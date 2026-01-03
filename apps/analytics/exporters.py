@@ -1176,3 +1176,436 @@ class AnalyticsExporter:
         worksheet.cell(row=current_row, column=1).font = Font(bold=True)
 
         self._auto_adjust_columns(worksheet)
+
+    def export_financial_history(
+        self,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ) -> HttpResponse:
+        """
+        Export financial history analytics to Excel format.
+
+        Args:
+            analytics: Financial history analytics data
+            applied_filters: Applied filters information
+
+        Returns:
+            HttpResponse with Excel file
+        """
+        try:
+            workbook = Workbook()
+
+            # Remove default sheet
+            workbook.remove(workbook.active)
+
+            # Create sheets
+            monthly_sheet = workbook.create_sheet("Monthly History")
+            summary_sheet = workbook.create_sheet("Summary")
+            highlights_sheet = workbook.create_sheet("Highlights")
+            problems_sheet = workbook.create_sheet("Problems")
+
+            # Fill sheets with data
+            self._create_monthly_history_sheet(
+                monthly_sheet, analytics, applied_filters
+            )
+            self._create_history_summary_sheet(
+                summary_sheet, analytics, applied_filters
+            )
+            self._create_highlights_sheet(highlights_sheet, analytics, applied_filters)
+            self._create_problems_sheet(problems_sheet, analytics, applied_filters)
+
+            # Save to BytesIO
+            output = BytesIO()
+            workbook.save(output)
+            output.seek(0)
+
+            # Create response
+            response = HttpResponse(
+                output.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response[
+                "Content-Disposition"
+            ] = f'attachment; filename="financial_history_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx"'
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error exporting financial history: {e}")
+            raise
+
+    def _create_monthly_history_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create monthly history sheet."""
+        # Add title and metadata
+        worksheet.cell(row=1, column=1, value="Financial History - Monthly Data")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:J1")
+
+        worksheet.cell(
+            row=2,
+            column=1,
+            value=f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        )
+
+        current_row = 3
+        if applied_filters:
+            worksheet.cell(row=current_row, column=1, value="Applied Filters:")
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+            for filter_name, filter_value in applied_filters.items():
+                if filter_value:
+                    worksheet.cell(
+                        row=current_row,
+                        column=1,
+                        value=f"  {filter_name}: {filter_value}",
+                    )
+                    current_row += 1
+            current_row += 1
+
+        # Headers
+        headers = [
+            "Month",
+            "Year",
+            "Actual Premium",
+            "Planned Premium",
+            "Premium Achievement %",
+            "Actual Commission",
+            "Planned Commission",
+            "Commission Achievement %",
+            "Policies Created",
+            "Payment Discipline %",
+        ]
+
+        for col, header in enumerate(headers, 1):
+            worksheet.cell(row=current_row, column=col, value=header)
+
+        self._apply_header_style(worksheet, current_row, len(headers))
+        current_row += 1
+
+        # Data
+        monthly_history = analytics.get("monthly_history", [])
+        start_data_row = current_row
+
+        for month_data in monthly_history:
+            worksheet.cell(
+                row=current_row, column=1, value=month_data.get("month_name", "")
+            )
+            worksheet.cell(row=current_row, column=2, value=month_data.get("year", ""))
+            worksheet.cell(
+                row=current_row,
+                column=3,
+                value=self._format_value(month_data.get("actual_premium", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=4,
+                value=self._format_value(month_data.get("planned_premium", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=5,
+                value=self._format_value(month_data.get("premium_achievement", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=6,
+                value=self._format_value(month_data.get("actual_commission", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=7,
+                value=self._format_value(month_data.get("planned_commission", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=8,
+                value=self._format_value(month_data.get("commission_achievement", 0)),
+            )
+            worksheet.cell(
+                row=current_row, column=9, value=month_data.get("policies_created", 0)
+            )
+            worksheet.cell(
+                row=current_row,
+                column=10,
+                value=self._format_value(month_data.get("payment_discipline", 0)),
+            )
+            current_row += 1
+
+        # Apply styling
+        if monthly_history:
+            self._apply_data_style(
+                worksheet, start_data_row, current_row - 1, len(headers)
+            )
+
+        self._auto_adjust_columns(worksheet)
+
+    def _create_history_summary_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create history summary sheet."""
+        # Add title and metadata
+        worksheet.cell(row=1, column=1, value="Financial History - Summary")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:C1")
+
+        worksheet.cell(
+            row=2,
+            column=1,
+            value=f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        )
+
+        current_row = 4
+
+        # Summary metrics
+        summary_metrics = analytics.get("summary_metrics", {})
+        fact_vs_forecast = analytics.get("fact_vs_forecast", {})
+        performance_trends = analytics.get("performance_trends", {})
+
+        # Summary section
+        worksheet.cell(row=current_row, column=1, value="Summary Metrics")
+        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
+        current_row += 2
+
+        summary_data = [
+            (
+                "Total Actual Premium",
+                self._format_value(summary_metrics.get("total_actual_premium", 0)),
+            ),
+            (
+                "Total Actual Commission",
+                self._format_value(summary_metrics.get("total_actual_commission", 0)),
+            ),
+            (
+                "Total Policies Created",
+                summary_metrics.get("total_policies_created", 0),
+            ),
+            ("Months Analyzed", summary_metrics.get("months_analyzed", 0)),
+            (
+                "Average Monthly Premium",
+                self._format_value(summary_metrics.get("avg_monthly_premium", 0)),
+            ),
+            (
+                "Average Monthly Commission",
+                self._format_value(summary_metrics.get("avg_monthly_commission", 0)),
+            ),
+        ]
+
+        for label, value in summary_data:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+        current_row += 1
+
+        # Fact vs Forecast section
+        worksheet.cell(row=current_row, column=1, value="Fact vs Forecast Analysis")
+        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
+        current_row += 2
+
+        forecast_data = [
+            (
+                "Overall Premium Accuracy",
+                f"{self._format_value(fact_vs_forecast.get('overall_premium_accuracy', 0))}%",
+            ),
+            (
+                "Overall Commission Accuracy",
+                f"{self._format_value(fact_vs_forecast.get('overall_commission_accuracy', 0))}%",
+            ),
+            ("Accuracy Trend", fact_vs_forecast.get("accuracy_trend", "N/A")),
+        ]
+
+        for label, value in forecast_data:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+        current_row += 1
+
+        # Performance Trends section
+        worksheet.cell(row=current_row, column=1, value="Performance Trends")
+        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
+        current_row += 2
+
+        trends_data = [
+            ("Premium Trend", performance_trends.get("premium_trend", "N/A")),
+            ("Commission Trend", performance_trends.get("commission_trend", "N/A")),
+            ("Policy Trend", performance_trends.get("policy_trend", "N/A")),
+            (
+                "Growth Rate",
+                f"{self._format_value(performance_trends.get('growth_rate', 0))}%",
+            ),
+            (
+                "Volatility",
+                f"{self._format_value(performance_trends.get('volatility', 0))}%",
+            ),
+        ]
+
+        for label, value in trends_data:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+        self._auto_adjust_columns(worksheet)
+
+    def _create_highlights_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create highlights sheet."""
+        # Add title and metadata
+        worksheet.cell(row=1, column=1, value="Financial History - Monthly Highlights")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:F1")
+
+        current_row = 3
+
+        # Headers
+        headers = [
+            "Month",
+            "Top Client",
+            "Top Client Premium",
+            "Top Insurance Type",
+            "Insurance Count",
+            "Largest Policy Sum",
+        ]
+
+        for col, header in enumerate(headers, 1):
+            worksheet.cell(row=current_row, column=col, value=header)
+
+        self._apply_header_style(worksheet, current_row, len(headers))
+        current_row += 1
+
+        # Data
+        monthly_highlights = analytics.get("monthly_highlights", [])
+        start_data_row = current_row
+
+        for highlight in monthly_highlights:
+            worksheet.cell(
+                row=current_row,
+                column=1,
+                value=f"{highlight.get('month_name', '')} {highlight.get('month', {}).get('year', '')}",
+            )
+            worksheet.cell(
+                row=current_row, column=2, value=highlight.get("top_client", "")
+            )
+            worksheet.cell(
+                row=current_row,
+                column=3,
+                value=self._format_value(highlight.get("top_client_premium", 0)),
+            )
+            worksheet.cell(
+                row=current_row, column=4, value=highlight.get("top_insurance_type", "")
+            )
+            worksheet.cell(
+                row=current_row, column=5, value=highlight.get("top_insurance_count", 0)
+            )
+            worksheet.cell(
+                row=current_row,
+                column=6,
+                value=self._format_value(highlight.get("largest_policy_sum", 0)),
+            )
+            current_row += 1
+
+        # Apply styling
+        if monthly_highlights:
+            self._apply_data_style(
+                worksheet, start_data_row, current_row - 1, len(headers)
+            )
+
+        self._auto_adjust_columns(worksheet)
+
+    def _create_problems_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create problems analysis sheet."""
+        # Add title and metadata
+        worksheet.cell(row=1, column=1, value="Financial History - Problem Analysis")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:D1")
+
+        current_row = 3
+
+        problem_analysis = analytics.get("problem_analysis", {})
+
+        # Summary
+        worksheet.cell(row=current_row, column=1, value="Problem Summary")
+        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
+        current_row += 2
+
+        summary_data = [
+            (
+                "Total Overdue Amount",
+                self._format_value(problem_analysis.get("total_overdue_amount", 0)),
+            ),
+            ("Total Overdue Count", problem_analysis.get("total_overdue_count", 0)),
+            (
+                "Average Monthly Overdue",
+                self._format_value(problem_analysis.get("average_monthly_overdue", 0)),
+            ),
+        ]
+
+        for label, value in summary_data:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+        current_row += 2
+
+        # Problematic clients
+        worksheet.cell(row=current_row, column=1, value="Problematic Clients")
+        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
+        current_row += 1
+
+        # Headers for problematic clients
+        headers = ["Client Name", "Total Overdue", "Overdue Count"]
+        for col, header in enumerate(headers, 1):
+            worksheet.cell(row=current_row, column=col, value=header)
+
+        self._apply_header_style(worksheet, current_row, len(headers))
+        current_row += 1
+
+        # Data for problematic clients
+        problematic_clients = problem_analysis.get("problematic_clients", [])
+        start_data_row = current_row
+
+        for client in problematic_clients:
+            worksheet.cell(
+                row=current_row,
+                column=1,
+                value=client.get("policy__client__client_name", ""),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=2,
+                value=self._format_value(client.get("total_overdue", 0)),
+            )
+            worksheet.cell(
+                row=current_row, column=3, value=client.get("overdue_count", 0)
+            )
+            current_row += 1
+
+        # Apply styling
+        if problematic_clients:
+            self._apply_data_style(
+                worksheet, start_data_row, current_row - 1, len(headers)
+            )
+
+        self._auto_adjust_columns(worksheet)

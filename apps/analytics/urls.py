@@ -12,6 +12,11 @@ urlpatterns = [
         "financial/", views.FinancialAnalyticsView.as_view(), name="financial_analytics"
     ),
     path(
+        "financial-history/",
+        views.FinancialHistoryView.as_view(),
+        name="financial_history",
+    ),
+    path(
         "time-series/",
         views.TimeSeriesAnalyticsView.as_view(),
         name="time_series_analytics",

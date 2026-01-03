@@ -4,7 +4,7 @@ from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
 from django.http import JsonResponse
 from django.contrib import messages
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
 import calendar
@@ -1804,6 +1804,459 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             enhanced_forecast.append(enhanced_item)
 
         return enhanced_forecast
+
+
+class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
+    """
+    Financial history view displaying historical performance analysis.
+
+    Provides comprehensive analysis of completed periods starting from October 2025,
+    including fact vs forecast comparison, performance trends, monthly highlights,
+    problem areas analysis, and dimensional breakdowns.
+    """
+
+    template_name = "analytics/financial_history.html"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.analytics_service = AnalyticsService()
+        self.exporter = AnalyticsExporter()
+
+    def get_context_data(self, **kwargs):
+        """
+        Get context data for financial history template.
+
+        Returns:
+            Dictionary containing financial history analytics and filter options
+        """
+        context = super().get_context_data(**kwargs)
+
+        # Log access to financial history
+        security_logger.info(
+            f"Financial history accessed by user {self.request.user.username} "
+            f"from IP {self.request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+
+        try:
+            # Get filter parameters from request
+            analytics_filter = self._get_analytics_filter()
+
+            # Get financial history data
+            history_data = self.analytics_service.get_financial_history(
+                analytics_filter
+            )
+
+            # Process data for better template usage
+            monthly_history = history_data.get("monthly_history", [])
+            fact_vs_forecast = history_data.get("fact_vs_forecast", {})
+            performance_trends = history_data.get("performance_trends", {})
+            monthly_highlights = history_data.get("monthly_highlights", [])
+            problem_analysis = history_data.get("problem_analysis", {})
+            dimensional_breakdown = history_data.get("dimensional_breakdown", {})
+            summary_metrics = history_data.get("summary_metrics", {})
+
+            # Prepare chart data
+            chart_data = self._prepare_history_chart_data(monthly_history)
+
+            # Calculate additional metrics for display
+            if monthly_history:
+                # Calculate quarter performance
+                quarterly_performance = self._calculate_quarterly_performance(
+                    monthly_history
+                )
+
+                # Find trends and patterns
+                trend_analysis = self._analyze_trends(monthly_history)
+            else:
+                quarterly_performance = {}
+                trend_analysis = {}
+
+            # Generate available months for filter
+            available_months = self._generate_available_months()
+
+            # Add filter options for the form
+            context.update(
+                {
+                    "monthly_history": monthly_history,
+                    "fact_vs_forecast": fact_vs_forecast,
+                    "performance_trends": performance_trends,
+                    "monthly_highlights": monthly_highlights,
+                    "problem_analysis": problem_analysis,
+                    "dimensional_breakdown": dimensional_breakdown,
+                    "summary_metrics": summary_metrics,
+                    "quarterly_performance": quarterly_performance,
+                    "trend_analysis": trend_analysis,
+                    "chart_data": chart_data,
+                    "branches": Branch.objects.all().order_by("branch_name"),
+                    "insurers": Insurer.objects.all().order_by("insurer_name"),
+                    "available_months": available_months,
+                    "clients": Client.objects.all().order_by("client_name")[:100],
+                    "current_filter": analytics_filter,
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                    "current_year": datetime.now().year,
+                }
+            )
+
+            # Add error message if present
+            if "error" in history_data:
+                messages.error(
+                    self.request,
+                    f"Ошибка при расчете финансовой истории: {history_data['error']}",
+                )
+
+        except Exception as e:
+            logger.error(f"Error in FinancialHistoryView.get_context_data: {e}")
+            messages.error(
+                self.request, "Произошла ошибка при загрузке финансовой истории"
+            )
+
+            # Provide empty data as fallback
+            context.update(
+                {
+                    "monthly_history": [],
+                    "fact_vs_forecast": {},
+                    "performance_trends": {},
+                    "monthly_highlights": [],
+                    "problem_analysis": {},
+                    "dimensional_breakdown": {},
+                    "summary_metrics": {},
+                    "quarterly_performance": {},
+                    "trend_analysis": {},
+                    "chart_data": "{}",
+                    "branches": Branch.objects.none(),
+                    "insurers": Insurer.objects.none(),
+                    "available_months": [],
+                    "clients": Client.objects.none(),
+                    "current_filter": None,
+                    "filter_applied": False,
+                    "current_year": datetime.now().year,
+                }
+            )
+
+        return context
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for filtering financial history data.
+
+        Returns:
+            JsonResponse with updated history metrics or error message
+        """
+        try:
+            # Get filter parameters from POST data
+            analytics_filter = self._get_analytics_filter_from_post()
+
+            # Get updated financial history
+            history_data = self.analytics_service.get_financial_history(
+                analytics_filter
+            )
+
+            # Format response data (simplified for AJAX)
+            response_data = {
+                "success": True,
+                "summary_metrics": {
+                    "total_actual_premium": str(
+                        history_data["summary_metrics"]["total_actual_premium"]
+                    ),
+                    "total_actual_commission": str(
+                        history_data["summary_metrics"]["total_actual_commission"]
+                    ),
+                    "total_policies_created": history_data["summary_metrics"][
+                        "total_policies_created"
+                    ],
+                    "months_analyzed": history_data["summary_metrics"][
+                        "months_analyzed"
+                    ],
+                },
+                "fact_vs_forecast": {
+                    "overall_premium_accuracy": str(
+                        history_data["fact_vs_forecast"]["overall_premium_accuracy"]
+                    ),
+                    "overall_commission_accuracy": str(
+                        history_data["fact_vs_forecast"]["overall_commission_accuracy"]
+                    ),
+                    "accuracy_trend": history_data["fact_vs_forecast"][
+                        "accuracy_trend"
+                    ],
+                },
+                "filter_applied": history_data.get("filter_applied", False),
+            }
+
+            if "error" in history_data:
+                response_data["warning"] = f"Предупреждение: {history_data['error']}"
+
+            return JsonResponse(response_data)
+
+        except Exception as e:
+            logger.error(f"Error in FinancialHistoryView.post: {e}")
+            return JsonResponse(
+                {"success": False, "error": "Произошла ошибка при применении фильтров"},
+                status=500,
+            )
+
+    def _get_analytics_filter(self):
+        """Get AnalyticsFilter from GET parameters."""
+        try:
+            filter_data = {}
+
+            # Note: We don't use date filters here as we control the date range
+            # Multi-select filters
+            if self.request.GET.getlist("branches"):
+                filter_data["branch_ids"] = self.request.GET.getlist("branches")
+            if self.request.GET.getlist("insurers"):
+                filter_data["insurer_ids"] = self.request.GET.getlist("insurers")
+            if self.request.GET.getlist("clients"):
+                filter_data["client_ids"] = self.request.GET.getlist("clients")
+
+            # Target month filter
+            if self.request.GET.get("target_month"):
+                filter_data["target_month"] = self.request.GET.get("target_month")
+
+            if filter_data:
+                return self.analytics_service.validate_filter_input(filter_data)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating analytics filter from GET: {e}")
+            return None
+
+    def _get_analytics_filter_from_post(self):
+        """Get AnalyticsFilter from POST parameters."""
+        try:
+            filter_data = {}
+
+            # Multi-select filters
+            if self.request.POST.getlist("branches"):
+                filter_data["branch_ids"] = self.request.POST.getlist("branches")
+            if self.request.POST.getlist("insurers"):
+                filter_data["insurer_ids"] = self.request.POST.getlist("insurers")
+            if self.request.POST.getlist("clients"):
+                filter_data["client_ids"] = self.request.POST.getlist("clients")
+
+            # Target month filter
+            if self.request.POST.get("target_month"):
+                filter_data["target_month"] = self.request.POST.get("target_month")
+
+            if filter_data:
+                return self.analytics_service.validate_filter_input(filter_data)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating analytics filter from POST: {e}")
+            raise ValueError(f"Некорректные параметры фильтра: {e}")
+
+    def get(self, request, *args, **kwargs):
+        """Handle GET requests including export requests."""
+        if request.GET.get("export") == "excel":
+            return self.export_data()
+        return super().get(request, *args, **kwargs)
+
+    def export_data(self):
+        """Export financial history to Excel."""
+        # Log export access
+        security_logger.info(
+            f"Financial history export by user {self.request.user.username} "
+            f"from IP {self.request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+
+        try:
+            # Get current filter
+            analytics_filter = self._get_analytics_filter()
+
+            # Get financial history
+            history_data = self.analytics_service.get_financial_history(
+                analytics_filter
+            )
+
+            # Prepare applied filters info for export
+            applied_filters = {}
+            if analytics_filter:
+                if analytics_filter.branch_ids:
+                    branch_names = Branch.objects.filter(
+                        id__in=analytics_filter.branch_ids
+                    ).values_list("branch_name", flat=True)
+                    applied_filters["Branches"] = ", ".join(branch_names)
+                if analytics_filter.insurer_ids:
+                    insurer_names = Insurer.objects.filter(
+                        id__in=analytics_filter.insurer_ids
+                    ).values_list("insurer_name", flat=True)
+                    applied_filters["Insurers"] = ", ".join(insurer_names)
+                if analytics_filter.insurance_type_ids:
+                    type_names = InsuranceType.objects.filter(
+                        id__in=analytics_filter.insurance_type_ids
+                    ).values_list("name", flat=True)
+                    applied_filters["Insurance Types"] = ", ".join(type_names)
+
+            # Export data
+            return self.exporter.export_financial_history(history_data, applied_filters)
+
+        except Exception as e:
+            logger.error(f"Error exporting financial history: {e}")
+            messages.error(self.request, "Произошла ошибка при экспорте данных")
+            return self.get(self.request)
+
+    def _prepare_history_chart_data(self, monthly_history):
+        """Prepare chart data for JavaScript."""
+        if not monthly_history:
+            return "{}"
+
+        import json
+
+        chart_data = {
+            "labels": [
+                month["month_name"] + " " + str(month["year"])
+                for month in monthly_history
+            ],
+            "actual_premium": [
+                float(month["actual_premium"]) for month in monthly_history
+            ],
+            "planned_premium": [
+                float(month["planned_premium"]) for month in monthly_history
+            ],
+            "actual_commission": [
+                float(month["actual_commission"]) for month in monthly_history
+            ],
+            "planned_commission": [
+                float(month["planned_commission"]) for month in monthly_history
+            ],
+            "achievement_rates": [
+                float(month["premium_achievement"]) for month in monthly_history
+            ],
+            "payment_discipline": [
+                float(month["payment_discipline"]) for month in monthly_history
+            ],
+        }
+
+        return json.dumps(chart_data)
+
+    def _calculate_quarterly_performance(self, monthly_history):
+        """Calculate quarterly performance metrics."""
+        from collections import defaultdict
+
+        quarterly_data = defaultdict(
+            lambda: {
+                "premium": Decimal("0"),
+                "commission": Decimal("0"),
+                "policies": 0,
+                "months": [],
+            }
+        )
+
+        for month in monthly_history:
+            quarter = f"Q{(month['month'].month - 1) // 3 + 1} {month['year']}"
+            quarterly_data[quarter]["premium"] += month["actual_premium"]
+            quarterly_data[quarter]["commission"] += month["actual_commission"]
+            quarterly_data[quarter]["policies"] += month["policies_created"]
+            quarterly_data[quarter]["months"].append(month)
+
+        # Convert to regular dict and calculate averages
+        result = {}
+        for quarter, data in quarterly_data.items():
+            months_count = len(data["months"])
+            result[quarter] = {
+                "premium": data["premium"],
+                "commission": data["commission"],
+                "policies": data["policies"],
+                "avg_monthly_premium": data["premium"] / months_count
+                if months_count > 0
+                else Decimal("0"),
+                "avg_monthly_commission": data["commission"] / months_count
+                if months_count > 0
+                else Decimal("0"),
+                "months_count": months_count,
+            }
+
+        return result
+
+    def _analyze_trends(self, monthly_history):
+        """Analyze trends and patterns in the data."""
+        if len(monthly_history) < 3:
+            return {"insufficient_data": True}
+
+        # Calculate moving averages
+        premium_values = [month["actual_premium"] for month in monthly_history]
+        commission_values = [month["actual_commission"] for month in monthly_history]
+
+        # Simple 3-month moving average
+        premium_ma = []
+        commission_ma = []
+
+        for i in range(2, len(premium_values)):
+            premium_ma.append(sum(premium_values[i - 2 : i + 1]) / 3)
+            commission_ma.append(sum(commission_values[i - 2 : i + 1]) / 3)
+
+        # Find best and worst consecutive 3-month periods
+        best_period_start = 0
+        worst_period_start = 0
+        best_period_sum = sum(premium_values[:3])
+        worst_period_sum = sum(premium_values[:3])
+
+        for i in range(1, len(premium_values) - 2):
+            period_sum = sum(premium_values[i : i + 3])
+            if period_sum > best_period_sum:
+                best_period_sum = period_sum
+                best_period_start = i
+            if period_sum < worst_period_sum:
+                worst_period_sum = period_sum
+                worst_period_start = i
+
+        return {
+            "insufficient_data": False,
+            "premium_moving_average": [float(ma) for ma in premium_ma],
+            "commission_moving_average": [float(ma) for ma in commission_ma],
+            "best_3month_period": {
+                "start_month": monthly_history[best_period_start]["month_name"],
+                "start_year": monthly_history[best_period_start]["year"],
+                "total_premium": best_period_sum,
+            },
+            "worst_3month_period": {
+                "start_month": monthly_history[worst_period_start]["month_name"],
+                "start_year": monthly_history[worst_period_start]["year"],
+                "total_premium": worst_period_sum,
+            },
+        }
+
+    def _generate_available_months(self):
+        """Generate list of available months for filtering."""
+        available_months = []
+
+        # Start from October 2025
+        start_date = datetime(2025, 10, 1).date()
+        current_date = datetime.now().date()
+
+        # Get the first day of current month, then subtract 1 day to get last day of previous month
+        first_day_current_month = current_date.replace(day=1)
+        end_date = first_day_current_month - timedelta(days=1)
+
+        # If we're still before October 2025, return empty list
+        if current_date < start_date:
+            return available_months
+
+        # Generate months from start_date to end_date
+        current_month = start_date.replace(day=1)
+
+        while current_month <= end_date:
+            month_value = current_month.strftime("%Y-%m")
+            month_label = current_month.strftime("%B %Y")
+
+            available_months.append({"value": month_value, "label": month_label})
+
+            # Move to next month
+            if current_month.month == 12:
+                current_month = current_month.replace(
+                    year=current_month.year + 1, month=1
+                )
+            else:
+                current_month = current_month.replace(month=current_month.month + 1)
+
+        # Reverse to show most recent first
+        available_months.reverse()
+
+        return available_months
 
 
 class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):

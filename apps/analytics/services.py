@@ -4,7 +4,8 @@ This module contains the core business logic for analytics calculations.
 """
 
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+import calendar
 from typing import Optional, Dict, Any
 from django.db.models import QuerySet, Sum, Count, Avg
 from django.db.models.functions import Coalesce
@@ -200,6 +201,7 @@ class AnalyticsFilter:
         insurance_type_ids: Optional[list] = None,
         client_ids: Optional[list] = None,
         policy_active: Optional[bool] = None,
+        target_month: Optional[str] = None,
     ):
         self.date_from = date_from
         self.date_to = date_to
@@ -208,6 +210,7 @@ class AnalyticsFilter:
         self.insurance_type_ids = insurance_type_ids or []
         self.client_ids = client_ids or []
         self.policy_active = policy_active
+        self.target_month = target_month
 
     def apply_to_policies(self, queryset: QuerySet) -> QuerySet:
         """
@@ -320,6 +323,7 @@ class AnalyticsFilter:
             or self.insurance_type_ids
             or self.client_ids
             or self.policy_active is not None
+            or self.target_month
         )
 
 
@@ -1721,6 +1725,709 @@ class AnalyticsService:
                 "new_clients_percentage": Decimal("0"),
             }
 
+    def get_financial_history(
+        self, analytics_filter: Optional[AnalyticsFilter] = None
+    ) -> Dict[str, Any]:
+        """
+        Get financial history analytics for completed periods.
+
+        Args:
+            analytics_filter: Optional filter to apply to the data
+
+        Returns:
+            Dictionary containing financial history analytics
+        """
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+            from datetime import datetime, timedelta
+            from django.db.models import Q, Sum, Count, Avg
+            from django.utils import timezone
+            import calendar
+
+            # Define the start date (October 2025) and end date (previous month)
+            start_date = datetime(2025, 10, 1).date()
+            current_date = datetime.now().date()
+
+            # Get the first day of current month, then subtract 1 day to get last day of previous month
+            first_day_current_month = current_date.replace(day=1)
+            end_date = first_day_current_month - timedelta(days=1)
+
+            # If we're still before October 2025, return empty data
+            if current_date < start_date:
+                return self._get_empty_financial_history()
+
+            # Get base querysets
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            # Apply filters if provided (except date filters - we control dates)
+            if analytics_filter:
+                if analytics_filter.branch_ids:
+                    policies_qs = policies_qs.filter(
+                        branch_id__in=analytics_filter.branch_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__branch_id__in=analytics_filter.branch_ids
+                    )
+                if analytics_filter.insurer_ids:
+                    policies_qs = policies_qs.filter(
+                        insurer_id__in=analytics_filter.insurer_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__insurer_id__in=analytics_filter.insurer_ids
+                    )
+                if analytics_filter.client_ids:
+                    policies_qs = policies_qs.filter(
+                        client_id__in=analytics_filter.client_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__client_id__in=analytics_filter.client_ids
+                    )
+                if analytics_filter.policy_active is not None:
+                    policies_qs = policies_qs.filter(
+                        policy_active=analytics_filter.policy_active
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__policy_active=analytics_filter.policy_active
+                    )
+
+            # Filter to our date range
+            historical_payments = payments_qs.filter(
+                due_date__gte=start_date, due_date__lte=end_date
+            )
+
+            historical_policies = policies_qs.filter(
+                start_date__gte=start_date, start_date__lte=end_date
+            )
+
+            # Apply target month filter if specified
+            if analytics_filter and analytics_filter.target_month:
+                try:
+                    # Parse target month (format: "YYYY-MM")
+                    year, month = map(int, analytics_filter.target_month.split("-"))
+
+                    # Filter payments to specific month
+                    historical_payments = historical_payments.filter(
+                        due_date__year=year, due_date__month=month
+                    )
+
+                    # Filter policies to specific month
+                    historical_policies = historical_policies.filter(
+                        start_date__year=year, start_date__month=month
+                    )
+
+                    # Update date range for monthly history generation
+                    start_date = datetime(year, month, 1).date()
+                    if month == 12:
+                        end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+                    else:
+                        end_date = datetime(year, month + 1, 1).date() - timedelta(
+                            days=1
+                        )
+
+                except (ValueError, TypeError):
+                    # Invalid month format, ignore filter
+                    pass
+
+            # Generate monthly historical data
+            monthly_history = self._generate_monthly_history(
+                historical_payments, historical_policies, start_date, end_date
+            )
+
+            # Calculate fact vs forecast analysis
+            fact_vs_forecast = self._calculate_fact_vs_forecast(
+                monthly_history, analytics_filter
+            )
+
+            # Calculate performance trends
+            performance_trends = self._calculate_performance_trends(monthly_history)
+
+            # Get top events for each month
+            monthly_highlights = self._get_monthly_highlights(
+                historical_payments,
+                historical_policies,
+                start_date,
+                end_date,
+                analytics_filter,
+            )
+
+            # Analyze problem areas
+            problem_analysis = self._analyze_problem_areas(
+                historical_payments, start_date, end_date
+            )
+
+            # Calculate dimensional breakdown
+            dimensional_breakdown = self._calculate_dimensional_breakdown(
+                historical_payments, historical_policies, analytics_filter
+            )
+
+            # Calculate summary metrics
+            total_actual_premium = sum(
+                month["actual_premium"] for month in monthly_history
+            )
+            total_actual_commission = sum(
+                month["actual_commission"] for month in monthly_history
+            )
+            total_policies_created = sum(
+                month["policies_created"] for month in monthly_history
+            )
+
+            # Calculate average monthly performance
+            months_count = len(monthly_history)
+            avg_monthly_premium = (
+                total_actual_premium / months_count
+                if months_count > 0
+                else Decimal("0")
+            )
+            avg_monthly_commission = (
+                total_actual_commission / months_count
+                if months_count > 0
+                else Decimal("0")
+            )
+
+            return {
+                "monthly_history": monthly_history,
+                "fact_vs_forecast": fact_vs_forecast,
+                "performance_trends": performance_trends,
+                "monthly_highlights": monthly_highlights,
+                "problem_analysis": problem_analysis,
+                "dimensional_breakdown": dimensional_breakdown,
+                "summary_metrics": {
+                    "total_actual_premium": total_actual_premium,
+                    "total_actual_commission": total_actual_commission,
+                    "total_policies_created": total_policies_created,
+                    "avg_monthly_premium": avg_monthly_premium,
+                    "avg_monthly_commission": avg_monthly_commission,
+                    "months_analyzed": months_count,
+                    "period_start": start_date,
+                    "period_end": end_date,
+                },
+                "filter_applied": analytics_filter.has_filters()
+                if analytics_filter
+                else False,
+            }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating financial history: {e}")
+
+            return self._get_empty_financial_history(error=str(e))
+
+    def _generate_monthly_history(self, payments_qs, policies_qs, start_date, end_date):
+        """Generate monthly historical data."""
+        monthly_data = []
+
+        # Iterate through each month in the range
+        current_month = start_date.replace(day=1)
+
+        while current_month <= end_date:
+            # Calculate month boundaries
+            if current_month.month == 12:
+                next_month = current_month.replace(year=current_month.year + 1, month=1)
+            else:
+                next_month = current_month.replace(month=current_month.month + 1)
+
+            month_end = next_month - timedelta(days=1)
+
+            # Get payments for this month
+            month_payments = payments_qs.filter(
+                due_date__gte=current_month, due_date__lte=month_end
+            )
+
+            # Get policies created in this month
+            month_policies = policies_qs.filter(
+                start_date__gte=current_month, start_date__lte=month_end
+            )
+
+            # Calculate actual amounts (only paid payments)
+            paid_payments = month_payments.filter(paid_date__isnull=False)
+            actual_premium = self.calculator.calculate_premium_volume(paid_payments)
+            actual_commission = self.calculator.calculate_commission_revenue(
+                paid_payments
+            )
+
+            # Calculate planned amounts (all payments due in this month)
+            planned_premium = self.calculator.calculate_premium_volume(month_payments)
+            planned_commission = self.calculator.calculate_commission_revenue(
+                month_payments
+            )
+
+            # Calculate performance metrics
+            payment_discipline = Decimal("0")
+            if month_payments.count() > 0:
+                payment_discipline = (
+                    Decimal(str(paid_payments.count()))
+                    / Decimal(str(month_payments.count()))
+                ) * Decimal("100")
+
+            # Calculate achievement percentage
+            premium_achievement = Decimal("0")
+            commission_achievement = Decimal("0")
+
+            if planned_premium > 0:
+                premium_achievement = (actual_premium / planned_premium) * Decimal(
+                    "100"
+                )
+            if planned_commission > 0:
+                commission_achievement = (
+                    actual_commission / planned_commission
+                ) * Decimal("100")
+
+            monthly_data.append(
+                {
+                    "month": current_month,
+                    "month_name": calendar.month_name[current_month.month],
+                    "year": current_month.year,
+                    "actual_premium": actual_premium,
+                    "actual_commission": actual_commission,
+                    "planned_premium": planned_premium,
+                    "planned_commission": planned_commission,
+                    "premium_achievement": premium_achievement,
+                    "commission_achievement": commission_achievement,
+                    "payment_discipline": payment_discipline,
+                    "policies_created": month_policies.count(),
+                    "total_payments": month_payments.count(),
+                    "paid_payments": paid_payments.count(),
+                    "overdue_payments": month_payments.filter(
+                        paid_date__isnull=True, due_date__lt=datetime.now().date()
+                    ).count(),
+                }
+            )
+
+            # Move to next month
+            current_month = next_month
+
+        return monthly_data
+
+    def _calculate_fact_vs_forecast(self, monthly_history, analytics_filter):
+        """Calculate fact vs forecast analysis."""
+        if not monthly_history:
+            return {
+                "overall_premium_accuracy": Decimal("0"),
+                "overall_commission_accuracy": Decimal("0"),
+                "best_month": None,
+                "worst_month": None,
+                "accuracy_trend": "stable",
+            }
+
+        # Calculate overall accuracy
+        total_actual_premium = sum(m["actual_premium"] for m in monthly_history)
+        total_planned_premium = sum(m["planned_premium"] for m in monthly_history)
+        total_actual_commission = sum(m["actual_commission"] for m in monthly_history)
+        total_planned_commission = sum(m["planned_commission"] for m in monthly_history)
+
+        overall_premium_accuracy = Decimal("0")
+        overall_commission_accuracy = Decimal("0")
+
+        if total_planned_premium > 0:
+            overall_premium_accuracy = (
+                total_actual_premium / total_planned_premium
+            ) * Decimal("100")
+        if total_planned_commission > 0:
+            overall_commission_accuracy = (
+                total_actual_commission / total_planned_commission
+            ) * Decimal("100")
+
+        # Find best and worst performing months
+        best_month = max(monthly_history, key=lambda x: x["premium_achievement"])
+        worst_month = min(monthly_history, key=lambda x: x["premium_achievement"])
+
+        # Calculate accuracy trend
+        if len(monthly_history) >= 3:
+            recent_accuracy = (
+                sum(m["premium_achievement"] for m in monthly_history[-3:]) / 3
+            )
+            early_accuracy = (
+                sum(m["premium_achievement"] for m in monthly_history[:3]) / 3
+            )
+
+            if recent_accuracy > early_accuracy + 5:
+                accuracy_trend = "improving"
+            elif recent_accuracy < early_accuracy - 5:
+                accuracy_trend = "declining"
+            else:
+                accuracy_trend = "stable"
+        else:
+            accuracy_trend = "insufficient_data"
+
+        return {
+            "overall_premium_accuracy": overall_premium_accuracy,
+            "overall_commission_accuracy": overall_commission_accuracy,
+            "best_month": best_month,
+            "worst_month": worst_month,
+            "accuracy_trend": accuracy_trend,
+            "total_actual_premium": total_actual_premium,
+            "total_planned_premium": total_planned_premium,
+            "total_actual_commission": total_actual_commission,
+            "total_planned_commission": total_planned_commission,
+        }
+
+    def _calculate_performance_trends(self, monthly_history):
+        """Calculate performance trends over time."""
+        if len(monthly_history) < 2:
+            return {
+                "premium_trend": "insufficient_data",
+                "commission_trend": "insufficient_data",
+                "policy_trend": "insufficient_data",
+                "discipline_trend": "insufficient_data",
+                "growth_rate": Decimal("0"),
+                "volatility": Decimal("0"),
+            }
+
+        # Calculate trends
+        premium_values = [float(m["actual_premium"]) for m in monthly_history]
+        commission_values = [float(m["actual_commission"]) for m in monthly_history]
+        policy_values = [m["policies_created"] for m in monthly_history]
+        discipline_values = [float(m["payment_discipline"]) for m in monthly_history]
+
+        def calculate_trend(values):
+            if len(values) < 2:
+                return "insufficient_data"
+
+            # Simple linear trend calculation
+            n = len(values)
+            x_sum = sum(range(n))
+            y_sum = sum(values)
+            xy_sum = sum(i * values[i] for i in range(n))
+            x2_sum = sum(i * i for i in range(n))
+
+            if n * x2_sum - x_sum * x_sum == 0:
+                return "stable"
+
+            slope = (n * xy_sum - x_sum * y_sum) / (n * x2_sum - x_sum * x_sum)
+
+            if slope > 0.1:
+                return "growing"
+            elif slope < -0.1:
+                return "declining"
+            else:
+                return "stable"
+
+        # Calculate growth rate (first vs last month)
+        first_premium = monthly_history[0]["actual_premium"]
+        last_premium = monthly_history[-1]["actual_premium"]
+
+        growth_rate = Decimal("0")
+        if first_premium > 0:
+            growth_rate = ((last_premium - first_premium) / first_premium) * Decimal(
+                "100"
+            )
+
+        # Calculate volatility (coefficient of variation)
+        import statistics
+
+        volatility = Decimal("0")
+        if premium_values and statistics.mean(premium_values) > 0:
+            cv = statistics.stdev(premium_values) / statistics.mean(premium_values)
+            volatility = Decimal(str(cv * 100))
+
+        return {
+            "premium_trend": calculate_trend(premium_values),
+            "commission_trend": calculate_trend(commission_values),
+            "policy_trend": calculate_trend(policy_values),
+            "discipline_trend": calculate_trend(discipline_values),
+            "growth_rate": growth_rate,
+            "volatility": volatility,
+            "best_performing_month": max(
+                monthly_history, key=lambda x: x["actual_premium"]
+            ),
+            "most_stable_month": min(
+                monthly_history,
+                key=lambda x: abs(
+                    float(x["actual_premium"]) - statistics.mean(premium_values)
+                ),
+            ),
+        }
+
+    def _get_monthly_highlights(
+        self, payments_qs, policies_qs, start_date, end_date, analytics_filter
+    ):
+        """Get highlights and key events for each month."""
+        from apps.clients.models import Client
+        from apps.insurers.models import Branch, Insurer
+        from apps.policies.models import InsuranceType
+        from django.db.models import Sum, Count
+
+        highlights = []
+
+        # Iterate through each month
+        current_month = start_date.replace(day=1)
+
+        while current_month <= end_date:
+            # Calculate month boundaries
+            if current_month.month == 12:
+                next_month = current_month.replace(year=current_month.year + 1, month=1)
+            else:
+                next_month = current_month.replace(month=current_month.month + 1)
+
+            month_end = next_month - timedelta(days=1)
+
+            # Get month data
+            month_payments = payments_qs.filter(
+                due_date__gte=current_month, due_date__lte=month_end
+            )
+
+            month_policies = policies_qs.filter(
+                start_date__gte=current_month, start_date__lte=month_end
+            )
+
+            # Find top client by premium
+            top_client_data = (
+                month_payments.values("policy__client__client_name")
+                .annotate(total_premium=Sum("amount"))
+                .order_by("-total_premium")
+                .first()
+            )
+
+            # Find top insurance type
+            top_insurance_type = (
+                month_policies.values("insurance_type__name")
+                .annotate(count=Count("id"))
+                .order_by("-count")
+                .first()
+            )
+
+            # Find largest single payment by insurance sum
+            largest_payment = month_payments.order_by("-insurance_sum").first()
+
+            # Calculate month achievements
+            month_premium = month_payments.filter(paid_date__isnull=False).aggregate(
+                total=Sum("amount")
+            )["total"] or Decimal("0")
+
+            highlights.append(
+                {
+                    "month": current_month,
+                    "month_name": calendar.month_name[current_month.month],
+                    "top_client": top_client_data["policy__client__client_name"]
+                    if top_client_data
+                    else "Нет данных",
+                    "top_client_premium": top_client_data["total_premium"]
+                    if top_client_data
+                    else Decimal("0"),
+                    "top_insurance_type": top_insurance_type["insurance_type__name"]
+                    if top_insurance_type
+                    else "Нет данных",
+                    "top_insurance_count": top_insurance_type["count"]
+                    if top_insurance_type
+                    else 0,
+                    "largest_policy_sum": largest_payment.insurance_sum
+                    if largest_payment
+                    else Decimal("0"),
+                    "largest_policy_client": largest_payment.policy.client.client_name
+                    if largest_payment
+                    else "Нет данных",
+                    "total_premium": month_premium,
+                    "policies_count": month_policies.count(),
+                }
+            )
+
+            current_month = next_month
+
+        return highlights
+
+    def _analyze_problem_areas(self, payments_qs, start_date, end_date):
+        """Analyze problem areas and risks."""
+        from django.db.models import Sum, Count, Q
+
+        # Get overdue payments in the period
+        overdue_payments = payments_qs.filter(
+            paid_date__isnull=True, due_date__lt=datetime.now().date()
+        )
+
+        # Analyze by month
+        monthly_problems = []
+        current_month = start_date.replace(day=1)
+
+        while current_month <= end_date:
+            if current_month.month == 12:
+                next_month = current_month.replace(year=current_month.year + 1, month=1)
+            else:
+                next_month = current_month.replace(month=current_month.month + 1)
+
+            month_end = next_month - timedelta(days=1)
+
+            month_overdue = overdue_payments.filter(
+                due_date__gte=current_month, due_date__lte=month_end
+            )
+
+            overdue_amount = month_overdue.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal("0")
+            overdue_count = month_overdue.count()
+
+            # Find worst clients for this month
+            worst_clients = (
+                month_overdue.values("policy__client__client_name")
+                .annotate(overdue_amount=Sum("amount"), overdue_count=Count("id"))
+                .order_by("-overdue_amount")[:3]
+            )
+
+            monthly_problems.append(
+                {
+                    "month": current_month,
+                    "overdue_amount": overdue_amount,
+                    "overdue_count": overdue_count,
+                    "worst_clients": list(worst_clients),
+                }
+            )
+
+            current_month = next_month
+
+        # Overall problem analysis
+        total_overdue_amount = overdue_payments.aggregate(total=Sum("amount"))[
+            "total"
+        ] or Decimal("0")
+        total_overdue_count = overdue_payments.count()
+
+        # Find consistently problematic clients
+        problematic_clients = (
+            overdue_payments.values("policy__client__client_name")
+            .annotate(total_overdue=Sum("amount"), overdue_count=Count("id"))
+            .filter(overdue_count__gte=2)
+            .order_by("-total_overdue")[:5]
+        )
+
+        return {
+            "monthly_problems": monthly_problems,
+            "total_overdue_amount": total_overdue_amount,
+            "total_overdue_count": total_overdue_count,
+            "problematic_clients": list(problematic_clients),
+            "average_monthly_overdue": total_overdue_amount / len(monthly_problems)
+            if monthly_problems
+            else Decimal("0"),
+        }
+
+    def _calculate_dimensional_breakdown(
+        self, payments_qs, policies_qs, analytics_filter
+    ):
+        """Calculate breakdown by different dimensions."""
+        from apps.insurers.models import Branch, Insurer
+        from apps.policies.models import InsuranceType
+        from django.db.models import Sum, Count
+
+        # Branch breakdown
+        branch_breakdown = []
+        branches = Branch.objects.filter(
+            id__in=policies_qs.values_list("branch_id", flat=True).distinct()
+        )
+
+        for branch in branches:
+            branch_payments = payments_qs.filter(
+                policy__branch=branch, paid_date__isnull=False
+            )
+            branch_policies = policies_qs.filter(branch=branch)
+
+            premium = branch_payments.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal("0")
+            commission = branch_payments.aggregate(total=Sum("kv_rub"))[
+                "total"
+            ] or Decimal("0")
+            policy_count = branch_policies.count()
+
+            branch_breakdown.append(
+                {
+                    "name": branch.branch_name,
+                    "premium": premium,
+                    "commission": commission,
+                    "policy_count": policy_count,
+                }
+            )
+
+        # Insurance type breakdown
+        insurance_breakdown = []
+        insurance_types = InsuranceType.objects.filter(
+            id__in=policies_qs.values_list("insurance_type_id", flat=True).distinct()
+        )
+
+        for ins_type in insurance_types:
+            type_payments = payments_qs.filter(
+                policy__insurance_type=ins_type, paid_date__isnull=False
+            )
+            type_policies = policies_qs.filter(insurance_type=ins_type)
+
+            premium = type_payments.aggregate(total=Sum("amount"))["total"] or Decimal(
+                "0"
+            )
+            commission = type_payments.aggregate(total=Sum("kv_rub"))[
+                "total"
+            ] or Decimal("0")
+            policy_count = type_policies.count()
+
+            insurance_breakdown.append(
+                {
+                    "name": ins_type.name,
+                    "premium": premium,
+                    "commission": commission,
+                    "policy_count": policy_count,
+                }
+            )
+
+        # Sort by premium descending
+        branch_breakdown.sort(key=lambda x: x["premium"], reverse=True)
+        insurance_breakdown.sort(key=lambda x: x["premium"], reverse=True)
+
+        return {
+            "branch_breakdown": branch_breakdown,
+            "insurance_breakdown": insurance_breakdown,
+        }
+
+    def _get_empty_financial_history(self, error=None):
+        """Return empty financial history data structure."""
+        empty_data = {
+            "monthly_history": [],
+            "fact_vs_forecast": {
+                "overall_premium_accuracy": Decimal("0"),
+                "overall_commission_accuracy": Decimal("0"),
+                "best_month": None,
+                "worst_month": None,
+                "accuracy_trend": "insufficient_data",
+                "total_actual_premium": Decimal("0"),
+                "total_planned_premium": Decimal("0"),
+                "total_actual_commission": Decimal("0"),
+                "total_planned_commission": Decimal("0"),
+            },
+            "performance_trends": {
+                "premium_trend": "insufficient_data",
+                "commission_trend": "insufficient_data",
+                "policy_trend": "insufficient_data",
+                "discipline_trend": "insufficient_data",
+                "growth_rate": Decimal("0"),
+                "volatility": Decimal("0"),
+            },
+            "monthly_highlights": [],
+            "problem_analysis": {
+                "monthly_problems": [],
+                "total_overdue_amount": Decimal("0"),
+                "total_overdue_count": 0,
+                "problematic_clients": [],
+                "average_monthly_overdue": Decimal("0"),
+            },
+            "dimensional_breakdown": {
+                "branch_breakdown": [],
+                "insurance_breakdown": [],
+            },
+            "summary_metrics": {
+                "total_actual_premium": Decimal("0"),
+                "total_actual_commission": Decimal("0"),
+                "total_policies_created": 0,
+                "avg_monthly_premium": Decimal("0"),
+                "avg_monthly_commission": Decimal("0"),
+                "months_analyzed": 0,
+                "period_start": datetime(2025, 10, 1).date(),
+                "period_end": datetime.now().date(),
+            },
+            "filter_applied": False,
+        }
+
+        if error:
+            empty_data["error"] = error
+
+        return empty_data
+
     def get_time_series_analytics(
         self, analytics_filter: Optional[AnalyticsFilter] = None
     ) -> Dict[str, Any]:
@@ -2101,6 +2808,11 @@ class AnalyticsService:
             if policy_active is not None and not isinstance(policy_active, bool):
                 policy_active = str(policy_active).lower() in ["true", "1", "yes"]
 
+            # Parse target_month
+            target_month = filter_data.get("target_month")
+            if target_month == "":
+                target_month = None
+
             return AnalyticsFilter(
                 date_from=date_from,
                 date_to=date_to,
@@ -2109,6 +2821,7 @@ class AnalyticsService:
                 insurance_type_ids=insurance_type_ids,
                 client_ids=client_ids,
                 policy_active=policy_active,
+                target_month=target_month,
             )
 
         except (ValueError, TypeError) as e:

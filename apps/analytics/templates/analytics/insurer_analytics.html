@@ -312,13 +312,58 @@
     }
 
     /* Column widths */
-    .insurer-col { width: 20%; }
-    .market-share-col { width: 12%; }
-    .premium-col { width: 15%; }
-    .commission-col { width: 15%; }
-    .policies-col { width: 10%; }
-    .insurance-sum-col { width: 15%; }
-    .distribution-col { width: 13%; }
+    .insurer-col { width: 18%; }
+    .market-share-col { width: 11%; }
+    .premium-col { width: 13%; }
+    .commission-col { width: 13%; }
+    .policies-col { width: 9%; }
+    .insurance-sum-col { width: 13%; }
+    .market-share-by-sum-col { width: 11%; }
+    .distribution-col { width: 12%; }
+
+    /* Table sorting styles */
+    .sortable {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        transition: background-color 0.2s ease;
+    }
+
+    .sortable:hover {
+        background-color: #f8f9fa;
+    }
+
+    .sort-icon {
+        opacity: 0.3;
+        font-size: 0.8em;
+        transition: all 0.2s ease;
+    }
+
+    .sortable:hover .sort-icon {
+        opacity: 0.6;
+    }
+
+    .sortable.sort-asc .sort-icon {
+        opacity: 1;
+        color: #007bff;
+    }
+
+    .sortable.sort-desc .sort-icon {
+        opacity: 1;
+        color: #007bff;
+    }
+
+    .sortable.sort-asc .sort-icon:before {
+        content: "\f0de"; /* fa-sort-up */
+    }
+
+    .sortable.sort-desc .sort-icon:before {
+        content: "\f0dd"; /* fa-sort-down */
+    }
+
+    .sortable.sort-active {
+        background-color: #e3f2fd;
+    }
 
     /* Responsive adjustments */
     @media (max-width: 1200px) {
@@ -572,33 +617,45 @@
                     <table class="table insurer-table">
                         <thead>
                             <tr>
-                                <th class="insurer-col">
+                                <th class="insurer-col sortable" data-sort="text" data-column="insurer_name">
                                     <i class="fas fa-building me-1"></i>
                                     Страховщик
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="market-share-col">
+                                <th class="market-share-col sortable" data-sort="percent" data-column="market_share">
                                     <i class="fas fa-chart-pie me-1"></i>
                                     Доля рынка
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="premium-col">
+                                <th class="premium-col sortable" data-sort="currency" data-column="premium_volume">
                                     <i class="fas fa-money-bill-wave me-1"></i>
                                     Объем премий
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="commission-col">
+                                <th class="commission-col sortable" data-sort="currency" data-column="commission_revenue">
                                     <i class="fas fa-percentage me-1"></i>
                                     Комиссия
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="policies-col">
+                                <th class="policies-col sortable" data-sort="number" data-column="policy_count">
                                     <i class="fas fa-file-contract me-1"></i>
                                     Полисы
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="insurance-sum-col">
+                                <th class="insurance-sum-col sortable" data-sort="currency" data-column="insurance_sum">
                                     <i class="fas fa-shield-alt me-1"></i>
                                     Страх. сумма
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="distribution-col">
+                                <th class="market-share-by-sum-col sortable" data-sort="percent" data-column="market_share_by_sum">
+                                    <i class="fas fa-chart-pie me-1"></i>
+                                    Доля рынка по СС
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
+                                </th>
+                                <th class="distribution-col sortable" data-sort="text" data-column="insurance_types">
                                     <i class="fas fa-chart-bar me-1"></i>
                                     Виды страхования
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
                             </tr>
                         </thead>
@@ -645,6 +702,14 @@
                                 <td class="insurance-sum-cell">
                                     <div class="metric-value-table">{{ metric.insurance_sum|currency }}</div>
                                 </td>
+                                <td class="market-share-by-sum-cell">
+                                    <div class="market-share-wrapper">
+                                        <div class="market-share-bar">
+                                            <div class="market-share-fill" style="width: {{ metric.market_share_by_sum|floatformat:1 }}%"></div>
+                                        </div>
+                                        <span class="market-share-text">{{ metric.market_share_by_sum|floatformat:1 }}%</span>
+                                    </div>
+                                </td>
                                 <td class="distribution-cell">
                                     {% if metric.insurance_type_distribution %}
                                         <div class="insurance-types-mini">
@@ -688,20 +753,6 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize charts
-    initializeCharts();
-
-    // Add escape key handler for expanded table
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const container = document.querySelector('.insurer-table-container');
-            if (container && container.classList.contains('expanded')) {
-                toggleTableView();
-            }
-        }
-    });
-});
 
 // Global chart instances to prevent duplicates
 let marketShareChart = null;
@@ -1082,6 +1133,157 @@ function toggleTableView() {
         container.scrollTop = 0;
     }
 }
+
+// Table sorting functionality
+class TableSorter {
+    constructor(tableSelector) {
+        this.table = document.querySelector(tableSelector);
+        this.tbody = this.table.querySelector('tbody');
+        this.headers = this.table.querySelectorAll('th.sortable');
+        this.currentSort = { column: null, direction: null };
+        this.originalOrder = Array.from(this.tbody.querySelectorAll('tr'));
+
+        this.init();
+    }
+
+    init() {
+        this.headers.forEach((header, index) => {
+            header.addEventListener('click', () => this.handleSort(header, index));
+        });
+    }
+
+    handleSort(header, columnIndex) {
+        const column = header.dataset.column;
+        const sortType = header.dataset.sort;
+
+        // Determine sort direction
+        let direction = 'asc';
+        if (this.currentSort.column === column) {
+            if (this.currentSort.direction === 'asc') {
+                direction = 'desc';
+            } else if (this.currentSort.direction === 'desc') {
+                // Third click resets to original order
+                this.resetSort();
+                return;
+            }
+        }
+
+        // Update visual indicators
+        this.updateSortIndicators(header, direction);
+
+        // Perform sort
+        this.sortTable(columnIndex, sortType, direction);
+
+        // Update current sort state
+        this.currentSort = { column, direction };
+    }
+
+    updateSortIndicators(activeHeader, direction) {
+        // Reset all headers
+        this.headers.forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc', 'sort-active');
+        });
+
+        // Set active header
+        activeHeader.classList.add('sort-active', `sort-${direction}`);
+    }
+
+    sortTable(columnIndex, sortType, direction) {
+        const rows = Array.from(this.tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+            const aValue = this.getCellValue(a, columnIndex, sortType);
+            const bValue = this.getCellValue(b, columnIndex, sortType);
+
+            let comparison = 0;
+
+            if (sortType === 'text') {
+                comparison = aValue.localeCompare(bValue, 'ru', { numeric: true });
+            } else if (sortType === 'number' || sortType === 'currency' || sortType === 'percent') {
+                comparison = aValue - bValue;
+            }
+
+            return direction === 'asc' ? comparison : -comparison;
+        });
+
+        // Re-append sorted rows
+        rows.forEach(row => this.tbody.appendChild(row));
+    }
+
+    getCellValue(row, columnIndex, sortType) {
+        const cell = row.cells[columnIndex];
+        let value = '';
+
+        switch (columnIndex) {
+            case 0: // Страховщик
+                value = cell.querySelector('.insurer-name-table')?.textContent || '';
+                break;
+            case 1: // Доля рынка
+            case 6: // Доля рынка по СС
+                const percentText = cell.querySelector('.market-share-text')?.textContent || '0%';
+                value = parseFloat(percentText.replace('%', '').replace(',', '.')) || 0;
+                break;
+            case 2: // Объем премий
+            case 3: // Комиссия
+            case 5: // Страх. сумма
+                const currencyText = cell.querySelector('.metric-value-table')?.textContent || '0';
+                // Remove currency symbols, spaces, and convert to number
+                value = parseFloat(currencyText.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+                break;
+            case 4: // Полисы
+                const countText = cell.querySelector('.metric-value-table')?.textContent || '0';
+                value = parseInt(countText.replace(/\D/g, '')) || 0;
+                break;
+            case 7: // Виды страхования
+                const typesContainer = cell.querySelector('.insurance-types-mini');
+                if (typesContainer) {
+                    // Sort by number of insurance types
+                    value = typesContainer.querySelectorAll('.insurance-type-item').length;
+                } else {
+                    value = 0;
+                }
+                break;
+            default:
+                value = cell.textContent.trim();
+        }
+
+        return value;
+    }
+
+    resetSort() {
+        // Reset visual indicators
+        this.headers.forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc', 'sort-active');
+        });
+
+        // Restore original order
+        this.originalOrder.forEach(row => this.tbody.appendChild(row));
+
+        // Reset current sort state
+        this.currentSort = { column: null, direction: null };
+    }
+}
+
+// Initialize table sorting when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+
+    // Initialize table sorting
+    if (document.querySelector('.insurer-table')) {
+        new TableSorter('.insurer-table');
+    }
+
+    // Add escape key handler for expanded table
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const container = document.querySelector('.insurer-table-container');
+            if (container && container.classList.contains('expanded')) {
+                toggleTableView();
+            }
+        }
+    });
+});
 
 function updateAnalytics() {
     const policyStatus = document.getElementById('policyStatus').value;

@@ -555,6 +555,7 @@ class AnalyticsService:
 
             insurer_metrics = []
             total_premium = Decimal("0")
+            total_insurance_sum = Decimal("0")
 
             for insurer in insurers_with_data:
                 # Filter data for this insurer
@@ -576,6 +577,7 @@ class AnalyticsService:
                 )
 
                 total_premium += premium_volume
+                total_insurance_sum += insurance_sum
 
                 # Get insurance type distribution for this insurer
                 insurance_type_distribution = dict(
@@ -608,6 +610,14 @@ class AnalyticsService:
                     ) * Decimal("100")
                 else:
                     metric["market_share"] = Decimal("0")
+
+                # Calculate market share by insurance sum
+                if total_insurance_sum > 0:
+                    metric["market_share_by_sum"] = (
+                        metric["insurance_sum"] / total_insurance_sum
+                    ) * Decimal("100")
+                else:
+                    metric["market_share_by_sum"] = Decimal("0")
 
             return {
                 "insurer_metrics": insurer_metrics,
@@ -667,6 +677,7 @@ class AnalyticsService:
 
             insurer_metrics = []
             total_premium = Decimal("0")
+            total_insurance_sum = Decimal("0")
 
             for insurer in insurers_with_data:
                 # Filter data for this insurer
@@ -688,6 +699,7 @@ class AnalyticsService:
                 )
 
                 total_premium += premium_volume
+                total_insurance_sum += insurance_sum
 
                 # Get insurance type distribution for this insurer
                 insurance_type_distribution = dict(
@@ -723,6 +735,14 @@ class AnalyticsService:
                     ) * Decimal("100")
                 else:
                     metric["market_share"] = Decimal("0")
+
+                # Calculate market share by insurance sum
+                if total_insurance_sum > 0:
+                    metric["market_share_by_sum"] = (
+                        metric["insurance_sum"] / total_insurance_sum
+                    ) * Decimal("100")
+                else:
+                    metric["market_share_by_sum"] = Decimal("0")
 
             return {
                 "insurer_metrics": insurer_metrics,

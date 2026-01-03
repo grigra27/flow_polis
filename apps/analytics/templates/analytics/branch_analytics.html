@@ -366,6 +366,60 @@
             font-size: 0.85em;
         }
     }
+
+    /* Column widths */
+    .branch-col { width: 18%; }
+    .market-share-col { width: 11%; }
+    .premium-col { width: 13%; }
+    .commission-col { width: 13%; }
+    .policies-col { width: 9%; }
+    .insurance-sum-col { width: 13%; }
+    .market-share-by-sum-col { width: 11%; }
+    .distribution-col { width: 12%; }
+
+    /* Table sorting styles */
+    .sortable {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        transition: background-color 0.2s ease;
+    }
+
+    .sortable:hover {
+        background-color: #f8f9fa;
+    }
+
+    .sort-icon {
+        opacity: 0.3;
+        font-size: 0.8em;
+        transition: all 0.2s ease;
+    }
+
+    .sortable:hover .sort-icon {
+        opacity: 0.6;
+    }
+
+    .sortable.sort-asc .sort-icon {
+        opacity: 1;
+        color: #007bff;
+    }
+
+    .sortable.sort-desc .sort-icon {
+        opacity: 1;
+        color: #007bff;
+    }
+
+    .sortable.sort-asc .sort-icon:before {
+        content: "\f0de"; /* fa-sort-up */
+    }
+
+    .sortable.sort-desc .sort-icon:before {
+        content: "\f0dd"; /* fa-sort-down */
+    }
+
+    .sortable.sort-active {
+        background-color: #e3f2fd;
+    }
 </style>
 {% endblock %}
 
@@ -423,8 +477,8 @@
         </div>
         <div class="col-lg-6">
             <div class="chart-container">
-                <h5 class="mb-3">Количество полисов по филиалам</h5>
-                <canvas id="policyChart" width="400" height="300"></canvas>
+                <h5 class="mb-3">Рыночная доля по СС</h5>
+                <canvas id="marketShareBySumChart" width="400" height="300"></canvas>
             </div>
         </div>
     </div>
@@ -450,33 +504,45 @@
                     <table class="table branch-table">
                         <thead>
                             <tr>
-                                <th class="branch-col">
+                                <th class="branch-col sortable" data-sort="text" data-column="branch_name">
                                     <i class="fas fa-map-marker-alt me-1"></i>
                                     Филиал
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="market-share-col">
+                                <th class="market-share-col sortable" data-sort="percent" data-column="market_share">
                                     <i class="fas fa-chart-pie me-1"></i>
                                     Доля рынка
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="premium-col">
+                                <th class="premium-col sortable" data-sort="currency" data-column="premium_volume">
                                     <i class="fas fa-money-bill-wave me-1"></i>
                                     Объем премий
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="commission-col">
+                                <th class="commission-col sortable" data-sort="currency" data-column="commission_revenue">
                                     <i class="fas fa-percentage me-1"></i>
                                     Комиссия
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="policies-col">
+                                <th class="policies-col sortable" data-sort="number" data-column="policy_count">
                                     <i class="fas fa-file-contract me-1"></i>
                                     Полисы
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="insurance-sum-col">
+                                <th class="insurance-sum-col sortable" data-sort="currency" data-column="insurance_sum">
                                     <i class="fas fa-shield-alt me-1"></i>
                                     Страх. сумма
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
-                                <th class="distribution-col">
+                                <th class="market-share-by-sum-col sortable" data-sort="percent" data-column="market_share_by_sum">
+                                    <i class="fas fa-chart-pie me-1"></i>
+                                    Доля рынка по СС
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
+                                </th>
+                                <th class="distribution-col sortable" data-sort="text" data-column="insurance_types">
                                     <i class="fas fa-chart-bar me-1"></i>
                                     Виды страхования
+                                    <i class="sort-icon fas fa-sort ms-1"></i>
                                 </th>
                             </tr>
                         </thead>
@@ -523,6 +589,14 @@
                                 <td class="insurance-sum-cell">
                                     <div class="metric-value-table">{{ metric.insurance_sum|currency }}</div>
                                 </td>
+                                <td class="market-share-by-sum-cell">
+                                    <div class="market-share-wrapper">
+                                        <div class="market-share-bar">
+                                            <div class="market-share-fill" style="width: {{ metric.market_share_by_sum|floatformat:1 }}%"></div>
+                                        </div>
+                                        <span class="market-share-text">{{ metric.market_share_by_sum|floatformat:1 }}%</span>
+                                    </div>
+                                </td>
                                 <td class="distribution-cell">
                                     {% if metric.insurance_type_distribution %}
                                         <div class="insurance-types-mini">
@@ -545,6 +619,16 @@
             </div>
         </div>
     </div>
+
+    <!-- Policy Count Chart Section (moved below table) -->
+    <div class="row mb-4 justify-content-center">
+        <div class="col-lg-7" style="max-width: 60%;">
+            <div class="chart-container">
+                <h5 class="mb-3">Количество полисов по филиалам</h5>
+                <canvas id="policyChart" width="800" height="300"></canvas>
+            </div>
+        </div>
+    </div>
     {% else %}
     <div class="row">
         <div class="col-12">
@@ -563,21 +647,6 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize charts
-    initializeCharts();
-
-    // Add escape key handler for expanded table
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const container = document.querySelector('.branch-table-container');
-            if (container && container.classList.contains('expanded')) {
-                toggleTableView();
-            }
-        }
-    });
-});
-
 // Global chart instances to prevent duplicates
 let marketShareChart = null;
 let policyChart = null;
@@ -783,6 +852,186 @@ function initializeCharts() {
         }
     });
 
+    // Market Share by Sum Chart (NEW CHART)
+    // COMPLETELY CLEAR AND RECREATE CANVAS FOR MARKET SHARE BY SUM
+    const oldSumCanvas = document.getElementById('marketShareBySumChart');
+    const sumCanvasContainer = oldSumCanvas.parentNode;
+
+    // Remove old canvas completely
+    oldSumCanvas.remove();
+
+    // Create brand new canvas
+    const newSumCanvas = document.createElement('canvas');
+    newSumCanvas.id = 'marketShareBySumChart';
+    newSumCanvas.width = 400;
+    newSumCanvas.height = 300;
+    sumCanvasContainer.appendChild(newSumCanvas);
+
+    // Get context from new canvas
+    const marketShareBySumCtx = newSumCanvas.getContext('2d');
+
+    // Prepare branch data for pie chart by sum (TOP-10)
+    const branchDataBySum = {
+        {% for metric in branch_metrics %}
+        {% if forloop.counter <= 10 %}
+        '{{ metric.branch|escapejs }}': parseFloat('{{ metric.market_share_by_sum|floatformat:1 }}'.replace(',', '.')){% if not forloop.last and forloop.counter < 10 %},{% endif %}
+        {% endif %}
+        {% endfor %}
+    };
+
+    // Convert to arrays and take TOP-10
+    const allLabelsFromBranchBySum = Object.keys(branchDataBySum);
+    const allValuesFromBranchBySum = Object.values(branchDataBySum);
+
+    const chartLabelsBySum = allLabelsFromBranchBySum.slice(0, 10);
+    const chartValuesBySum = allValuesFromBranchBySum.slice(0, 10);
+
+    console.log('=== TOP-10 FROM BRANCH DATA BY SUM ===');
+    console.log('Branch data by sum object:', branchDataBySum);
+    console.log('Chart labels by sum (TOP-10):', chartLabelsBySum);
+    console.log('Chart values by sum (TOP-10):', chartValuesBySum);
+    console.log('Canvas element by sum:', newSumCanvas);
+    console.log('===============================');
+
+    // Colors for TOP-10 branches - dark green monochrome palette
+    const darkGreenColors = [
+        '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
+        '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7', '#F0FDF4'
+    ];
+    const colorsBySum = chartLabelsBySum.map((label, index) => darkGreenColors[index % darkGreenColors.length]);
+
+    console.log('Colors assigned by sum:', colorsBySum);
+
+    // Custom legend plugin with logos for sum chart (SAME AS PREMIUM CHART)
+    const legendWithLogosPluginBySum = {
+        id: 'legendWithLogosBySum',
+        beforeInit: function(chart) {
+            // Preload legend images
+            chart.legendImages = {};
+            chartLabelsBySum.forEach((label) => {
+                const logoUrl = pieBranchLogoUrls[label];
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.legendImages[label] = img;
+                        chart.update('none');
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.legendImages[label] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const legendArea = chart.legend;
+
+            if (!legendArea || !legendArea.legendItems) return;
+
+            // Clear default legend area
+            const legendBox = legendArea.legendHitBoxes;
+            if (legendBox && legendBox.length > 0) {
+                const startX = legendBox[0].left;
+                const startY = legendBox[0].top - 10;
+                const width = Math.max(...legendBox.map(box => box.left + box.width)) - startX + 50;
+                const height = Math.max(...legendBox.map(box => box.top + box.height)) - startY + 20;
+
+                ctx.clearRect(startX - 10, startY, width, height);
+
+                // Draw custom legend with logos in single column
+                const itemHeight = 30;
+
+                legendArea.legendItems.forEach((item, index) => {
+                    const x = startX;
+                    const y = startY + (index * itemHeight) + 15;
+
+                    // Draw color indicator (small rectangle)
+                    ctx.fillStyle = item.fillStyle;
+                    ctx.fillRect(x, y - 8, 16, 16);
+                    ctx.strokeStyle = '#ccc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y - 8, 16, 16);
+
+                    // Draw logo if available
+                    const img = chart.legendImages[item.text];
+                    if (img && img.complete) {
+                        ctx.drawImage(img, x + 20, y - 10, 20, 20);
+                    } else {
+                        // Fallback: draw colored circle
+                        ctx.fillStyle = item.fillStyle;
+                        ctx.beginPath();
+                        ctx.arc(x + 30, y, 8, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    // Draw branch name
+                    ctx.fillStyle = '#333';
+                    ctx.font = '13px Arial';
+                    const branchName = item.text;
+                    ctx.fillText(branchName, x + 45, y + 4);
+
+                    // Draw percentage (after branch name)
+                    const percentage = chartValuesBySum[chartLabelsBySum.indexOf(item.text)];
+                    const nameWidth = ctx.measureText(branchName).width;
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(' - ' + percentage.toFixed(1) + '%', x + 45 + nameWidth, y + 4);
+                });
+            }
+        }
+    };
+
+    // Create completely new chart for market share by sum - PIE CHART
+    let marketShareBySumChart = new Chart(marketShareBySumCtx, {
+        type: 'pie',
+        data: {
+            labels: chartLabelsBySum,
+            datasets: [{
+                label: 'Доля рынка по СС (%)',
+                data: chartValuesBySum,
+                backgroundColor: colorsBySum,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        plugins: [legendWithLogosPluginBySum], // Add custom legend plugin
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: false, // We'll draw custom logos
+                        font: {
+                            size: 13
+                        },
+                        generateLabels: function(chart) {
+                            // Generate labels without text (we'll draw custom)
+                            return chart.data.labels.map((label, index) => ({
+                                text: label,
+                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                hidden: false,
+                                index: index
+                            }));
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            return label + ': ' + value.toFixed(1) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     // Policy count chart (top 10) with orange gradient and logos
     const policyCtx = document.getElementById('policyChart').getContext('2d');
 
@@ -799,12 +1048,12 @@ function initializeCharts() {
             label: 'Количество полисов',
             data: policyValues,
             backgroundColor: [
-                '#C2410C', '#DC2626', '#EA580C', '#F97316', '#FB923C',
-                '#FDBA74', '#FED7AA', '#FFEDD5', '#FFF7ED', '#FFFBF5'
-            ], // Orange gradient palette
+                '#1A0B2E', '#2D1B4E', '#4C1D95', '#5B21B6', '#6D28D9',
+                '#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'
+            ], // Purple-black gradient palette (dark to light)
             borderColor: [
-                '#C2410C', '#DC2626', '#EA580C', '#F97316', '#FB923C',
-                '#FDBA74', '#FED7AA', '#FFEDD5', '#FFF7ED', '#FFFBF5'
+                '#1A0B2E', '#2D1B4E', '#4C1D95', '#5B21B6', '#6D28D9',
+                '#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'
             ], // Same colors for borders
             borderWidth: 1
         }]
@@ -940,6 +1189,157 @@ function toggleTableView() {
         container.scrollTop = 0;
     }
 }
+
+// Table sorting functionality
+class TableSorter {
+    constructor(tableSelector) {
+        this.table = document.querySelector(tableSelector);
+        this.tbody = this.table.querySelector('tbody');
+        this.headers = this.table.querySelectorAll('th.sortable');
+        this.currentSort = { column: null, direction: null };
+        this.originalOrder = Array.from(this.tbody.querySelectorAll('tr'));
+
+        this.init();
+    }
+
+    init() {
+        this.headers.forEach((header, index) => {
+            header.addEventListener('click', () => this.handleSort(header, index));
+        });
+    }
+
+    handleSort(header, columnIndex) {
+        const column = header.dataset.column;
+        const sortType = header.dataset.sort;
+
+        // Determine sort direction
+        let direction = 'asc';
+        if (this.currentSort.column === column) {
+            if (this.currentSort.direction === 'asc') {
+                direction = 'desc';
+            } else if (this.currentSort.direction === 'desc') {
+                // Third click resets to original order
+                this.resetSort();
+                return;
+            }
+        }
+
+        // Update visual indicators
+        this.updateSortIndicators(header, direction);
+
+        // Perform sort
+        this.sortTable(columnIndex, sortType, direction);
+
+        // Update current sort state
+        this.currentSort = { column, direction };
+    }
+
+    updateSortIndicators(activeHeader, direction) {
+        // Reset all headers
+        this.headers.forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc', 'sort-active');
+        });
+
+        // Set active header
+        activeHeader.classList.add('sort-active', `sort-${direction}`);
+    }
+
+    sortTable(columnIndex, sortType, direction) {
+        const rows = Array.from(this.tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+            const aValue = this.getCellValue(a, columnIndex, sortType);
+            const bValue = this.getCellValue(b, columnIndex, sortType);
+
+            let comparison = 0;
+
+            if (sortType === 'text') {
+                comparison = aValue.localeCompare(bValue, 'ru', { numeric: true });
+            } else if (sortType === 'number' || sortType === 'currency' || sortType === 'percent') {
+                comparison = aValue - bValue;
+            }
+
+            return direction === 'asc' ? comparison : -comparison;
+        });
+
+        // Re-append sorted rows
+        rows.forEach(row => this.tbody.appendChild(row));
+    }
+
+    getCellValue(row, columnIndex, sortType) {
+        const cell = row.cells[columnIndex];
+        let value = '';
+
+        switch (columnIndex) {
+            case 0: // Филиал
+                value = cell.querySelector('.branch-name-table')?.textContent || '';
+                break;
+            case 1: // Доля рынка
+            case 6: // Доля рынка по СС
+                const percentText = cell.querySelector('.market-share-text')?.textContent || '0%';
+                value = parseFloat(percentText.replace('%', '').replace(',', '.')) || 0;
+                break;
+            case 2: // Объем премий
+            case 3: // Комиссия
+            case 5: // Страх. сумма
+                const currencyText = cell.querySelector('.metric-value-table')?.textContent || '0';
+                // Remove currency symbols, spaces, and convert to number
+                value = parseFloat(currencyText.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+                break;
+            case 4: // Полисы
+                const countText = cell.querySelector('.metric-value-table')?.textContent || '0';
+                value = parseInt(countText.replace(/\D/g, '')) || 0;
+                break;
+            case 7: // Виды страхования
+                const typesContainer = cell.querySelector('.insurance-types-mini');
+                if (typesContainer) {
+                    // Sort by number of insurance types
+                    value = typesContainer.querySelectorAll('.insurance-type-item').length;
+                } else {
+                    value = 0;
+                }
+                break;
+            default:
+                value = cell.textContent.trim();
+        }
+
+        return value;
+    }
+
+    resetSort() {
+        // Reset visual indicators
+        this.headers.forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc', 'sort-active');
+        });
+
+        // Restore original order
+        this.originalOrder.forEach(row => this.tbody.appendChild(row));
+
+        // Reset current sort state
+        this.currentSort = { column: null, direction: null };
+    }
+}
+
+// Initialize table sorting when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+
+    // Initialize table sorting
+    if (document.querySelector('.branch-table')) {
+        new TableSorter('.branch-table');
+    }
+
+    // Add escape key handler for expanded table
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const container = document.querySelector('.branch-table-container');
+            if (container && container.classList.contains('expanded')) {
+                toggleTableView();
+            }
+        }
+    });
+});
 
 function updateAnalytics() {
     const policyStatus = document.getElementById('policyStatus').value;

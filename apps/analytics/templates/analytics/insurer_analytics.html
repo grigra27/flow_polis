@@ -590,8 +590,8 @@
         </div>
         <div class="col-lg-6">
             <div class="chart-container">
-                <h5 class="mb-3">Количество полисов по страховщикам</h5>
-                <canvas id="policyChart" width="400" height="300"></canvas>
+                <h5 class="mb-3">Рыночная доля по СС</h5>
+                <canvas id="marketShareBySumChart" width="400" height="300"></canvas>
             </div>
         </div>
     </div>
@@ -732,6 +732,13 @@
             </div>
         </div>
     </div>
+
+    <!-- Policy Count Chart Section (moved below table) -->
+    <div class="row mb-4 justify-content-center">
+        <div class="col-lg-7" style="max-width: 60%;">
+            <div class="chart-container">
+                <h5 class="mb-3">Количество полисов по страховщикам</h5>
+                <canvas id="policyChart" width="800" height="300"></canvas>
             </div>
         </div>
     </div>
@@ -976,6 +983,186 @@ function initializeCharts() {
         }
     });
 
+    // Market Share by Sum Chart (NEW CHART)
+    // COMPLETELY CLEAR AND RECREATE CANVAS FOR MARKET SHARE BY SUM
+    const oldSumCanvas = document.getElementById('marketShareBySumChart');
+    const sumCanvasContainer = oldSumCanvas.parentNode;
+
+    // Remove old canvas completely
+    oldSumCanvas.remove();
+
+    // Create brand new canvas
+    const newSumCanvas = document.createElement('canvas');
+    newSumCanvas.id = 'marketShareBySumChart';
+    newSumCanvas.width = 400;
+    newSumCanvas.height = 300;
+    sumCanvasContainer.appendChild(newSumCanvas);
+
+    // Get context from new canvas
+    const marketShareBySumCtx = newSumCanvas.getContext('2d');
+
+    // Prepare insurer data for pie chart by sum (TOP-10)
+    const insurerDataBySum = {
+        {% for metric in insurer_metrics %}
+        {% if forloop.counter <= 10 %}
+        '{{ metric.insurer.insurer_name|escapejs }}': parseFloat('{{ metric.market_share_by_sum|floatformat:1 }}'.replace(',', '.')){% if not forloop.last and forloop.counter < 10 %},{% endif %}
+        {% endif %}
+        {% endfor %}
+    };
+
+    // Convert to arrays and take TOP-10
+    const allLabelsFromInsurerBySum = Object.keys(insurerDataBySum);
+    const allValuesFromInsurerBySum = Object.values(insurerDataBySum);
+
+    const chartLabelsBySum = allLabelsFromInsurerBySum.slice(0, 10);
+    const chartValuesBySum = allValuesFromInsurerBySum.slice(0, 10);
+
+    console.log('=== TOP-10 FROM INSURER DATA BY SUM ===');
+    console.log('Insurer data by sum object:', insurerDataBySum);
+    console.log('Chart labels by sum (TOP-10):', chartLabelsBySum);
+    console.log('Chart values by sum (TOP-10):', chartValuesBySum);
+    console.log('Canvas element by sum:', newSumCanvas);
+    console.log('===============================');
+
+    // Colors for TOP-10 insurers - dark green monochrome palette
+    const darkGreenColors = [
+        '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
+        '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7', '#F0FDF4'
+    ];
+    const colorsBySum = chartLabelsBySum.map((label, index) => darkGreenColors[index % darkGreenColors.length]);
+
+    console.log('Colors assigned by sum:', colorsBySum);
+
+    // Custom legend plugin with logos for sum chart (SAME AS PREMIUM CHART)
+    const legendWithLogosPluginBySum = {
+        id: 'legendWithLogosBySum',
+        beforeInit: function(chart) {
+            // Preload legend images
+            chart.legendImages = {};
+            chartLabelsBySum.forEach((label) => {
+                const logoUrl = pieLogoUrls[label];
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.legendImages[label] = img;
+                        chart.update('none');
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.legendImages[label] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const legendArea = chart.legend;
+
+            if (!legendArea || !legendArea.legendItems) return;
+
+            // Clear default legend area
+            const legendBox = legendArea.legendHitBoxes;
+            if (legendBox && legendBox.length > 0) {
+                const startX = legendBox[0].left;
+                const startY = legendBox[0].top - 10;
+                const width = Math.max(...legendBox.map(box => box.left + box.width)) - startX + 50;
+                const height = Math.max(...legendBox.map(box => box.top + box.height)) - startY + 20;
+
+                ctx.clearRect(startX - 10, startY, width, height);
+
+                // Draw custom legend with logos in single column
+                const itemHeight = 30;
+
+                legendArea.legendItems.forEach((item, index) => {
+                    const x = startX;
+                    const y = startY + (index * itemHeight) + 15;
+
+                    // Draw color indicator (small rectangle)
+                    ctx.fillStyle = item.fillStyle;
+                    ctx.fillRect(x, y - 8, 16, 16);
+                    ctx.strokeStyle = '#ccc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y - 8, 16, 16);
+
+                    // Draw logo if available
+                    const img = chart.legendImages[item.text];
+                    if (img && img.complete) {
+                        ctx.drawImage(img, x + 20, y - 10, 20, 20);
+                    } else {
+                        // Fallback: draw colored circle
+                        ctx.fillStyle = item.fillStyle;
+                        ctx.beginPath();
+                        ctx.arc(x + 30, y, 8, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    // Draw insurer name
+                    ctx.fillStyle = '#333';
+                    ctx.font = '13px Arial';
+                    const insurerName = item.text;
+                    ctx.fillText(insurerName, x + 45, y + 4);
+
+                    // Draw percentage (after insurer name)
+                    const percentage = chartValuesBySum[chartLabelsBySum.indexOf(item.text)];
+                    const nameWidth = ctx.measureText(insurerName).width;
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(' - ' + percentage.toFixed(1) + '%', x + 45 + nameWidth, y + 4);
+                });
+            }
+        }
+    };
+
+    // Create completely new chart for market share by sum - PIE CHART
+    let marketShareBySumChart = new Chart(marketShareBySumCtx, {
+        type: 'pie',
+        data: {
+            labels: chartLabelsBySum,
+            datasets: [{
+                label: 'Доля рынка по СС (%)',
+                data: chartValuesBySum,
+                backgroundColor: colorsBySum,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        plugins: [legendWithLogosPluginBySum], // Add custom legend plugin
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: false, // We'll draw custom logos
+                        font: {
+                            size: 12
+                        },
+                        generateLabels: function(chart) {
+                            // Generate labels without text (we'll draw custom)
+                            return chart.data.labels.map((label, index) => ({
+                                text: label,
+                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                hidden: false,
+                                index: index
+                            }));
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            return label + ': ' + value.toFixed(1) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     // Policy count chart (top 10) with logos
     const policyCtx = document.getElementById('policyChart').getContext('2d');
 
@@ -992,12 +1179,12 @@ function initializeCharts() {
             label: 'Количество полисов',
             data: policyValues,
             backgroundColor: [
-                '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
-                '#4ADE80', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#ECFDF5'
-            ], // Green gradient palette
+                '#1A0B2E', '#2D1B4E', '#4C1D95', '#5B21B6', '#6D28D9',
+                '#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'
+            ], // Purple-black gradient palette (dark to light)
             borderColor: [
-                '#14532D', '#166534', '#15803D', '#16A34A', '#22C55E',
-                '#4ADE80', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#ECFDF5'
+                '#1A0B2E', '#2D1B4E', '#4C1D95', '#5B21B6', '#6D28D9',
+                '#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'
             ], // Same colors for borders
             borderWidth: 1
         }]

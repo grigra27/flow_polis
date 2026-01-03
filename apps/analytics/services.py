@@ -490,6 +490,10 @@ class AnalyticsService:
 
             # Calculate market share for each branch
             total_premium = sum(metric["premium_volume"] for metric in branch_metrics)
+            total_insurance_sum = sum(
+                metric["insurance_sum"] for metric in branch_metrics
+            )
+
             for metric in branch_metrics:
                 if total_premium > 0:
                     metric["market_share"] = (
@@ -497,6 +501,14 @@ class AnalyticsService:
                     ) * Decimal("100")
                 else:
                     metric["market_share"] = Decimal("0")
+
+                # Calculate market share by insurance sum
+                if total_insurance_sum > 0:
+                    metric["market_share_by_sum"] = (
+                        metric["insurance_sum"] / total_insurance_sum
+                    ) * Decimal("100")
+                else:
+                    metric["market_share_by_sum"] = Decimal("0")
 
             return {
                 "branch_metrics": branch_metrics,

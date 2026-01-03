@@ -601,14 +601,14 @@ function initializeCharts() {
     chartsInitialized = true;
 
     {% if client_distribution_by_branch %}
-    // Branch distribution chart (pie chart)
+    // Branch distribution chart (pie chart) - COPIED STYLE FROM BRANCH ANALYTICS
     const branchCtx = document.getElementById('branchDistributionChart').getContext('2d');
 
-    // Prepare data with blue monochrome palette
+    // Prepare data
     const branchLabels = [{% for branch, count in client_distribution_by_branch.items %}'{{ branch|default:"Не указан" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
     const branchValues = [{% for branch, count in client_distribution_by_branch.items %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}];
 
-    // Bright colorful palette for branch distribution
+    // Use the same colorful palette as before
     const branchColors = [
         '#FF3030', // Bright Red
         '#00CED1', // Dark Turquoise
@@ -627,6 +627,69 @@ function initializeCharts() {
         '#BA55D3'  // Medium Orchid
     ];
 
+    // Prepare logo URLs for branches (empty for now, but structure ready)
+    const clientBranchLogoUrls = {};
+    branchLabels.forEach((label) => {
+        clientBranchLogoUrls[label] = null; // No logos available for client analytics
+    });
+
+    // Custom legend plugin with logos (COPIED FROM BRANCH ANALYTICS)
+    const clientBranchLegendPlugin = {
+        id: 'clientBranchLegend',
+        beforeInit: function(chart) {
+            // Preload legend images (none for client analytics)
+            chart.legendImages = {};
+            branchLabels.forEach((label) => {
+                chart.legendImages[label] = null;
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const legendArea = chart.legend;
+
+            if (!legendArea || !legendArea.legendItems) return;
+
+            // Clear default legend area
+            const legendBox = legendArea.legendHitBoxes;
+            if (legendBox && legendBox.length > 0) {
+                const startX = legendBox[0].left;
+                const startY = legendBox[0].top - 10;
+                const width = Math.max(...legendBox.map(box => box.left + box.width)) - startX + 30; // Smaller width without logos
+                const height = Math.max(...legendBox.map(box => box.top + box.height)) - startY + 20;
+
+                ctx.clearRect(startX - 10, startY, width, height);
+
+                // Draw custom legend with logos in single column
+                const itemHeight = 30;
+
+                legendArea.legendItems.forEach((item, index) => {
+                    const x = startX;
+                    const y = startY + (index * itemHeight) + 15;
+
+                    // Draw color indicator (small rectangle)
+                    ctx.fillStyle = item.fillStyle;
+                    ctx.fillRect(x, y - 8, 16, 16);
+                    ctx.strokeStyle = '#ccc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y - 8, 16, 16);
+
+                    // Draw branch name (no logos, just text after rectangle)
+                    ctx.fillStyle = '#333';
+                    ctx.font = '13px Arial';
+                    const branchName = item.text;
+                    ctx.fillText(branchName, x + 25, y + 4); // Closer to rectangle
+
+                    // Draw client count (after branch name)
+                    const clientCount = branchValues[branchLabels.indexOf(item.text)];
+                    const nameWidth = ctx.measureText(branchName).width;
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(' - ' + clientCount + ' клиентов', x + 25 + nameWidth, y + 4);
+                });
+            }
+        }
+    };
+
     const branchData = {
         labels: branchLabels,
         datasets: [{
@@ -641,6 +704,7 @@ function initializeCharts() {
     branchDistributionChart = new Chart(branchCtx, {
         type: 'pie',
         data: branchData,
+        plugins: [clientBranchLegendPlugin], // Add custom legend plugin
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -649,29 +713,19 @@ function initializeCharts() {
                 legend: {
                     position: 'right',
                     labels: {
-                        padding: 12,
-                        usePointStyle: false,
+                        padding: 20,
+                        usePointStyle: false, // We'll draw custom
                         font: {
                             size: 13
                         },
                         generateLabels: function(chart) {
-                            const data = chart.data;
-                            if (data.labels.length && data.datasets.length) {
-                                return data.labels.map((label, index) => {
-                                    const value = data.datasets[0].data[index];
-                                    // Truncate long branch names to fit better
-                                    const truncatedLabel = label.length > 15 ? label.substring(0, 15) + '...' : label;
-                                    return {
-                                        text: truncatedLabel + ': ' + value,
-                                        fillStyle: data.datasets[0].backgroundColor[index],
-                                        strokeStyle: data.datasets[0].backgroundColor[index],
-                                        lineWidth: 0,
-                                        hidden: false,
-                                        index: index
-                                    };
-                                });
-                            }
-                            return [];
+                            // Generate labels without text (we'll draw custom)
+                            return chart.data.labels.map((label, index) => ({
+                                text: label,
+                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                hidden: false,
+                                index: index
+                            }));
                         }
                     }
                 },

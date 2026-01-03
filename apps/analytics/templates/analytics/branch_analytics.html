@@ -621,6 +621,15 @@ function initializeCharts() {
         {% endfor %}
     };
 
+    // Prepare logo URLs for pie chart (TOP-10)
+    const pieBranchLogoUrls = {
+        {% for metric in branch_metrics %}
+        {% if forloop.counter <= 10 %}
+        '{{ metric.branch|escapejs }}': {% if metric.branch.logo %}'{{ metric.branch.logo.url }}'{% else %}null{% endif %}{% if not forloop.last and forloop.counter < 10 %},{% endif %}
+        {% endif %}
+        {% endfor %}
+    };
+
     // Convert to arrays and take TOP-10
     const allLabelsFromBranch = Object.keys(branchData);
     const allValuesFromBranch = Object.values(branchData);
@@ -646,7 +655,86 @@ function initializeCharts() {
 
     console.log('Colors assigned:', colors);
 
-    // Create completely new chart - PIE CHART
+    // Custom legend plugin with logos (COPIED FROM INSURER ANALYTICS)
+    const legendWithLogosPlugin = {
+        id: 'legendWithLogos',
+        beforeInit: function(chart) {
+            // Preload legend images
+            chart.legendImages = {};
+            chartLabels.forEach((label) => {
+                const logoUrl = pieBranchLogoUrls[label];
+                if (logoUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        chart.legendImages[label] = img;
+                        chart.update('none');
+                    };
+                    img.src = logoUrl;
+                } else {
+                    chart.legendImages[label] = null;
+                }
+            });
+        },
+        afterDraw: function(chart) {
+            const ctx = chart.ctx;
+            const legendArea = chart.legend;
+
+            if (!legendArea || !legendArea.legendItems) return;
+
+            // Clear default legend area
+            const legendBox = legendArea.legendHitBoxes;
+            if (legendBox && legendBox.length > 0) {
+                const startX = legendBox[0].left;
+                const startY = legendBox[0].top - 10;
+                const width = Math.max(...legendBox.map(box => box.left + box.width)) - startX + 50;
+                const height = Math.max(...legendBox.map(box => box.top + box.height)) - startY + 20;
+
+                ctx.clearRect(startX - 10, startY, width, height);
+
+                // Draw custom legend with logos in single column
+                const itemHeight = 30;
+
+                legendArea.legendItems.forEach((item, index) => {
+                    const x = startX;
+                    const y = startY + (index * itemHeight) + 15;
+
+                    // Draw color indicator (small rectangle)
+                    ctx.fillStyle = item.fillStyle;
+                    ctx.fillRect(x, y - 8, 16, 16);
+                    ctx.strokeStyle = '#ccc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y - 8, 16, 16);
+
+                    // Draw logo if available
+                    const img = chart.legendImages[item.text];
+                    if (img && img.complete) {
+                        ctx.drawImage(img, x + 20, y - 10, 20, 20);
+                    } else {
+                        // Fallback: draw colored circle
+                        ctx.fillStyle = item.fillStyle;
+                        ctx.beginPath();
+                        ctx.arc(x + 30, y, 8, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    // Draw branch name
+                    ctx.fillStyle = '#333';
+                    ctx.font = '13px Arial';
+                    const branchName = item.text;
+                    ctx.fillText(branchName, x + 45, y + 4);
+
+                    // Draw percentage (after branch name)
+                    const percentage = chartValues[chartLabels.indexOf(item.text)];
+                    const nameWidth = ctx.measureText(branchName).width;
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(' - ' + percentage.toFixed(1) + '%', x + 45 + nameWidth, y + 4);
+                });
+            }
+        }
+    };
+
+    // Create completely new chart - PIE CHART (COPIED FROM INSURER ANALYTICS)
     marketShareChart = new Chart(marketShareCtx, {
         type: 'pie',
         data: {
@@ -659,6 +747,7 @@ function initializeCharts() {
                 borderColor: '#ffffff'
             }]
         },
+        plugins: [legendWithLogosPlugin], // Add custom legend plugin
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -668,11 +757,12 @@ function initializeCharts() {
                     position: 'right',
                     labels: {
                         padding: 20,
-                        usePointStyle: false,
+                        usePointStyle: false, // We'll draw custom logos
                         font: {
-                            size: 12
+                            size: 13
                         },
                         generateLabels: function(chart) {
+                            // Generate labels without text (we'll draw custom)
                             return chart.data.labels.map((label, index) => ({
                                 text: label,
                                 fillStyle: chart.data.datasets[0].backgroundColor[index],

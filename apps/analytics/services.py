@@ -1302,12 +1302,24 @@ class AnalyticsService:
                 "worst_performing_clients": worst_performing_clients,
             }
 
+            # Calculate seasonal analysis
+            seasonal_analysis = self._calculate_seasonal_analysis(
+                monthly_premium_forecast, analytics_filter
+            )
+
+            # Calculate comparative analysis (year-over-year)
+            comparative_analysis = self._calculate_comparative_analysis(
+                analytics_filter
+            )
+
             return {
                 "monthly_premium_forecast": monthly_premium_forecast,
                 "monthly_commission_forecast": monthly_commission_forecast,
                 "payment_status_analysis": payment_status_analysis,
                 "average_commission_rates": average_commission_rates,
                 "overdue_payments_analysis": overdue_payments_analysis,
+                "seasonal_analysis": seasonal_analysis,
+                "comparative_analysis": comparative_analysis,
                 "filter_applied": analytics_filter.has_filters()
                 if analytics_filter
                 else False,
@@ -1341,8 +1353,372 @@ class AnalyticsService:
                     "average_overdue_days": Decimal("0"),
                     "worst_performing_clients": [],
                 },
+                "seasonal_analysis": {
+                    "monthly_averages": {},
+                    "seasonal_indices": {},
+                    "peak_months": [],
+                    "low_months": [],
+                    "quarterly_data": {},
+                    "seasonality_strength": Decimal("0"),
+                    "overall_average": Decimal("0"),
+                },
+                "comparative_analysis": {
+                    "current_year": datetime.now().year,
+                    "previous_year": datetime.now().year - 1,
+                    "premium_growth": Decimal("0"),
+                    "commission_growth": Decimal("0"),
+                    "policy_growth": Decimal("0"),
+                    "current_premium": Decimal("0"),
+                    "previous_premium": Decimal("0"),
+                    "current_commission": Decimal("0"),
+                    "previous_commission": Decimal("0"),
+                    "current_policy_count": 0,
+                    "previous_policy_count": 0,
+                    "insurance_type_changes": {},
+                    "new_clients": 0,
+                    "returning_clients": 0,
+                    "new_clients_percentage": Decimal("0"),
+                },
                 "filter_applied": False,
                 "error": str(e),
+            }
+
+    def _calculate_seasonal_analysis(
+        self, monthly_forecast: list, analytics_filter: Optional[AnalyticsFilter] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate seasonal patterns and analysis.
+
+        Args:
+            monthly_forecast: List of monthly forecast data
+            analytics_filter: Optional filter for historical data
+
+        Returns:
+            Dictionary containing seasonal analysis
+        """
+        try:
+            from apps.policies.models import PaymentSchedule
+            from collections import defaultdict
+            import calendar
+
+            # Get historical data for seasonal analysis (last 2-3 years)
+            current_year = datetime.now().year
+            historical_years = [current_year - 2, current_year - 1, current_year]
+
+            payments_qs = PaymentSchedule.objects.filter(
+                due_date__year__in=historical_years
+            )
+
+            # Apply filters if provided (except date filters)
+            if analytics_filter:
+                if analytics_filter.branch_ids:
+                    payments_qs = payments_qs.filter(
+                        policy__branch_id__in=analytics_filter.branch_ids
+                    )
+                if analytics_filter.insurer_ids:
+                    payments_qs = payments_qs.filter(
+                        policy__insurer_id__in=analytics_filter.insurer_ids
+                    )
+                if analytics_filter.insurance_type_ids:
+                    payments_qs = payments_qs.filter(
+                        policy__insurance_type_id__in=analytics_filter.insurance_type_ids
+                    )
+                if analytics_filter.client_ids:
+                    payments_qs = payments_qs.filter(
+                        policy__client_id__in=analytics_filter.client_ids
+                    )
+                if analytics_filter.policy_active is not None:
+                    payments_qs = payments_qs.filter(
+                        policy__policy_active=analytics_filter.policy_active
+                    )
+
+            # Group by month number (1-12) and calculate averages
+            monthly_totals = defaultdict(list)
+
+            for payment in payments_qs:
+                month_num = payment.due_date.month
+                monthly_totals[month_num].append(payment.amount or Decimal("0"))
+
+            # Calculate monthly averages
+            monthly_averages = {}
+            for month_num in range(1, 13):
+                if month_num in monthly_totals and monthly_totals[month_num]:
+                    avg = sum(monthly_totals[month_num]) / len(
+                        monthly_totals[month_num]
+                    )
+                    monthly_averages[month_num] = avg
+                else:
+                    monthly_averages[month_num] = Decimal("0")
+
+            # Calculate overall average
+            overall_avg = (
+                sum(monthly_averages.values()) / 12
+                if monthly_averages
+                else Decimal("0")
+            )
+
+            # Calculate seasonal indices
+            seasonal_indices = {}
+            for month_num, avg in monthly_averages.items():
+                if overall_avg > 0:
+                    seasonal_indices[month_num] = (avg / overall_avg) * Decimal("100")
+                else:
+                    seasonal_indices[month_num] = Decimal("100")
+
+            # Find peak and low months
+            if monthly_averages:
+                sorted_months = sorted(
+                    monthly_averages.items(), key=lambda x: x[1], reverse=True
+                )
+                peak_months = [
+                    {"month": month, "name": calendar.month_name[month], "value": value}
+                    for month, value in sorted_months[:3]
+                ]
+                low_months = [
+                    {"month": month, "name": calendar.month_name[month], "value": value}
+                    for month, value in sorted_months[-3:]
+                ]
+            else:
+                peak_months = []
+                low_months = []
+
+            # Calculate quarterly patterns
+            quarterly_data = {
+                "Q1": sum(monthly_averages[m] for m in [1, 2, 3]) / 3,
+                "Q2": sum(monthly_averages[m] for m in [4, 5, 6]) / 3,
+                "Q3": sum(monthly_averages[m] for m in [7, 8, 9]) / 3,
+                "Q4": sum(monthly_averages[m] for m in [10, 11, 12]) / 3,
+            }
+
+            # Calculate seasonality strength (coefficient of variation)
+            if overall_avg > 0:
+                variance = (
+                    sum((avg - overall_avg) ** 2 for avg in monthly_averages.values())
+                    / 12
+                )
+                std_dev = variance ** Decimal("0.5")
+                seasonality_strength = (std_dev / overall_avg) * Decimal("100")
+            else:
+                seasonality_strength = Decimal("0")
+
+            return {
+                "monthly_averages": monthly_averages,
+                "seasonal_indices": seasonal_indices,
+                "peak_months": peak_months,
+                "low_months": low_months,
+                "quarterly_data": quarterly_data,
+                "seasonality_strength": seasonality_strength,
+                "overall_average": overall_avg,
+            }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating seasonal analysis: {e}")
+
+            return {
+                "monthly_averages": {},
+                "seasonal_indices": {},
+                "peak_months": [],
+                "low_months": [],
+                "quarterly_data": {},
+                "seasonality_strength": Decimal("0"),
+                "overall_average": Decimal("0"),
+            }
+
+    def _calculate_comparative_analysis(
+        self, analytics_filter: Optional[AnalyticsFilter] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate year-over-year comparative analysis.
+
+        Args:
+            analytics_filter: Optional filter to apply
+
+        Returns:
+            Dictionary containing comparative analysis
+        """
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+            from django.db.models import Sum, Count
+
+            current_year = datetime.now().year
+            previous_year = current_year - 1
+
+            # Get base querysets
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            # Apply filters if provided (except date filters)
+            if analytics_filter:
+                if analytics_filter.branch_ids:
+                    policies_qs = policies_qs.filter(
+                        branch_id__in=analytics_filter.branch_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__branch_id__in=analytics_filter.branch_ids
+                    )
+                if analytics_filter.insurer_ids:
+                    policies_qs = policies_qs.filter(
+                        insurer_id__in=analytics_filter.insurer_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__insurer_id__in=analytics_filter.insurer_ids
+                    )
+                if analytics_filter.insurance_type_ids:
+                    policies_qs = policies_qs.filter(
+                        insurance_type_id__in=analytics_filter.insurance_type_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__insurance_type_id__in=analytics_filter.insurance_type_ids
+                    )
+                if analytics_filter.client_ids:
+                    policies_qs = policies_qs.filter(
+                        client_id__in=analytics_filter.client_ids
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__client_id__in=analytics_filter.client_ids
+                    )
+                if analytics_filter.policy_active is not None:
+                    policies_qs = policies_qs.filter(
+                        policy_active=analytics_filter.policy_active
+                    )
+                    payments_qs = payments_qs.filter(
+                        policy__policy_active=analytics_filter.policy_active
+                    )
+
+            # Calculate current year metrics
+            current_year_payments = payments_qs.filter(due_date__year=current_year)
+            current_year_policies = policies_qs.filter(start_date__year=current_year)
+
+            current_premium = current_year_payments.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal("0")
+
+            current_commission = current_year_payments.aggregate(total=Sum("kv_rub"))[
+                "total"
+            ] or Decimal("0")
+
+            current_policy_count = current_year_policies.count()
+
+            # Calculate previous year metrics
+            previous_year_payments = payments_qs.filter(due_date__year=previous_year)
+            previous_year_policies = policies_qs.filter(start_date__year=previous_year)
+
+            previous_premium = previous_year_payments.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal("0")
+
+            previous_commission = previous_year_payments.aggregate(total=Sum("kv_rub"))[
+                "total"
+            ] or Decimal("0")
+
+            previous_policy_count = previous_year_policies.count()
+
+            # Calculate growth rates
+            def calculate_growth(current, previous):
+                if previous > 0:
+                    return ((current - previous) / previous) * Decimal("100")
+                elif current > 0:
+                    return Decimal("100")  # 100% growth from zero
+                else:
+                    return Decimal("0")
+
+            premium_growth = calculate_growth(current_premium, previous_premium)
+            commission_growth = calculate_growth(
+                current_commission, previous_commission
+            )
+            policy_growth = calculate_growth(
+                Decimal(str(current_policy_count)), Decimal(str(previous_policy_count))
+            )
+
+            # Calculate insurance type distribution changes
+            from apps.policies.models import InsuranceType
+
+            insurance_type_changes = {}
+            insurance_types = InsuranceType.objects.filter(
+                id__in=policies_qs.values_list(
+                    "insurance_type_id", flat=True
+                ).distinct()
+            )
+
+            for ins_type in insurance_types:
+                current_count = current_year_policies.filter(
+                    insurance_type=ins_type
+                ).count()
+                previous_count = previous_year_policies.filter(
+                    insurance_type=ins_type
+                ).count()
+
+                growth = calculate_growth(
+                    Decimal(str(current_count)), Decimal(str(previous_count))
+                )
+
+                insurance_type_changes[ins_type.name] = {
+                    "current": current_count,
+                    "previous": previous_count,
+                    "growth": growth,
+                }
+
+            # Calculate new vs returning clients
+            current_year_client_ids = set(
+                current_year_policies.values_list("client_id", flat=True)
+            )
+            previous_year_client_ids = set(
+                previous_year_policies.values_list("client_id", flat=True)
+            )
+
+            new_clients = len(current_year_client_ids - previous_year_client_ids)
+            returning_clients = len(current_year_client_ids & previous_year_client_ids)
+
+            new_clients_percentage = Decimal("0")
+            if current_year_client_ids:
+                new_clients_percentage = (
+                    Decimal(str(new_clients))
+                    / Decimal(str(len(current_year_client_ids)))
+                ) * Decimal("100")
+
+            return {
+                "current_year": current_year,
+                "previous_year": previous_year,
+                "premium_growth": premium_growth,
+                "commission_growth": commission_growth,
+                "policy_growth": policy_growth,
+                "current_premium": current_premium,
+                "previous_premium": previous_premium,
+                "current_commission": current_commission,
+                "previous_commission": previous_commission,
+                "current_policy_count": current_policy_count,
+                "previous_policy_count": previous_policy_count,
+                "insurance_type_changes": insurance_type_changes,
+                "new_clients": new_clients,
+                "returning_clients": returning_clients,
+                "new_clients_percentage": new_clients_percentage,
+            }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating comparative analysis: {e}")
+
+            return {
+                "current_year": datetime.now().year,
+                "previous_year": datetime.now().year - 1,
+                "premium_growth": Decimal("0"),
+                "commission_growth": Decimal("0"),
+                "policy_growth": Decimal("0"),
+                "current_premium": Decimal("0"),
+                "previous_premium": Decimal("0"),
+                "current_commission": Decimal("0"),
+                "previous_commission": Decimal("0"),
+                "current_policy_count": 0,
+                "previous_policy_count": 0,
+                "insurance_type_changes": {},
+                "new_clients": 0,
+                "returning_clients": 0,
+                "new_clients_percentage": Decimal("0"),
             }
 
     def get_time_series_analytics(

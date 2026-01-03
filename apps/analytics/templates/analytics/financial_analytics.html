@@ -168,6 +168,99 @@
         z-index: 10;
     }
 
+    /* Quarter color coding */
+    .quarter-q1 {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-left: 4px solid #2196f3;
+    }
+
+    .quarter-q2 {
+        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%) !important;
+        border-left: 4px solid #4caf50;
+    }
+
+    .quarter-q3 {
+        background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%) !important;
+        border-left: 4px solid #ff9800;
+    }
+
+    .quarter-q4 {
+        background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%) !important;
+        border-left: 4px solid #e91e63;
+    }
+
+    /* Trend indicators */
+    .trend-up {
+        color: #28a745;
+        font-size: 0.8rem;
+    }
+
+    .trend-down {
+        color: #dc3545;
+        font-size: 0.8rem;
+    }
+
+    .trend-neutral {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+
+    /* Running totals styling */
+    .running-total {
+        font-size: 0.75rem;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* Analysis cards */
+    .analysis-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .analysis-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .analysis-card.seasonal {
+        border-left: 4px solid #17a2b8;
+    }
+
+    .analysis-card.comparative {
+        border-left: 4px solid #6f42c1;
+    }
+
+    .metric-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .metric-item:last-child {
+        border-bottom: none;
+    }
+
+    .growth-positive {
+        color: #28a745;
+        font-weight: bold;
+    }
+
+    .growth-negative {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .growth-neutral {
+        color: #6c757d;
+    }
+
     @media (max-width: 768px) {
         .metric-value {
             font-size: 1.5rem;
@@ -384,28 +477,56 @@
                             <th>Месяц</th>
                             <th class="text-end">Премия</th>
                             <th class="text-end">Комиссия</th>
+                            <th class="text-end">Накопительно</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for forecast in monthly_premium_forecast|slice:":24" %}
-                        <tr>
+                        <tr class="{{ forecast.quarter_class }}">
                             <td>
-                                <strong>{{ forecast.month|date:"M Y" }}</strong>
+                                <div class="d-flex align-items-center">
+                                    <strong>{{ forecast.month|date:"M Y" }}</strong>
+                                    <span class="badge bg-secondary ms-2">{{ forecast.quarter }}</span>
+                                    {% if forecast.actual_premium %}
+                                        <span class="badge bg-success ms-1">Факт</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex align-items-center justify-content-end">
+                                    <span class="fw-bold">{{ forecast.forecasted_premium|currency }}</span>
+                                    {% if forecast.trend_premium == 'up' %}
+                                        <i class="bi bi-arrow-up trend-up ms-1"></i>
+                                    {% elif forecast.trend_premium == 'down' %}
+                                        <i class="bi bi-arrow-down trend-down ms-1"></i>
+                                    {% else %}
+                                        <i class="bi bi-dash trend-neutral ms-1"></i>
+                                    {% endif %}
+                                </div>
                                 {% if forecast.actual_premium %}
-                                    <span class="badge bg-success ms-1">Факт</span>
+                                    <small class="text-muted">Факт: {{ forecast.actual_premium|currency }}</small>
                                 {% endif %}
                             </td>
                             <td class="text-end">
-                                <span class="fw-bold">{{ forecast.forecasted_premium|currency }}</span>
-                                {% if forecast.actual_premium %}
-                                    <br><small class="text-muted">Факт: {{ forecast.actual_premium|currency }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <span class="fw-bold">{{ forecast.forecasted_commission|currency }}</span>
+                                <div class="d-flex align-items-center justify-content-end">
+                                    <span class="fw-bold">{{ forecast.forecasted_commission|currency }}</span>
+                                    {% if forecast.trend_commission == 'up' %}
+                                        <i class="bi bi-arrow-up trend-up ms-1"></i>
+                                    {% elif forecast.trend_commission == 'down' %}
+                                        <i class="bi bi-arrow-down trend-down ms-1"></i>
+                                    {% else %}
+                                        <i class="bi bi-dash trend-neutral ms-1"></i>
+                                    {% endif %}
+                                </div>
                                 {% if forecast.actual_commission %}
-                                    <br><small class="text-muted">Факт: {{ forecast.actual_commission|currency }}</small>
+                                    <small class="text-muted">Факт: {{ forecast.actual_commission|currency }}</small>
                                 {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="running-total">
+                                    <div>П: {{ forecast.running_premium_total|currency }}</div>
+                                    <div>К: {{ forecast.running_commission_total|currency }}</div>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -416,11 +537,142 @@
     </div>
 </div>
 
+<!-- New Analysis Blocks -->
+<div class="row mb-4">
+    <!-- Seasonal Analysis -->
+    <div class="col-lg-6">
+        <div class="analysis-card seasonal">
+            <h5 class="mb-3">
+                <i class="bi bi-calendar4-range"></i>
+                Сезонный анализ
+            </h5>
 
+            {% if seasonal_analysis.peak_months %}
+            <div class="metric-item">
+                <div>
+                    <strong>Лучшие месяцы:</strong>
+                    <div class="text-muted">
+                        {% for month in seasonal_analysis.peak_months|slice:":3" %}
+                            {{ month.name }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="text-success">
+                    <i class="bi bi-arrow-up-circle"></i>
+                </div>
+            </div>
+            {% endif %}
 
+            {% if seasonal_analysis.low_months %}
+            <div class="metric-item">
+                <div>
+                    <strong>Слабые месяцы:</strong>
+                    <div class="text-muted">
+                        {% for month in seasonal_analysis.low_months|slice:":3" %}
+                            {{ month.name }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="text-warning">
+                    <i class="bi bi-arrow-down-circle"></i>
+                </div>
+            </div>
+            {% endif %}
 
+            <div class="metric-item">
+                <div>
+                    <strong>Сезонность:</strong>
+                    <div class="text-muted">Коэффициент вариации</div>
+                </div>
+                <div class="fw-bold">
+                    {{ seasonal_analysis.seasonality_strength|floatformat:1 }}%
+                </div>
+            </div>
 
+            {% if seasonal_analysis.quarterly_data %}
+            <div class="mt-3">
+                <small class="text-muted">Квартальные средние:</small>
+                <div class="row mt-2">
+                    {% for quarter, value in seasonal_analysis.quarterly_data.items %}
+                    <div class="col-3 text-center">
+                        <div class="badge bg-secondary">{{ quarter }}</div>
+                        <div class="small">{{ value|currency }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
+    <!-- Comparative Analysis -->
+    <div class="col-lg-6">
+        <div class="analysis-card comparative">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up-arrow"></i>
+                Сравнение с {{ comparative_analysis.previous_year }} годом
+            </h5>
+
+            <div class="metric-item">
+                <div>
+                    <strong>Рост премий:</strong>
+                    <div class="text-muted">{{ comparative_analysis.current_premium|currency }} vs {{ comparative_analysis.previous_premium|currency }}</div>
+                </div>
+                <div class="{% if comparative_analysis.premium_growth > 0 %}growth-positive{% elif comparative_analysis.premium_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
+                    {% if comparative_analysis.premium_growth > 0 %}+{% endif %}{{ comparative_analysis.premium_growth|floatformat:1 }}%
+                </div>
+            </div>
+
+            <div class="metric-item">
+                <div>
+                    <strong>Рост комиссий:</strong>
+                    <div class="text-muted">{{ comparative_analysis.current_commission|currency }} vs {{ comparative_analysis.previous_commission|currency }}</div>
+                </div>
+                <div class="{% if comparative_analysis.commission_growth > 0 %}growth-positive{% elif comparative_analysis.commission_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
+                    {% if comparative_analysis.commission_growth > 0 %}+{% endif %}{{ comparative_analysis.commission_growth|floatformat:1 }}%
+                </div>
+            </div>
+
+            <div class="metric-item">
+                <div>
+                    <strong>Рост полисов:</strong>
+                    <div class="text-muted">{{ comparative_analysis.current_policy_count }} vs {{ comparative_analysis.previous_policy_count }}</div>
+                </div>
+                <div class="{% if comparative_analysis.policy_growth > 0 %}growth-positive{% elif comparative_analysis.policy_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
+                    {% if comparative_analysis.policy_growth > 0 %}+{% endif %}{{ comparative_analysis.policy_growth|floatformat:1 }}%
+                </div>
+            </div>
+
+            <div class="metric-item">
+                <div>
+                    <strong>Новые клиенты:</strong>
+                    <div class="text-muted">{{ comparative_analysis.new_clients_percentage|floatformat:1 }}% от общего числа</div>
+                </div>
+                <div class="text-info">
+                    {{ comparative_analysis.new_clients }} клиентов
+                </div>
+            </div>
+
+            {% if comparative_analysis.insurance_type_changes %}
+            <div class="mt-3">
+                <small class="text-muted">Изменения по видам страхования:</small>
+                <div class="mt-2">
+                    {% for type_name, change in comparative_analysis.insurance_type_changes.items %}
+                        {% if change.growth != 0 %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small">{{ type_name }}:</span>
+                            <span class="small {% if change.growth > 0 %}text-success{% elif change.growth < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                {% if change.growth > 0 %}+{% endif %}{{ change.growth|floatformat:0 }}%
+                            </span>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 
 <!-- Loading Overlay -->
 <div class="loading-overlay" id="loadingOverlay">
@@ -537,10 +789,10 @@ function initializeCharts() {
     // Forecast Chart
     const forecastCtx = document.getElementById('forecastChart').getContext('2d');
 
-    // Get data from template context
-    const forecastLabels = {{ forecast_chart_labels|safe }};
-    const premiumForecastData = {{ premium_forecast_data|safe }};
-    const commissionForecastData = {{ commission_forecast_data|safe }};
+    // Get data from template context - use JSON filter for safety
+    const forecastLabels = JSON.parse('{{ forecast_chart_labels|escapejs }}' || '[]');
+    const premiumForecastData = JSON.parse('{{ premium_forecast_data|escapejs }}' || '[]');
+    const commissionForecastData = JSON.parse('{{ commission_forecast_data|escapejs }}' || '[]');
 
     new Chart(forecastCtx, {
         type: 'line',

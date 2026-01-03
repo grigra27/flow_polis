@@ -1337,6 +1337,11 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 "monthly_commission_forecast", []
             )
             payment_status_analysis = financial_data.get("payment_status_analysis", {})
+            seasonal_analysis = financial_data.get("seasonal_analysis", {})
+            comparative_analysis = financial_data.get("comparative_analysis", {})
+
+            # Calculate running totals by calendar year and add trend indicators
+            enhanced_forecast = self._enhance_forecast_data(monthly_premium_forecast)
 
             # Calculate summary metrics
             total_forecasted_premium = sum(
@@ -1384,6 +1389,13 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 for forecast in monthly_commission_forecast
             ]
 
+            # Convert to JSON strings for template
+            import json
+
+            forecast_chart_labels_json = json.dumps(forecast_chart_labels)
+            premium_forecast_data_json = json.dumps(premium_forecast_data)
+            commission_forecast_data_json = json.dumps(commission_forecast_data)
+
             # Prepare payment status chart data
             payment_status_labels = ["Оплачено", "Ожидает оплаты", "Просрочено"]
             payment_status_counts = [
@@ -1400,15 +1412,17 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Add filter options for the form
             context.update(
                 {
-                    "monthly_premium_forecast": monthly_premium_forecast,
+                    "monthly_premium_forecast": enhanced_forecast,
                     "monthly_commission_forecast": monthly_commission_forecast,
                     "payment_status_analysis": payment_status_analysis,
+                    "seasonal_analysis": seasonal_analysis,
+                    "comparative_analysis": comparative_analysis,
                     "total_forecasted_premium": total_forecasted_premium,
                     "total_forecasted_commission": total_forecasted_commission,
                     "actual_vs_forecast_variance": actual_vs_forecast_variance,
-                    "forecast_chart_labels": forecast_chart_labels,
-                    "premium_forecast_data": premium_forecast_data,
-                    "commission_forecast_data": commission_forecast_data,
+                    "forecast_chart_labels": forecast_chart_labels_json,
+                    "premium_forecast_data": premium_forecast_data_json,
+                    "commission_forecast_data": commission_forecast_data_json,
                     "payment_status_labels": payment_status_labels,
                     "payment_status_counts": payment_status_counts,
                     "payment_status_amounts": payment_status_amounts,
@@ -1445,12 +1459,14 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "monthly_premium_forecast": [],
                     "monthly_commission_forecast": [],
                     "payment_status_analysis": {},
+                    "seasonal_analysis": {},
+                    "comparative_analysis": {},
                     "total_forecasted_premium": Decimal("0"),
                     "total_forecasted_commission": Decimal("0"),
                     "actual_vs_forecast_variance": [],
-                    "forecast_chart_labels": [],
-                    "premium_forecast_data": [],
-                    "commission_forecast_data": [],
+                    "forecast_chart_labels": "[]",
+                    "premium_forecast_data": "[]",
+                    "commission_forecast_data": "[]",
                     "payment_status_labels": [],
                     "payment_status_counts": [],
                     "payment_status_amounts": [],
@@ -1700,6 +1716,94 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             logger.error(f"Error exporting financial analytics: {e}")
             messages.error(self.request, "Произошла ошибка при экспорте данных")
             return self.get(self.request)
+
+    def _enhance_forecast_data(self, monthly_forecast):
+        """
+        Enhance forecast data with running totals, trends, and quarter info.
+
+        Args:
+            monthly_forecast: List of monthly forecast dictionaries
+
+        Returns:
+            Enhanced forecast data with additional fields
+        """
+        if not monthly_forecast:
+            return []
+
+        enhanced_forecast = []
+
+        # Group by calendar year for running totals
+        yearly_totals = {}
+
+        for i, forecast in enumerate(monthly_forecast):
+            month_date = forecast["month"]
+            year = month_date.year
+            month_num = month_date.month
+
+            # Initialize year totals if needed
+            if year not in yearly_totals:
+                yearly_totals[year] = {
+                    "premium_total": Decimal("0"),
+                    "commission_total": Decimal("0"),
+                }
+
+            # Add to running totals
+            yearly_totals[year]["premium_total"] += forecast["forecasted_premium"]
+            yearly_totals[year]["commission_total"] += forecast["forecasted_commission"]
+
+            # Calculate trend indicator (compare with previous month)
+            trend_premium = "neutral"
+            trend_commission = "neutral"
+
+            if i > 0:
+                prev_forecast = monthly_forecast[i - 1]
+
+                # Premium trend
+                if forecast["forecasted_premium"] > prev_forecast["forecasted_premium"]:
+                    trend_premium = "up"
+                elif (
+                    forecast["forecasted_premium"] < prev_forecast["forecasted_premium"]
+                ):
+                    trend_premium = "down"
+
+                # Commission trend
+                if (
+                    forecast["forecasted_commission"]
+                    > prev_forecast["forecasted_commission"]
+                ):
+                    trend_commission = "up"
+                elif (
+                    forecast["forecasted_commission"]
+                    < prev_forecast["forecasted_commission"]
+                ):
+                    trend_commission = "down"
+
+            # Determine quarter
+            quarter = f"Q{(month_num - 1) // 3 + 1}"
+
+            # Determine quarter CSS class for color coding
+            quarter_class = {
+                "Q1": "quarter-q1",  # Winter - blue
+                "Q2": "quarter-q2",  # Spring - green
+                "Q3": "quarter-q3",  # Summer - yellow
+                "Q4": "quarter-q4",  # Autumn - orange
+            }.get(quarter, "")
+
+            enhanced_item = {
+                **forecast,  # Include all original data
+                "running_premium_total": yearly_totals[year]["premium_total"],
+                "running_commission_total": yearly_totals[year]["commission_total"],
+                "trend_premium": trend_premium,
+                "trend_commission": trend_commission,
+                "quarter": quarter,
+                "quarter_class": quarter_class,
+                "year": year,
+                "month_num": month_num,
+            }
+
+            enhanced_forecast.append(enhanced_item)
+
+        return enhanced_forecast
 
 
 class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):

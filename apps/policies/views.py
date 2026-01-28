@@ -102,6 +102,11 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         if branch_id:
             queryset = queryset.filter(policy__branch_id=branch_id)
 
+        # Filter by insurer if specified
+        insurer_id = self.request.GET.get("insurer")
+        if insurer_id:
+            queryset = queryset.filter(policy__insurer_id=insurer_id)
+
         # Filter by date range
         date_from = self.request.GET.get("date_from")
         date_to = self.request.GET.get("date_to")
@@ -191,9 +196,11 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        from apps.insurers.models import Branch
+        from apps.insurers.models import Branch, Insurer
 
         context["branches"] = Branch.objects.all()
+        context["insurers"] = Insurer.objects.all()
         context["selected_branch"] = self.request.GET.get("branch")
+        context["selected_insurer"] = self.request.GET.get("insurer")
         context["can_edit"] = self.request.user.is_staff
         return context

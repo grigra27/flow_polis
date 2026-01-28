@@ -69,7 +69,7 @@
 <!-- Date Range Filter -->
 <div class="card mb-3">
     <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
+        <form method="get" class="row g-3 align-items-end" id="filterForm">
             {% if selected_branch %}
             <input type="hidden" name="branch" value="{{ selected_branch }}">
             {% endif %}
@@ -81,12 +81,23 @@
                 <label class="form-label">Дата платежа до:</label>
                 <input type="date" name="date_to" class="form-control" value="{{ request.GET.date_to }}">
             </div>
-            <div class="col-md-6">
+            <div class="col-md-3">
+                <label class="form-label">Страховщик:</label>
+                <select name="insurer" class="form-select" id="insurerSelect">
+                    <option value="">Все страховщики</option>
+                    {% for insurer in insurers %}
+                    <option value="{{ insurer.id }}" {% if selected_insurer == insurer.id|stringformat:'s' %}selected{% endif %}>
+                        {{ insurer.insurer_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-funnel"></i> Применить фильтр
                 </button>
                 <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Сбросить даты
+                    <i class="bi bi-x-circle"></i> Сбросить
                 </a>
             </div>
         </form>
@@ -99,15 +110,15 @@
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <!-- Past payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
                class="btn btn-outline-success {% if request.GET.status == 'approved' %}active{% endif %}">
                 <i class="bi bi-check2-circle"></i> Акт согласован СК
             </a>
-            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
                class="btn btn-outline-primary {% if request.GET.status == 'paid' %}active{% endif %}">
                 <i class="bi bi-check-circle"></i> Оплаченные
             </a>
-            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
                class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
                 <i class="bi bi-exclamation-triangle"></i> Не оплаченные
             </a>
@@ -117,11 +128,11 @@
 
         <!-- Future payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
                class="btn btn-outline-warning {% if request.GET.status == 'upcoming' or not request.GET.status %}active{% endif %}">
                 <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
             </a>
-            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
                class="btn btn-outline-info {% if request.GET.status == 'future' %}active{% endif %}">
                 <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
             </a>
@@ -130,7 +141,7 @@
         <div class="vr" style="height: 38px;"></div>
 
         <!-- All payments -->
-        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
            class="btn btn-outline-primary {% if request.GET.status == 'all' %}active{% endif %}">
             <i class="bi bi-list-ul"></i> Все платежи
         </a>
@@ -316,6 +327,28 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = this.dataset.href;
         });
     });
+
+    // Handle insurer select change - preserve all current URL parameters
+    const insurerSelect = document.getElementById('insurerSelect');
+    if (insurerSelect) {
+        insurerSelect.addEventListener('change', function() {
+            const currentUrl = new URL(window.location.href);
+            const params = new URLSearchParams(currentUrl.search);
+
+            // Update or remove insurer parameter
+            if (this.value) {
+                params.set('insurer', this.value);
+            } else {
+                params.delete('insurer');
+            }
+
+            // Remove page parameter to go back to first page
+            params.delete('page');
+
+            // Redirect with all preserved parameters
+            window.location.href = currentUrl.pathname + '?' + params.toString();
+        });
+    }
 });
 </script>
 {% endblock %}

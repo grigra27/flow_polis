@@ -453,6 +453,7 @@ def export_commission_report(request):
                 policy__insurer_id=insurer_id,
                 paid_date__isnull=False,  # Есть дата оплаты
                 insurer_date__isnull=True,  # Нет даты согласования СК
+                kv_rub__gt=0,  # КВ руб больше нуля
             )
             .order_by("paid_date", "policy__policy_number")
         )

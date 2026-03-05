@@ -116,6 +116,7 @@ def export_payments_excel(request):
                 due_date__gte=date_from,
                 due_date__lte=date_to,
                 policy__policy_active=True,  # Только активные полисы, как на странице платежей
+                paid_date__isnull=True,  # Исключаем все платежи с датой фактической оплаты
             )
             .order_by("due_date", "policy__policy_number")
         )

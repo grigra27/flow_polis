@@ -682,3 +682,68 @@ class PaymentExportDateRangeTest(TestCase):
         # Должен быть редирект с предупреждением о том, что нет данных
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse("reports:index"))
+
+    def test_export_excludes_all_paid_payments(self):
+        """Тест: экспорт исключает все платежи с заполненной paid_date, независимо от insurer_date"""
+        from openpyxl import load_workbook
+        from io import BytesIO
+
+        # Активный полис, чтобы проверка шла именно по статусу платежа, а не по активности полиса
+        status_policy = Policy.objects.create(
+            policy_number="TEST-STATUS",
+            client=self.test_client,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            premium_total=Decimal("60000.00"),
+            property_description="Имущество для проверки статусов",
+            policy_active=True,
+        )
+
+        # Должен быть исключен: есть paid_date (insurer_date пустая)
+        PaymentSchedule.objects.create(
+            policy=status_policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2024, 8, 10),
+            amount=Decimal("20000.00"),
+            insurance_sum=Decimal("600000.00"),
+            paid_date=date(2024, 8, 12),
+        )
+
+        # Должен быть включен: paid_date пустая, но есть insurer_date
+        PaymentSchedule.objects.create(
+            policy=status_policy,
+            year_number=1,
+            installment_number=2,
+            due_date=date(2024, 9, 10),
+            amount=Decimal("20000.00"),
+            insurance_sum=Decimal("600000.00"),
+            insurer_date=date(2024, 9, 12),
+        )
+
+        url = reverse("reports:export_payments")
+        response = self.client.get(
+            url, {"date_from": "2024-01-01", "date_to": "2024-12-31"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        wb = load_workbook(BytesIO(response.content))
+        ws = wb.active
+
+        policy_numbers = []
+        for row in range(5, ws.max_row + 1):
+            policy_number_cell = ws.cell(row=row, column=1).value
+            if policy_number_cell:
+                policy_numbers.append(policy_number_cell)
+
+        # Исключаются только платежи с paid_date
+        status_payments_count = sum(1 for p in policy_numbers if p == "TEST-STATUS")
+        self.assertEqual(
+            status_payments_count,
+            1,
+            "Из TEST-STATUS должен попасть только платеж без paid_date",
+        )

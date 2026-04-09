@@ -900,6 +900,7 @@ class ThursdayReportExporter(BaseExporter):
             "Дата платежа по договору",
             "Дата факт. оплаты",
             "Причина",
+            "Участие брокера",
         ]
 
     def export(self):
@@ -1029,7 +1030,7 @@ class ThursdayReportExporter(BaseExporter):
 
                 # Формируем столбец "Причина" с форматированием
                 reason_cell_value = self._format_reasons(reasons)
-                row[-1] = reason_cell_value  # Заменяем последний элемент (причина)
+                row[11] = reason_cell_value  # 12-й столбец - "Причина"
 
                 current_row = ws.max_row + 1
                 ws.append(row)
@@ -1140,6 +1141,7 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(payment_to_show.due_date) if payment_to_show else "",
             self.format_value(payment_to_show.paid_date) if payment_to_show else "",
             reason,
+            self.format_value(policy.broker_participation),
         ]
 
     def get_payment_row_data(self, payment):
@@ -1162,6 +1164,7 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(payment.due_date),
             self.format_value(payment.paid_date),
             reason,
+            self.format_value(policy.broker_participation),
         ]
 
     def get_reason(self, policy, payment=None):
@@ -1227,6 +1230,7 @@ class ThursdayReportExporter(BaseExporter):
             "J": 13,  # Дата платежа по договору
             "K": 13,  # Дата фактической оплаты
             "L": 30,  # Причина - увеличена ширина
+            "M": 14,  # Участие брокера
         }
 
         from openpyxl.utils import get_column_letter
@@ -1269,55 +1273,55 @@ class ThursdayReportExporter(BaseExporter):
             ):  # Пропускаем заголовок отчета, пустую строку и заголовки столбцов
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
-        # 3. Выравнивание для разных типов данных
+        # 3. Выравнивание, числовые форматы и мягкая подсветка строк с "Участие брокера = Нет"
+        from openpyxl.styles import PatternFill
+
+        no_broker_fill = PatternFill(
+            start_color="FFF8E1", end_color="FFF8E1", fill_type="solid"
+        )
+
         for row in ws.iter_rows(
-            min_row=4
-        ):  # Пропускаем заголовок отчета, пустую строку и заголовки столбцов
+            min_row=5
+        ):  # Пропускаем заголовок отчета, пустую строку, заголовки столбцов и служебную пустую строку
+            is_city_header = (
+                row[0].value
+                and isinstance(row[0].value, str)
+                and len(row) > 1
+                and row[1].value is None
+            )
+            if is_city_header:
+                continue
+
+            # Столбец M (13) - "Участие брокера"
+            broker_cell = row[12] if len(row) > 12 else None
+            is_no_broker_participation = broker_cell and broker_cell.value == "Нет"
+
             for idx, cell in enumerate(row, start=1):
-                # Проверяем, является ли это заголовком города (первая ячейка заполнена, вторая пустая)
-                is_city_header = (
-                    idx == 1
-                    and cell.value
-                    and isinstance(cell.value, str)
-                    and len(row) > 1
-                    and row[1].value is None
-                    and cell.row > 4
-                )
+                # Не перезаписываем уже установленную цветовую индикацию в "Причина"
+                if is_no_broker_participation and cell.fill.fill_type is None:
+                    cell.fill = no_broker_fill
 
-                if is_city_header:
-                    continue  # Пропускаем заголовки городов
+                # Столбцы с датами (F, G, J, K) - по центру + форматирование дат
+                if idx in [6, 7, 10, 11]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    from datetime import date
 
-                if (
-                    cell.value
-                    and not isinstance(cell.value, str)
-                    or (
-                        isinstance(cell.value, str)
-                        and cell.value.replace(".", "").replace(",", "").isdigit()
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
+                # Столбец с суммой (I) - справа + денежный формат
+                elif idx == 9:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    cell.number_format = "#,##0.00"
+                # Столбец "Причина" (L) - перенос строк
+                elif idx == 12:
+                    cell.alignment = Alignment(
+                        horizontal="left", vertical="top", wrap_text=True
                     )
-                ):
-                    # Столбцы с датами (F, G, J, K) - по центру + форматирование дат
-                    if idx in [6, 7, 10, 11]:
-                        cell.alignment = Alignment(
-                            horizontal="center", vertical="center"
-                        )
-                        # Применяем форматирование дат для Excel
-                        from datetime import date
-
-                        if isinstance(cell.value, date):
-                            cell.number_format = "DD.MM.YYYY"
-                    # Столбцы с суммами (I) - справа + числовое форматирование
-                    elif idx == 9:
-                        cell.alignment = Alignment(
-                            horizontal="right", vertical="center"
-                        )
-                        # Применяем числовой формат с разделителями тысяч и двумя десятичными знаками
-                        # Копируем точно такой же формат как в ScheduledPaymentsExporter
-                        cell.number_format = "#,##0.00"
-                    # Остальные текстовые - слева
-                    else:
-                        cell.alignment = Alignment(horizontal="left", vertical="center")
+                # Столбец "Участие брокера" (M) - по центру
+                elif idx == 13:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                # Остальные - слева
                 else:
-                    # Текстовые поля - слева
                     cell.alignment = Alignment(horizontal="left", vertical="center")
 
         # 4. Закрепление заголовков (заголовок отчета + пустая строка + заголовки столбцов + пустая строка)
@@ -1340,9 +1344,6 @@ class ThursdayReportExporter(BaseExporter):
             )
             if is_city_header:
                 continue
-
-            # Проверяем ячейку "Причина" (столбец M, индекс 13)
-            reason_cell = ws.cell(row=row, column=13)
 
             # Если высота строки уже установлена (для строк с двумя причинами), пропускаем
             if ws.row_dimensions[row].height and ws.row_dimensions[row].height > 20:

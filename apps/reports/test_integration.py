@@ -488,6 +488,10 @@ class ReadyExportsTest(TestCase):
             policy_uploaded=True,  # Этот полис подгружен
         )
 
+        # Делаем тестовый полис без участия брокера, чтобы проверить новый столбец и подсветку
+        self.policy.broker_participation = False
+        self.policy.save(update_fields=["broker_participation"])
+
         self.test_client.login(username="testuser", password="testpass123")
 
         response = self.test_client.get("/reports/export/thursday/")
@@ -536,6 +540,7 @@ class ReadyExportsTest(TestCase):
             "Дата платежа по договору",
             "Дата факт. оплаты",
             "Причина",
+            "Участие брокера",
         ]
         self.assertEqual(headers, expected_headers)
 
@@ -568,6 +573,23 @@ class ReadyExportsTest(TestCase):
             if cell_value == "READY-001":
                 reason = ws.cell(row=row, column=12).value  # 12-й столбец - Причина
                 self.assertIn("не подгружены документы", reason)
+                broker_participation = ws.cell(
+                    row=row, column=13
+                ).value  # 13-й столбец - Участие брокера
+                self.assertEqual(broker_participation, "Нет")
+
+                # Проверяем мягкую подсветку строки для "Участие брокера = Нет"
+                highlighted_cell = ws.cell(row=row, column=1)
+                fill_rgb = (
+                    highlighted_cell.fill.start_color.rgb
+                    if highlighted_cell.fill and highlighted_cell.fill.start_color
+                    else None
+                )
+                self.assertIsNotNone(fill_rgb)
+                self.assertTrue(
+                    fill_rgb.upper().endswith("FFF8E1"),
+                    f"Ожидали мягкую подсветку FFF8E1, получили {fill_rgb}",
+                )
                 break
 
         # Проверяем что неоплаченные платежи также попадают в отчет (в том же городе)

@@ -518,24 +518,6 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class ThursdayReportHelpView(LoginRequiredMixin, TemplateView):
-    """FAQ-страница с описанием логики формирования четвергового отчета"""
-
-    template_name = "reports/thursday_report_help.html"
-
-
-class PolicyExpirationHelpView(LoginRequiredMixin, TemplateView):
-    """FAQ-страница с описанием логики формирования экспорта пролонгации"""
-
-    template_name = "reports/policy_expiration_help.html"
-
-
-class ScheduledPaymentsHelpView(LoginRequiredMixin, TemplateView):
-    """FAQ-страница с описанием логики формирования экспорта очередных взносов"""
-
-    template_name = "reports/scheduled_payments_help.html"
-
-
 class CustomExportView(LoginRequiredMixin, FormView):
     """Конструктор кастомного экспорта"""
 

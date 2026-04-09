@@ -29,6 +29,12 @@
                 <p class="text-muted mb-3">
                     Экспорт полисов с окончанием страхования за выбранный период
                 </p>
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm mb-3"
+                        data-bs-toggle="modal"
+                        data-bs-target="#policyExpirationFaqModal">
+                    <i class="bi bi-question-circle"></i> FAQ
+                </button>
 
                 <!-- Ключевые особенности -->
                 <div class="row g-2 mb-3">
@@ -113,6 +119,12 @@
                 <p class="text-muted mb-3">
                     Экспорт платежей за выбранный период с детальной информацией
                 </p>
+                <button type="button"
+                        class="btn btn-outline-success btn-sm mb-3"
+                        data-bs-toggle="modal"
+                        data-bs-target="#scheduledPaymentsFaqModal">
+                    <i class="bi bi-question-circle"></i> FAQ
+                </button>
 
                 <!-- Ключевые особенности -->
                 <div class="row g-2 mb-3">
@@ -200,6 +212,12 @@
                 <p class="text-muted small mb-3">
                     Перечень ДФА с недостающими документами
                 </p>
+                <button type="button"
+                        class="btn btn-outline-warning btn-sm mb-3"
+                        data-bs-toggle="modal"
+                        data-bs-target="#thursdayReportFaqModal">
+                    <i class="bi bi-question-circle"></i> FAQ
+                </button>
 
                 <!-- Разделы отчета -->
                 <div class="mb-3">
@@ -253,29 +271,90 @@
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="card mb-4 shadow-sm border-info">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0">
-                    <i class="bi bi-question-circle"></i> Справка по готовым экспортам
-                </h6>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Краткие инструкции и FAQ по составу данных, параметрам фильтрации и причинам, почему записи могут не попадать в экспорт.
-                </p>
+</div>
 
-                <div class="d-grid gap-2">
-                    <a href="{% url 'reports:thursday_report_help' %}" class="btn btn-outline-info btn-sm">
-                        <i class="bi bi-book"></i> FAQ: Четверговый отчет
-                    </a>
-                    <a href="{% url 'reports:policy_expiration_help' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-book"></i> FAQ: Пролонгация
-                    </a>
-                    <a href="{% url 'reports:scheduled_payments_help' %}" class="btn btn-outline-success btn-sm">
-                        <i class="bi bi-book"></i> FAQ: Очередные взносы (счета)
-                    </a>
-                </div>
+<!-- FAQ: Пролонгация -->
+<div class="modal fade" id="policyExpirationFaqModal" tabindex="-1" aria-labelledby="policyExpirationFaqModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="policyExpirationFaqModalLabel">
+                    <i class="bi bi-question-circle"></i> FAQ: Пролонгация
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Что попадает в экспорт:</strong> полисы с датой окончания страхования в выбранном диапазоне (<code>date_from</code> — <code>date_to</code>).</p>
+                <p><strong>Как формируется:</strong> данные сортируются по филиалу, дате окончания и номеру полиса. В отчете 26 столбцов: базовые поля заполняются автоматически, остальные предназначены для ручного заполнения.</p>
+                <p class="mb-2"><strong>Почему полис может не попасть:</strong></p>
+                <ul>
+                    <li>дата окончания вне выбранного периода;</li>
+                    <li>задан дополнительный фильтр по филиалу <code>branch</code>;</li>
+                    <li>ошибка в диапазоне дат (дата начала позже даты окончания).</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAQ: Очередные взносы -->
+<div class="modal fade" id="scheduledPaymentsFaqModal" tabindex="-1" aria-labelledby="scheduledPaymentsFaqModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="scheduledPaymentsFaqModalLabel">
+                    <i class="bi bi-question-circle"></i> FAQ: Очередные взносы
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Что попадает в экспорт:</strong> только неоплаченные платежи (<code>paid_date</code> пусто) по активным полисам в выбранном периоде по дате платежа (<code>due_date</code>).</p>
+                <p><strong>Что рассчитывается автоматически:</strong></p>
+                <ul>
+                    <li>статус рассрочки: «годовой» или «рассрочка»;</li>
+                    <li>«Этот взнос» в формате <code>N из M</code>;</li>
+                    <li>«Крайняя дата запроса счета» = дата платежа минус 2 недели.</li>
+                </ul>
+                <p class="mb-2"><strong>Почему платеж может не попасть:</strong></p>
+                <ul>
+                    <li>платеж уже оплачен;</li>
+                    <li>полис неактивен;</li>
+                    <li>дата платежа вне выбранного диапазона;</li>
+                    <li>задан фильтр по филиалу <code>branch</code>.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAQ: Четверговый отчет -->
+<div class="modal fade" id="thursdayReportFaqModal" tabindex="-1" aria-labelledby="thursdayReportFaqModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="thursdayReportFaqModalLabel">
+                    <i class="bi bi-question-circle"></i> FAQ: Четверговый отчет
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Что попадает в отчет:</strong></p>
+                <ul>
+                    <li>полисы с признаком <code>policy_uploaded = False</code>;</li>
+                    <li>неоплаченные платежи (<code>paid_date</code> пусто) по активным полисам.</li>
+                </ul>
+                <p><strong>Как работает дата «для раздела 2»:</strong> учитываются только платежи с договорной датой <code>due_date &lt;= payment_date</code>. Если дата не указана, берется текущая дата.</p>
+                <p><strong>Почему в строке может быть две причины:</strong> для одного полиса одновременно найдены «не подгружены документы» и «нет данных об оплате»; причины объединяются в одной строке.</p>
+                <p class="mb-0"><strong>Почему запись может не попасть:</strong> полис подгружен и нет неоплаченных платежей, подходящих под выбранную дату.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>

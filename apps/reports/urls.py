@@ -20,21 +20,6 @@ urlpatterns = [
         "export/thursday/", views.export_thursday_report, name="export_thursday_report"
     ),
     path(
-        "export/thursday/help/",
-        views.ThursdayReportHelpView.as_view(),
-        name="thursday_report_help",
-    ),
-    path(
-        "export/policy-expiration/help/",
-        views.PolicyExpirationHelpView.as_view(),
-        name="policy_expiration_help",
-    ),
-    path(
-        "export/payments/help/",
-        views.ScheduledPaymentsHelpView.as_view(),
-        name="scheduled_payments_help",
-    ),
-    path(
         "export/policy-expiration/",
         views.export_policy_expiration,
         name="export_policy_expiration",

@@ -1039,18 +1039,6 @@ class AuthorizationTest(TestCase):
         self.assertEqual(response3.status_code, 302)
         self.assertIn("/accounts/login/", response3.url)
 
-        response4 = self.test_client.get("/reports/export/thursday/help/")
-        self.assertEqual(response4.status_code, 302)
-        self.assertIn("/accounts/login/", response4.url)
-
-        response5 = self.test_client.get("/reports/export/policy-expiration/help/")
-        self.assertEqual(response5.status_code, 302)
-        self.assertIn("/accounts/login/", response5.url)
-
-        response6 = self.test_client.get("/reports/export/payments/help/")
-        self.assertEqual(response6.status_code, 302)
-        self.assertIn("/accounts/login/", response6.url)
-
     def test_authorized_access(self):
         """Авторизованный пользователь имеет доступ"""
         self.test_client.login(username="testuser", password="testpass123")
@@ -1061,24 +1049,15 @@ class AuthorizationTest(TestCase):
         response2 = self.test_client.get("/reports/custom/")
         self.assertEqual(response2.status_code, 200)
 
-        response3 = self.test_client.get("/reports/export/thursday/help/")
-        self.assertEqual(response3.status_code, 200)
-        self.assertContains(response3, "Как формируется четверговый отчет")
-
-        response4 = self.test_client.get("/reports/export/policy-expiration/help/")
-        self.assertEqual(response4.status_code, 200)
-        self.assertContains(response4, "FAQ: Экспорт «Пролонгация»")
-
-        response5 = self.test_client.get("/reports/export/payments/help/")
-        self.assertEqual(response5.status_code, 200)
-        self.assertContains(response5, "FAQ: Экспорт «Очередные взносы (счета)»")
-
-    def test_index_contains_export_help_links(self):
-        """Главная страница экспортов содержит ссылки на FAQ по готовым экспортам"""
+    def test_index_contains_export_faq_modals(self):
+        """Главная страница экспортов содержит кнопки и модальные FAQ по готовым экспортам"""
         self.test_client.login(username="testuser", password="testpass123")
 
         response = self.test_client.get("/reports/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/reports/export/thursday/help/")
-        self.assertContains(response, "/reports/export/policy-expiration/help/")
-        self.assertContains(response, "/reports/export/payments/help/")
+        self.assertContains(response, 'data-bs-target="#policyExpirationFaqModal"')
+        self.assertContains(response, 'data-bs-target="#scheduledPaymentsFaqModal"')
+        self.assertContains(response, 'data-bs-target="#thursdayReportFaqModal"')
+        self.assertContains(response, 'id="policyExpirationFaqModal"')
+        self.assertContains(response, 'id="scheduledPaymentsFaqModal"')
+        self.assertContains(response, 'id="thursdayReportFaqModal"')

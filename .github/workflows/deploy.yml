@@ -10,6 +10,8 @@ on:
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
+  # Opt in to Node.js 24 for JavaScript actions to avoid Node 20 deprecation warnings.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   validate:
@@ -93,11 +95,31 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
+          set -euo pipefail
+
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${DROPLET_HOST:-}" ] || [ -z "${DROPLET_USER:-}" ]; then
+            echo "❌ Missing required deployment secrets (SSH_PRIVATE_KEY, DROPLET_HOST, DROPLET_USER)"
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H $DROPLET_HOST >> ~/.ssh/known_hosts
           echo "✅ SSH configured"
+
+      - name: Preflight SSH connectivity
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -o StrictHostKeyChecking=no \
+              "$DROPLET_USER@$DROPLET_HOST" \
+              "echo '✅ SSH connection established to $(hostname)'"
 
       - name: Copy files to server
         env:
@@ -318,7 +340,6 @@ jobs:
         run: |
           echo "❌ Deployment failed!"
           echo "Please check the logs above for details."
-          exit 1
 
   rollback:
     name: Rollback on Failure

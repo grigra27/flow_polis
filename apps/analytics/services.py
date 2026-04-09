@@ -1773,15 +1773,15 @@ class AnalyticsService:
             from django.utils import timezone
             import calendar
 
-            # Define the start date (October 2025) and end date (previous month)
-            start_date = datetime(2025, 10, 1).date()
+            # Define the start date (January 2026) and end date (previous month)
+            start_date = datetime(2026, 1, 1).date()
             current_date = datetime.now().date()
 
             # Get the first day of current month, then subtract 1 day to get last day of previous month
             first_day_current_month = current_date.replace(day=1)
             end_date = first_day_current_month - timedelta(days=1)
 
-            # If we're still before October 2025, return empty data
+            # If we're still before January 2026, return empty data
             if current_date < start_date:
                 return self._get_empty_financial_history()
 
@@ -1897,9 +1897,61 @@ class AnalyticsService:
             total_actual_commission = sum(
                 month["actual_commission"] for month in monthly_history
             )
+            total_planned_premium = sum(
+                month["planned_premium"] for month in monthly_history
+            )
+            total_planned_commission = sum(
+                month["planned_commission"] for month in monthly_history
+            )
             total_policies_created = sum(
                 month["policies_created"] for month in monthly_history
             )
+            total_payments_count = sum(
+                month["total_payments"] for month in monthly_history
+            )
+            total_paid_payments = sum(
+                month["paid_payments"] for month in monthly_history
+            )
+            total_overdue_payments = sum(
+                month["overdue_payments"] for month in monthly_history
+            )
+
+            # Plan vs fact deltas and collection rate
+            premium_deviation_amount = total_actual_premium - total_planned_premium
+            commission_deviation_amount = (
+                total_actual_commission - total_planned_commission
+            )
+
+            if total_planned_premium > 0:
+                premium_deviation_percent = (
+                    premium_deviation_amount / total_planned_premium
+                ) * Decimal("100")
+                collection_rate = (
+                    total_actual_premium / total_planned_premium
+                ) * Decimal("100")
+            else:
+                premium_deviation_percent = Decimal("0")
+                collection_rate = Decimal("0")
+
+            if total_planned_commission > 0:
+                commission_deviation_percent = (
+                    commission_deviation_amount / total_planned_commission
+                ) * Decimal("100")
+            else:
+                commission_deviation_percent = Decimal("0")
+
+            payment_realization_rate = Decimal("0")
+            if total_payments_count > 0:
+                payment_realization_rate = (
+                    Decimal(str(total_paid_payments))
+                    / Decimal(str(total_payments_count))
+                ) * Decimal("100")
+
+            average_paid_payment = Decimal("0")
+            if total_paid_payments > 0:
+                average_paid_payment = total_actual_premium / Decimal(
+                    str(total_paid_payments)
+                )
 
             # Calculate average monthly performance
             months_count = len(monthly_history)
@@ -1924,6 +1976,18 @@ class AnalyticsService:
                 "summary_metrics": {
                     "total_actual_premium": total_actual_premium,
                     "total_actual_commission": total_actual_commission,
+                    "total_planned_premium": total_planned_premium,
+                    "total_planned_commission": total_planned_commission,
+                    "premium_deviation_amount": premium_deviation_amount,
+                    "premium_deviation_percent": premium_deviation_percent,
+                    "commission_deviation_amount": commission_deviation_amount,
+                    "commission_deviation_percent": commission_deviation_percent,
+                    "collection_rate": collection_rate,
+                    "total_payments_count": total_payments_count,
+                    "total_paid_payments": total_paid_payments,
+                    "total_overdue_payments": total_overdue_payments,
+                    "payment_realization_rate": payment_realization_rate,
+                    "average_paid_payment": average_paid_payment,
                     "total_policies_created": total_policies_created,
                     "avg_monthly_premium": avg_monthly_premium,
                     "avg_monthly_commission": avg_monthly_commission,
@@ -2202,9 +2266,11 @@ class AnalyticsService:
                 start_date__gte=current_month, start_date__lte=month_end
             )
 
-            # Find top client by premium
+            paid_month_payments = month_payments.filter(paid_date__isnull=False)
+
+            # Find top client by paid premium
             top_client_data = (
-                month_payments.values("policy__client__client_name")
+                paid_month_payments.values("policy__client__client_name")
                 .annotate(total_premium=Sum("amount"))
                 .order_by("-total_premium")
                 .first()
@@ -2218,13 +2284,13 @@ class AnalyticsService:
                 .first()
             )
 
-            # Find largest single payment by insurance sum
-            largest_payment = month_payments.order_by("-insurance_sum").first()
+            # Find largest paid payment for the month
+            largest_payment = paid_month_payments.order_by("-amount").first()
 
             # Calculate month achievements
-            month_premium = month_payments.filter(paid_date__isnull=False).aggregate(
-                total=Sum("amount")
-            )["total"] or Decimal("0")
+            month_premium = paid_month_payments.aggregate(total=Sum("amount"))[
+                "total"
+            ] or Decimal("0")
 
             highlights.append(
                 {
@@ -2242,7 +2308,7 @@ class AnalyticsService:
                     "top_insurance_count": top_insurance_type["count"]
                     if top_insurance_type
                     else 0,
-                    "largest_policy_sum": largest_payment.insurance_sum
+                    "largest_policy_sum": largest_payment.amount
                     if largest_payment
                     else Decimal("0"),
                     "largest_policy_client": largest_payment.policy.client.client_name
@@ -2442,11 +2508,23 @@ class AnalyticsService:
             "summary_metrics": {
                 "total_actual_premium": Decimal("0"),
                 "total_actual_commission": Decimal("0"),
+                "total_planned_premium": Decimal("0"),
+                "total_planned_commission": Decimal("0"),
+                "premium_deviation_amount": Decimal("0"),
+                "premium_deviation_percent": Decimal("0"),
+                "commission_deviation_amount": Decimal("0"),
+                "commission_deviation_percent": Decimal("0"),
+                "collection_rate": Decimal("0"),
+                "total_payments_count": 0,
+                "total_paid_payments": 0,
+                "total_overdue_payments": 0,
+                "payment_realization_rate": Decimal("0"),
+                "average_paid_payment": Decimal("0"),
                 "total_policies_created": 0,
                 "avg_monthly_premium": Decimal("0"),
                 "avg_monthly_commission": Decimal("0"),
                 "months_analyzed": 0,
-                "period_start": datetime(2025, 10, 1).date(),
+                "period_start": datetime(2026, 1, 1).date(),
                 "period_end": datetime.now().date(),
             },
             "filter_applied": False,

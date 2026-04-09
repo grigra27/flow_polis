@@ -1840,11 +1840,11 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
 class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
     """
-    Financial history view displaying historical performance analysis.
+    Financial history view displaying actual historical financial performance.
 
-    Provides comprehensive analysis of completed periods starting from October 2025,
-    including fact vs forecast comparison, performance trends, monthly highlights,
-    problem areas analysis, and dimensional breakdowns.
+    Provides analysis of completed periods starting from January 2026 with focus on
+    paid payments, received premium/commission, monthly dynamics, risk signals and
+    dimensional breakdowns.
     """
 
     template_name = "analytics/financial_history.html"
@@ -1886,6 +1886,7 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
             problem_analysis = history_data.get("problem_analysis", {})
             dimensional_breakdown = history_data.get("dimensional_breakdown", {})
             summary_metrics = history_data.get("summary_metrics", {})
+            actual_insights = self._build_actual_insights(monthly_history)
 
             # Prepare chart data
             chart_data = self._prepare_history_chart_data(monthly_history)
@@ -1918,6 +1919,7 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
                     "summary_metrics": summary_metrics,
                     "quarterly_performance": quarterly_performance,
                     "trend_analysis": trend_analysis,
+                    "actual_insights": actual_insights,
                     "chart_data": chart_data,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
@@ -1951,11 +1953,42 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
                     "fact_vs_forecast": {},
                     "performance_trends": {},
                     "monthly_highlights": [],
-                    "problem_analysis": {},
-                    "dimensional_breakdown": {},
-                    "summary_metrics": {},
+                    "problem_analysis": {
+                        "monthly_problems": [],
+                        "total_overdue_amount": Decimal("0"),
+                        "total_overdue_count": 0,
+                        "problematic_clients": [],
+                        "average_monthly_overdue": Decimal("0"),
+                    },
+                    "dimensional_breakdown": {
+                        "branch_breakdown": [],
+                        "insurance_breakdown": [],
+                    },
+                    "summary_metrics": {
+                        "total_actual_premium": Decimal("0"),
+                        "total_actual_commission": Decimal("0"),
+                        "total_planned_premium": Decimal("0"),
+                        "total_planned_commission": Decimal("0"),
+                        "premium_deviation_amount": Decimal("0"),
+                        "premium_deviation_percent": Decimal("0"),
+                        "commission_deviation_amount": Decimal("0"),
+                        "commission_deviation_percent": Decimal("0"),
+                        "collection_rate": Decimal("0"),
+                        "total_payments_count": 0,
+                        "total_paid_payments": 0,
+                        "total_overdue_payments": 0,
+                        "payment_realization_rate": Decimal("0"),
+                        "average_paid_payment": Decimal("0"),
+                        "total_policies_created": 0,
+                        "avg_monthly_premium": Decimal("0"),
+                        "avg_monthly_commission": Decimal("0"),
+                        "months_analyzed": 0,
+                        "period_start": datetime(2026, 1, 1).date(),
+                        "period_end": datetime.now().date(),
+                    },
                     "quarterly_performance": {},
                     "trend_analysis": {},
+                    "actual_insights": {"insufficient_data": True},
                     "chart_data": "{}",
                     "branches": Branch.objects.none(),
                     "insurers": Insurer.objects.none(),
@@ -1995,22 +2028,28 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
                     "total_actual_commission": str(
                         history_data["summary_metrics"]["total_actual_commission"]
                     ),
+                    "total_payments_count": history_data["summary_metrics"].get(
+                        "total_payments_count", 0
+                    ),
+                    "total_paid_payments": history_data["summary_metrics"].get(
+                        "total_paid_payments", 0
+                    ),
+                    "total_overdue_payments": history_data["summary_metrics"].get(
+                        "total_overdue_payments", 0
+                    ),
+                    "payment_realization_rate": str(
+                        history_data["summary_metrics"].get(
+                            "payment_realization_rate", 0
+                        )
+                    ),
+                    "average_paid_payment": str(
+                        history_data["summary_metrics"].get("average_paid_payment", 0)
+                    ),
                     "total_policies_created": history_data["summary_metrics"][
                         "total_policies_created"
                     ],
                     "months_analyzed": history_data["summary_metrics"][
                         "months_analyzed"
-                    ],
-                },
-                "fact_vs_forecast": {
-                    "overall_premium_accuracy": str(
-                        history_data["fact_vs_forecast"]["overall_premium_accuracy"]
-                    ),
-                    "overall_commission_accuracy": str(
-                        history_data["fact_vs_forecast"]["overall_commission_accuracy"]
-                    ),
-                    "accuracy_trend": history_data["fact_vs_forecast"][
-                        "accuracy_trend"
                     ],
                 },
                 "filter_applied": history_data.get("filter_applied", False),
@@ -2146,17 +2185,13 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
             "actual_premium": [
                 float(month["actual_premium"]) for month in monthly_history
             ],
-            "planned_premium": [
-                float(month["planned_premium"]) for month in monthly_history
-            ],
             "actual_commission": [
                 float(month["actual_commission"]) for month in monthly_history
             ],
-            "planned_commission": [
-                float(month["planned_commission"]) for month in monthly_history
-            ],
-            "achievement_rates": [
-                float(month["premium_achievement"]) for month in monthly_history
+            "paid_payments": [month["paid_payments"] for month in monthly_history],
+            "total_payments": [month["total_payments"] for month in monthly_history],
+            "overdue_payments": [
+                month["overdue_payments"] for month in monthly_history
             ],
             "payment_discipline": [
                 float(month["payment_discipline"]) for month in monthly_history
@@ -2252,19 +2287,70 @@ class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):
             },
         }
 
+    def _build_actual_insights(self, monthly_history):
+        """Build concise insights focused on factual financial results."""
+        if not monthly_history:
+            return {"insufficient_data": True}
+
+        latest_month = monthly_history[-1]
+        previous_month = monthly_history[-2] if len(monthly_history) > 1 else None
+
+        def calculate_change(current_value, previous_value):
+            if previous_value and previous_value != Decimal("0"):
+                return ((current_value - previous_value) / previous_value) * Decimal(
+                    "100"
+                )
+            if current_value > 0:
+                return Decimal("100")
+            return Decimal("0")
+
+        premium_change_percent = Decimal("0")
+        commission_change_percent = Decimal("0")
+        discipline_change_pp = Decimal("0")
+
+        if previous_month:
+            premium_change_percent = calculate_change(
+                latest_month["actual_premium"], previous_month["actual_premium"]
+            )
+            commission_change_percent = calculate_change(
+                latest_month["actual_commission"], previous_month["actual_commission"]
+            )
+            discipline_change_pp = (
+                latest_month["payment_discipline"]
+                - previous_month["payment_discipline"]
+            )
+
+        best_month = max(monthly_history, key=lambda x: x["actual_premium"])
+        lowest_month = min(monthly_history, key=lambda x: x["actual_premium"])
+        best_discipline_month = max(
+            monthly_history, key=lambda x: x["payment_discipline"]
+        )
+
+        return {
+            "insufficient_data": False,
+            "latest_month": latest_month,
+            "previous_month": previous_month,
+            "premium_change_percent": premium_change_percent,
+            "commission_change_percent": commission_change_percent,
+            "discipline_change_pp": discipline_change_pp,
+            "best_month": best_month,
+            "lowest_month": lowest_month,
+            "best_discipline_month": best_discipline_month,
+        }
+
     def _generate_available_months(self):
         """Generate list of available months for filtering."""
         available_months = []
 
-        # Start from October 2025
-        start_date = datetime(2025, 10, 1).date()
+        # Start from January 2026
+        start_date = datetime(2026, 1, 1).date()
         current_date = datetime.now().date()
 
         # Get the first day of current month, then subtract 1 day to get last day of previous month
         first_day_current_month = current_date.replace(day=1)
         end_date = first_day_current_month - timedelta(days=1)
 
-        # If we're still before October 2025, return empty list
+        # If we're still before January 2026, return empty list
         if current_date < start_date:
             return available_months
 

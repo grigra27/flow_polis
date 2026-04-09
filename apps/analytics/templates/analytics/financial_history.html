@@ -13,744 +13,666 @@
 
 {% block extra_css %}
 <style>
-    .history-card {
-        background: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border-left: 4px solid #6c5ce7;
+    .financial-history-page {
+        --fh-bg: #f2f6fb;
+        --fh-surface: #ffffff;
+        --fh-border: #d7e3ef;
+        --fh-primary: #1f4e79;
+        --fh-primary-soft: #e8f1fb;
+        --fh-secondary: #1f7a5c;
+        --fh-warning: #a66b00;
+        --fh-danger: #b42318;
+        --fh-muted: #5f7489;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
     }
 
-    .history-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    .history-hero {
+        background: linear-gradient(120deg, #0d3b66 0%, #1f6f8b 55%, #8ab6d6 100%);
+        border-radius: 18px;
+        color: #fff;
+        padding: 1.6rem;
+        box-shadow: 0 12px 30px rgba(13, 59, 102, 0.2);
     }
 
-    .history-card.summary {
-        border-left-color: #6c5ce7;
+    .history-hero h1 {
+        letter-spacing: 0.2px;
     }
 
-    .history-card.performance {
-        border-left-color: #00b894;
+    .hero-description {
+        max-width: 760px;
+        opacity: 0.93;
     }
 
-    .history-card.problems {
-        border-left-color: #e17055;
-    }
-
-    .history-card.highlights {
-        border-left-color: #fdcb6e;
-    }
-
-    .timeline-container {
-        position: relative;
-        padding: 1rem 0;
-    }
-
-    .timeline-item {
-        position: relative;
-        padding: 1rem 0 1rem 3rem;
-        border-left: 2px solid #e9ecef;
-    }
-
-    .timeline-item:last-child {
-        border-left: none;
-    }
-
-    .timeline-marker {
-        position: absolute;
-        left: -8px;
-        top: 1.5rem;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #6c5ce7;
-        border: 3px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .timeline-marker.success {
-        background: #00b894;
-    }
-
-    .timeline-marker.warning {
-        background: #fdcb6e;
-    }
-
-    .timeline-marker.danger {
-        background: #e17055;
-    }
-
-    .month-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-
-    .month-card:hover {
-        background: white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-
-    .achievement-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: bold;
-    }
-
-    .achievement-excellent {
-        background: linear-gradient(135deg, #00b894 0%, #55efc4 100%);
-        color: white;
-    }
-
-    .achievement-good {
-        background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
-        color: white;
-    }
-
-    .achievement-average {
-        background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
-        color: white;
-    }
-
-    .achievement-poor {
-        background: linear-gradient(135deg, #d63031 0%, #e84393 100%);
-        color: white;
-    }
-
-    .metric-comparison {
-        display: flex;
-        justify-content: space-between;
+    .period-pill {
+        display: inline-flex;
         align-items: center;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    .metric-comparison:last-child {
-        border-bottom: none;
-    }
-
-    .trend-indicator {
+        gap: 0.4rem;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        background: rgba(255, 255, 255, 0.12);
         font-size: 0.9rem;
-        font-weight: bold;
-    }
-
-    .trend-up {
-        color: #00b894;
-    }
-
-    .trend-down {
-        color: #e17055;
-    }
-
-    .trend-stable {
-        color: #6c757d;
-    }
-
-    .chart-container {
-        background: white;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
     .filter-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        border: 1px solid #e9ecef;
+        background: var(--fh-surface);
+        border-radius: 14px;
+        border: 1px solid var(--fh-border);
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 3px 10px rgba(15, 41, 69, 0.06);
     }
 
     .filter-applied-badge {
-        background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.75rem;
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .metric-card {
+        background: var(--fh-surface);
+        border: 1px solid var(--fh-border);
+        border-radius: 14px;
+        padding: 1.15rem;
+        box-shadow: 0 2px 12px rgba(15, 41, 69, 0.06);
+        height: 100%;
+    }
+
+    .metric-label {
+        color: var(--fh-muted);
+        font-size: 0.84rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .metric-value {
+        margin-bottom: 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #12263a;
+    }
+
+    .metric-note {
+        margin-top: 0.45rem;
+        color: var(--fh-muted);
+        font-size: 0.82rem;
+    }
+
+    .analytics-card {
+        background: var(--fh-surface);
+        border: 1px solid var(--fh-border);
+        border-radius: 14px;
+        padding: 1.2rem;
+        box-shadow: 0 3px 12px rgba(15, 41, 69, 0.06);
+        margin-bottom: 1.2rem;
+    }
+
+    .analytics-card h5 {
+        color: var(--fh-primary);
+        margin-bottom: 0.95rem;
+    }
+
+    .history-table thead th {
+        border-bottom: 1px solid #d5e2ef;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #49657f;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .history-table tbody td {
+        vertical-align: middle;
         font-size: 0.9rem;
-        margin-left: 1rem;
+        color: #1c2f42;
     }
 
-    .problem-item {
-        background: #fff5f5;
-        border: 1px solid #fed7d7;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
+    .history-table tbody tr {
+        border-bottom: 1px solid #eef3f8;
     }
 
-    .highlight-item {
-        background: #fffbf0;
-        border: 1px solid #feebc8;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
+    .history-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .mini-stat {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.65rem 0;
+        border-bottom: 1px dashed #d9e3ed;
+    }
+
+    .mini-stat:last-child {
+        border-bottom: none;
+    }
+
+    .mini-stat .label {
+        color: var(--fh-muted);
+        font-size: 0.84rem;
+    }
+
+    .mini-stat .value {
+        font-weight: 600;
+        color: #15354f;
+        text-align: right;
+    }
+
+    .delta-up {
+        color: var(--fh-secondary);
+        font-weight: 600;
+    }
+
+    .delta-down {
+        color: var(--fh-danger);
+        font-weight: 600;
     }
 
     .dimensional-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #6c5ce7;
-    }
-
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .loading-spinner {
-        background: white;
-        padding: 2rem;
+        gap: 0.75rem;
+        background: var(--fh-bg);
         border-radius: 10px;
-        text-align: center;
+        border: 1px solid #e2ebf4;
+        padding: 0.7rem;
+        margin-bottom: 0.55rem;
     }
 
-    @media (max-width: 768px) {
-        .timeline-item {
-            padding-left: 2rem;
+    .event-item {
+        background: #f7fbff;
+        border: 1px solid #ddebf8;
+        border-radius: 10px;
+        padding: 0.75rem;
+        margin-bottom: 0.55rem;
+    }
+
+    .event-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .event-title {
+        color: #1b4965;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .chart-box {
+        position: relative;
+        min-height: 320px;
+    }
+
+    @media (max-width: 991px) {
+        .chart-box {
+            min-height: 280px;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .history-hero {
+            padding: 1.2rem;
         }
 
-        .metric-comparison {
-            flex-direction: column;
-            align-items: flex-start;
+        .metric-value {
+            font-size: 1.15rem;
+        }
+
+        .history-table thead {
+            display: none;
+        }
+
+        .history-table tbody tr,
+        .history-table tbody td {
+            display: block;
+            width: 100%;
+        }
+
+        .history-table tbody tr {
+            padding: 0.65rem 0;
+        }
+
+        .history-table tbody td {
+            padding: 0.2rem 0;
+            border: none;
+        }
+
+        .history-table tbody td::before {
+            content: attr(data-label) ": ";
+            font-weight: 600;
+            color: #3d5974;
         }
     }
 </style>
 {% endblock %}
 
 {% block analytics_content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h2 mb-0">
-        <i class="bi bi-clock-history text-primary"></i>
-        Финансовая история
-        {% if filter_applied %}
-            <span class="filter-applied-badge">
-                <i class="bi bi-funnel-fill"></i> Фильтры применены
-            </span>
-        {% endif %}
-    </h1>
-    <div class="d-flex align-items-center">
-        <div class="text-muted me-3">
-            <i class="bi bi-calendar-range"></i>
-            Октябрь 2025 - {{ summary_metrics.period_end|date:"M Y" }}
-        </div>
-        <button class="btn btn-success" onclick="exportData()">
-            <i class="fas fa-download me-1"></i>
-            Экспорт
-        </button>
-    </div>
-</div>
-
-<!-- Filters Section -->
-<div class="filter-card">
-    <h5 class="mb-3">
-        <i class="bi bi-funnel"></i>
-        Фильтры
-    </h5>
-    <form id="filterForm" method="get">
-        <div class="row">
-            <div class="col-md-3 mb-3">
-                <label for="branches" class="form-label">Филиалы:</label>
-                <select class="form-select" id="branches" name="branches" multiple>
-                    {% for branch in branches %}
-                        <option value="{{ branch.id }}"
-                                {% if current_filter and branch.id in current_filter.branch_ids %}selected{% endif %}>
-                            {{ branch.branch_name }}
-                        </option>
-                    {% endfor %}
-                </select>
+<div class="financial-history-page">
+    <div class="history-hero mb-4">
+        <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+            <div>
+                <h1 class="h2 mb-2">
+                    <i class="bi bi-clock-history"></i>
+                    Финансовая история
+                </h1>
+                <p class="hero-description mb-0">
+                    Отчет показывает только фактические финансовые результаты: оплаченные платежи и реально полученные деньги по завершенным месяцам.
+                </p>
+                {% if filter_applied %}
+                    <span class="filter-applied-badge">
+                        <i class="bi bi-funnel-fill"></i> Фильтры применены
+                    </span>
+                {% endif %}
             </div>
-            <div class="col-md-3 mb-3">
-                <label for="insurers" class="form-label">Страховщики:</label>
-                <select class="form-select" id="insurers" name="insurers" multiple>
-                    {% for insurer in insurers %}
-                        <option value="{{ insurer.id }}"
-                                {% if current_filter and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
-                            {{ insurer.insurer_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="target_month" class="form-label">Месяц:</label>
-                <select class="form-select" id="target_month" name="target_month">
-                    <option value="">Все месяцы</option>
-                    {% for month_data in available_months %}
-                        <option value="{{ month_data.value }}"
-                                {% if current_filter and current_filter.target_month == month_data.value %}selected{% endif %}>
-                            {{ month_data.label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="clients" class="form-label">Клиенты (топ 100):</label>
-                <select class="form-select" id="clients" name="clients" multiple>
-                    {% for client in clients %}
-                        <option value="{{ client.id }}"
-                                {% if current_filter and client.id in current_filter.client_ids %}selected{% endif %}>
-                            {{ client.client_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary me-2">
-                    <i class="bi bi-search"></i>
-                    Применить фильтры
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="clearFilters">
-                    <i class="bi bi-x-circle"></i>
-                    Сбросить
+            <div class="d-flex flex-column align-items-start align-items-lg-end gap-2">
+                <span class="period-pill">
+                    <i class="bi bi-calendar-range"></i>
+                    Январь 2026 - {{ summary_metrics.period_end|date:"M Y" }}
+                </span>
+                <button class="btn btn-success" onclick="exportData(this)">
+                    <i class="fas fa-download me-1"></i>
+                    Экспорт
                 </button>
             </div>
         </div>
-    </form>
-</div>
+    </div>
 
-<!-- Summary Cards -->
-<div class="row mb-4">
-    <div class="col-lg-3 col-md-6">
-        <div class="history-card summary">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h6 class="text-muted mb-1">Общая премия</h6>
-                    <h4 class="mb-0">{{ summary_metrics.total_actual_premium|currency }}</h4>
+    <div class="filter-card">
+        <h5 class="mb-3">
+            <i class="bi bi-funnel"></i>
+            Фильтры
+        </h5>
+        <form id="filterForm" method="get">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label for="branches" class="form-label">Филиалы:</label>
+                    <select class="form-select" id="branches" name="branches" multiple>
+                        {% for branch in branches %}
+                            <option value="{{ branch.id }}"
+                                    {% if current_filter and branch.id in current_filter.branch_ids %}selected{% endif %}>
+                                {{ branch.branch_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="text-primary">
-                    <i class="bi bi-cash-stack fs-2"></i>
+                <div class="col-md-3 mb-3">
+                    <label for="insurers" class="form-label">Страховщики:</label>
+                    <select class="form-select" id="insurers" name="insurers" multiple>
+                        {% for insurer in insurers %}
+                            <option value="{{ insurer.id }}"
+                                    {% if current_filter and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
+                                {{ insurer.insurer_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="target_month" class="form-label">Месяц:</label>
+                    <select class="form-select" id="target_month" name="target_month">
+                        <option value="">Все месяцы</option>
+                        {% for month_data in available_months %}
+                            <option value="{{ month_data.value }}"
+                                    {% if current_filter and current_filter.target_month == month_data.value %}selected{% endif %}>
+                                {{ month_data.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="clients" class="form-label">Клиенты (топ 100):</label>
+                    <select class="form-select" id="clients" name="clients" multiple>
+                        {% for client in clients %}
+                            <option value="{{ client.id }}"
+                                    {% if current_filter and client.id in current_filter.client_ids %}selected{% endif %}>
+                                {{ client.client_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="history-card summary">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h6 class="text-muted mb-1">Общая комиссия</h6>
-                    <h4 class="mb-0">{{ summary_metrics.total_actual_commission|currency }}</h4>
-                </div>
-                <div class="text-success">
-                    <i class="bi bi-piggy-bank fs-2"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="history-card summary">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h6 class="text-muted mb-1">Полисов создано</h6>
-                    <h4 class="mb-0">{{ summary_metrics.total_policies_created }}</h4>
-                </div>
-                <div class="text-info">
-                    <i class="bi bi-file-earmark-text fs-2"></i>
+            <div class="row">
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-search"></i>
+                        Применить фильтры
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="clearFilters">
+                        <i class="bi bi-x-circle"></i>
+                        Сбросить
+                    </button>
                 </div>
             </div>
-        </div>
+        </form>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="history-card summary">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h6 class="text-muted mb-1">Месяцев проанализировано</h6>
-                    <h4 class="mb-0">{{ summary_metrics.months_analyzed }}</h4>
-                </div>
-                <div class="text-warning">
-                    <i class="bi bi-calendar-check fs-2"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Main Content Row -->
-<div class="row">
-    <!-- Left Column: Charts and Timeline -->
-    <div class="col-lg-8">
-        <!-- Performance Chart -->
-        <div class="history-card performance mb-3">
-            <h5 class="mb-3">
-                <i class="bi bi-graph-up"></i>
-                Динамика выполнения
-            </h5>
-            <div class="chart-container">
-                <canvas id="performanceChart" width="800" height="400"></canvas>
+    <div class="row g-3 mb-4">
+        <div class="col-xxl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Получено премии</div>
+                <h4 class="metric-value">{{ summary_metrics.total_actual_premium|currency }}</h4>
+                <div class="metric-note">За весь выбранный период</div>
+            </div>
+        </div>
+        <div class="col-xxl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Получено комиссии</div>
+                <h4 class="metric-value">{{ summary_metrics.total_actual_commission|currency }}</h4>
+                <div class="metric-note">Реально начисленная комиссия</div>
+            </div>
+        </div>
+        <div class="col-xxl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Оплаченные платежи</div>
+                <h4 class="metric-value">{{ summary_metrics.total_paid_payments }} / {{ summary_metrics.total_payments_count }}</h4>
+                <div class="metric-note">Доля оплат: {{ summary_metrics.payment_realization_rate|floatformat:1 }}%</div>
+            </div>
+        </div>
+        <div class="col-xxl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Средний оплаченный платеж</div>
+                <h4 class="metric-value">{{ summary_metrics.average_paid_payment|currency }}</h4>
+                <div class="metric-note">Считается только по фактически оплаченным платежам</div>
+            </div>
+        </div>
+        <div class="col-xxl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Просроченные платежи</div>
+                <h4 class="metric-value">{{ summary_metrics.total_overdue_payments }}</h4>
+                <div class="metric-note text-danger">На сумму {{ problem_analysis.total_overdue_amount|currency }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-8">
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-graph-up-arrow"></i>
+                    Динамика фактических поступлений
+                </h5>
+                <div class="chart-box">
+                    <canvas id="financialFlowChart"></canvas>
+                </div>
+            </div>
+
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-bar-chart-steps"></i>
+                    Статус платежей по месяцам
+                </h5>
+                <div class="chart-box">
+                    <canvas id="paymentStatusChart"></canvas>
+                </div>
+            </div>
+
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-table"></i>
+                    Помесячная фактическая детализация
+                </h5>
+                <div class="table-responsive">
+                    <table class="table history-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Месяц</th>
+                                <th>Премия</th>
+                                <th>Комиссия</th>
+                                <th>Оплачено</th>
+                                <th>Дисциплина</th>
+                                <th>Просрочка</th>
+                                <th>Полисов</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for month in monthly_history %}
+                                <tr>
+                                    <td data-label="Месяц"><strong>{{ month.month_name }} {{ month.year }}</strong></td>
+                                    <td data-label="Премия">{{ month.actual_premium|currency }}</td>
+                                    <td data-label="Комиссия">{{ month.actual_commission|currency }}</td>
+                                    <td data-label="Оплачено">{{ month.paid_payments }} / {{ month.total_payments }}</td>
+                                    <td data-label="Дисциплина">
+                                        {% if month.payment_discipline >= 90 %}
+                                            <span class="badge text-bg-success">{{ month.payment_discipline|floatformat:1 }}%</span>
+                                        {% elif month.payment_discipline >= 70 %}
+                                            <span class="badge text-bg-warning">{{ month.payment_discipline|floatformat:1 }}%</span>
+                                        {% else %}
+                                            <span class="badge text-bg-danger">{{ month.payment_discipline|floatformat:1 }}%</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-label="Просрочка">{{ month.overdue_payments }}</td>
+                                    <td data-label="Полисов">{{ month.policies_created }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="bi bi-calendar-x fs-4 d-block mb-2"></i>
+                                        Нет фактических данных за выбранный период
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- Monthly Timeline -->
-        <div class="history-card highlights">
-            <h5 class="mb-3">
-                <i class="bi bi-clock"></i>
-                Временная шкала
-            </h5>
-            <div class="timeline-container">
-                {% for month in monthly_history %}
-                <div class="timeline-item">
-                    <div class="timeline-marker
-                        {% if month.premium_achievement >= 100 %}success
-                        {% elif month.premium_achievement >= 80 %}warning
-                        {% else %}danger{% endif %}">
+        <div class="col-xl-4">
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-clipboard-data"></i>
+                    Сводка периода
+                </h5>
+                <div class="mini-stat">
+                    <div class="label">Период анализа</div>
+                    <div class="value">{{ summary_metrics.period_start|date:"d.m.Y" }} - {{ summary_metrics.period_end|date:"d.m.Y" }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Месяцев проанализировано</div>
+                    <div class="value">{{ summary_metrics.months_analyzed }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Полисов создано</div>
+                    <div class="value">{{ summary_metrics.total_policies_created }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Средняя премия в месяц</div>
+                    <div class="value">{{ summary_metrics.avg_monthly_premium|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Средняя комиссия в месяц</div>
+                    <div class="value">{{ summary_metrics.avg_monthly_commission|currency }}</div>
+                </div>
+            </div>
+
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-activity"></i>
+                    Динамика последних месяцев
+                </h5>
+                {% if not actual_insights.insufficient_data %}
+                    <div class="mini-stat">
+                        <div class="label">Последний месяц в выборке</div>
+                        <div class="value">{{ actual_insights.latest_month.month_name }} {{ actual_insights.latest_month.year }}</div>
                     </div>
-                    <div class="month-card">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="mb-0">{{ month.month_name }} {{ month.year }}</h6>
-                            <span class="achievement-badge
-                                {% if month.premium_achievement >= 100 %}achievement-excellent
-                                {% elif month.premium_achievement >= 80 %}achievement-good
-                                {% elif month.premium_achievement >= 60 %}achievement-average
-                                {% else %}achievement-poor{% endif %}">
-                                {{ month.premium_achievement|floatformat:0 }}%
-                            </span>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <small class="text-muted">Премия:</small>
-                                <div>{{ month.actual_premium|currency }} / {{ month.planned_premium|currency }}</div>
-                            </div>
-                            <div class="col-md-6">
-                                <small class="text-muted">Комиссия:</small>
-                                <div>{{ month.actual_commission|currency }} / {{ month.planned_commission|currency }}</div>
+                    {% if actual_insights.previous_month %}
+                        <div class="mini-stat">
+                            <div class="label">Изменение премии к пред. месяцу</div>
+                            <div class="value {% if actual_insights.premium_change_percent >= 0 %}delta-up{% else %}delta-down{% endif %}">
+                                {% if actual_insights.premium_change_percent > 0 %}+{% endif %}{{ actual_insights.premium_change_percent|floatformat:1 }}%
                             </div>
                         </div>
-                        <div class="row mt-2">
-                            <div class="col-md-6">
-                                <small class="text-muted">Полисов создано:</small>
-                                <div>{{ month.policies_created }}</div>
-                            </div>
-                            <div class="col-md-6">
-                                <small class="text-muted">Дисциплина платежей:</small>
-                                <div>{{ month.payment_discipline|floatformat:1 }}%</div>
+                        <div class="mini-stat">
+                            <div class="label">Изменение комиссии к пред. месяцу</div>
+                            <div class="value {% if actual_insights.commission_change_percent >= 0 %}delta-up{% else %}delta-down{% endif %}">
+                                {% if actual_insights.commission_change_percent > 0 %}+{% endif %}{{ actual_insights.commission_change_percent|floatformat:1 }}%
                             </div>
                         </div>
+                        <div class="mini-stat">
+                            <div class="label">Изменение дисциплины оплат</div>
+                            <div class="value {% if actual_insights.discipline_change_pp >= 0 %}delta-up{% else %}delta-down{% endif %}">
+                                {% if actual_insights.discipline_change_pp > 0 %}+{% endif %}{{ actual_insights.discipline_change_pp|floatformat:1 }} п.п.
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="mini-stat">
+                        <div class="label">Самый сильный месяц по премии</div>
+                        <div class="value">{{ actual_insights.best_month.month_name }} {{ actual_insights.best_month.year }}</div>
                     </div>
-                </div>
-                {% empty %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-calendar-x fs-1"></i>
-                    <p class="mt-2">Нет данных за указанный период</p>
-                </div>
-                {% endfor %}
+                    <div class="mini-stat">
+                        <div class="label">Самый слабый месяц по премии</div>
+                        <div class="value">{{ actual_insights.lowest_month.month_name }} {{ actual_insights.lowest_month.year }}</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="label">Лучшая дисциплина оплат</div>
+                        <div class="value">{{ actual_insights.best_discipline_month.month_name }} {{ actual_insights.best_discipline_month.year }}</div>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Недостаточно данных для анализа динамики.</p>
+                {% endif %}
             </div>
-        </div>
-    </div>
 
-    <!-- Right Column: Analysis Blocks -->
-    <div class="col-lg-4">
-        <!-- Fact vs Forecast Analysis -->
-        <div class="history-card performance mb-3">
-            <h5 class="mb-3">
-                <i class="bi bi-bullseye"></i>
-                Факт vs Прогноз
-            </h5>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Точность по премиям:</strong>
-                    <div class="text-muted">Общая точность прогнозов</div>
+            <div class="analytics-card">
+                <h5>
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Риски по просрочке
+                </h5>
+                <div class="mini-stat">
+                    <div class="label">Всего просроченных платежей</div>
+                    <div class="value">{{ problem_analysis.total_overdue_count }}</div>
                 </div>
-                <div class="text-end">
-                    <span class="{% if fact_vs_forecast.overall_premium_accuracy >= 90 %}text-success{% elif fact_vs_forecast.overall_premium_accuracy >= 70 %}text-warning{% else %}text-danger{% endif %}">
-                        {{ fact_vs_forecast.overall_premium_accuracy|floatformat:1 }}%
-                    </span>
+                <div class="mini-stat">
+                    <div class="label">Сумма просрочки</div>
+                    <div class="value text-danger">{{ problem_analysis.total_overdue_amount|currency }}</div>
                 </div>
+                <div class="mini-stat">
+                    <div class="label">Средняя просрочка в месяц</div>
+                    <div class="value">{{ problem_analysis.average_monthly_overdue|currency }}</div>
+                </div>
+                {% if problem_analysis.problematic_clients %}
+                    <div class="mt-2">
+                        {% for client in problem_analysis.problematic_clients|slice:":3" %}
+                            <div class="event-item">
+                                <div class="event-title">{{ client.policy__client__client_name }}</div>
+                                <div class="small text-danger">{{ client.total_overdue|currency }} ({{ client.overdue_count }} платежей)</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Точность по комиссиям:</strong>
-                    <div class="text-muted">Общая точность прогнозов</div>
-                </div>
-                <div class="text-end">
-                    <span class="{% if fact_vs_forecast.overall_commission_accuracy >= 90 %}text-success{% elif fact_vs_forecast.overall_commission_accuracy >= 70 %}text-warning{% else %}text-danger{% endif %}">
-                        {{ fact_vs_forecast.overall_commission_accuracy|floatformat:1 }}%
-                    </span>
-                </div>
-            </div>
-            {% if fact_vs_forecast.best_month %}
-            <div class="metric-comparison">
-                <div>
-                    <strong>Лучший месяц:</strong>
-                    <div class="text-muted">{{ fact_vs_forecast.best_month.month_name }} {{ fact_vs_forecast.best_month.year }}</div>
-                </div>
-                <div class="text-end text-success">
-                    {{ fact_vs_forecast.best_month.premium_achievement|floatformat:0 }}%
-                </div>
-            </div>
-            {% endif %}
-            {% if fact_vs_forecast.worst_month %}
-            <div class="metric-comparison">
-                <div>
-                    <strong>Худший месяц:</strong>
-                    <div class="text-muted">{{ fact_vs_forecast.worst_month.month_name }} {{ fact_vs_forecast.worst_month.year }}</div>
-                </div>
-                <div class="text-end text-danger">
-                    {{ fact_vs_forecast.worst_month.premium_achievement|floatformat:0 }}%
-                </div>
-            </div>
-            {% endif %}
-        </div>
 
-        <!-- Performance Trends -->
-        <div class="history-card performance mb-3">
-            <h5 class="mb-3">
-                <i class="bi bi-trending-up"></i>
-                Тренды производительности
-            </h5>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Тренд премий:</strong>
-                </div>
-                <div class="trend-indicator
-                    {% if performance_trends.premium_trend == 'growing' %}trend-up
-                    {% elif performance_trends.premium_trend == 'declining' %}trend-down
-                    {% else %}trend-stable{% endif %}">
-                    {% if performance_trends.premium_trend == 'growing' %}
-                        <i class="bi bi-arrow-up"></i> Рост
-                    {% elif performance_trends.premium_trend == 'declining' %}
-                        <i class="bi bi-arrow-down"></i> Снижение
-                    {% else %}
-                        <i class="bi bi-dash"></i> Стабильно
+            {% if dimensional_breakdown.branch_breakdown or dimensional_breakdown.insurance_breakdown %}
+                <div class="analytics-card">
+                    <h5>
+                        <i class="bi bi-pie-chart"></i>
+                        Структура фактических поступлений
+                    </h5>
+                    {% if dimensional_breakdown.branch_breakdown %}
+                        <div class="text-muted small mb-2">Топ филиалов</div>
+                        {% for branch in dimensional_breakdown.branch_breakdown|slice:":3" %}
+                            <div class="dimensional-item">
+                                <div>
+                                    <strong>{{ branch.name }}</strong>
+                                    <div class="small text-muted">{{ branch.policy_count }} полисов</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-semibold">{{ branch.premium|currency }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if dimensional_breakdown.insurance_breakdown %}
+                        <div class="text-muted small mb-2 mt-2">Топ видов страхования</div>
+                        {% for insurance in dimensional_breakdown.insurance_breakdown|slice:":3" %}
+                            <div class="dimensional-item">
+                                <div>
+                                    <strong>{{ insurance.name }}</strong>
+                                    <div class="small text-muted">{{ insurance.policy_count }} полисов</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-semibold">{{ insurance.premium|currency }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
                     {% endif %}
                 </div>
-            </div>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Тренд комиссий:</strong>
-                </div>
-                <div class="trend-indicator
-                    {% if performance_trends.commission_trend == 'growing' %}trend-up
-                    {% elif performance_trends.commission_trend == 'declining' %}trend-down
-                    {% else %}trend-stable{% endif %}">
-                    {% if performance_trends.commission_trend == 'growing' %}
-                        <i class="bi bi-arrow-up"></i> Рост
-                    {% elif performance_trends.commission_trend == 'declining' %}
-                        <i class="bi bi-arrow-down"></i> Снижение
-                    {% else %}
-                        <i class="bi bi-dash"></i> Стабильно
-                    {% endif %}
-                </div>
-            </div>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Общий рост:</strong>
-                    <div class="text-muted">За весь период</div>
-                </div>
-                <div class="text-end">
-                    <span class="{% if performance_trends.growth_rate > 0 %}text-success{% elif performance_trends.growth_rate < 0 %}text-danger{% else %}text-muted{% endif %}">
-                        {% if performance_trends.growth_rate > 0 %}+{% endif %}{{ performance_trends.growth_rate|floatformat:1 }}%
-                    </span>
-                </div>
-            </div>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Волатильность:</strong>
-                    <div class="text-muted">Коэффициент вариации</div>
-                </div>
-                <div class="text-end">
-                    <span class="{% if performance_trends.volatility < 20 %}text-success{% elif performance_trends.volatility < 40 %}text-warning{% else %}text-danger{% endif %}">
-                        {{ performance_trends.volatility|floatformat:1 }}%
-                    </span>
-                </div>
-            </div>
-        </div>
+            {% endif %}
 
-        <!-- Problem Areas -->
-        {% if problem_analysis.total_overdue_count > 0 %}
-        <div class="history-card problems mb-3">
-            <h5 class="mb-3">
-                <i class="bi bi-exclamation-triangle"></i>
-                Проблемные зоны
-            </h5>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Общая просрочка:</strong>
-                    <div class="text-muted">{{ problem_analysis.total_overdue_count }} платежей</div>
+            {% if monthly_highlights %}
+                <div class="analytics-card">
+                    <h5>
+                        <i class="bi bi-stars"></i>
+                        Фактические события периода
+                    </h5>
+                    {% for highlight in monthly_highlights|slice:":3" %}
+                        <div class="event-item">
+                            <div class="event-title">{{ highlight.month_name }} {{ highlight.month.year }}</div>
+                            <div class="small text-muted">Топ клиент: {{ highlight.top_client }}</div>
+                            <div class="small text-muted">Премия клиента: {{ highlight.top_client_premium|currency }}</div>
+                            <div class="small text-muted">Крупнейший оплаченный платеж: {{ highlight.largest_policy_sum|currency }}</div>
+                        </div>
+                    {% endfor %}
                 </div>
-                <div class="text-end text-danger">
-                    {{ problem_analysis.total_overdue_amount|currency }}
-                </div>
-            </div>
-            <div class="metric-comparison">
-                <div>
-                    <strong>Средняя просрочка в месяц:</strong>
-                </div>
-                <div class="text-end text-warning">
-                    {{ problem_analysis.average_monthly_overdue|currency }}
-                </div>
-            </div>
-            {% if problem_analysis.problematic_clients %}
-            <div class="mt-3">
-                <small class="text-muted">Проблемные клиенты:</small>
-                {% for client in problem_analysis.problematic_clients|slice:":3" %}
-                <div class="problem-item">
-                    <strong>{{ client.policy__client__client_name }}</strong>
-                    <div class="text-danger">{{ client.total_overdue|currency }} ({{ client.overdue_count }} платежей)</div>
-                </div>
-                {% endfor %}
-            </div>
             {% endif %}
         </div>
-        {% endif %}
-
-        <!-- Monthly Highlights -->
-        {% if monthly_highlights %}
-        <div class="history-card highlights">
-            <h5 class="mb-3">
-                <i class="bi bi-star"></i>
-                Ключевые события
-            </h5>
-            {% for highlight in monthly_highlights|slice:":3" %}
-            <div class="highlight-item">
-                <strong>{{ highlight.month_name }} {{ highlight.month.year }}</strong>
-                <div class="small text-muted mt-1">
-                    <div>Топ клиент: {{ highlight.top_client }} ({{ highlight.top_client_premium|currency }})</div>
-                    <div>Популярный тип: {{ highlight.top_insurance_type }} ({{ highlight.top_insurance_count }} полисов)</div>
-                    {% if highlight.largest_policy_sum > 0 %}
-                    <div>Крупнейший полис: {{ highlight.largest_policy_sum|currency }}</div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Dimensional Breakdown -->
-{% if dimensional_breakdown.branch_breakdown or dimensional_breakdown.insurance_breakdown %}
-<div class="row mt-4">
-    {% if dimensional_breakdown.branch_breakdown %}
-    <div class="col-lg-6">
-        <div class="history-card">
-            <h5 class="mb-3">
-                <i class="bi bi-building"></i>
-                Разбивка по филиалам
-            </h5>
-            {% for branch in dimensional_breakdown.branch_breakdown|slice:":5" %}
-            <div class="dimensional-item">
-                <div>
-                    <strong>{{ branch.name }}</strong>
-                    <div class="small text-muted">{{ branch.policy_count }} полисов</div>
-                </div>
-                <div class="text-end">
-                    <div class="fw-bold">{{ branch.premium|currency }}</div>
-                    <div class="small text-muted">{{ branch.commission|currency }}</div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    {% if dimensional_breakdown.insurance_breakdown %}
-    <div class="col-lg-6">
-        <div class="history-card">
-            <h5 class="mb-3">
-                <i class="bi bi-shield-check"></i>
-                Разбивка по видам страхования
-            </h5>
-            {% for insurance in dimensional_breakdown.insurance_breakdown|slice:":5" %}
-            <div class="dimensional-item">
-                <div>
-                    <strong>{{ insurance.name }}</strong>
-                    <div class="small text-muted">{{ insurance.policy_count }} полисов</div>
-                </div>
-                <div class="text-end">
-                    <div class="fw-bold">{{ insurance.premium|currency }}</div>
-                    <div class="small text-muted">{{ insurance.commission|currency }}</div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-</div>
-{% endif %}
-
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-spinner">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Загрузка...</span>
-        </div>
-        <div class="mt-2">Обновление исторических данных...</div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize charts
     initializeCharts();
 
-    // Clear filters button
     document.getElementById('clearFilters').addEventListener('click', function() {
         window.location.href = window.location.pathname;
     });
 });
 
 function initializeCharts() {
-    // Performance Chart
-    const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-
-    // Get data from template context
     const chartData = JSON.parse('{{ chart_data|escapejs }}' || '{}');
 
-    if (chartData.labels && chartData.labels.length > 0) {
-        new Chart(performanceCtx, {
+    if (!chartData.labels || chartData.labels.length === 0) {
+        return;
+    }
+
+    const flowCanvas = document.getElementById('financialFlowChart');
+    if (flowCanvas) {
+        const flowCtx = flowCanvas.getContext('2d');
+        new Chart(flowCtx, {
             type: 'line',
             data: {
                 labels: chartData.labels,
-                datasets: [{
-                    label: 'Факт премии (₽)',
-                    data: chartData.actual_premium,
-                    borderColor: 'rgba(108, 92, 231, 1)',
-                    backgroundColor: 'rgba(108, 92, 231, 0.1)',
-                    tension: 0.4,
-                    fill: false
-                }, {
-                    label: 'План премии (₽)',
-                    data: chartData.planned_premium,
-                    borderColor: 'rgba(108, 92, 231, 0.5)',
-                    backgroundColor: 'rgba(108, 92, 231, 0.05)',
-                    tension: 0.4,
-                    fill: false,
-                    borderDash: [5, 5]
-                }, {
-                    label: 'Выполнение плана (%)',
-                    data: chartData.achievement_rates,
-                    borderColor: 'rgba(0, 184, 148, 1)',
-                    backgroundColor: 'rgba(0, 184, 148, 0.1)',
-                    tension: 0.4,
-                    fill: false,
-                    yAxisID: 'y1'
-                }]
+                datasets: [
+                    {
+                        label: 'Полученная премия (₽)',
+                        data: chartData.actual_premium,
+                        borderColor: 'rgba(31, 78, 121, 1)',
+                        backgroundColor: 'rgba(31, 78, 121, 0.08)',
+                        tension: 0.32,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Полученная комиссия (₽)',
+                        data: chartData.actual_commission,
+                        borderColor: 'rgba(31, 122, 92, 1)',
+                        backgroundColor: 'rgba(31, 122, 92, 0.08)',
+                        tension: 0.32,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 5
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -761,43 +683,63 @@ function initializeCharts() {
                 },
                 scales: {
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
                                 return value.toLocaleString('ru-RU') + ' ₽';
                             }
                         }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        beginAtZero: true,
-                        max: 150,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
-                        grid: {
-                            drawOnChartArea: false,
-                        },
                     }
                 },
                 plugins: {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                if (context.datasetIndex === 2) {
-                                    return context.dataset.label + ': ' + context.parsed.y + '%';
-                                } else {
-                                    return context.dataset.label + ': ' +
-                                           context.parsed.y.toLocaleString('ru-RU') + ' ₽';
-                                }
+                                return context.dataset.label + ': ' + context.parsed.y.toLocaleString('ru-RU') + ' ₽';
                             }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const statusCanvas = document.getElementById('paymentStatusChart');
+    if (statusCanvas) {
+        const statusCtx = statusCanvas.getContext('2d');
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    {
+                        label: 'Оплаченные платежи',
+                        data: chartData.paid_payments,
+                        backgroundColor: 'rgba(31, 122, 92, 0.72)',
+                        borderColor: 'rgba(31, 122, 92, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Просроченные платежи',
+                        data: chartData.overdue_payments,
+                        backgroundColor: 'rgba(180, 35, 24, 0.68)',
+                        borderColor: 'rgba(180, 35, 24, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
                         }
                     }
                 }
@@ -817,7 +759,6 @@ function showAlert(type, message) {
     const container = document.querySelector('.analytics-container');
     container.insertBefore(alertDiv, container.firstChild);
 
-    // Auto-dismiss after 5 seconds
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -825,19 +766,16 @@ function showAlert(type, message) {
     }, 5000);
 }
 
-function exportData() {
-    // Show loading indicator
-    const exportBtn = event.target.closest('button');
+function exportData(button) {
+    const exportBtn = button;
     const originalText = exportBtn.innerHTML;
     exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Экспорт...';
     exportBtn.disabled = true;
 
     try {
-        // Create export URL with current filters
         const params = new URLSearchParams(window.location.search);
         params.set('export', 'excel');
 
-        // Create temporary link and trigger download
         const exportUrl = window.location.pathname + '?' + params.toString();
         const link = document.createElement('a');
         link.href = exportUrl;
@@ -846,14 +784,11 @@ function exportData() {
         link.click();
         document.body.removeChild(link);
 
-        // Show success message
         showAlert('success', 'Экспорт данных начат. Файл будет загружен автоматически.');
-
     } catch (error) {
         console.error('Export error:', error);
         showAlert('danger', 'Произошла ошибка при экспорте данных');
     } finally {
-        // Restore button state after delay
         setTimeout(() => {
             exportBtn.innerHTML = originalText;
             exportBtn.disabled = false;

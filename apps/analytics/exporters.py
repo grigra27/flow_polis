@@ -1291,14 +1291,14 @@ class AnalyticsExporter:
         headers = [
             "Month",
             "Year",
-            "Actual Premium",
-            "Planned Premium",
-            "Premium Achievement %",
-            "Actual Commission",
-            "Planned Commission",
-            "Commission Achievement %",
-            "Policies Created",
+            "Received Premium",
+            "Received Commission",
+            "Paid Payments",
+            "Total Payments",
             "Payment Discipline %",
+            "Overdue Payments",
+            "Policies Created",
+            "Average Paid Payment",
         ]
 
         for col, header in enumerate(headers, 1):
@@ -1312,6 +1312,13 @@ class AnalyticsExporter:
         start_data_row = current_row
 
         for month_data in monthly_history:
+            paid_payments_count = month_data.get("paid_payments", 0)
+            average_paid_payment = Decimal("0")
+            if paid_payments_count:
+                average_paid_payment = month_data.get(
+                    "actual_premium", Decimal("0")
+                ) / Decimal(str(paid_payments_count))
+
             worksheet.cell(
                 row=current_row, column=1, value=month_data.get("month_name", "")
             )
@@ -1324,27 +1331,27 @@ class AnalyticsExporter:
             worksheet.cell(
                 row=current_row,
                 column=4,
-                value=self._format_value(month_data.get("planned_premium", 0)),
-            )
-            worksheet.cell(
-                row=current_row,
-                column=5,
-                value=self._format_value(month_data.get("premium_achievement", 0)),
-            )
-            worksheet.cell(
-                row=current_row,
-                column=6,
                 value=self._format_value(month_data.get("actual_commission", 0)),
             )
             worksheet.cell(
                 row=current_row,
+                column=5,
+                value=month_data.get("paid_payments", 0),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=6,
+                value=month_data.get("total_payments", 0),
+            )
+            worksheet.cell(
+                row=current_row,
                 column=7,
-                value=self._format_value(month_data.get("planned_commission", 0)),
+                value=self._format_value(month_data.get("payment_discipline", 0)),
             )
             worksheet.cell(
                 row=current_row,
                 column=8,
-                value=self._format_value(month_data.get("commission_achievement", 0)),
+                value=month_data.get("overdue_payments", 0),
             )
             worksheet.cell(
                 row=current_row, column=9, value=month_data.get("policies_created", 0)
@@ -1352,7 +1359,7 @@ class AnalyticsExporter:
             worksheet.cell(
                 row=current_row,
                 column=10,
-                value=self._format_value(month_data.get("payment_discipline", 0)),
+                value=self._format_value(average_paid_payment),
             )
             current_row += 1
 
@@ -1386,8 +1393,8 @@ class AnalyticsExporter:
 
         # Summary metrics
         summary_metrics = analytics.get("summary_metrics", {})
-        fact_vs_forecast = analytics.get("fact_vs_forecast", {})
         performance_trends = analytics.get("performance_trends", {})
+        problem_analysis = analytics.get("problem_analysis", {})
 
         # Summary section
         worksheet.cell(row=current_row, column=1, value="Summary Metrics")
@@ -1402,6 +1409,30 @@ class AnalyticsExporter:
             (
                 "Total Actual Commission",
                 self._format_value(summary_metrics.get("total_actual_commission", 0)),
+            ),
+            (
+                "Paid Payments",
+                summary_metrics.get("total_paid_payments", 0),
+            ),
+            (
+                "Total Payments",
+                summary_metrics.get("total_payments_count", 0),
+            ),
+            (
+                "Payment Realization Rate",
+                f"{self._format_value(summary_metrics.get('payment_realization_rate', 0))}%",
+            ),
+            (
+                "Average Paid Payment",
+                self._format_value(summary_metrics.get("average_paid_payment", 0)),
+            ),
+            (
+                "Overdue Payments",
+                summary_metrics.get("total_overdue_payments", 0),
+            ),
+            (
+                "Total Overdue Amount",
+                self._format_value(problem_analysis.get("total_overdue_amount", 0)),
             ),
             (
                 "Total Policies Created",
@@ -1419,31 +1450,6 @@ class AnalyticsExporter:
         ]
 
         for label, value in summary_data:
-            worksheet.cell(row=current_row, column=1, value=label)
-            worksheet.cell(row=current_row, column=2, value=value)
-            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
-            current_row += 1
-
-        current_row += 1
-
-        # Fact vs Forecast section
-        worksheet.cell(row=current_row, column=1, value="Fact vs Forecast Analysis")
-        worksheet.cell(row=current_row, column=1).font = Font(bold=True, size=14)
-        current_row += 2
-
-        forecast_data = [
-            (
-                "Overall Premium Accuracy",
-                f"{self._format_value(fact_vs_forecast.get('overall_premium_accuracy', 0))}%",
-            ),
-            (
-                "Overall Commission Accuracy",
-                f"{self._format_value(fact_vs_forecast.get('overall_commission_accuracy', 0))}%",
-            ),
-            ("Accuracy Trend", fact_vs_forecast.get("accuracy_trend", "N/A")),
-        ]
-
-        for label, value in forecast_data:
             worksheet.cell(row=current_row, column=1, value=label)
             worksheet.cell(row=current_row, column=2, value=value)
             worksheet.cell(row=current_row, column=1).font = Font(bold=True)

@@ -110,3 +110,22 @@ class TestPaymentScheduleListView:
         # Check that payment is in the list
         content = response.content.decode("utf-8")
         assert sample_payment.policy.policy_number in content
+
+    def test_payment_list_highlights_no_broker_policy_rows(
+        self, client, regular_user, sample_payment
+    ):
+        """
+        Test that payments for policies without broker participation
+        are highlighted with gray row and "Без брокера" badge.
+        """
+        sample_payment.policy.broker_participation = False
+        sample_payment.policy.save(update_fields=["broker_participation"])
+
+        client.force_login(regular_user)
+        url = reverse("policies:payments")
+        response = client.get(f"{url}?status=all")
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "table-secondary" in content
+        assert "Без брокера" in content

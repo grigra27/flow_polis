@@ -116,6 +116,22 @@ jobs:
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
           set -euo pipefail
+          echo "Network diagnostics for $DROPLET_HOST:${SSH_PORT:-22}"
+          echo "--- DNS (all records via getent ahosts) ---"
+          getent ahosts "$DROPLET_HOST" || true
+          echo "--- IPv4 TCP probe ---"
+          ipv4_list=$(getent ahostsv4 "$DROPLET_HOST" | awk '{print $1}' | sort -u || true)
+          if [ -z "${ipv4_list:-}" ]; then
+            echo "⚠️ No IPv4 addresses resolved for $DROPLET_HOST"
+          else
+            for ip in $ipv4_list; do
+              if timeout 5 bash -lc "cat < /dev/null > /dev/tcp/$ip/${SSH_PORT:-22}" 2>/dev/null; then
+                echo "✅ TCP reachable: $ip:${SSH_PORT:-22}"
+              else
+                echo "❌ TCP not reachable: $ip:${SSH_PORT:-22}"
+              fi
+            done
+          fi
           echo "Checking SSH access to $DROPLET_HOST:${SSH_PORT:-22}"
           ssh -4 -i ~/.ssh/deploy_key \
               -p "${SSH_PORT:-22}" \

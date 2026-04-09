@@ -67,6 +67,14 @@ class DashboardView(SuperuserRequiredMixin, TemplateView):
                 total_policy_count=metrics_data["total_policy_count"],
                 total_insurance_sum=metrics_data["total_insurance_sum"],
                 active_policies_count=metrics_data["active_policies_count"],
+                planned_premium_volume=metrics_data.get("planned_premium_volume"),
+                actual_premium_volume=metrics_data.get("actual_premium_volume"),
+                planned_commission_revenue=metrics_data.get(
+                    "planned_commission_revenue"
+                ),
+                actual_commission_revenue=metrics_data.get("actual_commission_revenue"),
+                planned_insurance_sum=metrics_data.get("planned_insurance_sum"),
+                actual_insurance_sum=metrics_data.get("actual_insurance_sum"),
                 average_commission_rate=metrics_data.get("average_commission_rate"),
                 filter_applied=metrics_data.get("filter_applied", False),
             )
@@ -125,6 +133,12 @@ class DashboardView(SuperuserRequiredMixin, TemplateView):
                         total_policy_count=0,
                         total_insurance_sum=Decimal("0"),
                         active_policies_count=0,
+                        planned_premium_volume=Decimal("0"),
+                        actual_premium_volume=Decimal("0"),
+                        planned_commission_revenue=Decimal("0"),
+                        actual_commission_revenue=Decimal("0"),
+                        planned_insurance_sum=Decimal("0"),
+                        actual_insurance_sum=Decimal("0"),
                         filter_applied=False,
                     ),
                     "branches": Branch.objects.none(),
@@ -173,6 +187,24 @@ class DashboardView(SuperuserRequiredMixin, TemplateView):
             response_data = {
                 "success": True,
                 "metrics": {
+                    "planned_premium_volume": str(
+                        metrics_data.get("planned_premium_volume", Decimal("0"))
+                    ),
+                    "actual_premium_volume": str(
+                        metrics_data.get("actual_premium_volume", Decimal("0"))
+                    ),
+                    "planned_commission_revenue": str(
+                        metrics_data.get("planned_commission_revenue", Decimal("0"))
+                    ),
+                    "actual_commission_revenue": str(
+                        metrics_data.get("actual_commission_revenue", Decimal("0"))
+                    ),
+                    "planned_insurance_sum": str(
+                        metrics_data.get("planned_insurance_sum", Decimal("0"))
+                    ),
+                    "actual_insurance_sum": str(
+                        metrics_data.get("actual_insurance_sum", Decimal("0"))
+                    ),
                     "total_premium_volume": str(metrics_data["total_premium_volume"]),
                     "total_commission_revenue": str(
                         metrics_data["total_commission_revenue"]

@@ -131,20 +131,60 @@
     <div class="col-lg-4 col-md-6">
         <div class="metric-card premium position-relative">
             <i class="bi bi-cash-coin metric-icon"></i>
-            <div class="metric-value" id="premiumVolume">
-                {{ dashboard_metrics.total_premium_volume|rub }}
+            <div class="metric-value" id="plannedPremiumVolume">
+                {{ dashboard_metrics.planned_premium_volume|default:dashboard_metrics.total_premium_volume|rub }}
             </div>
-            <div class="metric-label">Объем премий (₽)</div>
+            <div class="metric-label">Премии, план (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card commission position-relative">
+            <i class="bi bi-cash-stack metric-icon"></i>
+            <div class="metric-value" id="actualPremiumVolume">
+                {{ dashboard_metrics.actual_premium_volume|default:"0"|rub }}
+            </div>
+            <div class="metric-label">Премии, факт (₽)</div>
         </div>
     </div>
 
     <div class="col-lg-4 col-md-6">
         <div class="metric-card commission position-relative">
             <i class="bi bi-percent metric-icon"></i>
-            <div class="metric-value" id="commissionRevenue">
-                {{ dashboard_metrics.total_commission_revenue|rub }}
+            <div class="metric-value" id="plannedCommissionRevenue">
+                {{ dashboard_metrics.planned_commission_revenue|default:dashboard_metrics.total_commission_revenue|rub }}
             </div>
-            <div class="metric-label">Комиссионный доход (₽)</div>
+            <div class="metric-label">Комиссия, план (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card commission position-relative">
+            <i class="bi bi-coin metric-icon"></i>
+            <div class="metric-value" id="actualCommissionRevenue">
+                {{ dashboard_metrics.actual_commission_revenue|default:"0"|rub }}
+            </div>
+            <div class="metric-label">Комиссия, факт (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card insurance-sum position-relative">
+            <i class="bi bi-shield-check metric-icon"></i>
+            <div class="metric-value" id="plannedInsuranceSum">
+                {{ dashboard_metrics.planned_insurance_sum|default:dashboard_metrics.total_insurance_sum|rub }}
+            </div>
+            <div class="metric-label">Страховая сумма, план (₽)</div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card insurance-sum position-relative">
+            <i class="bi bi-shield-fill-check metric-icon"></i>
+            <div class="metric-value" id="actualInsuranceSum">
+                {{ dashboard_metrics.actual_insurance_sum|default:"0"|rub }}
+            </div>
+            <div class="metric-label">Страховая сумма, факт (₽)</div>
         </div>
     </div>
 
@@ -155,16 +195,6 @@
                 {{ dashboard_metrics.total_policy_count }}
             </div>
             <div class="metric-label">Количество полисов</div>
-        </div>
-    </div>
-
-    <div class="col-lg-4 col-md-6">
-        <div class="metric-card insurance-sum position-relative">
-            <i class="bi bi-shield-check metric-icon"></i>
-            <div class="metric-value" id="insuranceSum">
-                {{ dashboard_metrics.total_insurance_sum|rub }}
-            </div>
-            <div class="metric-label">Страховая сумма (₽)</div>
         </div>
     </div>
 

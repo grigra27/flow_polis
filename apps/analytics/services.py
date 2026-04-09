@@ -364,18 +364,33 @@ class AnalyticsService:
             else:
                 date_range = None
 
-            # Calculate metrics
-            total_premium_volume = self.calculator.calculate_premium_volume(
+            # Split scheduled values (plan) from collected values (fact)
+            paid_payments_qs = payments_qs.filter(paid_date__isnull=False)
+
+            # Planned metrics (all scheduled payments)
+            planned_premium_volume = self.calculator.calculate_premium_volume(
                 payments_qs, date_range
             )
-            total_commission_revenue = self.calculator.calculate_commission_revenue(
+            planned_commission_revenue = self.calculator.calculate_commission_revenue(
                 payments_qs, date_range
             )
+            planned_insurance_sum = self.calculator.calculate_insurance_sum(
+                payments_qs, date_range
+            )
+
+            # Actual metrics (only paid payments)
+            actual_premium_volume = self.calculator.calculate_premium_volume(
+                paid_payments_qs, date_range
+            )
+            actual_commission_revenue = self.calculator.calculate_commission_revenue(
+                paid_payments_qs, date_range
+            )
+            actual_insurance_sum = self.calculator.calculate_insurance_sum(
+                paid_payments_qs, date_range
+            )
+
             total_policy_count = self.calculator.calculate_policy_count(
                 policies_qs, date_range
-            )
-            total_insurance_sum = self.calculator.calculate_insurance_sum(
-                payments_qs, date_range
             )
             average_commission_rate = self.calculator.calculate_average_commission_rate(
                 payments_qs
@@ -385,10 +400,18 @@ class AnalyticsService:
             active_policies_count = policies_qs.filter(policy_active=True).count()
 
             return {
-                "total_premium_volume": total_premium_volume,
-                "total_commission_revenue": total_commission_revenue,
+                # Explicit plan/fact keys
+                "planned_premium_volume": planned_premium_volume,
+                "actual_premium_volume": actual_premium_volume,
+                "planned_commission_revenue": planned_commission_revenue,
+                "actual_commission_revenue": actual_commission_revenue,
+                "planned_insurance_sum": planned_insurance_sum,
+                "actual_insurance_sum": actual_insurance_sum,
+                # Backward-compatible aliases (legacy KPI cards)
+                "total_premium_volume": planned_premium_volume,
+                "total_commission_revenue": planned_commission_revenue,
                 "total_policy_count": total_policy_count,
-                "total_insurance_sum": total_insurance_sum,
+                "total_insurance_sum": planned_insurance_sum,
                 "average_commission_rate": average_commission_rate,
                 "active_policies_count": active_policies_count,
                 "filter_applied": analytics_filter.has_filters()
@@ -404,6 +427,12 @@ class AnalyticsService:
             logger.error(f"Error calculating dashboard metrics: {e}")
 
             return {
+                "planned_premium_volume": Decimal("0"),
+                "actual_premium_volume": Decimal("0"),
+                "planned_commission_revenue": Decimal("0"),
+                "actual_commission_revenue": Decimal("0"),
+                "planned_insurance_sum": Decimal("0"),
+                "actual_insurance_sum": Decimal("0"),
                 "total_premium_volume": Decimal("0"),
                 "total_commission_revenue": Decimal("0"),
                 "total_policy_count": 0,

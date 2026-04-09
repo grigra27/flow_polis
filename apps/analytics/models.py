@@ -17,11 +17,17 @@ class DashboardMetrics:
     Main dashboard metrics containing key performance indicators.
 
     Attributes:
-        total_premium_volume: Total premium volume across all policies
-        total_commission_revenue: Total commission revenue earned
+        total_premium_volume: Legacy alias of planned premium volume
+        total_commission_revenue: Legacy alias of planned commission revenue
         total_policy_count: Total number of policies
-        total_insurance_sum: Total insurance sum of all policies
+        total_insurance_sum: Legacy alias of planned insurance sum
         active_policies_count: Number of currently active policies
+        planned_premium_volume: Scheduled premium volume
+        actual_premium_volume: Collected premium volume (paid schedules only)
+        planned_commission_revenue: Scheduled commission revenue
+        actual_commission_revenue: Collected commission revenue (paid schedules only)
+        planned_insurance_sum: Scheduled insurance sum
+        actual_insurance_sum: Collected insurance sum (paid schedules only)
         current_year_growth: Growth percentage compared to previous year
         average_commission_rate: Average commission rate percentage
         filter_applied: Whether any filters are currently applied
@@ -32,6 +38,12 @@ class DashboardMetrics:
     total_policy_count: int
     total_insurance_sum: Decimal
     active_policies_count: int
+    planned_premium_volume: Optional[Decimal] = None
+    actual_premium_volume: Optional[Decimal] = None
+    planned_commission_revenue: Optional[Decimal] = None
+    actual_commission_revenue: Optional[Decimal] = None
+    planned_insurance_sum: Optional[Decimal] = None
+    actual_insurance_sum: Optional[Decimal] = None
     current_year_growth: Optional[Decimal] = None
     average_commission_rate: Optional[Decimal] = None
     filter_applied: bool = False

@@ -1404,6 +1404,7 @@ class PolicyExpirationExporter(BaseExporter):
             "Дата отправки письма ЛП с предложением",
             "Ответ ЛП (дата и решение)",
             "Дата заключения договора на новый срок",
+            "Инфо 4",
             "Примечания",
         ]
 
@@ -1491,7 +1492,8 @@ class PolicyExpirationExporter(BaseExporter):
             "заполняет УБТиСЛО",  # W
             "",  # X (будет объединена с W)
             "заполн. стр. брокер",  # Y
-            "заполняет УБТиСЛО",  # Z
+            "заполняет страховой брокер",  # Z
+            "заполняет УБТиСЛО",  # AA
         ]
         ws.append(responsibility_row)
 
@@ -1562,11 +1564,17 @@ class PolicyExpirationExporter(BaseExporter):
         cell_y.font = responsibility_font
         cell_y.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Z: УБТиСЛО (розовый)
+        # Z: страховой брокер (зеленый)
         cell_z = ws.cell(row=4, column=26)
-        cell_z.fill = ubt_fill
+        cell_z.fill = broker_fill
         cell_z.font = responsibility_font
         cell_z.alignment = Alignment(horizontal="center", vertical="center")
+
+        # AA: УБТиСЛО (розовый)
+        cell_aa = ws.cell(row=4, column=27)
+        cell_aa.fill = ubt_fill
+        cell_aa.font = responsibility_font
+        cell_aa.alignment = Alignment(horizontal="center", vertical="center")
 
         # Высота строки ответственности
         ws.row_dimensions[4].height = 25
@@ -1675,6 +1683,7 @@ class PolicyExpirationExporter(BaseExporter):
             "",  # Дата отправки письма ЛП-лю с предложением
             "",  # Ответ ЛП-ля (дата и решение)
             "",  # Дата заключения договора страхования на новый срок
+            policy.info4 or "",  # Инфо 4 (из карточки полиса)
             notes_text,  # Примечания (заполняется автоматически)
         ]
 
@@ -1711,7 +1720,8 @@ class PolicyExpirationExporter(BaseExporter):
             "W": 18,  # Дата отправки письма ЛП-лю с предложением
             "X": 20,  # Ответ ЛП-ля (дата и решение)
             "Y": 18,  # Дата заключения договора страхования на новый срок
-            "Z": 15,  # Примечания
+            "Z": 20,  # Инфо 4
+            "AA": 15,  # Примечания
         }
 
         from openpyxl.utils import get_column_letter
@@ -1862,7 +1872,8 @@ class PolicyExpirationExporter(BaseExporter):
             "P",
             "Q",
             "U",
-        ]  # Объект страхования, кредитный договор, место нахождения, контакты, условия
+            "Z",
+        ]  # Объект страхования, кредитный договор, место нахождения, контакты, условия, Инфо 4
         for column_letter in wrap_text_columns:
             for cell in ws[column_letter]:
                 if cell.row > 4:  # Пропускаем заголовки и строку ответственности

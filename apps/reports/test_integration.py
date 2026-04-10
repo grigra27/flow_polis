@@ -682,6 +682,7 @@ class ReadyExportsTest(TestCase):
             start_date=date(2024, 1, 1),
             end_date=date(2024, 6, 15),  # В диапазоне
             premium_total=Decimal("75000.00"),
+            info4="Тестовое значение Info4",
         )
 
         policy_out_of_range = Policy.objects.create(
@@ -756,6 +757,7 @@ class ReadyExportsTest(TestCase):
             "Дата отправки письма ЛП с предложением",
             "Ответ ЛП (дата и решение)",
             "Дата заключения договора на новый срок",
+            "Инфо 4",
             "Примечания",
         ]
         self.assertEqual(headers, expected_headers)
@@ -792,6 +794,10 @@ class ReadyExportsTest(TestCase):
                 else:
                     end_date_value = None
                 self.assertEqual(end_date_value, date(2024, 6, 15))
+                # Проверяем новый столбец "Инфо 4" (предпоследний, 26-я колонка)
+                self.assertEqual(
+                    ws.cell(row=row, column=26).value, "Тестовое значение Info4"
+                )
                 break
 
         # Проверяем что без параметров дат возвращается ошибка

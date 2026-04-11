@@ -1152,6 +1152,19 @@ class AnalyticsService:
                         "forecasted_commission"
                     ] += missed_commission
 
+            # Build future-oriented forecast blocks for dashboard
+            (
+                future_forecast_summary,
+                future_quarterly_forecast,
+            ) = self._build_future_forecast_blocks(
+                monthly_premium_forecast, current_date
+            )
+
+            # Build current-year bridge block: actual for elapsed months + forecast for remaining
+            current_year_outlook = self._build_current_year_outlook(
+                payments_qs, current_date
+            )
+
             # Analyze payment statuses
             today = timezone.now().date()
 
@@ -1353,6 +1366,9 @@ class AnalyticsService:
                 "overdue_payments_analysis": overdue_payments_analysis,
                 "seasonal_analysis": seasonal_analysis,
                 "comparative_analysis": comparative_analysis,
+                "future_forecast_summary": future_forecast_summary,
+                "future_quarterly_forecast": future_quarterly_forecast,
+                "current_year_outlook": current_year_outlook,
                 "filter_applied": analytics_filter.has_filters()
                 if analytics_filter
                 else False,
@@ -1412,9 +1428,219 @@ class AnalyticsService:
                     "returning_clients": 0,
                     "new_clients_percentage": Decimal("0"),
                 },
+                "future_forecast_summary": {
+                    "as_of_date": datetime.now().date(),
+                    "horizon_months": 0,
+                    "total_future_premium": Decimal("0"),
+                    "total_future_commission": Decimal("0"),
+                    "current_month": None,
+                    "next_month": None,
+                    "current_quarter_remaining": None,
+                    "next_quarter": None,
+                },
+                "future_quarterly_forecast": [],
+                "current_year_outlook": {
+                    "year": datetime.now().year,
+                    "current_month": datetime.now().month,
+                    "ytd_actual_premium": Decimal("0"),
+                    "ytd_actual_commission": Decimal("0"),
+                    "remaining_forecast_premium": Decimal("0"),
+                    "remaining_forecast_commission": Decimal("0"),
+                    "projected_full_year_premium": Decimal("0"),
+                    "projected_full_year_commission": Decimal("0"),
+                    "ytd_months_count": 0,
+                    "forecast_months_count": 0,
+                    "monthly_breakdown": [],
+                },
                 "filter_applied": False,
                 "error": str(e),
             }
+
+    def _build_future_forecast_blocks(self, monthly_forecast, current_date):
+        """Build summary and quarterly breakdown for future forecast periods."""
+        if not monthly_forecast:
+            return (
+                {
+                    "as_of_date": current_date,
+                    "horizon_months": 0,
+                    "total_future_premium": Decimal("0"),
+                    "total_future_commission": Decimal("0"),
+                    "current_month": None,
+                    "next_month": None,
+                    "current_quarter_remaining": None,
+                    "next_quarter": None,
+                },
+                [],
+            )
+
+        # Global totals for the whole forecast horizon
+        total_future_premium = sum(
+            item["forecasted_premium"] for item in monthly_forecast
+        )
+        total_future_commission = sum(
+            item["forecasted_commission"] for item in monthly_forecast
+        )
+
+        # Quarter aggregation
+        quarter_map = {}
+        for item in monthly_forecast:
+            month_date = item["month"]
+            quarter_number = ((month_date.month - 1) // 3) + 1
+            key = (month_date.year, quarter_number)
+
+            if key not in quarter_map:
+                quarter_map[key] = {
+                    "year": month_date.year,
+                    "quarter_number": quarter_number,
+                    "quarter_label": f"Q{quarter_number} {month_date.year}",
+                    "forecasted_premium": Decimal("0"),
+                    "forecasted_commission": Decimal("0"),
+                    "months_count": 0,
+                    "start_month": month_date,
+                    "end_month": month_date,
+                }
+
+            quarter_map[key]["forecasted_premium"] += item["forecasted_premium"]
+            quarter_map[key]["forecasted_commission"] += item["forecasted_commission"]
+            quarter_map[key]["months_count"] += 1
+            quarter_map[key]["end_month"] = month_date
+
+        future_quarterly_forecast = [
+            quarter_map[key] for key in sorted(quarter_map.keys())
+        ]
+
+        current_quarter_number = ((current_date.month - 1) // 3) + 1
+        current_quarter_key = (current_date.year, current_quarter_number)
+
+        if current_quarter_number == 4:
+            next_quarter_key = (current_date.year + 1, 1)
+        else:
+            next_quarter_key = (current_date.year, current_quarter_number + 1)
+
+        current_quarter_remaining = quarter_map.get(current_quarter_key)
+        next_quarter = quarter_map.get(next_quarter_key)
+
+        summary = {
+            "as_of_date": current_date,
+            "horizon_months": len(monthly_forecast),
+            "total_future_premium": total_future_premium,
+            "total_future_commission": total_future_commission,
+            "current_month": monthly_forecast[0] if monthly_forecast else None,
+            "next_month": monthly_forecast[1] if len(monthly_forecast) > 1 else None,
+            "current_quarter_remaining": current_quarter_remaining,
+            "next_quarter": next_quarter,
+        }
+
+        return summary, future_quarterly_forecast
+
+    def _build_current_year_outlook(self, payments_qs, current_date):
+        """
+        Build current-year bridge:
+        elapsed months as actual (paid), remaining months as forecast (scheduled).
+        """
+        current_year = current_date.year
+        current_month = current_date.month
+        month_names_ru = {
+            1: "Январь",
+            2: "Февраль",
+            3: "Март",
+            4: "Апрель",
+            5: "Май",
+            6: "Июнь",
+            7: "Июль",
+            8: "Август",
+            9: "Сентябрь",
+            10: "Октябрь",
+            11: "Ноябрь",
+            12: "Декабрь",
+        }
+        month_short_ru = {
+            1: "Янв",
+            2: "Фев",
+            3: "Мар",
+            4: "Апр",
+            5: "Май",
+            6: "Июн",
+            7: "Июл",
+            8: "Авг",
+            9: "Сен",
+            10: "Окт",
+            11: "Ноя",
+            12: "Дек",
+        }
+
+        monthly_breakdown = []
+        ytd_actual_premium = Decimal("0")
+        ytd_actual_commission = Decimal("0")
+        remaining_forecast_premium = Decimal("0")
+        remaining_forecast_commission = Decimal("0")
+
+        for month in range(1, 13):
+            month_start = date(current_year, month, 1)
+            if month == 12:
+                month_end = date(current_year + 1, 1, 1) - timedelta(days=1)
+            else:
+                month_end = date(current_year, month + 1, 1) - timedelta(days=1)
+
+            month_payments = payments_qs.filter(
+                due_date__gte=month_start, due_date__lte=month_end
+            )
+            paid_month_payments = month_payments.filter(paid_date__isnull=False)
+
+            actual_premium = self.calculator.calculate_premium_volume(
+                paid_month_payments
+            )
+            actual_commission = self.calculator.calculate_commission_revenue(
+                paid_month_payments
+            )
+            forecasted_premium = self.calculator.calculate_premium_volume(
+                month_payments
+            )
+            forecasted_commission = self.calculator.calculate_commission_revenue(
+                month_payments
+            )
+
+            is_actual = month < current_month
+            premium_value = actual_premium if is_actual else forecasted_premium
+            commission_value = actual_commission if is_actual else forecasted_commission
+
+            if is_actual:
+                ytd_actual_premium += actual_premium
+                ytd_actual_commission += actual_commission
+            else:
+                remaining_forecast_premium += forecasted_premium
+                remaining_forecast_commission += forecasted_commission
+
+            monthly_breakdown.append(
+                {
+                    "month": month,
+                    "month_name": month_names_ru[month],
+                    "month_short": month_short_ru[month],
+                    "mode": "actual" if is_actual else "forecast",
+                    "premium_value": premium_value,
+                    "commission_value": commission_value,
+                    "actual_premium": actual_premium,
+                    "actual_commission": actual_commission,
+                    "forecasted_premium": forecasted_premium,
+                    "forecasted_commission": forecasted_commission,
+                }
+            )
+
+        return {
+            "year": current_year,
+            "current_month": current_month,
+            "ytd_actual_premium": ytd_actual_premium,
+            "ytd_actual_commission": ytd_actual_commission,
+            "remaining_forecast_premium": remaining_forecast_premium,
+            "remaining_forecast_commission": remaining_forecast_commission,
+            "projected_full_year_premium": ytd_actual_premium
+            + remaining_forecast_premium,
+            "projected_full_year_commission": ytd_actual_commission
+            + remaining_forecast_commission,
+            "ytd_months_count": max(0, current_month - 1),
+            "forecast_months_count": 13 - current_month,
+            "monthly_breakdown": monthly_breakdown,
+        }
 
     def _calculate_seasonal_analysis(
         self, monthly_forecast: list, analytics_filter: Optional[AnalyticsFilter] = None

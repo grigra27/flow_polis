@@ -681,18 +681,22 @@ class AnalyticsExporter:
         try:
             workbook = Workbook()
 
-            # Sheet 1: Monthly Forecasts
+            # Sheet 1: Future forecast summary
             ws1 = workbook.active
-            ws1.title = "Monthly Forecasts"
-            self._create_forecast_sheet(ws1, analytics, applied_filters)
+            ws1.title = "Сводка прогноза"
+            self._create_future_summary_sheet(ws1, analytics, applied_filters)
 
-            # Sheet 2: Payment Status Analysis
-            ws2 = workbook.create_sheet(title="Payment Analysis")
-            self._create_payment_analysis_sheet(ws2, analytics, applied_filters)
+            # Sheet 2: Future monthly detail
+            ws2 = workbook.create_sheet(title="Будущие месяцы")
+            self._create_future_monthly_sheet(ws2, analytics, applied_filters)
 
-            # Sheet 3: Overdue Analysis
-            ws3 = workbook.create_sheet(title="Overdue Analysis")
-            self._create_overdue_analysis_sheet(ws3, analytics, applied_filters)
+            # Sheet 3: Current year bridge (actual + forecast)
+            ws3 = workbook.create_sheet(title="Годовой мост")
+            self._create_current_year_bridge_sheet(ws3, analytics, applied_filters)
+
+            # Sheet 4: Payment contour (control block from the page)
+            ws4 = workbook.create_sheet(title="Платежный контур")
+            self._create_payment_analysis_sheet(ws4, analytics, applied_filters)
 
             # Save to BytesIO
             output = BytesIO()
@@ -713,6 +717,443 @@ class AnalyticsExporter:
         except Exception as e:
             logger.error(f"Error exporting financial analytics: {e}")
             raise
+
+    def _create_future_summary_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create summary sheet for all future forecast periods."""
+        worksheet.cell(row=1, column=1, value="Финансовая аналитика - Сводка прогноза")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:C1")
+
+        worksheet.cell(
+            row=2,
+            column=1,
+            value=f"Дата выгрузки: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        )
+
+        current_row = 3
+        if applied_filters:
+            worksheet.cell(row=current_row, column=1, value="Примененные фильтры:")
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+            for filter_name, filter_value in applied_filters.items():
+                if filter_value:
+                    worksheet.cell(
+                        row=current_row,
+                        column=1,
+                        value=f"  {filter_name}: {filter_value}",
+                    )
+                    current_row += 1
+            current_row += 1
+
+        summary = analytics.get("future_forecast_summary", {})
+
+        worksheet.cell(row=current_row, column=1, value="Показатель")
+        worksheet.cell(row=current_row, column=2, value="Значение")
+        self._apply_header_style(worksheet, current_row, 2)
+        current_row += 1
+
+        current_month = summary.get("current_month")
+        next_month = summary.get("next_month")
+        current_quarter = summary.get("current_quarter_remaining")
+        next_quarter = summary.get("next_quarter")
+
+        metrics = [
+            ("Дата среза", self._format_value(summary.get("as_of_date"))),
+            ("Горизонт прогноза (мес.)", summary.get("horizon_months", 0)),
+            (
+                "Всего будущая премия",
+                self._format_value(summary.get("total_future_premium", Decimal("0"))),
+            ),
+            (
+                "Всего будущая комиссия",
+                self._format_value(
+                    summary.get("total_future_commission", Decimal("0"))
+                ),
+            ),
+            (
+                "Текущий месяц",
+                self._format_value(current_month.get("month"))
+                if current_month
+                else "N/A",
+            ),
+            (
+                "Текущий месяц: премия",
+                self._format_value(
+                    current_month.get("forecasted_premium", Decimal("0"))
+                )
+                if current_month
+                else "N/A",
+            ),
+            (
+                "Текущий месяц: комиссия",
+                self._format_value(
+                    current_month.get("forecasted_commission", Decimal("0"))
+                )
+                if current_month
+                else "N/A",
+            ),
+            (
+                "Следующий месяц",
+                self._format_value(next_month.get("month")) if next_month else "N/A",
+            ),
+            (
+                "Следующий месяц: премия",
+                self._format_value(next_month.get("forecasted_premium", Decimal("0")))
+                if next_month
+                else "N/A",
+            ),
+            (
+                "Следующий месяц: комиссия",
+                self._format_value(
+                    next_month.get("forecasted_commission", Decimal("0"))
+                )
+                if next_month
+                else "N/A",
+            ),
+            (
+                "Остаток текущего квартала",
+                current_quarter.get("quarter_label", "N/A")
+                if current_quarter
+                else "N/A",
+            ),
+            (
+                "Текущий квартал: премия",
+                self._format_value(
+                    current_quarter.get("forecasted_premium", Decimal("0"))
+                )
+                if current_quarter
+                else "N/A",
+            ),
+            (
+                "Текущий квартал: комиссия",
+                self._format_value(
+                    current_quarter.get("forecasted_commission", Decimal("0"))
+                )
+                if current_quarter
+                else "N/A",
+            ),
+            (
+                "Следующий квартал",
+                next_quarter.get("quarter_label", "N/A") if next_quarter else "N/A",
+            ),
+            (
+                "Следующий квартал: премия",
+                self._format_value(next_quarter.get("forecasted_premium", Decimal("0")))
+                if next_quarter
+                else "N/A",
+            ),
+            (
+                "Следующий квартал: комиссия",
+                self._format_value(
+                    next_quarter.get("forecasted_commission", Decimal("0"))
+                )
+                if next_quarter
+                else "N/A",
+            ),
+        ]
+
+        start_data_row = current_row
+        for label, value in metrics:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            current_row += 1
+
+        if current_row > start_data_row:
+            self._apply_data_style(worksheet, start_data_row, current_row - 1, 2)
+
+        current_row += 2
+
+        quarter_rows = analytics.get("future_quarterly_forecast", [])
+        worksheet.cell(row=current_row, column=1, value="Квартал")
+        worksheet.cell(row=current_row, column=2, value="Прогноз премии")
+        worksheet.cell(row=current_row, column=3, value="Прогноз комиссии")
+        worksheet.cell(row=current_row, column=4, value="Месяцев в расчете")
+        self._apply_header_style(worksheet, current_row, 4)
+        current_row += 1
+
+        start_data_row = current_row
+        for quarter in quarter_rows:
+            worksheet.cell(
+                row=current_row, column=1, value=quarter.get("quarter_label", "")
+            )
+            worksheet.cell(
+                row=current_row,
+                column=2,
+                value=self._format_value(quarter.get("forecasted_premium", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=3,
+                value=self._format_value(quarter.get("forecasted_commission", 0)),
+            )
+            worksheet.cell(
+                row=current_row, column=4, value=quarter.get("months_count", 0)
+            )
+            current_row += 1
+
+        if current_row > start_data_row:
+            self._apply_data_style(worksheet, start_data_row, current_row - 1, 4)
+
+        self._auto_adjust_columns(worksheet)
+
+    def _create_future_monthly_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create monthly sheet for all future forecast periods."""
+        worksheet.cell(
+            row=1, column=1, value="Финансовая аналитика - Будущие месяцы (детализация)"
+        )
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:G1")
+
+        worksheet.cell(
+            row=2,
+            column=1,
+            value=f"Дата выгрузки: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        )
+
+        current_row = 3
+        if applied_filters:
+            worksheet.cell(row=current_row, column=1, value="Примененные фильтры:")
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+            for filter_name, filter_value in applied_filters.items():
+                if filter_value:
+                    worksheet.cell(
+                        row=current_row,
+                        column=1,
+                        value=f"  {filter_name}: {filter_value}",
+                    )
+                    current_row += 1
+            current_row += 1
+
+        headers = [
+            "Месяц",
+            "Квартал",
+            "Год",
+            "Прогноз премии",
+            "Прогноз комиссии",
+            "Накопительно премия",
+            "Накопительно комиссия",
+        ]
+        for col, header in enumerate(headers, 1):
+            worksheet.cell(row=current_row, column=col, value=header)
+
+        self._apply_header_style(worksheet, current_row, len(headers))
+        current_row += 1
+
+        monthly_rows = analytics.get("future_monthly_forecast") or analytics.get(
+            "monthly_premium_forecast", []
+        )
+        running_premium_total = Decimal("0")
+        running_commission_total = Decimal("0")
+        start_data_row = current_row
+
+        for row in monthly_rows:
+            month_date = row.get("month")
+            forecasted_premium = row.get("forecasted_premium", Decimal("0"))
+            forecasted_commission = row.get("forecasted_commission", Decimal("0"))
+            month_label = row.get("month_label")
+            quarter_label = row.get("quarter")
+            year_value = row.get("year")
+            row_running_premium = row.get("running_premium_total")
+            row_running_commission = row.get("running_commission_total")
+
+            if row_running_premium is None:
+                running_premium_total += forecasted_premium
+            else:
+                running_premium_total = row_running_premium
+
+            if row_running_commission is None:
+                running_commission_total += forecasted_commission
+            else:
+                running_commission_total = row_running_commission
+
+            if not quarter_label and month_date:
+                quarter_number = ((month_date.month - 1) // 3) + 1
+                quarter_label = f"Q{quarter_number}"
+            if not year_value and month_date:
+                year_value = month_date.year
+
+            worksheet.cell(
+                row=current_row,
+                column=1,
+                value=month_label
+                if month_label
+                else self._format_value(month_date)
+                if month_date
+                else "",
+            )
+            worksheet.cell(
+                row=current_row,
+                column=2,
+                value=quarter_label or "",
+            )
+            worksheet.cell(row=current_row, column=3, value=year_value or "")
+            worksheet.cell(
+                row=current_row,
+                column=4,
+                value=self._format_value(forecasted_premium),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=5,
+                value=self._format_value(forecasted_commission),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=6,
+                value=self._format_value(running_premium_total),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=7,
+                value=self._format_value(running_commission_total),
+            )
+            current_row += 1
+
+        if current_row > start_data_row:
+            self._apply_data_style(
+                worksheet, start_data_row, current_row - 1, len(headers)
+            )
+
+        self._auto_adjust_columns(worksheet)
+
+    def _create_current_year_bridge_sheet(
+        self,
+        worksheet,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ):
+        """Create current year bridge sheet (actual elapsed + forecast remaining)."""
+        worksheet.cell(row=1, column=1, value="Финансовая аналитика - Текущий год")
+        worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+        worksheet.merge_cells("A1:D1")
+
+        worksheet.cell(
+            row=2,
+            column=1,
+            value=f"Дата выгрузки: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        )
+
+        current_row = 3
+        if applied_filters:
+            worksheet.cell(row=current_row, column=1, value="Примененные фильтры:")
+            worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+            for filter_name, filter_value in applied_filters.items():
+                if filter_value:
+                    worksheet.cell(
+                        row=current_row,
+                        column=1,
+                        value=f"  {filter_name}: {filter_value}",
+                    )
+                    current_row += 1
+            current_row += 1
+
+        outlook = analytics.get("current_year_outlook", {})
+
+        worksheet.cell(row=current_row, column=1, value="Показатель")
+        worksheet.cell(row=current_row, column=2, value="Значение")
+        self._apply_header_style(worksheet, current_row, 2)
+        current_row += 1
+
+        metrics = [
+            ("Год", outlook.get("year", datetime.now().year)),
+            ("Текущий месяц (номер)", outlook.get("current_month", 0)),
+            (
+                "Факт с начала года: премия",
+                self._format_value(outlook.get("ytd_actual_premium", Decimal("0"))),
+            ),
+            (
+                "Факт с начала года: комиссия",
+                self._format_value(outlook.get("ytd_actual_commission", Decimal("0"))),
+            ),
+            (
+                "Прогноз до конца года: премия",
+                self._format_value(
+                    outlook.get("remaining_forecast_premium", Decimal("0"))
+                ),
+            ),
+            (
+                "Прогноз до конца года: комиссия",
+                self._format_value(
+                    outlook.get("remaining_forecast_commission", Decimal("0"))
+                ),
+            ),
+            (
+                "Итог года: премия",
+                self._format_value(
+                    outlook.get("projected_full_year_premium", Decimal("0"))
+                ),
+            ),
+            (
+                "Итог года: комиссия",
+                self._format_value(
+                    outlook.get("projected_full_year_commission", Decimal("0"))
+                ),
+            ),
+            ("Фактовых месяцев", outlook.get("ytd_months_count", 0)),
+            ("Прогнозных месяцев", outlook.get("forecast_months_count", 0)),
+        ]
+
+        start_data_row = current_row
+        for label, value in metrics:
+            worksheet.cell(row=current_row, column=1, value=label)
+            worksheet.cell(row=current_row, column=2, value=value)
+            current_row += 1
+
+        if current_row > start_data_row:
+            self._apply_data_style(worksheet, start_data_row, current_row - 1, 2)
+
+        current_row += 2
+
+        headers = [
+            "Месяц",
+            "Режим",
+            "Премия",
+            "Комиссия",
+        ]
+        for col, header in enumerate(headers, 1):
+            worksheet.cell(row=current_row, column=col, value=header)
+        self._apply_header_style(worksheet, current_row, len(headers))
+        current_row += 1
+
+        monthly_breakdown = outlook.get("monthly_breakdown", [])
+        start_data_row = current_row
+        for month in monthly_breakdown:
+            mode = "Факт" if month.get("mode") == "actual" else "Прогноз"
+            worksheet.cell(row=current_row, column=1, value=month.get("month_name", ""))
+            worksheet.cell(row=current_row, column=2, value=mode)
+            worksheet.cell(
+                row=current_row,
+                column=3,
+                value=self._format_value(month.get("premium_value", 0)),
+            )
+            worksheet.cell(
+                row=current_row,
+                column=4,
+                value=self._format_value(month.get("commission_value", 0)),
+            )
+            current_row += 1
+
+        if current_row > start_data_row:
+            self._apply_data_style(
+                worksheet, start_data_row, current_row - 1, len(headers)
+            )
+
+        self._auto_adjust_columns(worksheet)
 
     def _create_forecast_sheet(
         self,
@@ -820,19 +1261,19 @@ class AnalyticsExporter:
     ):
         """Create payment status analysis sheet."""
         # Add title and metadata
-        worksheet.cell(row=1, column=1, value="Payment Status Analysis")
+        worksheet.cell(row=1, column=1, value="Платежный контур")
         worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
-        worksheet.merge_cells("A1:B1")
+        worksheet.merge_cells("A1:C1")
 
         worksheet.cell(
             row=2,
             column=1,
-            value=f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            value=f"Дата выгрузки: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         )
 
         current_row = 3
         if applied_filters:
-            worksheet.cell(row=current_row, column=1, value="Applied Filters:")
+            worksheet.cell(row=current_row, column=1, value="Примененные фильтры:")
             worksheet.cell(row=current_row, column=1).font = Font(bold=True)
             current_row += 1
 
@@ -849,32 +1290,32 @@ class AnalyticsExporter:
         # Payment status summary
         payment_analysis = analytics.get("payment_status_analysis", {})
 
-        worksheet.cell(row=current_row, column=1, value="Payment Status")
-        worksheet.cell(row=current_row, column=2, value="Count")
-        worksheet.cell(row=current_row, column=3, value="Amount")
+        worksheet.cell(row=current_row, column=1, value="Статус платежа")
+        worksheet.cell(row=current_row, column=2, value="Количество")
+        worksheet.cell(row=current_row, column=3, value="Сумма")
         self._apply_header_style(worksheet, current_row, 3)
         current_row += 1
 
         status_data = [
             (
-                "Total Payments",
+                "Всего платежей",
                 payment_analysis.get("total_payments", 0),
                 payment_analysis.get("paid_amount", 0)
                 + payment_analysis.get("pending_amount", 0)
                 + payment_analysis.get("overdue_amount", 0),
             ),
             (
-                "Paid Payments",
+                "Оплачено",
                 payment_analysis.get("paid_payments", 0),
                 payment_analysis.get("paid_amount", 0),
             ),
             (
-                "Pending Payments",
+                "Ожидает оплаты",
                 payment_analysis.get("pending_payments", 0),
                 payment_analysis.get("pending_amount", 0),
             ),
             (
-                "Overdue Payments",
+                "Просрочено",
                 payment_analysis.get("overdue_payments", 0),
                 payment_analysis.get("overdue_amount", 0),
             ),
@@ -892,7 +1333,7 @@ class AnalyticsExporter:
 
         # Add payment discipline rate
         current_row += 1
-        worksheet.cell(row=current_row, column=1, value="Payment Discipline Rate (%)")
+        worksheet.cell(row=current_row, column=1, value="Платежная дисциплина (%)")
         worksheet.cell(
             row=current_row,
             column=2,

@@ -1323,11 +1323,11 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
 class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
-    Financial analytics view displaying forecasting and payment analysis.
+    Financial analytics view focused on forecasted future income.
 
-    Provides comprehensive financial analytics with premium and commission forecasting,
-    payment status analysis, overdue payment tracking, and average commission rates
-    by various dimensions.
+    Main goal:
+    - show complete future forecast by periods (month/quarter/horizon)
+    - show current-year bridge: actual for elapsed months + forecast to year end
     """
 
     template_name = "analytics/financial_analytics.html"
@@ -1361,103 +1361,40 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                 analytics_filter
             )
 
-            # Process financial metrics for better template usage
+            # Core data blocks
             monthly_premium_forecast = financial_data.get(
                 "monthly_premium_forecast", []
             )
-            monthly_commission_forecast = financial_data.get(
-                "monthly_commission_forecast", []
+            future_forecast_summary = financial_data.get("future_forecast_summary", {})
+            future_quarterly_forecast = financial_data.get(
+                "future_quarterly_forecast", []
             )
+            current_year_outlook = financial_data.get("current_year_outlook", {})
             payment_status_analysis = financial_data.get("payment_status_analysis", {})
-            seasonal_analysis = financial_data.get("seasonal_analysis", {})
-            comparative_analysis = financial_data.get("comparative_analysis", {})
 
-            # Calculate running totals by calendar year and add trend indicators
-            enhanced_forecast = self._enhance_forecast_data(monthly_premium_forecast)
-
-            # Calculate summary metrics
-            total_forecasted_premium = sum(
-                forecast["forecasted_premium"] for forecast in monthly_premium_forecast
-            )
-            total_forecasted_commission = sum(
-                forecast["forecasted_commission"]
-                for forecast in monthly_commission_forecast
+            # Enriched rows for long-range monthly table
+            future_monthly_forecast = self._enhance_forecast_data(
+                monthly_premium_forecast
             )
 
-            # Calculate actual vs forecasted for completed months
-            actual_vs_forecast_variance = []
-            for forecast in monthly_premium_forecast:
-                if forecast["actual_premium"] is not None:
-                    variance = (
-                        forecast["actual_premium"] - forecast["forecasted_premium"]
-                    )
-                    variance_percentage = Decimal("0")
-                    if forecast["forecasted_premium"] > 0:
-                        variance_percentage = (
-                            variance / forecast["forecasted_premium"]
-                        ) * Decimal("100")
-
-                    actual_vs_forecast_variance.append(
-                        {
-                            "month": forecast["month"],
-                            "variance": variance,
-                            "variance_percentage": variance_percentage,
-                            "forecasted": forecast["forecasted_premium"],
-                            "actual": forecast["actual_premium"],
-                        }
-                    )
-
-            # Prepare chart data for forecasts
-            forecast_chart_labels = [
-                forecast["month"].strftime("%Y-%m")
-                for forecast in monthly_premium_forecast
-            ]
-            premium_forecast_data = [
-                float(forecast["forecasted_premium"])
-                for forecast in monthly_premium_forecast
-            ]
-            commission_forecast_data = [
-                float(forecast["forecasted_commission"])
-                for forecast in monthly_commission_forecast
-            ]
-
-            # Convert to JSON strings for template
-            import json
-
-            forecast_chart_labels_json = json.dumps(forecast_chart_labels)
-            premium_forecast_data_json = json.dumps(premium_forecast_data)
-            commission_forecast_data_json = json.dumps(commission_forecast_data)
-
-            # Prepare payment status chart data
-            payment_status_labels = ["Оплачено", "Ожидает оплаты", "Просрочено"]
-            payment_status_counts = [
-                payment_status_analysis.get("paid_payments", 0),
-                payment_status_analysis.get("pending_payments", 0),
-                payment_status_analysis.get("overdue_payments", 0),
-            ]
-            payment_status_amounts = [
-                float(payment_status_analysis.get("paid_amount", Decimal("0"))),
-                float(payment_status_analysis.get("pending_amount", Decimal("0"))),
-                float(payment_status_analysis.get("overdue_amount", Decimal("0"))),
-            ]
+            # Chart data
+            future_chart_data = self._prepare_future_chart_data(
+                monthly_premium_forecast
+            )
+            current_year_chart_data = self._prepare_current_year_chart_data(
+                current_year_outlook
+            )
 
             # Add filter options for the form
             context.update(
                 {
-                    "monthly_premium_forecast": enhanced_forecast,
-                    "monthly_commission_forecast": monthly_commission_forecast,
+                    "future_forecast_summary": future_forecast_summary,
+                    "future_quarterly_forecast": future_quarterly_forecast,
+                    "future_monthly_forecast": future_monthly_forecast,
+                    "current_year_outlook": current_year_outlook,
                     "payment_status_analysis": payment_status_analysis,
-                    "seasonal_analysis": seasonal_analysis,
-                    "comparative_analysis": comparative_analysis,
-                    "total_forecasted_premium": total_forecasted_premium,
-                    "total_forecasted_commission": total_forecasted_commission,
-                    "actual_vs_forecast_variance": actual_vs_forecast_variance,
-                    "forecast_chart_labels": forecast_chart_labels_json,
-                    "premium_forecast_data": premium_forecast_data_json,
-                    "commission_forecast_data": commission_forecast_data_json,
-                    "payment_status_labels": payment_status_labels,
-                    "payment_status_counts": payment_status_counts,
-                    "payment_status_amounts": payment_status_amounts,
+                    "future_chart_data": future_chart_data,
+                    "current_year_chart_data": current_year_chart_data,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
                     "insurance_types": InsuranceType.objects.all().order_by("name"),
@@ -1488,20 +1425,43 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Provide empty data as fallback
             context.update(
                 {
-                    "monthly_premium_forecast": [],
-                    "monthly_commission_forecast": [],
-                    "payment_status_analysis": {},
-                    "seasonal_analysis": {},
-                    "comparative_analysis": {},
-                    "total_forecasted_premium": Decimal("0"),
-                    "total_forecasted_commission": Decimal("0"),
-                    "actual_vs_forecast_variance": [],
-                    "forecast_chart_labels": "[]",
-                    "premium_forecast_data": "[]",
-                    "commission_forecast_data": "[]",
-                    "payment_status_labels": [],
-                    "payment_status_counts": [],
-                    "payment_status_amounts": [],
+                    "future_forecast_summary": {
+                        "as_of_date": datetime.now().date(),
+                        "horizon_months": 0,
+                        "total_future_premium": Decimal("0"),
+                        "total_future_commission": Decimal("0"),
+                        "current_month": None,
+                        "next_month": None,
+                        "current_quarter_remaining": None,
+                        "next_quarter": None,
+                    },
+                    "future_quarterly_forecast": [],
+                    "future_monthly_forecast": [],
+                    "current_year_outlook": {
+                        "year": datetime.now().year,
+                        "current_month": datetime.now().month,
+                        "ytd_actual_premium": Decimal("0"),
+                        "ytd_actual_commission": Decimal("0"),
+                        "remaining_forecast_premium": Decimal("0"),
+                        "remaining_forecast_commission": Decimal("0"),
+                        "projected_full_year_premium": Decimal("0"),
+                        "projected_full_year_commission": Decimal("0"),
+                        "ytd_months_count": 0,
+                        "forecast_months_count": 0,
+                        "monthly_breakdown": [],
+                    },
+                    "payment_status_analysis": {
+                        "total_payments": 0,
+                        "paid_payments": 0,
+                        "pending_payments": 0,
+                        "overdue_payments": 0,
+                        "paid_amount": Decimal("0"),
+                        "pending_amount": Decimal("0"),
+                        "overdue_amount": Decimal("0"),
+                        "payment_discipline_rate": Decimal("0"),
+                    },
+                    "future_chart_data": "{}",
+                    "current_year_chart_data": "{}",
                     "branches": Branch.objects.none(),
                     "insurers": Insurer.objects.none(),
                     "insurance_types": InsuranceType.objects.none(),
@@ -1534,72 +1494,22 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             monthly_premium_forecast = financial_data.get(
                 "monthly_premium_forecast", []
             )
-            monthly_commission_forecast = financial_data.get(
-                "monthly_commission_forecast", []
-            )
-
-            # Format forecasts for JSON
-            formatted_premium_forecast = []
-            for forecast in monthly_premium_forecast:
-                formatted_premium_forecast.append(
-                    {
-                        "month": forecast["month"].strftime("%Y-%m-%d"),
-                        "forecasted_premium": str(forecast["forecasted_premium"]),
-                        "forecasted_commission": str(forecast["forecasted_commission"]),
-                        "actual_premium": str(forecast["actual_premium"])
-                        if forecast["actual_premium"]
-                        else None,
-                        "actual_commission": str(forecast["actual_commission"])
-                        if forecast["actual_commission"]
-                        else None,
-                        "confidence_level": str(forecast["confidence_level"]),
-                    }
-                )
-
-            formatted_commission_forecast = []
-            for forecast in monthly_commission_forecast:
-                formatted_commission_forecast.append(
-                    {
-                        "month": forecast["month"].strftime("%Y-%m-%d"),
-                        "forecasted_premium": str(forecast["forecasted_premium"]),
-                        "forecasted_commission": str(forecast["forecasted_commission"]),
-                        "actual_premium": str(forecast["actual_premium"])
-                        if forecast["actual_premium"]
-                        else None,
-                        "actual_commission": str(forecast["actual_commission"])
-                        if forecast["actual_commission"]
-                        else None,
-                        "confidence_level": str(forecast["confidence_level"]),
-                    }
-                )
-
-            # Format payment status analysis
-            payment_status_analysis = financial_data.get("payment_status_analysis", {})
-            formatted_payment_status = {
-                "total_payments": payment_status_analysis.get("total_payments", 0),
-                "paid_payments": payment_status_analysis.get("paid_payments", 0),
-                "pending_payments": payment_status_analysis.get("pending_payments", 0),
-                "overdue_payments": payment_status_analysis.get("overdue_payments", 0),
-                "paid_amount": str(
-                    payment_status_analysis.get("paid_amount", Decimal("0"))
-                ),
-                "pending_amount": str(
-                    payment_status_analysis.get("pending_amount", Decimal("0"))
-                ),
-                "overdue_amount": str(
-                    payment_status_analysis.get("overdue_amount", Decimal("0"))
-                ),
-                "payment_discipline_rate": str(
-                    payment_status_analysis.get("payment_discipline_rate", Decimal("0"))
-                ),
-            }
 
             # Format response data
             response_data = {
                 "success": True,
-                "monthly_premium_forecast": formatted_premium_forecast,
-                "monthly_commission_forecast": formatted_commission_forecast,
-                "payment_status_analysis": formatted_payment_status,
+                "future_forecast_summary": self._serialize_for_json(
+                    financial_data.get("future_forecast_summary", {})
+                ),
+                "future_quarterly_forecast": self._serialize_for_json(
+                    financial_data.get("future_quarterly_forecast", [])
+                ),
+                "current_year_outlook": self._serialize_for_json(
+                    financial_data.get("current_year_outlook", {})
+                ),
+                "future_monthly_forecast": self._serialize_for_json(
+                    self._enhance_forecast_data(monthly_premium_forecast)
+                ),
                 "filter_applied": financial_data.get("filter_applied", False),
             }
 
@@ -1625,13 +1535,7 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
         try:
             filter_data = {}
 
-            # Date filters
-            if self.request.GET.get("date_from"):
-                filter_data["date_from"] = self.request.GET.get("date_from")
-            if self.request.GET.get("date_to"):
-                filter_data["date_to"] = self.request.GET.get("date_to")
-
-            # Multi-select filters
+            # Segment filters
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
             if self.request.GET.getlist("insurers"):
@@ -1662,13 +1566,7 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
         try:
             filter_data = {}
 
-            # Date filters
-            if self.request.POST.get("date_from"):
-                filter_data["date_from"] = self.request.POST.get("date_from")
-            if self.request.POST.get("date_to"):
-                filter_data["date_to"] = self.request.POST.get("date_to")
-
-            # Multi-select filters
+            # Segment filters
             if self.request.POST.getlist("branches"):
                 filter_data["branch_ids"] = self.request.POST.getlist("branches")
             if self.request.POST.getlist("insurers"):
@@ -1715,14 +1613,6 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Prepare applied filters info for export
             applied_filters = {}
             if analytics_filter:
-                if analytics_filter.date_from:
-                    applied_filters["Date From"] = analytics_filter.date_from.strftime(
-                        "%Y-%m-%d"
-                    )
-                if analytics_filter.date_to:
-                    applied_filters["Date To"] = analytics_filter.date_to.strftime(
-                        "%Y-%m-%d"
-                    )
                 if analytics_filter.branch_ids:
                     branch_names = Branch.objects.filter(
                         id__in=analytics_filter.branch_ids
@@ -1738,6 +1628,11 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                         id__in=analytics_filter.insurance_type_ids
                     ).values_list("name", flat=True)
                     applied_filters["Insurance Types"] = ", ".join(type_names)
+                if analytics_filter.client_ids:
+                    client_names = Client.objects.filter(
+                        id__in=analytics_filter.client_ids
+                    ).values_list("client_name", flat=True)
+                    applied_filters["Clients"] = ", ".join(client_names)
 
             # Export data
             return self.exporter.export_financial_analytics(
@@ -1763,25 +1658,16 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
             return []
 
         enhanced_forecast = []
-
-        # Group by calendar year for running totals
-        yearly_totals = {}
+        running_premium_total = Decimal("0")
+        running_commission_total = Decimal("0")
 
         for i, forecast in enumerate(monthly_forecast):
             month_date = forecast["month"]
             year = month_date.year
             month_num = month_date.month
 
-            # Initialize year totals if needed
-            if year not in yearly_totals:
-                yearly_totals[year] = {
-                    "premium_total": Decimal("0"),
-                    "commission_total": Decimal("0"),
-                }
-
-            # Add to running totals
-            yearly_totals[year]["premium_total"] += forecast["forecasted_premium"]
-            yearly_totals[year]["commission_total"] += forecast["forecasted_commission"]
+            running_premium_total += forecast["forecasted_premium"]
+            running_commission_total += forecast["forecasted_commission"]
 
             # Calculate trend indicator (compare with previous month)
             trend_premium = "neutral"
@@ -1823,19 +1709,79 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
             enhanced_item = {
                 **forecast,  # Include all original data
-                "running_premium_total": yearly_totals[year]["premium_total"],
-                "running_commission_total": yearly_totals[year]["commission_total"],
+                "running_premium_total": running_premium_total,
+                "running_commission_total": running_commission_total,
                 "trend_premium": trend_premium,
                 "trend_commission": trend_commission,
                 "quarter": quarter,
                 "quarter_class": quarter_class,
                 "year": year,
                 "month_num": month_num,
+                "month_label": month_date.strftime("%m.%Y"),
             }
 
             enhanced_forecast.append(enhanced_item)
 
         return enhanced_forecast
+
+    def _prepare_future_chart_data(self, monthly_forecast):
+        """Prepare JSON chart data for all future monthly forecasts."""
+        if not monthly_forecast:
+            return "{}"
+
+        import json
+
+        chart_data = {
+            "labels": [item["month"].strftime("%m.%Y") for item in monthly_forecast],
+            "premium": [float(item["forecasted_premium"]) for item in monthly_forecast],
+            "commission": [
+                float(item["forecasted_commission"]) for item in monthly_forecast
+            ],
+        }
+
+        return json.dumps(chart_data)
+
+    def _prepare_current_year_chart_data(self, current_year_outlook):
+        """Prepare JSON chart data for current-year actual+forecast bridge."""
+        monthly_breakdown = current_year_outlook.get("monthly_breakdown", [])
+        if not monthly_breakdown:
+            return "{}"
+
+        import json
+
+        chart_data = {
+            "labels": [item["month_short"] for item in monthly_breakdown],
+            "actual_premium": [
+                float(item["premium_value"]) if item["mode"] == "actual" else None
+                for item in monthly_breakdown
+            ],
+            "forecast_premium": [
+                float(item["premium_value"]) if item["mode"] == "forecast" else None
+                for item in monthly_breakdown
+            ],
+            "actual_commission": [
+                float(item["commission_value"]) if item["mode"] == "actual" else None
+                for item in monthly_breakdown
+            ],
+            "forecast_commission": [
+                float(item["commission_value"]) if item["mode"] == "forecast" else None
+                for item in monthly_breakdown
+            ],
+        }
+
+        return json.dumps(chart_data)
+
+    def _serialize_for_json(self, data):
+        """Serialize Decimal/date values recursively for JSON responses."""
+        if isinstance(data, Decimal):
+            return str(data)
+        if isinstance(data, (datetime, date)):
+            return data.isoformat()
+        if isinstance(data, list):
+            return [self._serialize_for_json(item) for item in data]
+        if isinstance(data, dict):
+            return {key: self._serialize_for_json(value) for key, value in data.items()}
+        return data
 
 
 class FinancialHistoryView(SuperuserRequiredMixin, TemplateView):

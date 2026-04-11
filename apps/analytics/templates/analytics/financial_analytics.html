@@ -7,748 +7,815 @@
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">
-    <i class="bi bi-currency-dollar"></i> Финансовая аналитика
+    <i class="bi bi-cash-coin"></i> Финансовая аналитика
 </li>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    .financial-card {
-        background: white;
-        border-radius: 15px;
+    .forecast-page {
+        --fc-bg: #f2f7fb;
+        --fc-surface: #ffffff;
+        --fc-border: #d9e6f0;
+        --fc-primary: #0f5f8a;
+        --fc-primary-soft: #e7f4fb;
+        --fc-secondary: #1f7a64;
+        --fc-muted: #5d7488;
+        --fc-danger: #b42318;
+        --fc-shadow: 0 4px 14px rgba(17, 63, 95, 0.08);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+
+    .hero-block {
+        background: linear-gradient(118deg, #0b4f75 0%, #0f7ca8 55%, #57b4d9 100%);
+        border-radius: 18px;
+        color: #fff;
         padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border-left: 4px solid #667eea;
+        box-shadow: 0 12px 30px rgba(9, 65, 95, 0.25);
+        margin-bottom: 1.25rem;
     }
 
-    .financial-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    .hero-subtitle {
+        opacity: 0.92;
+        max-width: 860px;
     }
 
-    .financial-card.forecast {
-        border-left-color: #667eea;
-    }
-
-    .financial-card.payments {
-        border-left-color: #f093fb;
-    }
-
-
-
-
-
-    .metric-value {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-        color: #333;
-    }
-
-    .metric-label {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 0;
-    }
-
-    .forecast-item {
-        display: flex;
-        justify-content: space-between;
+    .hero-pill {
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        border-radius: 999px;
+        padding: 0.4rem 0.85rem;
+        background: rgba(255, 255, 255, 0.14);
+        font-size: 0.88rem;
+        display: inline-flex;
         align-items: center;
-        padding: 0.75rem 0;
-        border-bottom: 1px solid #f0f0f0;
+        gap: 0.4rem;
     }
 
-    .forecast-item:last-child {
-        border-bottom: none;
+    .panel-card {
+        background: var(--fc-surface);
+        border: 1px solid var(--fc-border);
+        border-radius: 14px;
+        padding: 1.1rem;
+        box-shadow: var(--fc-shadow);
+        margin-bottom: 1rem;
     }
 
-    .forecast-month {
-        font-weight: 500;
-        color: #333;
-    }
-
-    .forecast-amount {
-        font-weight: bold;
-        color: #667eea;
-    }
-
-    .payment-status-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
-        border-radius: 8px;
-        background: #f8f9fa;
-    }
-
-    .payment-status-item.paid {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        color: white;
-    }
-
-    .payment-status-item.pending {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        color: white;
-    }
-
-
-
-
-
-
-
-    .chart-container {
-        background: white;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    .panel-title {
+        color: var(--fc-primary);
+        font-weight: 700;
+        margin-bottom: 0.9rem;
     }
 
     .filter-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        border: 1px solid #e9ecef;
+        background: var(--fc-surface);
+        border: 1px solid var(--fc-border);
+        border-radius: 14px;
+        padding: 1.2rem;
+        box-shadow: var(--fc-shadow);
+        margin-bottom: 1rem;
     }
 
     .filter-applied-badge {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        margin-left: 1rem;
-    }
-
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        display: none;
-        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        padding: 0.35rem 0.75rem;
+        display: inline-flex;
         align-items: center;
-        z-index: 9999;
+        gap: 0.35rem;
     }
 
-    .loading-spinner {
-        background: white;
-        padding: 2rem;
-        border-radius: 10px;
-        text-align: center;
+    .metric-card {
+        background: var(--fc-surface);
+        border: 1px solid var(--fc-border);
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: var(--fc-shadow);
+        height: 100%;
     }
 
-    .variance-positive {
-        color: #28a745;
+    .metric-label {
+        color: var(--fc-muted);
+        font-size: 0.83rem;
+        margin-bottom: 0.35rem;
     }
 
-    .variance-negative {
-        color: #dc3545;
+    .metric-value {
+        font-size: 1.28rem;
+        font-weight: 700;
+        margin-bottom: 0;
+        color: #10293d;
     }
 
-    .forecast-table {
-        font-size: 0.9rem;
-    }
-
-    .forecast-table th {
-        font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
-    }
-
-    .forecast-table .sticky-top {
-        background: #f8f9fa !important;
-        z-index: 10;
-    }
-
-    /* Quarter color coding */
-    .quarter-q1 {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border-left: 4px solid #2196f3;
-    }
-
-    .quarter-q2 {
-        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%) !important;
-        border-left: 4px solid #4caf50;
-    }
-
-    .quarter-q3 {
-        background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%) !important;
-        border-left: 4px solid #ff9800;
-    }
-
-    .quarter-q4 {
-        background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%) !important;
-        border-left: 4px solid #e91e63;
-    }
-
-    /* Trend indicators */
-    .trend-up {
-        color: #28a745;
+    .metric-note {
         font-size: 0.8rem;
+        color: var(--fc-muted);
+        margin-top: 0.38rem;
     }
 
-    .trend-down {
-        color: #dc3545;
-        font-size: 0.8rem;
-    }
-
-    .trend-neutral {
-        color: #6c757d;
-        font-size: 0.8rem;
-    }
-
-    /* Running totals styling */
-    .running-total {
-        font-size: 0.75rem;
-        color: #6c757d;
-        font-style: italic;
-    }
-
-    /* Analysis cards */
-    .analysis-card {
-        background: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .analysis-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-
-    .analysis-card.seasonal {
-        border-left: 4px solid #17a2b8;
-    }
-
-    .analysis-card.comparative {
-        border-left: 4px solid #6f42c1;
-    }
-
-    .metric-item {
+    .metric-split {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid #f0f0f0;
+        align-items: baseline;
+        gap: 0.75rem;
     }
 
-    .metric-item:last-child {
+    .metric-split .caption {
+        color: var(--fc-muted);
+        font-size: 0.78rem;
+    }
+
+    .chart-box {
+        min-height: 320px;
+    }
+
+    .quarter-table thead th,
+    .month-table thead th,
+    .year-table thead th {
+        border-bottom: 1px solid #d7e4ef;
+        color: #415f77;
+        font-size: 0.79rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .quarter-table tbody td,
+    .month-table tbody td,
+    .year-table tbody td {
+        color: #1b3347;
+        font-size: 0.89rem;
+        vertical-align: middle;
+    }
+
+    .quarter-table tbody tr,
+    .month-table tbody tr,
+    .year-table tbody tr {
+        border-bottom: 1px solid #eef3f8;
+    }
+
+    .quarter-table tbody tr:last-child,
+    .month-table tbody tr:last-child,
+    .year-table tbody tr:last-child {
         border-bottom: none;
     }
 
-    .growth-positive {
-        color: #28a745;
-        font-weight: bold;
+    .actual-badge {
+        background: #d8f3e8;
+        color: #146c43;
     }
 
-    .growth-negative {
-        color: #dc3545;
-        font-weight: bold;
+    .forecast-badge {
+        background: #e6f1ff;
+        color: #0f5f8a;
     }
 
-    .growth-neutral {
-        color: #6c757d;
+    .mini-stat {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.8rem;
+        border-bottom: 1px dashed #d8e5ef;
+        padding: 0.58rem 0;
     }
 
-    @media (max-width: 768px) {
-        .metric-value {
-            font-size: 1.5rem;
+    .mini-stat:last-child {
+        border-bottom: none;
+    }
+
+    .mini-stat .label {
+        color: var(--fc-muted);
+        font-size: 0.83rem;
+    }
+
+    .mini-stat .value {
+        color: #11344f;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .section-kicker {
+        color: #4f6d84;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.74rem;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+    }
+
+    .status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 10px;
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 0.5rem;
+        color: #fff;
+    }
+
+    .status-paid {
+        background: linear-gradient(120deg, #159f75 0%, #33c695 100%);
+    }
+
+    .status-pending {
+        background: linear-gradient(120deg, #2f7ec1 0%, #56a5e0 100%);
+    }
+
+    .status-overdue {
+        background: linear-gradient(120deg, #b93a35 0%, #de6b5a 100%);
+    }
+
+    @media (max-width: 991px) {
+        .chart-box {
+            min-height: 280px;
         }
-        .forecast-item, .payment-status-item {
-            flex-direction: column;
-            align-items: flex-start;
+    }
+
+    @media (max-width: 767px) {
+        .metric-value {
+            font-size: 1.12rem;
+        }
+
+        .month-table thead,
+        .year-table thead {
+            display: none;
+        }
+
+        .month-table tbody tr,
+        .month-table tbody td,
+        .year-table tbody tr,
+        .year-table tbody td {
+            display: block;
+            width: 100%;
+            border: none;
+        }
+
+        .month-table tbody td,
+        .year-table tbody td {
+            padding: 0.2rem 0;
+        }
+
+        .month-table tbody td::before,
+        .year-table tbody td::before {
+            content: attr(data-label) ": ";
+            font-weight: 600;
+            color: #47657d;
         }
     }
 </style>
 {% endblock %}
 
 {% block analytics_content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h2 mb-0">
-        <i class="bi bi-graph-up text-primary"></i>
-        Финансовая аналитика
-        {% if filter_applied %}
-            <span class="filter-applied-badge">
-                <i class="bi bi-funnel-fill"></i> Фильтры применены
-            </span>
-        {% endif %}
-    </h1>
-    <div class="d-flex align-items-center">
-        <div class="text-muted me-3">
-            <i class="bi bi-calendar3"></i>
-            {{ current_year }} год
+<div class="forecast-page">
+    <div class="hero-block">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h1 class="h2 mb-2">
+                    <i class="bi bi-cash-coin"></i>
+                    Финансовая аналитика
+                </h1>
+                <p class="hero-subtitle mb-0">
+                    Страница сфокусирована на будущих доходах: прогноз премий и комиссий по всем предстоящим периодам, плюс отдельный мост текущего года (факт прошедших месяцев и прогноз до конца года).
+                </p>
+                {% if filter_applied %}
+                    <div class="mt-2">
+                        <span class="filter-applied-badge">
+                            <i class="bi bi-funnel-fill"></i> Фильтры применены
+                        </span>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="d-flex flex-column align-items-start align-items-lg-end gap-2">
+                <span class="hero-pill">
+                    <i class="bi bi-calendar-event"></i>
+                    Актуально на {{ future_forecast_summary.as_of_date|date:"d.m.Y" }}
+                </span>
+                <span class="hero-pill">
+                    <i class="bi bi-hourglass-split"></i>
+                    Горизонт: {{ future_forecast_summary.horizon_months }} мес.
+                </span>
+                <button class="btn btn-success" onclick="exportData(this)">
+                    <i class="fas fa-download me-1"></i> Экспорт
+                </button>
+            </div>
         </div>
-        <button class="btn btn-success" onclick="exportData()">
-            <i class="fas fa-download me-1"></i>
-            Экспорт
-        </button>
     </div>
-</div>
 
-<!-- Filters Section -->
-<div class="filter-card">
-    <h5 class="mb-3">
-        <i class="bi bi-funnel"></i>
-        Фильтры
-    </h5>
-    <form id="filterForm" method="get">
-        <div class="row">
-            <div class="col-md-3 mb-3">
-                <label for="date_from" class="form-label">Дата с:</label>
-                <input type="date" class="form-control" id="date_from" name="date_from"
-                       value="{% if current_filter.date_from %}{{ current_filter.date_from|date:'Y-m-d' }}{% endif %}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="date_to" class="form-label">Дата по:</label>
-                <input type="date" class="form-control" id="date_to" name="date_to"
-                       value="{% if current_filter.date_to %}{{ current_filter.date_to|date:'Y-m-d' }}{% endif %}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="branches" class="form-label">Филиалы:</label>
-                <select class="form-select" id="branches" name="branches" multiple>
-                    {% for branch in branches %}
-                        <option value="{{ branch.id }}"
+    <div class="filter-card">
+        <h5 class="panel-title mb-3">
+            <i class="bi bi-funnel"></i> Фильтры
+        </h5>
+        <form id="filterForm" method="get">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label for="branches" class="form-label">Филиалы:</label>
+                    <select class="form-select" id="branches" name="branches" multiple>
+                        {% for branch in branches %}
+                            <option value="{{ branch.id }}"
                                 {% if current_filter and branch.id in current_filter.branch_ids %}selected{% endif %}>
-                            {{ branch.branch_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="insurers" class="form-label">Страховщики:</label>
-                <select class="form-select" id="insurers" name="insurers" multiple>
-                    {% for insurer in insurers %}
-                        <option value="{{ insurer.id }}"
+                                {{ branch.branch_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="insurers" class="form-label">Страховщики:</label>
+                    <select class="form-select" id="insurers" name="insurers" multiple>
+                        {% for insurer in insurers %}
+                            <option value="{{ insurer.id }}"
                                 {% if current_filter and insurer.id in current_filter.insurer_ids %}selected{% endif %}>
-                            {{ insurer.insurer_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="insurance_types" class="form-label">Виды страхования:</label>
-                <select class="form-select" id="insurance_types" name="insurance_types" multiple>
-                    {% for insurance_type in insurance_types %}
-                        <option value="{{ insurance_type.id }}"
+                                {{ insurer.insurer_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="insurance_types" class="form-label">Виды страхования:</label>
+                    <select class="form-select" id="insurance_types" name="insurance_types" multiple>
+                        {% for insurance_type in insurance_types %}
+                            <option value="{{ insurance_type.id }}"
                                 {% if current_filter and insurance_type.id in current_filter.insurance_type_ids %}selected{% endif %}>
-                            {{ insurance_type.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="clients" class="form-label">Клиенты (топ 100):</label>
-                <select class="form-select" id="clients" name="clients" multiple>
-                    {% for client in clients %}
-                        <option value="{{ client.id }}"
+                                {{ insurance_type.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="clients" class="form-label">Клиенты (топ 100):</label>
+                    <select class="form-select" id="clients" name="clients" multiple>
+                        {% for client in clients %}
+                            <option value="{{ client.id }}"
                                 {% if current_filter and client.id in current_filter.client_ids %}selected{% endif %}>
-                            {{ client.client_name }}
-                        </option>
-                    {% endfor %}
-                </select>
+                                {{ client.client_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-        </div>
-        <div class="row">
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary me-2">
-                    <i class="bi bi-search"></i>
-                    Применить фильтры
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="clearFilters">
-                    <i class="bi bi-x-circle"></i>
-                    Сбросить
-                </button>
-            </div>
-        </div>
-    </form>
-</div>
-
-<!-- Financial Summary Cards -->
-<div class="row mb-4">
-    <div class="col-lg-6">
-        <div class="financial-card forecast">
-            <h5 class="mb-3">
-                <i class="bi bi-graph-up-arrow"></i>
-                Прогноз поступлений
-            </h5>
             <div class="row">
-                <div class="col-6">
-                    <div class="metric-value">{{ total_forecasted_premium|currency }}</div>
-                    <div class="metric-label">Прогноз премий</div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-search"></i> Применить фильтры
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="clearFilters">
+                        <i class="bi bi-x-circle"></i> Сбросить
+                    </button>
                 </div>
-                <div class="col-6">
-                    <div class="metric-value">{{ total_forecasted_commission|currency }}</div>
-                    <div class="metric-label">Прогноз комиссий</div>
-                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="section-kicker">Весь будущий прогноз</div>
+    <div class="row g-3 mb-4">
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Все будущие премии</div>
+                <h4 class="metric-value">{{ future_forecast_summary.total_future_premium|currency }}</h4>
+                <div class="metric-note">На весь прогнозный горизонт</div>
+            </div>
+        </div>
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Все будущие комиссии</div>
+                <h4 class="metric-value">{{ future_forecast_summary.total_future_commission|currency }}</h4>
+                <div class="metric-note">На весь прогнозный горизонт</div>
+            </div>
+        </div>
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Текущий месяц (прогноз)</div>
+                {% if future_forecast_summary.current_month %}
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.current_month.forecasted_premium|currency }}</h4>
+                        <span class="caption">Премия</span>
+                    </div>
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.current_month.forecasted_commission|currency }}</h4>
+                        <span class="caption">Комиссия</span>
+                    </div>
+                {% else %}
+                    <h4 class="metric-value">-</h4>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Следующий месяц</div>
+                {% if future_forecast_summary.next_month %}
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.next_month.forecasted_premium|currency }}</h4>
+                        <span class="caption">Премия</span>
+                    </div>
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.next_month.forecasted_commission|currency }}</h4>
+                        <span class="caption">Комиссия</span>
+                    </div>
+                {% else %}
+                    <h4 class="metric-value">-</h4>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Остаток текущего квартала</div>
+                {% if future_forecast_summary.current_quarter_remaining %}
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.current_quarter_remaining.forecasted_premium|currency }}</h4>
+                        <span class="caption">Премия</span>
+                    </div>
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.current_quarter_remaining.forecasted_commission|currency }}</h4>
+                        <span class="caption">Комиссия</span>
+                    </div>
+                {% else %}
+                    <h4 class="metric-value">-</h4>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-xl col-md-6">
+            <div class="metric-card">
+                <div class="metric-label">Следующий квартал</div>
+                {% if future_forecast_summary.next_quarter %}
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.next_quarter.forecasted_premium|currency }}</h4>
+                        <span class="caption">Премия</span>
+                    </div>
+                    <div class="metric-split">
+                        <h4 class="metric-value">{{ future_forecast_summary.next_quarter.forecasted_commission|currency }}</h4>
+                        <span class="caption">Комиссия</span>
+                    </div>
+                {% else %}
+                    <h4 class="metric-value">-</h4>
+                {% endif %}
             </div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div class="financial-card payments">
-            <h5 class="mb-3">
-                <i class="bi bi-credit-card"></i>
-                Платежная дисциплина
-            </h5>
-            <div class="row">
-                <div class="col-6">
-                    <div class="metric-value">{{ payment_status_analysis.payment_discipline_rate|floatformat:1 }}%</div>
-                    <div class="metric-label">Дисциплина платежей</div>
+
+    <div class="row">
+        <div class="col-xl-8">
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    Динамика прогноза по будущим месяцам
+                </h5>
+                <div class="chart-box">
+                    <canvas id="futureForecastChart"></canvas>
                 </div>
-                <div class="col-6">
-                    <div class="metric-value">{{ payment_status_analysis.overdue_payments }}</div>
-                    <div class="metric-label">Просроченные платежи</div>
+            </div>
+
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-calendar3"></i>
+                    Квартальные суммы прогноза
+                </h5>
+                <div class="table-responsive">
+                    <table class="table quarter-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Квартал</th>
+                                <th class="text-end">Премия</th>
+                                <th class="text-end">Комиссия</th>
+                                <th class="text-end">Месяцев в расчете</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for quarter in future_quarterly_forecast %}
+                                <tr>
+                                    <td>{{ quarter.quarter_label }}</td>
+                                    <td class="text-end">{{ quarter.forecasted_premium|currency }}</td>
+                                    <td class="text-end">{{ quarter.forecasted_commission|currency }}</td>
+                                    <td class="text-end">{{ quarter.months_count }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">Нет данных по кварталам</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-table"></i>
+                    Все будущие месяцы (детализация)
+                </h5>
+                <div class="table-responsive">
+                    <table class="table month-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Месяц</th>
+                                <th>Квартал</th>
+                                <th class="text-end">Премия</th>
+                                <th class="text-end">Комиссия</th>
+                                <th class="text-end">Накопительно премия</th>
+                                <th class="text-end">Накопительно комиссия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for month in future_monthly_forecast %}
+                                <tr>
+                                    <td data-label="Месяц"><strong>{{ month.month_label }}</strong></td>
+                                    <td data-label="Квартал">{{ month.quarter }} {{ month.year }}</td>
+                                    <td data-label="Премия" class="text-end">{{ month.forecasted_premium|currency }}</td>
+                                    <td data-label="Комиссия" class="text-end">{{ month.forecasted_commission|currency }}</td>
+                                    <td data-label="Накопительно премия" class="text-end">{{ month.running_premium_total|currency }}</td>
+                                    <td data-label="Накопительно комиссия" class="text-end">{{ month.running_commission_total|currency }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">Нет будущих прогнозных месяцев</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Monthly Forecast Section -->
-<div class="row">
-    <div class="col-lg-8 col-md-12">
-        <div class="financial-card forecast mb-3">
-            <h5 class="mb-3">
-                <i class="bi bi-calendar-month"></i>
-                Прогноз по месяцам
-            </h5>
-            <div class="chart-container">
-                <canvas id="forecastChart" width="800" height="400"></canvas>
+        <div class="col-xl-4">
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-calendar-check"></i>
+                    Текущий год: факт + прогноз
+                </h5>
+                <div class="mini-stat">
+                    <div class="label">Год</div>
+                    <div class="value">{{ current_year_outlook.year }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Факт с начала года (премия)</div>
+                    <div class="value">{{ current_year_outlook.ytd_actual_premium|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Факт с начала года (комиссия)</div>
+                    <div class="value">{{ current_year_outlook.ytd_actual_commission|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Прогноз до конца года (премия)</div>
+                    <div class="value">{{ current_year_outlook.remaining_forecast_premium|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Прогноз до конца года (комиссия)</div>
+                    <div class="value">{{ current_year_outlook.remaining_forecast_commission|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Итог года (премия)</div>
+                    <div class="value">{{ current_year_outlook.projected_full_year_premium|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Итог года (комиссия)</div>
+                    <div class="value">{{ current_year_outlook.projected_full_year_commission|currency }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Фактовых месяцев</div>
+                    <div class="value">{{ current_year_outlook.ytd_months_count }}</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="label">Прогнозных месяцев</div>
+                    <div class="value">{{ current_year_outlook.forecast_months_count }}</div>
+                </div>
             </div>
-        </div>
 
-        <!-- Payment Status directly under the chart -->
-        <div class="financial-card payments">
-            <h5 class="mb-3">
-                <i class="bi bi-pie-chart"></i>
-                Статус платежей
-            </h5>
-            <div class="payment-status-item paid">
-                <div>
-                    <strong>Оплачено</strong>
-                    <div>{{ payment_status_analysis.paid_payments }} платежей</div>
-                </div>
-                <div class="text-end">
-                    <strong>{{ payment_status_analysis.paid_amount|currency }}</strong>
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-bar-chart"></i>
+                    Годовой мост по месяцам
+                </h5>
+                <div class="chart-box" style="min-height: 280px;">
+                    <canvas id="currentYearBridgeChart"></canvas>
                 </div>
             </div>
-            <div class="payment-status-item pending">
-                <div>
-                    <strong>Ожидает оплаты</strong>
-                    <div>{{ payment_status_analysis.pending_payments }} платежей</div>
-                </div>
-                <div class="text-end">
-                    <strong>{{ payment_status_analysis.pending_amount|currency }}</strong>
-                </div>
-            </div>
-            <div class="payment-status-item" style="background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white;">
-                <div>
-                    <strong>Просрочено</strong>
-                    <div>{{ payment_status_analysis.overdue_payments }} платежей</div>
-                </div>
-                <div class="text-end">
-                    <strong>{{ payment_status_analysis.overdue_amount|currency }}</strong>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4 col-md-12">
-        <div class="financial-card forecast">
-            <h5 class="mb-3">
-                <i class="bi bi-calendar-range"></i>
-                Прогноз на 24 месяца
-            </h5>
-            <div style="height: auto; max-height: none;">
-                <table class="table table-sm table-hover forecast-table">
-                    <thead class="table-light sticky-top">
-                        <tr>
-                            <th>Месяц</th>
-                            <th class="text-end">Премия</th>
-                            <th class="text-end">Комиссия</th>
-                            <th class="text-end">Накопительно</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for forecast in monthly_premium_forecast|slice:":24" %}
-                        <tr class="{{ forecast.quarter_class }}">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ forecast.month|date:"M Y" }}</strong>
-                                    <span class="badge bg-secondary ms-2">{{ forecast.quarter }}</span>
-                                    {% if forecast.actual_premium %}
-                                        <span class="badge bg-success ms-1">Факт</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td class="text-end">
-                                <div class="d-flex align-items-center justify-content-end">
-                                    <span class="fw-bold">{{ forecast.forecasted_premium|currency }}</span>
-                                    {% if forecast.trend_premium == 'up' %}
-                                        <i class="bi bi-arrow-up trend-up ms-1"></i>
-                                    {% elif forecast.trend_premium == 'down' %}
-                                        <i class="bi bi-arrow-down trend-down ms-1"></i>
-                                    {% else %}
-                                        <i class="bi bi-dash trend-neutral ms-1"></i>
-                                    {% endif %}
-                                </div>
-                                {% if forecast.actual_premium %}
-                                    <small class="text-muted">Факт: {{ forecast.actual_premium|currency }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <div class="d-flex align-items-center justify-content-end">
-                                    <span class="fw-bold">{{ forecast.forecasted_commission|currency }}</span>
-                                    {% if forecast.trend_commission == 'up' %}
-                                        <i class="bi bi-arrow-up trend-up ms-1"></i>
-                                    {% elif forecast.trend_commission == 'down' %}
-                                        <i class="bi bi-arrow-down trend-down ms-1"></i>
-                                    {% else %}
-                                        <i class="bi bi-dash trend-neutral ms-1"></i>
-                                    {% endif %}
-                                </div>
-                                {% if forecast.actual_commission %}
-                                    <small class="text-muted">Факт: {{ forecast.actual_commission|currency }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <div class="running-total">
-                                    <div>П: {{ forecast.running_premium_total|currency }}</div>
-                                    <div>К: {{ forecast.running_commission_total|currency }}</div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- New Analysis Blocks -->
-<div class="row mb-4">
-    <!-- Seasonal Analysis -->
-    <div class="col-lg-6">
-        <div class="analysis-card seasonal">
-            <h5 class="mb-3">
-                <i class="bi bi-calendar4-range"></i>
-                Сезонный анализ
-            </h5>
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-list-ul"></i>
+                    Месяцы года: режим расчета
+                </h5>
+                <div class="table-responsive">
+                    <table class="table year-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Месяц</th>
+                                <th>Режим</th>
+                                <th class="text-end">Премия</th>
+                                <th class="text-end">Комиссия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for month in current_year_outlook.monthly_breakdown %}
+                                <tr>
+                                    <td data-label="Месяц">{{ month.month_name }}</td>
+                                    <td data-label="Режим">
+                                        {% if month.mode == 'actual' %}
+                                            <span class="badge actual-badge">Факт</span>
+                                        {% else %}
+                                            <span class="badge forecast-badge">Прогноз</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-label="Премия" class="text-end">{{ month.premium_value|currency }}</td>
+                                    <td data-label="Комиссия" class="text-end">{{ month.commission_value|currency }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">Нет данных по текущему году</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-            {% if seasonal_analysis.peak_months %}
-            <div class="metric-item">
-                <div>
-                    <strong>Лучшие месяцы:</strong>
-                    <div class="text-muted">
-                        {% for month in seasonal_analysis.peak_months|slice:":3" %}
-                            {{ month.name }}{% if not forloop.last %}, {% endif %}
-                        {% endfor %}
+            <div class="panel-card">
+                <h5 class="panel-title">
+                    <i class="bi bi-credit-card"></i>
+                    Платежный контур (контроль)
+                </h5>
+                <div class="status-row status-paid">
+                    <div>
+                        <strong>Оплачено</strong>
+                        <div>{{ payment_status_analysis.paid_payments }} платежей</div>
+                    </div>
+                    <div class="text-end">
+                        <strong>{{ payment_status_analysis.paid_amount|currency }}</strong>
                     </div>
                 </div>
-                <div class="text-success">
-                    <i class="bi bi-arrow-up-circle"></i>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if seasonal_analysis.low_months %}
-            <div class="metric-item">
-                <div>
-                    <strong>Слабые месяцы:</strong>
-                    <div class="text-muted">
-                        {% for month in seasonal_analysis.low_months|slice:":3" %}
-                            {{ month.name }}{% if not forloop.last %}, {% endif %}
-                        {% endfor %}
+                <div class="status-row status-pending">
+                    <div>
+                        <strong>Ожидает оплаты</strong>
+                        <div>{{ payment_status_analysis.pending_payments }} платежей</div>
+                    </div>
+                    <div class="text-end">
+                        <strong>{{ payment_status_analysis.pending_amount|currency }}</strong>
                     </div>
                 </div>
-                <div class="text-warning">
-                    <i class="bi bi-arrow-down-circle"></i>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="metric-item">
-                <div>
-                    <strong>Сезонность:</strong>
-                    <div class="text-muted">Коэффициент вариации</div>
-                </div>
-                <div class="fw-bold">
-                    {{ seasonal_analysis.seasonality_strength|floatformat:1 }}%
-                </div>
-            </div>
-
-            {% if seasonal_analysis.quarterly_data %}
-            <div class="mt-3">
-                <small class="text-muted">Квартальные средние:</small>
-                <div class="row mt-2">
-                    {% for quarter, value in seasonal_analysis.quarterly_data.items %}
-                    <div class="col-3 text-center">
-                        <div class="badge bg-secondary">{{ quarter }}</div>
-                        <div class="small">{{ value|currency }}</div>
+                <div class="status-row status-overdue">
+                    <div>
+                        <strong>Просрочено</strong>
+                        <div>{{ payment_status_analysis.overdue_payments }} платежей</div>
                     </div>
-                    {% endfor %}
+                    <div class="text-end">
+                        <strong>{{ payment_status_analysis.overdue_amount|currency }}</strong>
+                    </div>
                 </div>
             </div>
-            {% endif %}
         </div>
-    </div>
-
-    <!-- Comparative Analysis -->
-    <div class="col-lg-6">
-        <div class="analysis-card comparative">
-            <h5 class="mb-3">
-                <i class="bi bi-graph-up-arrow"></i>
-                Сравнение с {{ comparative_analysis.previous_year }} годом
-            </h5>
-
-            <div class="metric-item">
-                <div>
-                    <strong>Рост премий:</strong>
-                    <div class="text-muted">{{ comparative_analysis.current_premium|currency }} vs {{ comparative_analysis.previous_premium|currency }}</div>
-                </div>
-                <div class="{% if comparative_analysis.premium_growth > 0 %}growth-positive{% elif comparative_analysis.premium_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
-                    {% if comparative_analysis.premium_growth > 0 %}+{% endif %}{{ comparative_analysis.premium_growth|floatformat:1 }}%
-                </div>
-            </div>
-
-            <div class="metric-item">
-                <div>
-                    <strong>Рост комиссий:</strong>
-                    <div class="text-muted">{{ comparative_analysis.current_commission|currency }} vs {{ comparative_analysis.previous_commission|currency }}</div>
-                </div>
-                <div class="{% if comparative_analysis.commission_growth > 0 %}growth-positive{% elif comparative_analysis.commission_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
-                    {% if comparative_analysis.commission_growth > 0 %}+{% endif %}{{ comparative_analysis.commission_growth|floatformat:1 }}%
-                </div>
-            </div>
-
-            <div class="metric-item">
-                <div>
-                    <strong>Рост полисов:</strong>
-                    <div class="text-muted">{{ comparative_analysis.current_policy_count }} vs {{ comparative_analysis.previous_policy_count }}</div>
-                </div>
-                <div class="{% if comparative_analysis.policy_growth > 0 %}growth-positive{% elif comparative_analysis.policy_growth < 0 %}growth-negative{% else %}growth-neutral{% endif %}">
-                    {% if comparative_analysis.policy_growth > 0 %}+{% endif %}{{ comparative_analysis.policy_growth|floatformat:1 }}%
-                </div>
-            </div>
-
-            <div class="metric-item">
-                <div>
-                    <strong>Новые клиенты:</strong>
-                    <div class="text-muted">{{ comparative_analysis.new_clients_percentage|floatformat:1 }}% от общего числа</div>
-                </div>
-                <div class="text-info">
-                    {{ comparative_analysis.new_clients }} клиентов
-                </div>
-            </div>
-
-            {% if comparative_analysis.insurance_type_changes %}
-            <div class="mt-3">
-                <small class="text-muted">Изменения по видам страхования:</small>
-                <div class="mt-2">
-                    {% for type_name, change in comparative_analysis.insurance_type_changes.items %}
-                        {% if change.growth != 0 %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="small">{{ type_name }}:</span>
-                            <span class="small {% if change.growth > 0 %}text-success{% elif change.growth < 0 %}text-danger{% else %}text-muted{% endif %}">
-                                {% if change.growth > 0 %}+{% endif %}{{ change.growth|floatformat:0 }}%
-                            </span>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-spinner">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Загрузка...</span>
-        </div>
-        <div class="mt-2">Обновление финансовых данных...</div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize charts
     initializeCharts();
 
-    // Handle form submission - let it submit normally as GET
-    const filterForm = document.getElementById('filterForm');
-    // No preventDefault - let form submit normally
-
-    // Clear filters button
     document.getElementById('clearFilters').addEventListener('click', function() {
         window.location.href = window.location.pathname;
     });
 });
 
-function updateFinancialAnalytics() {
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    loadingOverlay.style.display = 'flex';
+function initializeCharts() {
+    const futureChartData = JSON.parse('{{ future_chart_data|escapejs }}' || '{}');
+    const currentYearChartData = JSON.parse('{{ current_year_chart_data|escapejs }}' || '{}');
 
-    const formData = new FormData(document.getElementById('filterForm'));
-
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update financial data
-            updateFinancialData(data);
-            if (data.warning) {
-                showAlert('warning', data.warning);
+    const futureCanvas = document.getElementById('futureForecastChart');
+    if (futureCanvas && futureChartData.labels && futureChartData.labels.length) {
+        const futureCtx = futureCanvas.getContext('2d');
+        new Chart(futureCtx, {
+            type: 'line',
+            data: {
+                labels: futureChartData.labels,
+                datasets: [
+                    {
+                        label: 'Прогноз премии (₽)',
+                        data: futureChartData.premium,
+                        borderColor: 'rgba(15, 95, 138, 1)',
+                        backgroundColor: 'rgba(15, 95, 138, 0.10)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3
+                    },
+                    {
+                        label: 'Прогноз комиссии (₽)',
+                        data: futureChartData.commission,
+                        borderColor: 'rgba(31, 122, 100, 1)',
+                        backgroundColor: 'rgba(31, 122, 100, 0.10)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                }
             }
-        } else {
-            showAlert('danger', data.error || 'Произошла ошибка при обновлении данных');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showAlert('danger', 'Произошла ошибка при обновлении данных');
-    })
-    .finally(() => {
-        loadingOverlay.style.display = 'none';
-    });
-}
+        });
+    }
 
-function updateFinancialData(data) {
-    // This would update the financial data on the page
-    // Implementation would depend on the exact structure returned by the backend
-    console.log('Updating financial data:', data);
-}
-
-function formatNumber(num) {
-    return parseFloat(num).toLocaleString('ru-RU', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    });
+    const yearCanvas = document.getElementById('currentYearBridgeChart');
+    if (yearCanvas && currentYearChartData.labels && currentYearChartData.labels.length) {
+        const yearCtx = yearCanvas.getContext('2d');
+        new Chart(yearCtx, {
+            data: {
+                labels: currentYearChartData.labels,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Премия (факт)',
+                        data: currentYearChartData.actual_premium,
+                        backgroundColor: 'rgba(31, 122, 100, 0.75)',
+                        borderColor: 'rgba(31, 122, 100, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Премия (прогноз)',
+                        data: currentYearChartData.forecast_premium,
+                        backgroundColor: 'rgba(15, 95, 138, 0.75)',
+                        borderColor: 'rgba(15, 95, 138, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        type: 'line',
+                        label: 'Комиссия (факт)',
+                        data: currentYearChartData.actual_commission,
+                        borderColor: 'rgba(255, 153, 0, 1)',
+                        backgroundColor: 'rgba(255, 153, 0, 0.12)',
+                        tension: 0.25,
+                        pointRadius: 3
+                    },
+                    {
+                        type: 'line',
+                        label: 'Комиссия (прогноз)',
+                        data: currentYearChartData.forecast_commission,
+                        borderColor: 'rgba(177, 119, 0, 1)',
+                        backgroundColor: 'rgba(177, 119, 0, 0.12)',
+                        borderDash: [5, 4],
+                        tension: 0.25,
+                        pointRadius: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.parsed.y === null) {
+                                    return null;
+                                }
+                                return context.dataset.label + ': ' + context.parsed.y.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 
 function showAlert(type, message) {
@@ -762,7 +829,6 @@ function showAlert(type, message) {
     const container = document.querySelector('.analytics-container');
     container.insertBefore(alertDiv, container.firstChild);
 
-    // Auto-dismiss after 5 seconds
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -770,96 +836,16 @@ function showAlert(type, message) {
     }, 5000);
 }
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function initializeCharts() {
-    // Forecast Chart
-    const forecastCtx = document.getElementById('forecastChart').getContext('2d');
-
-    // Get data from template context - use JSON filter for safety
-    const forecastLabels = JSON.parse('{{ forecast_chart_labels|escapejs }}' || '[]');
-    const premiumForecastData = JSON.parse('{{ premium_forecast_data|escapejs }}' || '[]');
-    const commissionForecastData = JSON.parse('{{ commission_forecast_data|escapejs }}' || '[]');
-
-    new Chart(forecastCtx, {
-        type: 'line',
-        data: {
-            labels: forecastLabels,
-            datasets: [{
-                label: 'Прогноз премий (₽)',
-                data: premiumForecastData,
-                borderColor: 'rgba(102, 126, 234, 1)',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Прогноз комиссий (₽)',
-                data: commissionForecastData,
-                borderColor: 'rgba(240, 147, 251, 1)',
-                backgroundColor: 'rgba(240, 147, 251, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return value.toLocaleString('ru-RU') + ' ₽';
-                        }
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' +
-                                   context.parsed.y.toLocaleString('ru-RU') + ' ₽';
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-
-}
-
-function exportData() {
-    // Show loading indicator
-    const exportBtn = event.target.closest('button');
+function exportData(button) {
+    const exportBtn = button;
     const originalText = exportBtn.innerHTML;
     exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Экспорт...';
     exportBtn.disabled = true;
 
     try {
-        // Create export URL with current filters
         const params = new URLSearchParams(window.location.search);
         params.set('export', 'excel');
 
-        // Create temporary link and trigger download
         const exportUrl = window.location.pathname + '?' + params.toString();
         const link = document.createElement('a');
         link.href = exportUrl;
@@ -868,14 +854,11 @@ function exportData() {
         link.click();
         document.body.removeChild(link);
 
-        // Show success message
         showAlert('success', 'Экспорт данных начат. Файл будет загружен автоматически.');
-
     } catch (error) {
         console.error('Export error:', error);
         showAlert('danger', 'Произошла ошибка при экспорте данных');
     } finally {
-        // Restore button state after delay
         setTimeout(() => {
             exportBtn.innerHTML = originalText;
             exportBtn.disabled = false;

@@ -73,7 +73,7 @@ class InsurerStatisticsService:
         parsed_policy_scope = (
             policy_scope if policy_scope in cls.VALID_POLICY_SCOPE else "active"
         )
-        parsed_metric = metric if metric in cls.VALID_METRIC else "count"
+        parsed_metric = metric if metric in cls.VALID_METRIC else "premium"
         if parsed_scope == "current" and branch_id is None:
             parsed_scope = "all"
 

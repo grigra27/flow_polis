@@ -265,7 +265,7 @@ class InsurerStatisticsServiceTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertIsNone(filters.selected_branch_id)
         self.assertEqual(filters.stats_scope, "all")
         self.assertEqual(filters.policy_scope, "active")
-        self.assertEqual(filters.metric, "count")
+        self.assertEqual(filters.metric, "premium")
         self.assertEqual(filters.date_from, date(2026, 1, 1))
         self.assertEqual(filters.date_to, date(2026, 12, 31))
 
@@ -409,7 +409,7 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertIsNone(response.context["selected_insurance_type_id"])
         self.assertEqual(response.context["stats_scope"], "all")
         self.assertEqual(response.context["policy_scope"], "active")
-        self.assertEqual(response.context["metric"], "count")
+        self.assertEqual(response.context["metric"], "premium")
         self.assertEqual(response.context["date_from"], date(2026, 1, 1))
         self.assertEqual(response.context["date_to"], date(2026, 12, 31))
 
@@ -418,7 +418,7 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
 
         statistics = response.context["statistics"]
         self.assertEqual(statistics["policy_scope"], "active")
-        self.assertEqual(statistics["metric"], "count")
+        self.assertEqual(statistics["metric"], "premium")
         self.assertEqual(statistics["scoped_policies"], 2)
 
 

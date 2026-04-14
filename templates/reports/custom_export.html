@@ -91,6 +91,8 @@
         <i class="bi bi-arrow-left"></i> Назад
     </a>
 </div>
+{% url 'reports:index' as reports_index_url %}
+{% include 'includes/page_breadcrumb.html' with section='Экспорты' section_url=reports_index_url current='Кастомный экспорт' %}
 
 {% if messages %}
     {% for message in messages %}

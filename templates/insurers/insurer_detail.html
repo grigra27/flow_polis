@@ -106,6 +106,8 @@
         </a>
     </div>
 </div>
+{% url 'insurers:list' as insurers_list_url %}
+{% include 'includes/page_breadcrumb.html' with section='Страховщики' section_url=insurers_list_url current=insurer.insurer_name %}
 
 <div class="row">
     <div class="col-md-4">

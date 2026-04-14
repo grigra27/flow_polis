@@ -26,6 +26,8 @@
         </a>
     </div>
 </div>
+{% url 'policies:list' as policies_list_url %}
+{% include 'includes/page_breadcrumb.html' with section='Полисы' section_url=policies_list_url current=policy.policy_number %}
 
 <div class="row">
     <!-- Main Info -->

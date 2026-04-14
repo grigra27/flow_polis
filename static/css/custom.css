@@ -50,6 +50,13 @@ body {
     box-shadow: var(--app-shadow-sm);
 }
 
+.app-navbar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    backdrop-filter: blur(10px);
+}
+
 .navbar-brand {
     font-weight: 700;
     letter-spacing: 0.2px;
@@ -57,6 +64,20 @@ body {
 
 .navbar .nav-link {
     font-weight: 500;
+    border-radius: var(--app-radius-sm);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.navbar .nav-link.active,
+.navbar .nav-link[aria-current="page"] {
+    background-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+.navbar .dropdown-menu .dropdown-item.active,
+.navbar .dropdown-menu .dropdown-item:active {
+    background-color: var(--app-color-primary-soft);
+    color: var(--app-color-primary-strong);
 }
 
 footer.bg-light {
@@ -124,19 +145,74 @@ footer.bg-light {
 .pagination .page-link {
     border-color: var(--app-color-border-strong);
     color: var(--app-color-primary-strong);
+    background-color: var(--app-color-surface);
     border-radius: var(--app-radius-sm);
     margin: 0 2px;
     min-width: 36px;
     text-align: center;
+    transition: all 0.15s ease;
+}
+
+.pagination .page-link:hover {
+    color: #084298;
+    background-color: var(--app-color-surface-muted);
+    border-color: var(--app-color-primary);
 }
 
 .pagination .page-item.active .page-link {
     background: linear-gradient(135deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%);
     border-color: var(--app-color-primary);
+    color: #fff;
+    font-weight: 700;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+}
+
+.pagination .page-item.active .page-link:hover {
+    color: #fff;
+    background: var(--app-color-primary-strong);
+    border-color: var(--app-color-primary-strong);
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #8ba0b8;
+    background-color: #f2f5fa;
+    border-color: #dce5ef;
+}
+
+.pagination .page-link:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.2);
 }
 
 .badge-status {
     font-size: 0.85rem;
+}
+
+.app-page-breadcrumb {
+    margin-top: -0.4rem;
+    margin-bottom: 1rem;
+}
+
+.app-page-breadcrumb .breadcrumb {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--app-color-border);
+    border-radius: var(--app-radius-sm);
+    padding: 0.4rem 0.65rem;
+    box-shadow: var(--app-shadow-sm);
+}
+
+.app-page-breadcrumb .breadcrumb-item,
+.app-page-breadcrumb .breadcrumb-item.active {
+    color: var(--app-color-text-muted);
+    font-size: 0.82rem;
+}
+
+.app-page-breadcrumb .breadcrumb-item a {
+    color: var(--app-color-primary-strong);
+    text-decoration: none;
+}
+
+.app-page-breadcrumb .breadcrumb-item a:hover {
+    text-decoration: underline;
 }
 
 .clickable-row {

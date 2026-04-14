@@ -21,7 +21,8 @@
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    {% with current_namespace=request.resolver_match.namespace current_view=request.resolver_match.view_name %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary app-navbar-sticky">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'core:dashboard' %}">
                 <i class="bi bi-shield-check"></i> флоу // полисы
@@ -32,62 +33,62 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'core:dashboard' %}">
+                        <a class="nav-link{% if current_view == 'core:dashboard' %} active{% endif %}" href="{% url 'core:dashboard' %}" {% if current_view == 'core:dashboard' %}aria-current="page"{% endif %}>
                             <i class="bi bi-speedometer2"></i> Дашборд
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'policies:list' %}">
+                        <a class="nav-link{% if current_namespace == 'policies' and current_view != 'policies:payments' %} active{% endif %}" href="{% url 'policies:list' %}" {% if current_namespace == 'policies' and current_view != 'policies:payments' %}aria-current="page"{% endif %}>
                             <i class="bi bi-file-earmark-text"></i> Полисы
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'policies:payments' %}">
+                        <a class="nav-link{% if current_view == 'policies:payments' %} active{% endif %}" href="{% url 'policies:payments' %}" {% if current_view == 'policies:payments' %}aria-current="page"{% endif %}>
                             <i class="bi bi-calendar-check"></i> Платежи
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'clients:list' %}">
+                        <a class="nav-link{% if current_namespace == 'clients' %} active{% endif %}" href="{% url 'clients:list' %}" {% if current_namespace == 'clients' %}aria-current="page"{% endif %}>
                             <i class="bi bi-people"></i> Лизингополучатели
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'insurers:list' %}">
+                        <a class="nav-link{% if current_namespace == 'insurers' %} active{% endif %}" href="{% url 'insurers:list' %}" {% if current_namespace == 'insurers' %}aria-current="page"{% endif %}>
                             <i class="bi bi-building"></i> Страховщики
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'reports:index' %}">
+                        <a class="nav-link{% if current_namespace == 'reports' %} active{% endif %}" href="{% url 'reports:index' %}" {% if current_namespace == 'reports' %}aria-current="page"{% endif %}>
                             <i class="bi bi-download"></i> Экспорты
                         </a>
                     </li>
                     {% if is_superuser %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="analyticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle{% if current_namespace == 'analytics' %} active{% endif %}" href="#" id="analyticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" {% if current_namespace == 'analytics' %}aria-current="page"{% endif %}>
                             <i class="bi bi-bar-chart"></i> Аналитика
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="analyticsDropdown">
-                            <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:dashboard' %} active{% endif %}" href="{% url 'analytics:dashboard' %}">
                                 <i class="bi bi-speedometer2"></i> Панель управления
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:branch_analytics' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:branch_analytics' %} active{% endif %}" href="{% url 'analytics:branch_analytics' %}">
                                 <i class="bi bi-geo-alt"></i> По филиалам
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:insurer_analytics' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:insurer_analytics' %} active{% endif %}" href="{% url 'analytics:insurer_analytics' %}">
                                 <i class="bi bi-building"></i> По страховщикам
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:client_analytics' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:client_analytics' %} active{% endif %}" href="{% url 'analytics:client_analytics' %}">
                                 <i class="bi bi-people"></i> По клиентам
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:financial_analytics' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:financial_analytics' %} active{% endif %}" href="{% url 'analytics:financial_analytics' %}">
                                 <i class="bi bi-currency-dollar"></i> Финансовая аналитика
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:financial_history' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:financial_history' %} active{% endif %}" href="{% url 'analytics:financial_history' %}">
                                 <i class="bi bi-clock-history"></i> Финансовая история
                             </a></li>
-                            <li><a class="dropdown-item" href="{% url 'analytics:time_series_analytics' %}">
+                            <li><a class="dropdown-item{% if current_view == 'analytics:time_series_analytics' %} active{% endif %}" href="{% url 'analytics:time_series_analytics' %}">
                                 <i class="bi bi-graph-up-arrow"></i> Временная аналитика
                             </a></li>
                         </ul>
@@ -98,7 +99,7 @@
                 <ul class="navbar-nav">
                     {% if is_admin %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'admin:index' %}">
+                        <a class="nav-link{% if current_namespace == 'admin' %} active{% endif %}" href="{% url 'admin:index' %}" {% if current_namespace == 'admin' %}aria-current="page"{% endif %}>
                             <i class="bi bi-gear"></i> Админка
                         </a>
                     </li>
@@ -122,6 +123,7 @@
             </div>
         </div>
     </nav>
+    {% endwith %}
 
     <!-- Main Content -->
     <div class="container-fluid main-content">

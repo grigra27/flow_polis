@@ -810,6 +810,78 @@ class AnalyticsService:
                 "error": str(e),
             }
 
+    def get_top_insurers_table(
+        self, analytics_filter: Optional[AnalyticsFilter] = None, limit: int = 5
+    ) -> list:
+        """
+        Get top insurers with plan/fact premium split for dashboard table.
+
+        Returns list of dicts sorted by planned premium volume desc, limited to `limit`.
+        Each dict has: name, planned_premium, actual_premium, execution_pct, commission.
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+            from apps.insurers.models import Insurer
+
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            if analytics_filter:
+                policies_qs = analytics_filter.apply_to_policies(policies_qs)
+                payments_qs = analytics_filter.apply_to_payments(payments_qs)
+                date_range = analytics_filter.get_date_range_dict()
+            else:
+                date_range = None
+
+            paid_payments_qs = payments_qs.filter(paid_date__isnull=False)
+
+            insurers_with_data = Insurer.objects.filter(
+                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
+            )
+
+            rows = []
+            for insurer in insurers_with_data:
+                insurer_payments = payments_qs.filter(policy__insurer=insurer)
+                insurer_paid = paid_payments_qs.filter(policy__insurer=insurer)
+
+                planned = self.calculator.calculate_premium_volume(
+                    insurer_payments, date_range
+                )
+                actual = self.calculator.calculate_premium_volume(
+                    insurer_paid, date_range
+                )
+                commission = self.calculator.calculate_commission_revenue(
+                    insurer_payments, date_range
+                )
+
+                if planned > 0:
+                    execution_pct = (actual / planned * Decimal("100")).quantize(
+                        Decimal("0.1")
+                    )
+                else:
+                    execution_pct = Decimal("0")
+
+                rows.append(
+                    {
+                        "name": insurer.insurer_name,
+                        "planned_premium": planned,
+                        "actual_premium": actual,
+                        "execution_pct": execution_pct,
+                        "commission": commission,
+                    }
+                )
+
+            rows.sort(key=lambda r: r["planned_premium"], reverse=True)
+            return rows[:limit]
+
+        except Exception as e:
+            logger.error(f"Error calculating top insurers table: {e}")
+            return []
+
     def get_client_analytics(
         self, analytics_filter: Optional[AnalyticsFilter] = None
     ) -> Dict[str, Any]:

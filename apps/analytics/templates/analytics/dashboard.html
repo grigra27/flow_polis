@@ -234,13 +234,77 @@
     </div>
 </div>
 
+<!-- Top-5 Insurers Table -->
 <div class="row">
-    <div class="col-lg-6">
-        {% include 'analytics/includes/chart.html' with chart_id='premium_by_insurer' chart_type='bar' chart_title='Объем премий по страховщикам' drill_down=True exportable=True %}
-    </div>
-
-    <div class="col-lg-6">
-        {% include 'analytics/includes/chart.html' with chart_id='commission_by_insurer' chart_type='bar' chart_title='Комиссионный доход по страховщикам' exportable=True %}
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom d-flex align-items-center gap-2 py-3">
+                <i class="bi bi-building text-primary fs-5"></i>
+                <h6 class="mb-0 fw-semibold">Топ-5 страховщиков по объёму премий</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if top_insurers %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-3 text-muted fw-semibold" style="width:30%">Страховщик</th>
+                                <th class="py-3 text-muted fw-semibold text-end">Премии, план</th>
+                                <th class="py-3 text-muted fw-semibold text-end">Премии, факт</th>
+                                <th class="py-3 text-muted fw-semibold" style="width:22%">Выполнение плана</th>
+                                <th class="pe-4 py-3 text-muted fw-semibold text-end">Комиссия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in top_insurers %}
+                            <tr>
+                                <td class="ps-4 py-3 fw-medium">{{ row.name }}</td>
+                                <td class="py-3 text-end text-nowrap">{{ row.planned_premium|rub }}</td>
+                                <td class="py-3 text-end text-nowrap">{{ row.actual_premium|rub }}</td>
+                                <td class="py-3">
+                                    {% if row.execution_pct >= 100 %}
+                                        {% with bar_class="bg-success" badge_class="text-success" %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height:6px;">
+                                                <div class="{{ bar_class }} progress-bar" style="width:100%"></div>
+                                            </div>
+                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
+                                        </div>
+                                        {% endwith %}
+                                    {% elif row.execution_pct >= 70 %}
+                                        {% with bar_class="bg-warning" badge_class="text-warning" %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height:6px;">
+                                                <div class="{{ bar_class }} progress-bar" style="width:{{ row.execution_pct }}%"></div>
+                                            </div>
+                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
+                                        </div>
+                                        {% endwith %}
+                                    {% else %}
+                                        {% with bar_class="bg-danger" badge_class="text-danger" %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height:6px;">
+                                                <div class="{{ bar_class }} progress-bar" style="width:{{ row.execution_pct }}%"></div>
+                                            </div>
+                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
+                                        </div>
+                                        {% endwith %}
+                                    {% endif %}
+                                </td>
+                                <td class="pe-4 py-3 text-end text-nowrap">{{ row.commission|rub }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                    Нет данных для отображения
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 

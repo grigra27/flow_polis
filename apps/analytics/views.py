@@ -94,10 +94,15 @@ class DashboardView(SuperuserRequiredMixin, TemplateView):
                     formatted_chart_data[chart_id] = chart_info
 
             # Add filter options for the form
+            top_insurers = self.analytics_service.get_top_insurers_table(
+                analytics_filter
+            )
+
             context.update(
                 {
                     "dashboard_metrics": dashboard_metrics,
                     "chart_data": formatted_chart_data,
+                    "top_insurers": top_insurers,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
                     "insurance_types": InsuranceType.objects.all().order_by("name"),

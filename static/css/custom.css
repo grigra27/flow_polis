@@ -142,6 +142,21 @@ footer.bg-light {
     border-radius: var(--app-radius-sm);
 }
 
+.pagination {
+    --bs-pagination-color: var(--app-color-primary-strong);
+    --bs-pagination-bg: var(--app-color-surface);
+    --bs-pagination-border-color: var(--app-color-border-strong);
+    --bs-pagination-hover-color: #084298;
+    --bs-pagination-hover-bg: var(--app-color-surface-muted);
+    --bs-pagination-hover-border-color: var(--app-color-primary);
+    --bs-pagination-active-color: #ffffff;
+    --bs-pagination-active-bg: var(--app-color-primary-strong);
+    --bs-pagination-active-border-color: var(--app-color-primary-strong);
+    --bs-pagination-disabled-color: #8ba0b8;
+    --bs-pagination-disabled-bg: #f2f5fa;
+    --bs-pagination-disabled-border-color: #dce5ef;
+}
+
 .pagination .page-link {
     border-color: var(--app-color-border-strong);
     color: var(--app-color-primary-strong);
@@ -162,13 +177,13 @@ footer.bg-light {
 .pagination .page-item.active .page-link {
     background: linear-gradient(135deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%);
     border-color: var(--app-color-primary);
-    color: #fff;
+    color: #fff !important;
     font-weight: 700;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .pagination .page-item.active .page-link:hover {
-    color: #fff;
+    color: #fff !important;
     background: var(--app-color-primary-strong);
     border-color: var(--app-color-primary-strong);
 }
@@ -185,34 +200,6 @@ footer.bg-light {
 
 .badge-status {
     font-size: 0.85rem;
-}
-
-.app-page-breadcrumb {
-    margin-top: -0.4rem;
-    margin-bottom: 1rem;
-}
-
-.app-page-breadcrumb .breadcrumb {
-    background-color: rgba(255, 255, 255, 0.9);
-    border: 1px solid var(--app-color-border);
-    border-radius: var(--app-radius-sm);
-    padding: 0.4rem 0.65rem;
-    box-shadow: var(--app-shadow-sm);
-}
-
-.app-page-breadcrumb .breadcrumb-item,
-.app-page-breadcrumb .breadcrumb-item.active {
-    color: var(--app-color-text-muted);
-    font-size: 0.82rem;
-}
-
-.app-page-breadcrumb .breadcrumb-item a {
-    color: var(--app-color-primary-strong);
-    text-decoration: none;
-}
-
-.app-page-breadcrumb .breadcrumb-item a:hover {
-    text-decoration: underline;
 }
 
 .clickable-row {

@@ -214,21 +214,36 @@ class PaymentExportDateRangeTest(TestCase):
         wb = load_workbook(BytesIO(response.content))
         ws = wb.active
 
-        # Пропускаем заголовки (строки 1-4) и читаем даты платежей
+        # Находим индекс столбца "Дата платежа по договору"
+        headers = [
+            ws.cell(row=3, column=col).value for col in range(1, ws.max_column + 1)
+        ]
+        due_date_column = headers.index("Дата платежа по договору") + 1
+
+        # Пропускаем служебные строки и читаем даты платежей
         dates = []
         for row in range(5, ws.max_row + 1):
-            # Столбец L (12) - "Дата платежа по договору"
-            date_cell = ws.cell(row=row, column=12).value
+            row_values = [
+                ws.cell(row=row, column=col).value
+                for col in range(1, ws.max_column + 1)
+            ]
+            is_branch_header = row_values[0] and all(
+                value in (None, "") for value in row_values[1:]
+            )
+            if not row_values[0] or is_branch_header:
+                continue
+
+            date_cell = ws.cell(row=row, column=due_date_column).value
             if date_cell:
                 dates.append(date_cell)
 
         # Проверяем, что даты идут в порядке возрастания
         self.assertEqual(len(dates), 4, "Должно быть 4 платежа")
 
-        # Преобразуем строки дат в объекты date для сравнения
+        # Нормализуем значения к date для сравнения
         from datetime import datetime
 
-        date_objects = [datetime.strptime(d, "%d.%m.%Y").date() for d in dates]
+        date_objects = [d.date() if isinstance(d, datetime) else d for d in dates]
 
         # Проверяем сортировку
         self.assertEqual(
@@ -268,11 +283,26 @@ class PaymentExportDateRangeTest(TestCase):
         wb = load_workbook(BytesIO(response.content))
         ws = wb.active
 
-        # Пропускаем заголовки (строки 1-4) и читаем значения столбца "Этот взнос"
+        # Находим индекс столбца "Этот взнос"
+        headers = [
+            ws.cell(row=3, column=col).value for col in range(1, ws.max_column + 1)
+        ]
+        payment_position_column = headers.index("Этот взнос") + 1
+
+        # Пропускаем служебные строки и читаем значения столбца "Этот взнос"
         payment_positions = []
         for row in range(5, ws.max_row + 1):
-            # Столбец K (11) - "Этот взнос"
-            position_cell = ws.cell(row=row, column=11).value
+            row_values = [
+                ws.cell(row=row, column=col).value
+                for col in range(1, ws.max_column + 1)
+            ]
+            is_branch_header = row_values[0] and all(
+                value in (None, "") for value in row_values[1:]
+            )
+            if not row_values[0] or is_branch_header:
+                continue
+
+            position_cell = ws.cell(row=row, column=payment_position_column).value
             if position_cell:
                 payment_positions.append(position_cell)
 
@@ -318,9 +348,30 @@ class PaymentExportDateRangeTest(TestCase):
         wb = load_workbook(BytesIO(response.content))
         ws = wb.active
 
-        # Проверяем форматирование первой строки данных (строка 5)
-        # Столбец I (9) - Страховая сумма
-        insurance_sum_cell = ws.cell(row=5, column=9)
+        headers = [
+            ws.cell(row=3, column=col).value for col in range(1, ws.max_column + 1)
+        ]
+        insurance_sum_column = headers.index("Страховая сумма") + 1
+        payment_amount_column = headers.index("Очередной взнос") + 1
+
+        # Ищем первую строку с данными платежа (пропускаем заголовки филиалов)
+        first_data_row = None
+        for row in range(5, ws.max_row + 1):
+            row_values = [
+                ws.cell(row=row, column=col).value
+                for col in range(1, ws.max_column + 1)
+            ]
+            is_branch_header = row_values[0] and all(
+                value in (None, "") for value in row_values[1:]
+            )
+            if row_values[0] and not is_branch_header:
+                first_data_row = row
+                break
+
+        self.assertIsNotNone(first_data_row, "Не найдена строка с данными платежа")
+
+        # Проверяем форматирование первой строки данных
+        insurance_sum_cell = ws.cell(row=first_data_row, column=insurance_sum_column)
         self.assertIsNotNone(
             insurance_sum_cell.value, "Страховая сумма должна быть заполнена"
         )
@@ -335,8 +386,7 @@ class PaymentExportDateRangeTest(TestCase):
             "Страховая сумма должна быть выровнена по правому краю",
         )
 
-        # Столбец J (10) - Очередной взнос
-        payment_amount_cell = ws.cell(row=5, column=10)
+        payment_amount_cell = ws.cell(row=first_data_row, column=payment_amount_column)
         self.assertIsNotNone(
             payment_amount_cell.value, "Очередной взнос должен быть заполнен"
         )
@@ -638,7 +688,16 @@ class PaymentExportDateRangeTest(TestCase):
         # Собираем все номера полисов из экспорта
         policy_numbers = []
         for row in range(5, ws.max_row + 1):
-            # Столбец A (1) - "Номер полиса"
+            row_values = [
+                ws.cell(row=row, column=col).value
+                for col in range(1, ws.max_column + 1)
+            ]
+            is_branch_header = row_values[0] and all(
+                value in (None, "") for value in row_values[1:]
+            )
+            if not row_values[0] or is_branch_header:
+                continue
+
             policy_number_cell = ws.cell(row=row, column=1).value
             if policy_number_cell:
                 policy_numbers.append(policy_number_cell)

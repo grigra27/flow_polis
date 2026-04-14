@@ -117,7 +117,7 @@ class FullCycleCustomExportTest(TestCase):
         headers = [cell.value for cell in ws[1]]
         self.assertEqual(len(headers), 4)
         self.assertIn("Номер полиса", headers)
-        self.assertIn("Клиент", headers)
+        self.assertIn("Лизингополучатель", headers)
         self.assertIn("Общая премия", headers)
         self.assertIn("Статус полиса", headers)
 
@@ -396,6 +396,10 @@ class ReadyExportsTest(TestCase):
     def test_ready_export_payments(self):
         """Тест готового экспорта платежей"""
         self.test_client.login(username="testuser", password="testpass123")
+
+        # В export_payments попадают только неоплаченные платежи.
+        # Обновляем через queryset, чтобы не задействовать full_clean/save-логику модели.
+        PaymentSchedule.objects.filter(pk=self.payment.pk).update(paid_date=None)
 
         # Добавляем обязательные параметры дат
         response = self.test_client.get(

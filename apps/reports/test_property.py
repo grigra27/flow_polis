@@ -333,29 +333,11 @@ class PropertyTest4_DateFormatting(TestCase):
         start_date_str = row[0]
         end_date_str = row[1]
 
-        # Проверяем что это строки
-        self.assertIsInstance(start_date_str, str)
-        self.assertIsInstance(end_date_str, str)
-
-        # Проверяем формат ДД.ММ.ГГГГ
-        import re
-
-        date_pattern = r"^\d{2}\.\d{2}\.\d{4}$"
-
-        self.assertRegex(
-            start_date_str,
-            date_pattern,
-            f"Start date '{start_date_str}' doesn't match DD.MM.YYYY format",
-        )
-        self.assertRegex(
-            end_date_str,
-            date_pattern,
-            f"End date '{end_date_str}' doesn't match DD.MM.YYYY format",
-        )
-
-        # Проверяем что дата корректно форматируется
-        expected_start = start_date.strftime("%d.%m.%Y")
-        self.assertEqual(start_date_str, expected_start)
+        # Даты в экспортере остаются date-объектами, чтобы Excel мог применить формат ячейки.
+        self.assertIsInstance(start_date_str, date)
+        self.assertIsInstance(end_date_str, date)
+        self.assertEqual(start_date_str, start_date)
+        self.assertEqual(end_date_str, end_date)
 
         # Очищаем тестовые данные
         policy.delete()

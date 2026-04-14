@@ -175,11 +175,7 @@ class BaseExporter:
 
         row += 1
         summary_ws[f"A{row}"] = "Количество записей:"
-        summary_ws[f"B{row}"] = (
-            self.queryset.count()
-            if hasattr(self.queryset, "count")
-            else len(list(self.queryset))
-        )
+        summary_ws[f"B{row}"] = self.get_records_count()
 
         row += 1
         summary_ws[f"A{row}"] = "Тип отчета:"
@@ -231,6 +227,19 @@ class BaseExporter:
     def get_report_type(self):
         """Возвращает тип отчета для сводки"""
         return "Общий отчет"
+
+    def get_records_count(self):
+        """
+        Возвращает количество записей для QuerySet/списков/итераторов.
+        list.count() требует аргумент, поэтому обрабатываем через try/except.
+        """
+        try:
+            return self.queryset.count()
+        except (AttributeError, TypeError):
+            try:
+                return len(self.queryset)
+            except TypeError:
+                return len(list(self.queryset))
 
     def add_custom_summary(self, ws, start_row):
         """Добавляет специфичную для отчета статистику (переопределяется в наследниках)"""

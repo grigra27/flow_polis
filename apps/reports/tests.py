@@ -96,7 +96,7 @@ class BaseExporterTest(TestCase):
         test_date = date(2024, 1, 15)
         formatted = exporter.format_value(test_date)
 
-        self.assertEqual(formatted, "15.01.2024")
+        self.assertEqual(formatted, test_date)
 
     def test_format_value_decimal(self):
         """Тест форматирования Decimal"""
@@ -340,13 +340,14 @@ class CustomExporterTest(TestCase):
 
     def test_custom_exporter_format_date(self):
         """Тест форматирования даты в CustomExporter"""
+        from datetime import date
         from .exporters import CustomExporter
         from apps.policies.models import Policy
 
         exporter = CustomExporter(Policy.objects.all(), [], "policies")
 
         value = exporter.get_field_value(self.policy, "start_date")
-        self.assertEqual(value, "15.01.2024")
+        self.assertEqual(value, date(2024, 1, 15))
 
     def test_custom_exporter_format_decimal(self):
         """Тест форматирования Decimal в CustomExporter"""
@@ -600,6 +601,7 @@ class PolicyExporterTest(TestCase):
 
     def test_policy_exporter_get_row_data(self):
         """Тест получения данных строки для полиса"""
+        from datetime import date
         from apps.reports.exporters import PolicyExporter
 
         exporter = PolicyExporter([], [])
@@ -610,7 +612,7 @@ class PolicyExporterTest(TestCase):
         self.assertEqual(row[1], "DFA-001")  # dfa_number
         self.assertEqual(row[2], "Тестовый клиент")  # client
         self.assertEqual(row[3], "Тестовый страховщик")  # insurer
-        self.assertEqual(row[6], "01.01.2024")  # start_date
+        self.assertEqual(row[6], date(2024, 1, 1))  # start_date
         self.assertEqual(row[10], "Активен")  # policy_active
 
     def test_policy_exporter_filename(self):

@@ -4,6 +4,7 @@ Django settings for insurance_broker project.
 from pathlib import Path
 from decouple import config, Csv
 import sys
+import os
 import warnings
 
 # Подавляем предупреждения urllib3 о LibreSSL
@@ -12,6 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+RUNNING_TESTS = "test" in sys.argv
 
 # Security
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-this-key")
@@ -89,6 +91,14 @@ def _should_filter_sentry_event(event, hint):
     return True
 
 
+# В тестах читаем критичные значения только из os.environ.
+# Это исключает влияние локального .env на unit-тесты настроек.
+def get_runtime_config(name, default=""):
+    if RUNNING_TESTS:
+        return os.environ.get(name, default)
+    return config(name, default=default)
+
+
 # Production environment checks
 # Check if we're running in production mode (DEBUG=False)
 if not DEBUG:
@@ -108,15 +118,13 @@ if not DEBUG:
             if SECRET_KEY == "django-insecure-change-this-key":
                 missing_vars.append(var)
         elif var == "ALLOWED_HOSTS":
-            if ALLOWED_HOSTS == ["localhost", "127.0.0.1"]:
+            allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
+            if not allowed_hosts_env or ALLOWED_HOSTS == ["localhost", "127.0.0.1"]:
                 missing_vars.append(var)
         else:
-            # For other vars, check if they're set in environment
-            try:
-                value = config(var)
-                if not value:
-                    missing_vars.append(var)
-            except:
+            # Для production-проверки учитываем только переменные окружения процесса.
+            value = os.environ.get(var)
+            if not value:
                 missing_vars.append(var)
 
     if missing_vars:
@@ -197,17 +205,17 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
-db_name = config("DB_NAME", default="")
+db_name = get_runtime_config("DB_NAME", default="")
 if db_name:
     # PostgreSQL
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": db_name,
-            "USER": config("DB_USER", default="postgres"),
-            "PASSWORD": config("DB_PASSWORD", default=""),
-            "HOST": config("DB_HOST", default="localhost"),
-            "PORT": config("DB_PORT", default="5432"),
+            "USER": get_runtime_config("DB_USER", default="postgres"),
+            "PASSWORD": get_runtime_config("DB_PASSWORD", default=""),
+            "HOST": get_runtime_config("DB_HOST", default="localhost"),
+            "PORT": get_runtime_config("DB_PORT", default="5432"),
         }
     }
 else:

@@ -98,3 +98,25 @@ def insurance_type_icon(insurance_type, size="medium"):
         "insurance_type": insurance_type,
         "size": sizes.get(size, sizes["medium"]),
     }
+
+
+@register.simple_tag(takes_context=True)
+def update_query(context, **kwargs):
+    """
+    Обновляет query-параметры текущего URL и возвращает строку для href.
+
+    Использование:
+    href="?{% update_query branch=branch.id %}"
+    href="?{% update_query branch='' %}"  # удалить параметр
+    """
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    query = request.GET.copy()
+    for key, value in kwargs.items():
+        if value in (None, ""):
+            query.pop(key, None)
+        else:
+            query[key] = value
+    return query.urlencode()

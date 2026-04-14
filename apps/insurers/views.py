@@ -3,9 +3,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Count, Sum, Q
-from decimal import Decimal
-from .models import Insurer, CommissionRate
+from django.db.models import Count
+from .models import Insurer, CommissionRate, Branch, InsuranceType
+from .services import InsurerStatisticsService
 
 
 class InsurerListView(LoginRequiredMixin, ListView):
@@ -100,134 +100,59 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Get policies queryset
+        raw_branch_id = self.request.GET.get("branch")
+        raw_insurance_type_id = self.request.GET.get("insurance_type")
+        stats_filters = InsurerStatisticsService.parse_filters(
+            selected_branch_id=raw_branch_id,
+            selected_insurance_type_id=raw_insurance_type_id,
+            stats_scope=self.request.GET.get("stats_scope"),
+            policy_scope=self.request.GET.get("policy_scope"),
+            metric=self.request.GET.get("metric"),
+            date_from=self.request.GET.get("date_from"),
+            date_to=self.request.GET.get("date_to"),
+        )
+
         policies_qs = self.object.policies.select_related(
             "client", "branch", "insurance_type"
         )
+        if stats_filters.selected_branch_id:
+            policies_qs = policies_qs.filter(branch_id=stats_filters.selected_branch_id)
+        if stats_filters.selected_insurance_type_id:
+            policies_qs = policies_qs.filter(
+                insurance_type_id=stats_filters.selected_insurance_type_id
+            )
 
-        # Filter by branch if specified
-        branch_id = self.request.GET.get("branch")
-        if branch_id:
-            policies_qs = policies_qs.filter(branch_id=branch_id)
-
-        context["policies"] = policies_qs.order_by("-start_date")
-
-        # Get branches that have policies for this insurer
-        from .models import Branch
+        context["policies"] = policies_qs.order_by("-start_date", "-id")
+        context["policies_count"] = policies_qs.count()
 
         context["branches"] = (
             Branch.objects.filter(policies__insurer=self.object)
             .distinct()
             .order_by("branch_name")
         )
+        context["insurance_types"] = (
+            InsuranceType.objects.filter(policies__insurer=self.object)
+            .distinct()
+            .order_by("name")
+        )
 
-        context["selected_branch"] = branch_id
+        context["selected_branch_id"] = stats_filters.selected_branch_id
+        context["selected_insurance_type_id"] = stats_filters.selected_insurance_type_id
+        context["stats_scope"] = stats_filters.stats_scope
+        context["policy_scope"] = stats_filters.policy_scope
+        context["metric"] = stats_filters.metric
+        context["date_from"] = stats_filters.date_from
+        context["date_to"] = stats_filters.date_to
 
         context["commission_rates"] = self.object.commission_rates.select_related(
             "insurance_type"
         ).order_by("insurance_type__name")
 
-        # Calculate statistics
-        context["statistics"] = self._calculate_statistics()
+        context["statistics"] = InsurerStatisticsService(self.object).calculate(
+            stats_filters
+        )
 
         return context
-
-    def _calculate_statistics(self):
-        """Calculate statistics for the insurer"""
-        all_policies = self.object.policies.all()
-
-        # Total counts
-        total_policies = all_policies.count()
-        active_policies = all_policies.filter(policy_active=True).count()
-        inactive_policies = total_policies - active_policies
-
-        # Total premium
-        total_premium = all_policies.aggregate(total=Sum("premium_total"))[
-            "total"
-        ] or Decimal("0")
-
-        # Distribution by branches
-        branch_stats = (
-            all_policies.filter(branch__isnull=False)
-            .values("branch__branch_name")
-            .annotate(count=Count("id"), total_premium=Sum("premium_total"))
-            .order_by("-count")
-        )
-
-        # Calculate percentages for branches
-        # Color palette for charts
-        colors = [
-            "#0d6efd",
-            "#6610f2",
-            "#6f42c1",
-            "#d63384",
-            "#dc3545",
-            "#fd7e14",
-            "#ffc107",
-            "#198754",
-            "#20c997",
-            "#0dcaf0",
-        ]
-
-        branch_distribution = []
-        for idx, stat in enumerate(branch_stats):
-            percentage = (
-                (stat["count"] / total_policies * 100) if total_policies > 0 else 0
-            )
-            branch_distribution.append(
-                {
-                    "name": stat["branch__branch_name"],
-                    "count": stat["count"],
-                    "percentage": round(percentage, 1),
-                    "total_premium": stat["total_premium"] or Decimal("0"),
-                    "color": colors[idx % len(colors)],
-                }
-            )
-
-        # Distribution by insurance types
-        type_stats = (
-            all_policies.values("insurance_type__name")
-            .annotate(count=Count("id"), total_premium=Sum("premium_total"))
-            .order_by("-count")
-        )
-
-        # Calculate percentages for insurance types
-        type_distribution = []
-        for stat in type_stats:
-            percentage = (
-                (stat["count"] / total_policies * 100) if total_policies > 0 else 0
-            )
-            type_distribution.append(
-                {
-                    "name": stat["insurance_type__name"],
-                    "count": stat["count"],
-                    "percentage": round(percentage, 1),
-                    "total_premium": stat["total_premium"] or Decimal("0"),
-                }
-            )
-
-        # Average premium
-        avg_premium = (
-            total_premium / total_policies if total_policies > 0 else Decimal("0")
-        )
-
-        # Policies with broker participation
-        broker_participation = all_policies.filter(broker_participation=True).count()
-        broker_percentage = (
-            (broker_participation / total_policies * 100) if total_policies > 0 else 0
-        )
-
-        return {
-            "total_policies": total_policies,
-            "active_policies": active_policies,
-            "inactive_policies": inactive_policies,
-            "total_premium": total_premium,
-            "avg_premium": avg_premium,
-            "branch_distribution": branch_distribution,
-            "type_distribution": type_distribution,
-            "broker_participation": broker_participation,
-            "broker_percentage": round(broker_percentage, 1),
-        }
 
 
 @staff_member_required

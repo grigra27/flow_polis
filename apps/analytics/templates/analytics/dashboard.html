@@ -118,6 +118,14 @@
             font-size: 2rem;
         }
     }
+
+    .bridge-legend {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
 </style>
 {% endblock %}
 
@@ -126,15 +134,26 @@
 
 {% block analytics_content %}
 
+<div class="alert alert-info border-0 shadow-sm mb-4" role="alert">
+    <div class="d-flex flex-column flex-md-row gap-2 justify-content-between">
+        <div>
+            <strong>Режим расчёта:</strong> закрытые месяцы считаются по факту, текущий и будущие месяцы по плану.
+        </div>
+        <div class="text-nowrap">
+            <strong>Итоговый мост по премии:</strong> {{ dashboard_metrics.total_premium_volume|rub }}
+        </div>
+    </div>
+</div>
+
 <!-- Metrics Cards -->
 <div class="row" id="metricsContainer">
     <div class="col-lg-4 col-md-6">
         <div class="metric-card premium position-relative">
             <i class="bi bi-cash-coin metric-icon"></i>
             <div class="metric-value" id="plannedPremiumVolume">
-                {{ dashboard_metrics.planned_premium_volume|default:dashboard_metrics.total_premium_volume|rub }}
+                {{ dashboard_metrics.planned_premium_volume|default:"0"|rub }}
             </div>
-            <div class="metric-label">Премии, план (₽)</div>
+            <div class="metric-label">Премии, план (текущий+будущие месяцы)</div>
         </div>
     </div>
 
@@ -144,7 +163,7 @@
             <div class="metric-value" id="actualPremiumVolume">
                 {{ dashboard_metrics.actual_premium_volume|default:"0"|rub }}
             </div>
-            <div class="metric-label">Премии, факт (₽)</div>
+            <div class="metric-label">Премии, факт (закрытые месяцы)</div>
         </div>
     </div>
 
@@ -152,9 +171,9 @@
         <div class="metric-card commission position-relative">
             <i class="bi bi-percent metric-icon"></i>
             <div class="metric-value" id="plannedCommissionRevenue">
-                {{ dashboard_metrics.planned_commission_revenue|default:dashboard_metrics.total_commission_revenue|rub }}
+                {{ dashboard_metrics.planned_commission_revenue|default:"0"|rub }}
             </div>
-            <div class="metric-label">Комиссия, план (₽)</div>
+            <div class="metric-label">Комиссия, план (текущий+будущие месяцы)</div>
         </div>
     </div>
 
@@ -164,7 +183,7 @@
             <div class="metric-value" id="actualCommissionRevenue">
                 {{ dashboard_metrics.actual_commission_revenue|default:"0"|rub }}
             </div>
-            <div class="metric-label">Комиссия, факт (₽)</div>
+            <div class="metric-label">Комиссия, факт (закрытые месяцы)</div>
         </div>
     </div>
 
@@ -172,9 +191,9 @@
         <div class="metric-card insurance-sum position-relative">
             <i class="bi bi-shield-check metric-icon"></i>
             <div class="metric-value" id="plannedInsuranceSum">
-                {{ dashboard_metrics.planned_insurance_sum|default:dashboard_metrics.total_insurance_sum|rub }}
+                {{ dashboard_metrics.planned_insurance_sum|default:"0"|rub }}
             </div>
-            <div class="metric-label">Страховая сумма, план (₽)</div>
+            <div class="metric-label">Страховая сумма, план (текущий+будущие месяцы)</div>
         </div>
     </div>
 
@@ -184,7 +203,7 @@
             <div class="metric-value" id="actualInsuranceSum">
                 {{ dashboard_metrics.actual_insurance_sum|default:"0"|rub }}
             </div>
-            <div class="metric-label">Страховая сумма, факт (₽)</div>
+            <div class="metric-label">Страховая сумма, факт (закрытые месяцы)</div>
         </div>
     </div>
 
@@ -212,25 +231,28 @@
         <div class="metric-card commission-rate position-relative">
             <i class="bi bi-graph-up metric-icon"></i>
             <div class="metric-value" id="commissionRate">
-                {% if dashboard_metrics.average_commission_rate %}
-                    {{ dashboard_metrics.average_commission_rate|floatformat:2 }}%
-                {% else %}
-                    0.00%
-                {% endif %}
+                {{ dashboard_metrics.total_insurance_sum|default:"0"|rub }}
             </div>
-            <div class="metric-label">Средняя ставка комиссии</div>
+            <div class="metric-label">Страховая сумма, итоговый мост</div>
         </div>
     </div>
 </div>
 
 <!-- Charts Section -->
+<div class="bridge-legend d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="text-muted fw-semibold me-1">Легенда:</span>
+    <span class="badge bg-light text-success border">Факт: закрытые месяцы</span>
+    <span class="badge bg-light text-primary border">План: текущий и будущие месяцы</span>
+    <span class="badge bg-light text-dark border">Итоговый мост = факт + план</span>
+</div>
+
 <div class="row">
     <div class="col-lg-6">
-        {% include 'analytics/includes/chart.html' with chart_id='branch_market_share' chart_type='pie' chart_title='Доля рынка по филиалам' exportable=True %}
+        {% include 'analytics/includes/chart.html' with chart_id='branch_market_share' chart_type='pie' chart_title='Доля филиалов в итоговом мосте премий' exportable=True %}
     </div>
 
     <div class="col-lg-6">
-        {% include 'analytics/includes/chart.html' with chart_id='premium_by_branch' chart_type='bar' chart_title='Объем премий по филиалам' drill_down=True exportable=True %}
+        {% include 'analytics/includes/chart.html' with chart_id='premium_by_branch' chart_type='bar' chart_title='Итоговый мост премий по филиалам' drill_down=True exportable=True %}
     </div>
 </div>
 
@@ -240,7 +262,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom d-flex align-items-center gap-2 py-3">
                 <i class="bi bi-building text-primary fs-5"></i>
-                <h6 class="mb-0 fw-semibold">Топ-5 страховщиков по объёму премий</h6>
+                <h6 class="mb-0 fw-semibold">Топ-5 страховщиков по итоговому мосту премий</h6>
             </div>
             <div class="card-body p-0">
                 {% if top_insurers %}
@@ -249,49 +271,20 @@
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-4 py-3 text-muted fw-semibold" style="width:30%">Страховщик</th>
-                                <th class="py-3 text-muted fw-semibold text-end">Премии, план</th>
-                                <th class="py-3 text-muted fw-semibold text-end">Премии, факт</th>
-                                <th class="py-3 text-muted fw-semibold" style="width:22%">Выполнение плана</th>
-                                <th class="pe-4 py-3 text-muted fw-semibold text-end">Комиссия</th>
+                                <th class="py-3 text-muted fw-semibold text-end">Премии, факт закрытых мес.</th>
+                                <th class="py-3 text-muted fw-semibold text-end">Премии, план текущий+будущие</th>
+                                <th class="py-3 text-muted fw-semibold text-end">Премии, итоговый мост</th>
+                                <th class="pe-4 py-3 text-muted fw-semibold text-end">Комиссия, итоговый мост</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in top_insurers %}
                             <tr>
                                 <td class="ps-4 py-3 fw-medium">{{ row.name }}</td>
-                                <td class="py-3 text-end text-nowrap">{{ row.planned_premium|rub }}</td>
-                                <td class="py-3 text-end text-nowrap">{{ row.actual_premium|rub }}</td>
-                                <td class="py-3">
-                                    {% if row.execution_pct >= 100 %}
-                                        {% with bar_class="bg-success" badge_class="text-success" %}
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="progress flex-grow-1" style="height:6px;">
-                                                <div class="{{ bar_class }} progress-bar" style="width:100%"></div>
-                                            </div>
-                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
-                                        </div>
-                                        {% endwith %}
-                                    {% elif row.execution_pct >= 70 %}
-                                        {% with bar_class="bg-warning" badge_class="text-warning" %}
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="progress flex-grow-1" style="height:6px;">
-                                                <div class="{{ bar_class }} progress-bar" style="width:{{ row.execution_pct }}%"></div>
-                                            </div>
-                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
-                                        </div>
-                                        {% endwith %}
-                                    {% else %}
-                                        {% with bar_class="bg-danger" badge_class="text-danger" %}
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="progress flex-grow-1" style="height:6px;">
-                                                <div class="{{ bar_class }} progress-bar" style="width:{{ row.execution_pct }}%"></div>
-                                            </div>
-                                            <span class="fw-semibold {{ badge_class }} text-nowrap" style="min-width:3.5rem">{{ row.execution_pct }}%</span>
-                                        </div>
-                                        {% endwith %}
-                                    {% endif %}
-                                </td>
-                                <td class="pe-4 py-3 text-end text-nowrap">{{ row.commission|rub }}</td>
+                                <td class="py-3 text-end text-nowrap">{{ row.fact_premium|rub }}</td>
+                                <td class="py-3 text-end text-nowrap">{{ row.plan_premium|rub }}</td>
+                                <td class="py-3 text-end text-nowrap fw-semibold">{{ row.bridge_premium|rub }}</td>
+                                <td class="pe-4 py-3 text-end text-nowrap">{{ row.bridge_commission|rub }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

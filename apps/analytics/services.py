@@ -337,6 +337,22 @@ class AnalyticsService:
         self.calculator = MetricsCalculator()
         self.chart_provider = ChartDataProvider()
 
+    def _split_bridge_payments_by_month_boundary(self, payments_qs, current_date=None):
+        """
+        Split payments for the month-based bridge model:
+        - closed months: use actual (paid) values
+        - current/future months: use planned (scheduled) values
+        """
+        if current_date is None:
+            current_date = datetime.now().date()
+
+        current_month_start = date(current_date.year, current_date.month, 1)
+        closed_months_qs = payments_qs.filter(due_date__lt=current_month_start)
+        current_and_future_qs = payments_qs.filter(due_date__gte=current_month_start)
+        closed_months_actual_qs = closed_months_qs.filter(paid_date__isnull=False)
+
+        return closed_months_actual_qs, current_and_future_qs, current_month_start
+
     def get_dashboard_metrics(
         self, analytics_filter: Optional[AnalyticsFilter] = None
     ) -> Dict[str, Any]:
@@ -364,56 +380,71 @@ class AnalyticsService:
             else:
                 date_range = None
 
-            # Split scheduled values (plan) from collected values (fact)
-            paid_payments_qs = payments_qs.filter(paid_date__isnull=False)
+            (
+                closed_months_actual_qs,
+                current_and_future_qs,
+                current_month_start,
+            ) = self._split_bridge_payments_by_month_boundary(payments_qs)
 
-            # Planned metrics (all scheduled payments)
+            # Planned metrics (current and future months only)
             planned_premium_volume = self.calculator.calculate_premium_volume(
-                payments_qs, date_range
+                current_and_future_qs
             )
             planned_commission_revenue = self.calculator.calculate_commission_revenue(
-                payments_qs, date_range
+                current_and_future_qs
             )
             planned_insurance_sum = self.calculator.calculate_insurance_sum(
-                payments_qs, date_range
+                current_and_future_qs
             )
 
-            # Actual metrics (only paid payments)
+            # Actual metrics (only paid payments from closed months)
             actual_premium_volume = self.calculator.calculate_premium_volume(
-                paid_payments_qs, date_range
+                closed_months_actual_qs
             )
             actual_commission_revenue = self.calculator.calculate_commission_revenue(
-                paid_payments_qs, date_range
+                closed_months_actual_qs
             )
             actual_insurance_sum = self.calculator.calculate_insurance_sum(
-                paid_payments_qs, date_range
+                closed_months_actual_qs
             )
+
+            # Bridge totals: actual (closed months) + planned (current and future)
+            bridge_premium_volume = actual_premium_volume + planned_premium_volume
+            bridge_commission_revenue = (
+                actual_commission_revenue + planned_commission_revenue
+            )
+            bridge_insurance_sum = actual_insurance_sum + planned_insurance_sum
 
             total_policy_count = self.calculator.calculate_policy_count(
                 policies_qs, date_range
             )
-            average_commission_rate = self.calculator.calculate_average_commission_rate(
-                payments_qs
-            )
+            if bridge_premium_volume > 0:
+                average_commission_rate = (
+                    bridge_commission_revenue / bridge_premium_volume
+                ) * Decimal("100")
+            else:
+                average_commission_rate = Decimal("0")
 
             # Count active policies
             active_policies_count = policies_qs.filter(policy_active=True).count()
 
             return {
-                # Explicit plan/fact keys
+                # Month-based bridge components
                 "planned_premium_volume": planned_premium_volume,
                 "actual_premium_volume": actual_premium_volume,
                 "planned_commission_revenue": planned_commission_revenue,
                 "actual_commission_revenue": actual_commission_revenue,
                 "planned_insurance_sum": planned_insurance_sum,
                 "actual_insurance_sum": actual_insurance_sum,
-                # Backward-compatible aliases (legacy KPI cards)
-                "total_premium_volume": planned_premium_volume,
-                "total_commission_revenue": planned_commission_revenue,
+                # Bridge totals (actual closed months + planned current/future)
+                "total_premium_volume": bridge_premium_volume,
+                "total_commission_revenue": bridge_commission_revenue,
                 "total_policy_count": total_policy_count,
-                "total_insurance_sum": planned_insurance_sum,
+                "total_insurance_sum": bridge_insurance_sum,
                 "average_commission_rate": average_commission_rate,
                 "active_policies_count": active_policies_count,
+                "bridge_model": "month_boundary",
+                "bridge_cutoff_month_start": current_month_start,
                 "filter_applied": analytics_filter.has_filters()
                 if analytics_filter
                 else False,
@@ -439,6 +470,8 @@ class AnalyticsService:
                 "total_insurance_sum": Decimal("0"),
                 "average_commission_rate": Decimal("0"),
                 "active_policies_count": 0,
+                "bridge_model": "month_boundary",
+                "bridge_cutoff_month_start": None,
                 "filter_applied": False,
                 "error": str(e),
             }
@@ -814,10 +847,9 @@ class AnalyticsService:
         self, analytics_filter: Optional[AnalyticsFilter] = None, limit: int = 5
     ) -> list:
         """
-        Get top insurers with plan/fact premium split for dashboard table.
+        Get top insurers for dashboard table in month-based bridge mode.
 
-        Returns list of dicts sorted by planned premium volume desc, limited to `limit`.
-        Each dict has: name, planned_premium, actual_premium, execution_pct, commission.
+        Returns list sorted by bridge premium (actual closed months + planned current/future).
         """
         import logging
 
@@ -833,11 +865,10 @@ class AnalyticsService:
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)
                 payments_qs = analytics_filter.apply_to_payments(payments_qs)
-                date_range = analytics_filter.get_date_range_dict()
-            else:
-                date_range = None
 
-            paid_payments_qs = payments_qs.filter(paid_date__isnull=False)
+            _, _, current_month_start = self._split_bridge_payments_by_month_boundary(
+                payments_qs
+            )
 
             insurers_with_data = Insurer.objects.filter(
                 id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
@@ -846,36 +877,43 @@ class AnalyticsService:
             rows = []
             for insurer in insurers_with_data:
                 insurer_payments = payments_qs.filter(policy__insurer=insurer)
-                insurer_paid = paid_payments_qs.filter(policy__insurer=insurer)
+                insurer_closed_actual = insurer_payments.filter(
+                    due_date__lt=current_month_start,
+                    paid_date__isnull=False,
+                )
+                insurer_current_future = insurer_payments.filter(
+                    due_date__gte=current_month_start
+                )
 
                 planned = self.calculator.calculate_premium_volume(
-                    insurer_payments, date_range
+                    insurer_current_future
                 )
-                actual = self.calculator.calculate_premium_volume(
-                    insurer_paid, date_range
-                )
-                commission = self.calculator.calculate_commission_revenue(
-                    insurer_payments, date_range
-                )
+                actual = self.calculator.calculate_premium_volume(insurer_closed_actual)
+                bridge_premium = planned + actual
 
-                if planned > 0:
-                    execution_pct = (actual / planned * Decimal("100")).quantize(
-                        Decimal("0.1")
-                    )
-                else:
-                    execution_pct = Decimal("0")
+                planned_commission = self.calculator.calculate_commission_revenue(
+                    insurer_current_future
+                )
+                actual_commission = self.calculator.calculate_commission_revenue(
+                    insurer_closed_actual
+                )
+                bridge_commission = planned_commission + actual_commission
 
                 rows.append(
                     {
                         "name": insurer.insurer_name,
+                        "fact_premium": actual,
+                        "plan_premium": planned,
+                        "bridge_premium": bridge_premium,
+                        "bridge_commission": bridge_commission,
+                        # Backward-compatible keys
                         "planned_premium": planned,
                         "actual_premium": actual,
-                        "execution_pct": execution_pct,
-                        "commission": commission,
+                        "commission": bridge_commission,
                     }
                 )
 
-            rows.sort(key=lambda r: r["planned_premium"], reverse=True)
+            rows.sort(key=lambda r: r["bridge_premium"], reverse=True)
             return rows[:limit]
 
         except Exception as e:
@@ -3249,32 +3287,35 @@ class AnalyticsService:
         logger = logging.getLogger(__name__)
 
         try:
-            # Get raw analytics data
-            dashboard_data = self.get_dashboard_metrics(analytics_filter)
-            branch_data = self.get_branch_analytics(analytics_filter)
-            insurer_data = self.get_insurer_analytics_for_charts(analytics_filter)
-
             charts = {}
 
-            # Format branch charts
-            if branch_data.get("branch_metrics"):
-                branch_charts = self.chart_provider.format_branch_analytics_charts(
-                    branch_data
-                )
-                charts.update(branch_charts)
-                logger.info(f"Added branch charts: {list(branch_charts.keys())}")
-            else:
-                logger.warning("No branch metrics data available")
+            # Dashboard charts follow month-based bridge:
+            # closed months as actual + current/future as planned
+            bridge_branch_metrics = self._get_dashboard_branch_bridge_metrics(
+                analytics_filter
+            )
 
-            # Format insurer charts
-            if insurer_data.get("insurer_metrics"):
-                insurer_charts = self.chart_provider.format_insurer_analytics_charts(
-                    insurer_data
+            if bridge_branch_metrics:
+                premium_data = {
+                    metric["branch"]["name"]: metric["bridge_premium"]
+                    for metric in bridge_branch_metrics
+                }
+                charts["premium_by_branch"] = self.chart_provider.get_bar_chart_data(
+                    premium_data,
+                    title="Итоговый мост премий по филиалам",
+                    x_axis_label="Филиалы",
+                    y_axis_label="Премии (факт закрытых мес. + план текущий/будущие), руб.",
                 )
-                charts.update(insurer_charts)
-                logger.info(f"Added insurer charts: {list(insurer_charts.keys())}")
+
+                market_share_data = {
+                    metric["branch"]["name"]: metric["bridge_market_share"]
+                    for metric in bridge_branch_metrics
+                }
+                charts["branch_market_share"] = self.chart_provider.get_pie_chart_data(
+                    market_share_data, title="Доля филиалов в итоговом мосте премий (%)"
+                )
             else:
-                logger.warning("No insurer metrics data available")
+                logger.warning("No bridge branch metrics data available for dashboard")
 
             logger.info(f"Total charts generated: {list(charts.keys())}")
             return charts
@@ -3282,6 +3323,69 @@ class AnalyticsService:
         except Exception as e:
             logger.error(f"Error generating dashboard charts: {e}")
             return {}
+
+    def _get_dashboard_branch_bridge_metrics(
+        self, analytics_filter: Optional[AnalyticsFilter] = None
+    ) -> list:
+        """
+        Build branch metrics for dashboard charts in month-based bridge mode.
+        """
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+            from apps.insurers.models import Branch
+
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            if analytics_filter:
+                policies_qs = analytics_filter.apply_to_policies(policies_qs)
+                payments_qs = analytics_filter.apply_to_payments(payments_qs)
+
+            (
+                closed_months_actual_qs,
+                current_and_future_qs,
+                _,
+            ) = self._split_bridge_payments_by_month_boundary(payments_qs)
+
+            branches_with_data = Branch.objects.filter(
+                id__in=policies_qs.values_list("branch_id", flat=True).distinct()
+            )
+
+            metrics = []
+            total_bridge_premium = Decimal("0")
+
+            for branch in branches_with_data:
+                branch_actual_qs = closed_months_actual_qs.filter(policy__branch=branch)
+                branch_plan_qs = current_and_future_qs.filter(policy__branch=branch)
+
+                fact_premium = self.calculator.calculate_premium_volume(
+                    branch_actual_qs
+                )
+                plan_premium = self.calculator.calculate_premium_volume(branch_plan_qs)
+                bridge_premium = fact_premium + plan_premium
+
+                metrics.append(
+                    {
+                        "branch": {"id": branch.id, "name": branch.branch_name},
+                        "fact_premium": fact_premium,
+                        "plan_premium": plan_premium,
+                        "bridge_premium": bridge_premium,
+                    }
+                )
+                total_bridge_premium += bridge_premium
+
+            for metric in metrics:
+                if total_bridge_premium > 0:
+                    metric["bridge_market_share"] = (
+                        metric["bridge_premium"] / total_bridge_premium
+                    ) * Decimal("100")
+                else:
+                    metric["bridge_market_share"] = Decimal("0")
+
+            metrics.sort(key=lambda x: x["bridge_premium"], reverse=True)
+            return metrics
+        except Exception:
+            return []
 
     def get_branch_charts(
         self, analytics_filter: Optional[AnalyticsFilter] = None

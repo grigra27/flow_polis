@@ -172,31 +172,49 @@ class AnalyticsExporter:
             # Key metrics
             metrics_to_export = [
                 (
-                    "Planned Premium Volume",
+                    "Bridge Premium Volume (Actual Closed Months + Planned Current/Future)",
+                    metrics.get("total_premium_volume", 0),
+                ),
+                (
+                    "Planned Premium Volume (Current/Future Months)",
                     metrics.get(
                         "planned_premium_volume", metrics.get("total_premium_volume", 0)
                     ),
                 ),
-                ("Actual Premium Volume", metrics.get("actual_premium_volume", 0)),
                 (
-                    "Planned Commission Revenue",
+                    "Actual Premium Volume (Closed Months)",
+                    metrics.get("actual_premium_volume", 0),
+                ),
+                (
+                    "Bridge Commission Revenue (Actual Closed Months + Planned Current/Future)",
+                    metrics.get("total_commission_revenue", 0),
+                ),
+                (
+                    "Planned Commission Revenue (Current/Future Months)",
                     metrics.get(
                         "planned_commission_revenue",
                         metrics.get("total_commission_revenue", 0),
                     ),
                 ),
                 (
-                    "Actual Commission Revenue",
+                    "Actual Commission Revenue (Closed Months)",
                     metrics.get("actual_commission_revenue", 0),
                 ),
                 ("Total Policy Count", metrics.get("total_policy_count", 0)),
                 (
-                    "Planned Insurance Sum",
+                    "Bridge Insurance Sum (Actual + Planned)",
+                    metrics.get("total_insurance_sum", 0),
+                ),
+                (
+                    "Planned Insurance Sum (Current/Future Months)",
                     metrics.get(
                         "planned_insurance_sum", metrics.get("total_insurance_sum", 0)
                     ),
                 ),
-                ("Actual Insurance Sum", metrics.get("actual_insurance_sum", 0)),
+                (
+                    "Actual Insurance Sum (Closed Months)",
+                    metrics.get("actual_insurance_sum", 0),
+                ),
                 ("Active Policies Count", metrics.get("active_policies_count", 0)),
                 (
                     "Average Commission Rate (%)",

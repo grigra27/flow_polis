@@ -1,3 +1,276 @@
-/* Custom styles for Insurance Broker System */
+/* Global design tokens and UI components */
 
-/* Add any custom CSS here */
+:root {
+    --app-font-family: "Segoe UI", "SF Pro Text", "Noto Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+
+    --app-color-primary: #0d6efd;
+    --app-color-primary-strong: #0a58ca;
+    --app-color-primary-soft: #e7f1ff;
+    --app-color-surface: #ffffff;
+    --app-color-surface-muted: #f8f9fa;
+    --app-color-border: #dce3eb;
+    --app-color-border-strong: #c8d2de;
+    --app-color-text: #1d2a3b;
+    --app-color-text-muted: #5f6f82;
+    --app-color-row-hover: #f2f6fc;
+
+    --app-color-danger-soft: #f8d7da;
+    --app-color-danger-soft-hover: #f5c2c7;
+    --app-color-secondary-soft: #e9ecef;
+    --app-color-secondary-soft-hover: #dee2e6;
+
+    --app-radius-sm: 6px;
+    --app-radius-md: 10px;
+    --app-radius-lg: 12px;
+
+    --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --app-shadow-md: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+html,
+body {
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--app-font-family);
+    color: var(--app-color-text);
+    background: linear-gradient(180deg, #f5f7fb 0%, #eef3f8 100%);
+}
+
+.main-content {
+    flex: 1;
+}
+
+.navbar.navbar-dark.bg-primary {
+    background: linear-gradient(90deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%) !important;
+    box-shadow: var(--app-shadow-sm);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+.navbar .nav-link {
+    font-weight: 500;
+}
+
+footer.bg-light {
+    border-top: 1px solid var(--app-color-border);
+    background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.card {
+    border: 1px solid var(--app-color-border);
+    border-radius: var(--app-radius-md);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.card-header {
+    border-bottom: 1px solid var(--app-color-border);
+    font-weight: 600;
+}
+
+.card-header:not([class*="bg-"]) {
+    background-color: var(--app-color-surface-muted);
+}
+
+.form-control,
+.form-select {
+    border-color: var(--app-color-border-strong);
+    border-radius: var(--app-radius-sm);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--app-color-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.btn {
+    border-radius: var(--app-radius-sm);
+    font-weight: 500;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.65rem 0.75rem;
+    border-bottom-color: var(--app-color-border);
+    vertical-align: middle;
+}
+
+.table thead th {
+    color: var(--app-color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.table-hover tbody tr:hover > * {
+    background-color: var(--app-color-row-hover);
+}
+
+.table-sm > :not(caption) > * > * {
+    padding: 0.35rem 0.5rem;
+}
+
+.table-responsive {
+    border-radius: var(--app-radius-sm);
+}
+
+.pagination .page-link {
+    border-color: var(--app-color-border-strong);
+    color: var(--app-color-primary-strong);
+    border-radius: var(--app-radius-sm);
+    margin: 0 2px;
+    min-width: 36px;
+    text-align: center;
+}
+
+.pagination .page-item.active .page-link {
+    background: linear-gradient(135deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%);
+    border-color: var(--app-color-primary);
+}
+
+.badge-status {
+    font-size: 0.85rem;
+}
+
+.clickable-row {
+    cursor: pointer;
+}
+
+.clickable-row a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.clickable-row a:hover {
+    text-decoration: underline;
+}
+
+tr.table-terminated,
+tr.table-terminated > td,
+tr.table-cancelled,
+tr.table-cancelled > td {
+    background-color: var(--app-color-danger-soft) !important;
+}
+
+tr.table-terminated:hover,
+tr.table-terminated:hover > td,
+tr.table-cancelled:hover,
+tr.table-cancelled:hover > td {
+    background-color: var(--app-color-danger-soft-hover) !important;
+}
+
+tr.table-secondary,
+tr.table-secondary > td {
+    background-color: var(--app-color-secondary-soft) !important;
+}
+
+tr.table-secondary:hover,
+tr.table-secondary:hover > td {
+    background-color: var(--app-color-secondary-soft-hover) !important;
+}
+
+.app-nav-pills .nav-link {
+    color: var(--app-color-primary);
+    font-weight: 500;
+    border: 2px solid var(--app-color-border);
+    margin: 0 2px;
+    transition: all 0.2s ease;
+    border-radius: var(--app-radius-sm);
+}
+
+.app-nav-pills .nav-link:hover {
+    background-color: var(--app-color-primary-soft);
+    border-color: var(--app-color-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.16);
+}
+
+.app-nav-pills .nav-link.active {
+    background: linear-gradient(135deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%);
+    border-color: var(--app-color-primary);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    font-weight: 600;
+}
+
+.app-nav-pills .nav-link i {
+    margin-right: 5px;
+}
+
+.search-box {
+    background-color: var(--app-color-surface-muted);
+    border: 1px solid var(--app-color-border);
+    border-radius: var(--app-radius-sm);
+}
+
+.client-item {
+    border: 1px solid #e9ecef;
+    border-radius: var(--app-radius-sm);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    background-color: var(--app-color-surface);
+}
+
+.client-item:hover {
+    background-color: var(--app-color-surface-muted);
+    border-color: var(--app-color-border-strong);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.client-name {
+    font-weight: 500;
+    color: var(--app-color-text);
+}
+
+.client-inn {
+    font-size: 0.875rem;
+}
+
+.insurance-type-icon-cell {
+    width: 40px !important;
+    min-width: 40px;
+    max-width: 40px;
+    text-align: center;
+    padding: 4px !important;
+    vertical-align: middle;
+}
+
+.insurance-type-icon-cell img,
+.insurance-type-icon-cell span {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.insurance-type-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+.insurance-type-icon-fallback {
+    width: 24px;
+    height: 24px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.insurance-type-icon-fallback i {
+    font-size: 14px;
+    color: #6c757d;
+}
+
+@media (max-width: 991.98px) {
+    .navbar .nav-link {
+        border-radius: var(--app-radius-sm);
+        padding: 0.5rem 0.65rem;
+    }
+}

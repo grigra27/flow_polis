@@ -157,7 +157,7 @@
             </thead>
             <tbody>
                 {% for insurer in insurers %}
-                <tr class="insurer-row clickable-row" style="cursor: pointer;" data-href="{% url 'insurers:detail' insurer.pk %}">
+                <tr class="insurer-row clickable-row" data-href="{% url 'insurers:detail' insurer.pk %}">
                     <td class="ps-4 py-3">
                         <a href="{% url 'insurers:detail' insurer.pk %}" class="insurer-name-link">
                             <div class="insurer-name">

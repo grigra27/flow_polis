@@ -51,7 +51,7 @@
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
     {% for client in clients %}
     <div class="col">
-        <div class="client-item p-2" onclick="window.location.href='{% url 'clients:detail' client.pk %}'" style="cursor: pointer;">
+        <div class="client-item p-2" onclick="window.location.href='{% url 'clients:detail' client.pk %}'">
             <div class="client-name mb-1">{{ client.client_name }}</div>
             <div class="client-inn text-muted small">ИНН: {{ client.client_inn|default:"—" }}</div>
         </div>
@@ -86,35 +86,4 @@
     </ul>
 </nav>
 {% endif %}
-
-<style>
-.search-box {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-}
-.search-box .form-control {
-    border: 1px solid #ced4da;
-    background-color: #ffffff;
-}
-.search-box .form-control:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
-}
-.client-item {
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-    transition: background-color 0.15s ease;
-}
-.client-item:hover {
-    background-color: #f8f9fa;
-}
-.client-name {
-    font-weight: 500;
-    color: #212529;
-}
-.client-inn {
-    font-size: 0.875rem;
-}
-</style>
 {% endblock %}

@@ -3,43 +3,6 @@
 
 {% block title %}{{ client.client_name }}{% endblock %}
 
-{% block extra_css %}
-<style>
-    tr.table-terminated,
-    tr.table-terminated > td {
-        background-color: #f8d7da !important;
-    }
-    tr.table-terminated:hover,
-    tr.table-terminated:hover > td {
-        background-color: #f5c2c7 !important;
-    }
-    tr.table-secondary,
-    tr.table-secondary > td {
-        background-color: #e9ecef !important;
-    }
-    tr.table-secondary:hover,
-    tr.table-secondary:hover > td {
-        background-color: #dee2e6 !important;
-    }
-
-    /* Стили для столбца с иконками видов страхования */
-    .insurance-type-icon-cell {
-        width: 40px !important;
-        min-width: 40px;
-        max-width: 40px;
-        text-align: center;
-        padding: 4px !important;
-        vertical-align: middle;
-    }
-
-    .insurance-type-icon-cell img,
-    .insurance-type-icon-cell span {
-        display: inline-block;
-        vertical-align: middle;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">{{ client.client_name }}</h1>
@@ -184,7 +147,7 @@
                         </thead>
                         <tbody>
                             {% for policy in policies %}
-                            <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
+                            <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" data-href="{% url 'policies:detail' policy.pk %}">
                                 <td>
                                     <strong>{{ policy.policy_number }}</strong>
                                     {% if not policy.policy_active %}
@@ -204,11 +167,11 @@
                                         <img src="{{ policy.insurance_type.icon.url }}"
                                              alt="{{ policy.insurance_type.name }}"
                                              title="{{ policy.insurance_type.name }}"
-                                             style="width: 24px; height: 24px; object-fit: contain;">
+                                             class="insurance-type-icon">
                                     {% else %}
                                         <span title="{{ policy.insurance_type.name }}"
-                                              style="width: 24px; height: 24px; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
-                                            <i class="bi bi-shield-check" style="font-size: 14px; color: #6c757d;"></i>
+                                              class="insurance-type-icon-fallback">
+                                            <i class="bi bi-shield-check"></i>
                                         </span>
                                     {% endif %}
                                 </td>

@@ -3,57 +3,6 @@
 
 {% block title %}Полисы{% endblock %}
 
-{% block extra_css %}
-<style>
-    .nav-pills .nav-link {
-        color: #0d6efd;
-        font-weight: 500;
-        border: 2px solid #dee2e6;
-        margin: 0 2px;
-        transition: all 0.3s ease;
-    }
-    .nav-pills .nav-link:hover {
-        background-color: #e7f1ff;
-        border-color: #0d6efd;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(13, 110, 253, 0.2);
-    }
-    .nav-pills .nav-link.active {
-        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-        border-color: #0d6efd;
-        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
-        font-weight: 600;
-    }
-    .nav-pills .nav-link i {
-        margin-right: 5px;
-    }
-    tr.table-terminated,
-    tr.table-terminated > td {
-        background-color: #f8d7da !important;
-    }
-    tr.table-terminated:hover,
-    tr.table-terminated:hover > td {
-        background-color: #f5c2c7 !important;
-    }
-
-    /* Стили для столбца с иконками видов страхования */
-    .insurance-type-icon-cell {
-        width: 40px !important;
-        min-width: 40px;
-        max-width: 40px;
-        text-align: center;
-        padding: 4px !important;
-        vertical-align: middle;
-    }
-
-    .insurance-type-icon-cell img,
-    .insurance-type-icon-cell span {
-        display: inline-block;
-        vertical-align: middle;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Журнал полисов</h1>
@@ -69,7 +18,7 @@
 <!-- Branch Tabs -->
 {% if branches %}
 <div class="mb-4">
-    <ul class="nav nav-pills nav-fill" role="tablist">
+    <ul class="nav nav-pills nav-fill app-nav-pills" role="tablist">
         <li class="nav-item" role="presentation">
             <a class="nav-link {% if not selected_branch %}active{% endif %}"
                href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
@@ -180,7 +129,7 @@
                 </thead>
                 <tbody>
                     {% for policy in policies %}
-                    <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" style="cursor: pointer;" data-href="{% url 'policies:detail' policy.pk %}">
+                    <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" data-href="{% url 'policies:detail' policy.pk %}">
                         <td>
                             <strong>{{ policy.policy_number }}</strong>
                             {% if not policy.policy_active %}
@@ -201,11 +150,11 @@
                                 <img src="{{ policy.insurance_type.icon.url }}"
                                      alt="{{ policy.insurance_type.name }}"
                                      title="{{ policy.insurance_type.name }}"
-                                     style="width: 24px; height: 24px; object-fit: contain;">
+                                     class="insurance-type-icon">
                             {% else %}
                                 <span title="{{ policy.insurance_type.name }}"
-                                      style="width: 24px; height: 24px; background-color: #e9ecef; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;">
-                                    <i class="bi bi-shield-check" style="font-size: 14px; color: #6c757d;"></i>
+                                      class="insurance-type-icon-fallback">
+                                    <i class="bi bi-shield-check"></i>
                                 </span>
                             {% endif %}
                         </td>

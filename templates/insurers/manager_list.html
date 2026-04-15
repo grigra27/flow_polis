@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Менеджеры ЛК{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Менеджеры лизинговой компании</h1>
+</div>
+
+<div class="mb-4">
+    <div class="search-box p-3">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-10">
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       placeholder="Поиск по фамилии, ФИО, телефону или email"
+                       value="{{ request.GET.search }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Найти
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if managers %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
+    {% for manager in managers %}
+    <div class="col">
+        <div class="client-item p-3" onclick="window.location.href='{% url 'insurers:manager_detail' manager.pk %}'">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="client-name">{{ manager.name }}</div>
+                <span class="badge bg-primary">{{ manager.total_policies }}</span>
+            </div>
+
+            {% if manager.full_name %}
+            <div class="text-muted small mb-1">{{ manager.full_name }}</div>
+            {% endif %}
+
+            {% if manager.phone %}
+            <div class="text-muted small mb-1">
+                <i class="bi bi-telephone"></i> {{ manager.phone }}
+            </div>
+            {% endif %}
+
+            {% if manager.email %}
+            <div class="text-muted small mb-1">
+                <i class="bi bi-envelope"></i> {{ manager.email }}
+            </div>
+            {% endif %}
+
+            <div class="mt-2">
+                <span class="badge bg-success">Активные: {{ manager.active_policies }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+    Менеджеры не найдены
+</div>
+{% endif %}
+
+{% if is_paginated %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">←</a>
+        </li>
+        {% endif %}
+
+        <li class="page-item active">
+            <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">→</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

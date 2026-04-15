@@ -390,6 +390,36 @@
                 <small class="text-muted">{{ policies_count }} {{ policies_count|ru_pluralize:"полис,полиса,полисов" }}</small>
             </div>
             <div class="card-body">
+                <div class="overview-grid">
+                    <div class="row g-2">
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-primary">{{ insurer_overview.total_policies }}</div>
+                                <div class="overview-label">Всего полисов</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-success">{{ insurer_overview.active_policies }}</div>
+                                <div class="overview-label">Активные</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-danger">{{ insurer_overview.terminated_policies }}</div>
+                                <div class="overview-label">Расторгнутые</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-info">{{ insurer_overview.avg_premium|rub }} ₽</div>
+                                <div class="overview-label">Средняя премия</div>
+                                <div class="overview-meta">по текущему списку</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {% if branches|length > 1 %}
                 <div class="mb-3">
                     <ul class="nav branch-filter-pills flex-wrap">

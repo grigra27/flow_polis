@@ -77,7 +77,13 @@
                         {% branch_logo policy.branch size='medium' %}
                         <div class="mt-3">
                             <strong>Менеджер:</strong><br>
-                            {{ policy.leasing_manager|default:"—" }}
+                            {% if policy.leasing_manager %}
+                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}">
+                                    {{ policy.leasing_manager }}
+                                </a>
+                            {% else %}
+                                —
+                            {% endif %}
                         </div>
                         <div class="mt-3">
                             <strong>Описание объекта страхования:</strong><br>

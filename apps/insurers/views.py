@@ -1,10 +1,18 @@
+from datetime import date
+
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Count
-from .models import Insurer, CommissionRate, Branch, InsuranceType
+from django.db.models import Avg, Count, Q
+from .models import (
+    Insurer,
+    CommissionRate,
+    Branch,
+    InsuranceType,
+    LeasingManager,
+)
 from .services import InsurerStatisticsService
 
 
@@ -124,6 +132,18 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
 
         context["policies"] = policies_qs.order_by("-start_date", "-id")
         context["policies_count"] = policies_qs.count()
+        overview_data = policies_qs.aggregate(
+            total_policies=Count("id"),
+            active_policies=Count("id", filter=Q(policy_active=True)),
+            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            avg_premium=Avg("premium_total"),
+        )
+        context["insurer_overview"] = {
+            "total_policies": overview_data["total_policies"],
+            "active_policies": overview_data["active_policies"],
+            "terminated_policies": overview_data["terminated_policies"],
+            "avg_premium": overview_data["avg_premium"] or 0,
+        }
 
         context["branches"] = (
             Branch.objects.filter(policies__insurer=self.object)
@@ -151,6 +171,78 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
         context["statistics"] = InsurerStatisticsService(self.object).calculate(
             stats_filters
         )
+
+        return context
+
+
+class LeasingManagerListView(LoginRequiredMixin, ListView):
+    model = LeasingManager
+    template_name = "insurers/manager_list.html"
+    context_object_name = "managers"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = (
+            super()
+            .get_queryset()
+            .annotate(
+                total_policies=Count("policies"),
+                active_policies=Count(
+                    "policies", filter=Q(policies__policy_active=True)
+                ),
+            )
+        )
+
+        search = self.request.GET.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search)
+                | Q(full_name__icontains=search)
+                | Q(phone__icontains=search)
+                | Q(email__icontains=search)
+            )
+
+        return queryset.order_by("name")
+
+
+class LeasingManagerDetailView(LoginRequiredMixin, DetailView):
+    model = LeasingManager
+    template_name = "insurers/manager_detail.html"
+    context_object_name = "manager"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        policies_qs = self.object.policies.select_related(
+            "client", "insurer", "branch", "insurance_type"
+        ).order_by("-start_date", "-id")
+        context["policies"] = policies_qs
+        context["policies_count"] = policies_qs.count()
+
+        overview_data = policies_qs.aggregate(
+            total_policies=Count("id"),
+            active_policies=Count("id", filter=Q(policy_active=True)),
+            terminated_policies=Count("id", filter=Q(policy_active=False)),
+        )
+        nearest_end_date = (
+            policies_qs.filter(policy_active=True, end_date__gte=date.today())
+            .order_by("end_date")
+            .values_list("end_date", flat=True)
+            .first()
+        )
+        if nearest_end_date is None:
+            nearest_end_date = (
+                policies_qs.filter(policy_active=True)
+                .order_by("end_date")
+                .values_list("end_date", flat=True)
+                .first()
+            )
+
+        context["manager_overview"] = {
+            "total_policies": overview_data["total_policies"],
+            "active_policies": overview_data["active_policies"],
+            "terminated_policies": overview_data["terminated_policies"],
+            "nearest_end_date": nearest_end_date,
+        }
 
         return context
 

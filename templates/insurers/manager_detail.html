@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% load insurer_tags %}
+{% load currency_filters %}
 
-{% block title %}{{ client.client_name }}{% endblock %}
+{% block title %}{{ manager.name }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">{{ client.client_name }}</h1>
+    <h1 class="h2">{{ manager.name }}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         {% if can_edit %}
-        <a href="{% url 'admin:clients_client_change' client.pk %}" class="btn btn-warning me-2">
+        <a href="{% url 'admin:insurers_leasingmanager_change' manager.pk %}" class="btn btn-warning me-2">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
         {% endif %}
-        <a href="{% url 'clients:list' %}" class="btn btn-secondary">
+        <a href="{% url 'insurers:managers_list' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Назад к списку
         </a>
     </div>
@@ -22,104 +23,36 @@
     <div class="col-md-3">
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Информация о лизингополучателе</h5>
+                <h5 class="mb-0">Информация о менеджере</h5>
             </div>
             <div class="card-body">
-                <p><strong>Название:</strong><br>
-                {{ client.client_name }}</p>
+                <p><strong>Фамилия:</strong><br>{{ manager.name }}</p>
 
-                {% if client.alternative_name %}
-                <p><strong>Альтернативное название:</strong><br>
-                {{ client.alternative_name }}</p>
+                {% if manager.full_name %}
+                <p><strong>ФИО:</strong><br>{{ manager.full_name }}</p>
                 {% endif %}
 
-                <p><strong>ИНН:</strong><br>
-                {{ client.client_inn|default:"—" }}</p>
+                {% if manager.phone %}
+                <p><strong>Телефон:</strong><br>
+                    <a href="tel:{{ manager.phone }}">{{ manager.phone }}</a>
+                </p>
+                {% endif %}
 
-                {% if client.client_inn %}
-                {% load static %}
-                <div class="mt-3 pt-3 border-top">
-                    <p class="mb-2"><strong>Внешние ссылки:</strong></p>
-                    <div class="d-flex gap-2">
-                        <a href="https://fedresurs.ru/entities?searchString={{ client.client_inn }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="btn btn-outline-primary btn-sm d-flex align-items-center">
-                            <img src="{% static 'images/favicon-fedres.png' %}"
-                                 alt="Федресурс"
-                                 width="16"
-                                 height="16"
-                                 class="me-1">
-                            <span>Федресурс</span>
-                            <i class="bi bi-box-arrow-up-right ms-1"></i>
-                        </a>
-                        <a href="https://www.rusprofile.ru/search?query={{ client.client_inn }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="btn btn-outline-primary btn-sm d-flex align-items-center">
-                            <img src="{% static 'images/rusprofile-favicon.ico' %}"
-                                 alt="Rusprofile"
-                                 width="16"
-                                 height="16"
-                                 class="me-1">
-                            <span>Rusprofile</span>
-                            <i class="bi bi-box-arrow-up-right ms-1"></i>
-                        </a>
-                    </div>
-                </div>
+                {% if manager.email %}
+                <p class="mb-0"><strong>Email:</strong><br>
+                    <a href="mailto:{{ manager.email }}">{{ manager.email }}</a>
+                </p>
                 {% endif %}
             </div>
         </div>
 
-        {% if client.notes %}
+        {% if manager.notes %}
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Примечание</h5>
             </div>
             <div class="card-body">
-                {{ client.notes|linebreaks }}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if managers_info %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Менеджеры лизинговой компании</h5>
-            </div>
-            <div class="card-body">
-                {% for item in managers_info %}
-                <div class="mb-3 {% if not forloop.last %}pb-3 border-bottom{% endif %}">
-                    <p class="mb-1">
-                        <strong><i class="bi bi-person-badge"></i> {{ item.manager.name }}</strong>
-                    </p>
-                    {% if item.manager.full_name %}
-                    <p class="mb-1 text-muted">
-                        <i class="bi bi-person"></i> {{ item.manager.full_name }}
-                    </p>
-                    {% endif %}
-                    {% if item.manager.phone %}
-                    <p class="mb-1 text-muted">
-                        <i class="bi bi-telephone"></i>
-                        <a href="tel:{{ item.manager.phone }}">{{ item.manager.phone }}</a>
-                    </p>
-                    {% endif %}
-                    {% if item.manager.email %}
-                    <p class="mb-1 text-muted">
-                        <i class="bi bi-envelope"></i>
-                        <a href="mailto:{{ item.manager.email }}">{{ item.manager.email }}</a>
-                    </p>
-                    {% endif %}
-                    <p class="mb-1 text-muted small">
-                        <i class="bi bi-building"></i>
-                        {% for branch in item.branches %}{{ branch }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                    </p>
-                    <p class="mb-0 text-muted small">
-                        <i class="bi bi-file-text"></i>
-                        Полисов: {{ item.policies_count }}
-                    </p>
-                </div>
-                {% endfor %}
+                {{ manager.notes|linebreaks }}
             </div>
         </div>
         {% endif %}
@@ -127,42 +60,43 @@
 
     <div class="col-md-9">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Полисы лизингополучателя</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Сделки менеджера</h5>
+                <small class="text-muted">{{ policies_count }} {{ policies_count|ru_pluralize:"полис,полиса,полисов" }}</small>
             </div>
             <div class="card-body">
                 <div class="overview-grid">
                     <div class="row g-2">
                         <div class="col-6 col-lg-3">
                             <div class="overview-card">
-                                <div class="overview-value text-primary">{{ client_overview.total_policies }}</div>
+                                <div class="overview-value text-primary">{{ manager_overview.total_policies }}</div>
                                 <div class="overview-label">Всего полисов</div>
                             </div>
                         </div>
                         <div class="col-6 col-lg-3">
                             <div class="overview-card">
-                                <div class="overview-value text-success">{{ client_overview.active_policies }}</div>
+                                <div class="overview-value text-success">{{ manager_overview.active_policies }}</div>
                                 <div class="overview-label">Активные</div>
                             </div>
                         </div>
                         <div class="col-6 col-lg-3">
                             <div class="overview-card">
-                                <div class="overview-value text-danger">{{ client_overview.terminated_policies }}</div>
+                                <div class="overview-value text-danger">{{ manager_overview.terminated_policies }}</div>
                                 <div class="overview-label">Расторгнутые</div>
                             </div>
                         </div>
                         <div class="col-6 col-lg-3">
                             <div class="overview-card">
-                                <div class="overview-value {% if client_overview.nearest_end_date %}text-warning{% else %}text-muted{% endif %}">
-                                    {% if client_overview.nearest_end_date %}
-                                        {{ client_overview.nearest_end_date|date:"d.m.Y" }}
+                                <div class="overview-value {% if manager_overview.nearest_end_date %}text-warning{% else %}text-muted{% endif %}">
+                                    {% if manager_overview.nearest_end_date %}
+                                        {{ manager_overview.nearest_end_date|date:"d.m.Y" }}
                                     {% else %}
                                         —
                                     {% endif %}
                                 </div>
                                 <div class="overview-label">Ближайшее окончание</div>
                                 <div class="overview-meta">
-                                    {% if client_overview.nearest_end_date %}
+                                    {% if manager_overview.nearest_end_date %}
                                         по активным полисам
                                     {% else %}
                                         нет активных полисов
@@ -180,10 +114,11 @@
                             <tr>
                                 <th>Номер полиса</th>
                                 <th>Номер ДФА</th>
+                                <th>Лизингополучатель</th>
                                 <th>Страховщик</th>
-                                <th>Объект страхования</th>
                                 <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
                                 <th>Период</th>
+                                <th>СП, ₽</th>
                                 <th>Статус</th>
                             </tr>
                         </thead>
@@ -199,11 +134,11 @@
                                         <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ policy.dfa_number }}</td>
-                                <td>{% insurer_logo policy.insurer size='small' %}</td>
+                                <td>{{ policy.dfa_number|default:"—" }}</td>
                                 <td>
-                                    <small>{{ policy.property_description|truncatewords:10 }}</small>
+                                    <a href="{% url 'clients:detail' policy.client.pk %}">{{ policy.client.client_name }}</a>
                                 </td>
+                                <td>{% insurer_logo policy.insurer size='small' %}</td>
                                 <td class="insurance-type-icon-cell">
                                     {% if policy.insurance_type.icon %}
                                         <img src="{{ policy.insurance_type.icon.url }}"
@@ -220,6 +155,7 @@
                                 <td>
                                     <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
                                 </td>
+                                <td><strong>{{ policy.premium_total|rub }}</strong></td>
                                 <td>
                                     {% if policy.policy_active %}
                                         <span class="badge bg-success">Активен</span>
@@ -233,7 +169,7 @@
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted">У лизингополучателя пока нет полисов</p>
+                <p class="text-muted mb-0">У этого менеджера пока нет полисов</p>
                 {% endif %}
             </div>
         </div>

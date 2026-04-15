@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.db.models import Count, Q
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Client
@@ -28,9 +31,36 @@ class ClientDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["policies"] = self.object.policies.select_related(
+        policies_qs = self.object.policies.select_related(
             "insurer", "branch", "insurance_type", "leasing_manager"
-        ).order_by("-start_date")
+        )
+        context["policies"] = policies_qs.order_by("-start_date")
+
+        overview_data = policies_qs.aggregate(
+            total_policies=Count("id"),
+            active_policies=Count("id", filter=Q(policy_active=True)),
+            terminated_policies=Count("id", filter=Q(policy_active=False)),
+        )
+        nearest_end_date = (
+            policies_qs.filter(policy_active=True, end_date__gte=date.today())
+            .order_by("end_date")
+            .values_list("end_date", flat=True)
+            .first()
+        )
+        if nearest_end_date is None:
+            nearest_end_date = (
+                policies_qs.filter(policy_active=True)
+                .order_by("end_date")
+                .values_list("end_date", flat=True)
+                .first()
+            )
+
+        context["client_overview"] = {
+            "total_policies": overview_data["total_policies"],
+            "active_policies": overview_data["active_policies"],
+            "terminated_policies": overview_data["terminated_policies"],
+            "nearest_end_date": nearest_end_date,
+        }
 
         # Получаем уникальных менеджеров и филиалы, работающие с этим клиентом
         managers_data = {}

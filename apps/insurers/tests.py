@@ -422,6 +422,87 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(statistics["scoped_policies"], 2)
 
 
+class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
+    def setUp(self):
+        self.setUp_statistics_data()
+        self.user = User.objects.create_user(
+            username="manager_user", password="testpass123"
+        )
+        self.client.login(username="manager_user", password="testpass123")
+
+        self.manager_ivan = LeasingManager.objects.create(
+            name="Иванов",
+            full_name="Иван Иванович Иванов",
+            phone="+79990001122",
+            email="ivanov@example.com",
+        )
+        self.manager_petr = LeasingManager.objects.create(
+            name="Петров", full_name="Петр Петрович Петров"
+        )
+        self.manager_empty = LeasingManager.objects.create(name="Сидоров")
+
+        self.policy_a1.leasing_manager = self.manager_ivan
+        self.policy_a1.save(update_fields=["leasing_manager"])
+        self.policy_b1.leasing_manager = self.manager_ivan
+        self.policy_b1.save(update_fields=["leasing_manager"])
+        self.policy_a2.leasing_manager = self.manager_petr
+        self.policy_a2.save(update_fields=["leasing_manager"])
+
+    def test_manager_list_requires_authentication(self):
+        self.client.logout()
+        response = self.client.get(reverse("insurers:managers_list"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_manager_list_search_filters_queryset(self):
+        response = self.client.get(
+            reverse("insurers:managers_list"), {"search": "Иванович"}
+        )
+        self.assertEqual(response.status_code, 200)
+        managers = list(response.context["managers"])
+        self.assertEqual(len(managers), 1)
+        self.assertEqual(managers[0].id, self.manager_ivan.id)
+
+    def test_manager_list_attaches_policy_stats(self):
+        response = self.client.get(reverse("insurers:managers_list"))
+        self.assertEqual(response.status_code, 200)
+        managers = {manager.id: manager for manager in response.context["managers"]}
+
+        self.assertEqual(managers[self.manager_ivan.id].total_policies, 2)
+        self.assertEqual(managers[self.manager_ivan.id].active_policies, 2)
+        self.assertEqual(managers[self.manager_petr.id].total_policies, 1)
+        self.assertEqual(managers[self.manager_petr.id].active_policies, 0)
+        self.assertEqual(managers[self.manager_empty.id].total_policies, 0)
+        self.assertEqual(managers[self.manager_empty.id].active_policies, 0)
+
+    def test_manager_detail_shows_only_related_policies(self):
+        response = self.client.get(
+            reverse("insurers:manager_detail", args=[self.manager_ivan.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        policies = list(response.context["policies"])
+        self.assertEqual(len(policies), 2)
+        self.assertSetEqual(
+            {policy.id for policy in policies},
+            {self.policy_a1.id, self.policy_b1.id},
+        )
+        self.assertEqual(response.context["policies_count"], 2)
+
+        overview = response.context["manager_overview"]
+        self.assertEqual(overview["total_policies"], 2)
+        self.assertEqual(overview["active_policies"], 2)
+        self.assertEqual(overview["terminated_policies"], 0)
+        self.assertEqual(overview["nearest_end_date"], self.policy_a1.end_date)
+
+    def test_policy_detail_contains_link_to_manager_card(self):
+        response = self.client.get(reverse("policies:detail", args=[self.policy_a1.id]))
+        self.assertEqual(response.status_code, 200)
+        manager_url = reverse("insurers:manager_detail", args=[self.manager_ivan.id])
+        self.assertContains(response, manager_url)
+        self.assertContains(response, self.manager_ivan.name)
+
+
 class InsurerTemplateTagsTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()

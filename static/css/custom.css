@@ -295,6 +295,39 @@ tr.table-secondary:hover > td {
     font-size: 0.875rem;
 }
 
+.overview-grid {
+    margin-bottom: 1rem;
+}
+
+.overview-card {
+    height: 100%;
+    background-color: var(--app-color-surface-muted);
+    border: 1px solid var(--app-color-border);
+    border-radius: var(--app-radius-sm);
+    padding: 0.75rem;
+}
+
+.overview-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.overview-label {
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    color: var(--app-color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+    font-weight: 600;
+}
+
+.overview-meta {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--app-color-text-muted);
+}
+
 .insurance-type-icon-cell {
     width: 40px !important;
     min-width: 40px;

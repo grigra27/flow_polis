@@ -5,6 +5,12 @@ app_name = "insurers"
 
 urlpatterns = [
     path("", views.InsurerListView.as_view(), name="list"),
+    path("managers/", views.LeasingManagerListView.as_view(), name="managers_list"),
+    path(
+        "managers/<int:pk>/",
+        views.LeasingManagerDetailView.as_view(),
+        name="manager_detail",
+    ),
     path("<int:pk>/", views.InsurerDetailView.as_view(), name="detail"),
     path("api/commission-rate/", views.get_commission_rate, name="api_commission_rate"),
 ]

@@ -46,7 +46,12 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             super()
             .get_queryset()
             .select_related(
-                "client", "policyholder", "insurer", "branch", "insurance_type"
+                "client",
+                "policyholder",
+                "insurer",
+                "branch",
+                "insurance_type",
+                "leasing_manager",
             )
             .prefetch_related("payment_schedule__commission_rate", "info_tags__tag")
         )

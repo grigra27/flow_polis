@@ -53,8 +53,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_namespace == 'insurers' %} active{% endif %}" href="{% url 'insurers:list' %}" {% if current_namespace == 'insurers' %}aria-current="page"{% endif %}>
+                        <a class="nav-link{% if current_view == 'insurers:list' or current_view == 'insurers:detail' %} active{% endif %}" href="{% url 'insurers:list' %}" {% if current_view == 'insurers:list' or current_view == 'insurers:detail' %}aria-current="page"{% endif %}>
                             <i class="bi bi-building"></i> Страховщики
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link{% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'insurers:managers_list' %}" {% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
+                            <i class="bi bi-person-badge"></i> Менеджеры ЛК
                         </a>
                     </li>
                     <li class="nav-item">

@@ -521,6 +521,37 @@ class CustomExportViewTest(TestCase):
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
+    def test_optimize_queryset_uses_deep_select_related_for_payment_fields(self):
+        """Тест: optimize_queryset добавляет deep select_related для вложенных payment-полей"""
+        from datetime import date
+        from decimal import Decimal
+        from apps.policies.models import PaymentSchedule
+        from .views import CustomExportView
+        from .exporters import CustomExporter
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2024, 2, 15),
+            insurance_sum=Decimal("100000.00"),
+            amount=Decimal("10000.00"),
+            kv_rub=Decimal("1000.00"),
+        )
+
+        view = CustomExportView()
+        fields = [
+            "policy__client__client_name",
+            "policy__insurer__insurer_name",
+        ]
+        queryset = view.optimize_queryset(PaymentSchedule.objects.all(), fields)
+        exporter = CustomExporter(queryset, fields, "payments")
+
+        # Один запрос на выборку payment + joins, без N+1 на policy/client/insurer
+        with self.assertNumQueries(1):
+            for payment in queryset:
+                exporter.get_row_data(payment)
+
     def test_delete_template(self):
         """Тест удаления шаблона"""
         from django.test import Client as TestClient

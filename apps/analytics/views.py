@@ -410,22 +410,33 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Process branch metrics for better template usage
             branch_metrics = branch_data.get("branch_metrics", [])
 
-            # Convert branch dictionaries to Branch objects for template
-            for metric in branch_metrics:
-                if isinstance(metric.get("branch"), dict):
-                    branch_id = metric["branch"].get("id")
-                    if branch_id:
-                        try:
-                            metric["branch"] = Branch.objects.get(id=branch_id)
-                        except Branch.DoesNotExist:
-                            # Fallback: create a simple object with branch_name
-                            class SimpleBranch:
-                                def __init__(self, name):
-                                    self.branch_name = name
+            # Convert branch dictionaries to Branch objects for template (batched)
+            branch_ids = [
+                metric.get("branch", {}).get("id")
+                for metric in branch_metrics
+                if isinstance(metric.get("branch"), dict)
+                and metric.get("branch", {}).get("id")
+            ]
+            branches_map = Branch.objects.in_bulk(branch_ids) if branch_ids else {}
 
-                            metric["branch"] = SimpleBranch(
-                                metric["branch"].get("name", "Неизвестный филиал")
-                            )
+            for metric in branch_metrics:
+                if not isinstance(metric.get("branch"), dict):
+                    continue
+
+                branch_data_obj = metric["branch"]
+                branch_id = branch_data_obj.get("id")
+                if branch_id and branch_id in branches_map:
+                    metric["branch"] = branches_map[branch_id]
+                    continue
+
+                # Fallback: create a simple object with branch_name
+                class SimpleBranch:
+                    def __init__(self, name):
+                        self.branch_name = name
+
+                metric["branch"] = SimpleBranch(
+                    branch_data_obj.get("name", "Неизвестный филиал")
+                )
 
             # Calculate additional metrics for display
             total_premium = sum(metric["premium_volume"] for metric in branch_metrics)

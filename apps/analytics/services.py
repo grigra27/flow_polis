@@ -6,6 +6,7 @@ This module contains the core business logic for analytics calculations.
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 import calendar
+from collections import defaultdict
 from typing import Optional, Dict, Any
 from django.db.models import QuerySet, Sum, Count, Avg
 from django.db.models.functions import Coalesce
@@ -337,6 +338,65 @@ class AnalyticsService:
         self.calculator = MetricsCalculator()
         self.chart_provider = ChartDataProvider()
 
+    @staticmethod
+    def _build_policy_count_map(
+        policies_qs: QuerySet, group_field: str
+    ) -> Dict[int, int]:
+        """Build a grouped policy count map by foreign key field."""
+        rows = policies_qs.values(group_field).annotate(policy_count=Count("id"))
+        counts: Dict[int, int] = {}
+        for row in rows:
+            group_id = row.get(group_field)
+            if group_id is None:
+                continue
+            counts[int(group_id)] = int(row.get("policy_count") or 0)
+        return counts
+
+    @staticmethod
+    def _build_payment_metrics_map(
+        payments_qs: QuerySet, group_field: str
+    ) -> Dict[int, Dict[str, Decimal]]:
+        """Build grouped premium/commission/insurance sum metrics by foreign key field."""
+        rows = payments_qs.values(group_field).annotate(
+            premium_volume=Coalesce(Sum("amount"), Decimal("0")),
+            commission_revenue=Coalesce(Sum("kv_rub"), Decimal("0")),
+            insurance_sum=Coalesce(Sum("insurance_sum"), Decimal("0")),
+        )
+        metrics_map: Dict[int, Dict[str, Decimal]] = {}
+        for row in rows:
+            group_id = row.get(group_field)
+            if group_id is None:
+                continue
+            metrics_map[int(group_id)] = {
+                "premium_volume": row.get("premium_volume") or Decimal("0"),
+                "commission_revenue": row.get("commission_revenue") or Decimal("0"),
+                "insurance_sum": row.get("insurance_sum") or Decimal("0"),
+            }
+        return metrics_map
+
+    @staticmethod
+    def _build_type_distribution_map(
+        policies_qs: QuerySet, group_field: str
+    ) -> Dict[int, Dict[str, int]]:
+        """Build grouped insurance-type distribution map by foreign key field."""
+        rows = (
+            policies_qs.values(group_field, "insurance_type__name")
+            .annotate(count=Count("id"))
+            .order_by(group_field, "-count", "insurance_type__name")
+        )
+        distributions: Dict[int, Dict[str, int]] = defaultdict(dict)
+        for row in rows:
+            group_id = row.get(group_field)
+            if group_id is None:
+                continue
+            type_name = row.get("insurance_type__name") or "Не указан вид"
+            distributions[int(group_id)][type_name] = int(row.get("count") or 0)
+
+        sorted_distributions: Dict[int, Dict[str, int]] = {}
+        for group_id, type_distribution in distributions.items():
+            sorted_distributions[group_id] = sort_insurance_types(type_distribution)
+        return sorted_distributions
+
     def _split_bridge_payments_by_month_boundary(self, payments_qs, current_date=None):
         """
         Split payments for the month-based bridge model:
@@ -491,7 +551,6 @@ class AnalyticsService:
         try:
             from apps.policies.models import Policy, PaymentSchedule
             from apps.insurers.models import Branch
-            from django.db.models import Count
 
             # Get base querysets
             policies_qs = Policy.objects.all()
@@ -501,56 +560,47 @@ class AnalyticsService:
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)
                 payments_qs = analytics_filter.apply_to_payments(payments_qs)
-                date_range = analytics_filter.get_date_range_dict()
-            else:
-                date_range = None
+            policy_count_map = self._build_policy_count_map(policies_qs, "branch_id")
+            if not policy_count_map:
+                return {
+                    "branch_metrics": [],
+                    "total_branches": 0,
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                }
 
-            # Get branches that have policies
-            branches_with_data = Branch.objects.filter(
-                id__in=policies_qs.values_list("branch_id", flat=True).distinct()
+            payment_metrics_map = self._build_payment_metrics_map(
+                payments_qs, "policy__branch_id"
+            )
+            type_distribution_map = self._build_type_distribution_map(
+                policies_qs, "branch_id"
             )
 
             branch_metrics = []
-
+            branches_with_data = Branch.objects.filter(
+                id__in=policy_count_map.keys()
+            ).order_by("branch_name")
             for branch in branches_with_data:
-                # Filter data for this branch
-                branch_policies = policies_qs.filter(branch=branch)
-                branch_payments = payments_qs.filter(policy__branch=branch)
-
-                # Calculate metrics for this branch
-                premium_volume = self.calculator.calculate_premium_volume(
-                    branch_payments, date_range
-                )
-                commission_revenue = self.calculator.calculate_commission_revenue(
-                    branch_payments, date_range
-                )
-                policy_count = self.calculator.calculate_policy_count(
-                    branch_policies, date_range
-                )
-                insurance_sum = self.calculator.calculate_insurance_sum(
-                    branch_payments, date_range
-                )
-
-                # Get insurance type distribution for this branch
-                insurance_type_distribution = dict(
-                    branch_policies.values("insurance_type__name")
-                    .annotate(count=Count("id"))
-                    .values_list("insurance_type__name", "count")
-                )
-
-                # Sort insurance types in preferred order
-                insurance_type_distribution = sort_insurance_types(
-                    insurance_type_distribution
+                payment_metrics = payment_metrics_map.get(
+                    branch.id,
+                    {
+                        "premium_volume": Decimal("0"),
+                        "commission_revenue": Decimal("0"),
+                        "insurance_sum": Decimal("0"),
+                    },
                 )
 
                 branch_metrics.append(
                     {
                         "branch": {"id": branch.id, "name": branch.branch_name},
-                        "premium_volume": premium_volume,
-                        "commission_revenue": commission_revenue,
-                        "policy_count": policy_count,
-                        "insurance_sum": insurance_sum,
-                        "insurance_type_distribution": insurance_type_distribution,
+                        "premium_volume": payment_metrics["premium_volume"],
+                        "commission_revenue": payment_metrics["commission_revenue"],
+                        "policy_count": policy_count_map.get(branch.id, 0),
+                        "insurance_sum": payment_metrics["insurance_sum"],
+                        "insurance_type_distribution": type_distribution_map.get(
+                            branch.id, {}
+                        ),
                     }
                 )
 
@@ -612,7 +662,6 @@ class AnalyticsService:
         try:
             from apps.policies.models import Policy, PaymentSchedule
             from apps.insurers.models import Insurer
-            from django.db.models import Count
 
             # Get base querysets
             policies_qs = Policy.objects.all()
@@ -622,61 +671,55 @@ class AnalyticsService:
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)
                 payments_qs = analytics_filter.apply_to_payments(payments_qs)
-                date_range = analytics_filter.get_date_range_dict()
-            else:
-                date_range = None
+            policy_count_map = self._build_policy_count_map(policies_qs, "insurer_id")
+            if not policy_count_map:
+                return {
+                    "insurer_metrics": [],
+                    "total_insurers": 0,
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                }
 
-            # Get insurers that have policies
-            insurers_with_data = Insurer.objects.filter(
-                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
+            payment_metrics_map = self._build_payment_metrics_map(
+                payments_qs, "policy__insurer_id"
+            )
+            type_distribution_map = self._build_type_distribution_map(
+                policies_qs, "insurer_id"
             )
 
             insurer_metrics = []
             total_premium = Decimal("0")
             total_insurance_sum = Decimal("0")
 
+            insurers_with_data = Insurer.objects.filter(
+                id__in=policy_count_map.keys()
+            ).order_by("insurer_name")
             for insurer in insurers_with_data:
-                # Filter data for this insurer
-                insurer_policies = policies_qs.filter(insurer=insurer)
-                insurer_payments = payments_qs.filter(policy__insurer=insurer)
-
-                # Calculate metrics for this insurer
-                premium_volume = self.calculator.calculate_premium_volume(
-                    insurer_payments, date_range
+                payment_metrics = payment_metrics_map.get(
+                    insurer.id,
+                    {
+                        "premium_volume": Decimal("0"),
+                        "commission_revenue": Decimal("0"),
+                        "insurance_sum": Decimal("0"),
+                    },
                 )
-                commission_revenue = self.calculator.calculate_commission_revenue(
-                    insurer_payments, date_range
-                )
-                policy_count = self.calculator.calculate_policy_count(
-                    insurer_policies, date_range
-                )
-                insurance_sum = self.calculator.calculate_insurance_sum(
-                    insurer_payments, date_range
-                )
+                premium_volume = payment_metrics["premium_volume"]
+                insurance_sum = payment_metrics["insurance_sum"]
 
                 total_premium += premium_volume
                 total_insurance_sum += insurance_sum
-
-                # Get insurance type distribution for this insurer
-                insurance_type_distribution = dict(
-                    insurer_policies.values("insurance_type__name")
-                    .annotate(count=Count("id"))
-                    .values_list("insurance_type__name", "count")
-                )
-
-                # Sort insurance types in preferred order
-                insurance_type_distribution = sort_insurance_types(
-                    insurance_type_distribution
-                )
 
                 insurer_metrics.append(
                     {
                         "insurer": insurer,  # Полный объект для страницы аналитики
                         "premium_volume": premium_volume,
-                        "commission_revenue": commission_revenue,
-                        "policy_count": policy_count,
+                        "commission_revenue": payment_metrics["commission_revenue"],
+                        "policy_count": policy_count_map.get(insurer.id, 0),
                         "insurance_sum": insurance_sum,
-                        "insurance_type_distribution": insurance_type_distribution,
+                        "insurance_type_distribution": type_distribution_map.get(
+                            insurer.id, {}
+                        ),
                     }
                 )
 
@@ -732,103 +775,42 @@ class AnalyticsService:
             Dictionary containing insurer analytics with simplified insurer data
         """
         try:
-            from apps.policies.models import Policy, PaymentSchedule
-            from apps.insurers.models import Insurer
-            from django.db.models import Count
+            insurer_data = self.get_insurer_analytics(analytics_filter)
+            insurer_metrics = insurer_data.get("insurer_metrics", [])
 
-            # Get base querysets
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
-
-            # Apply filters if provided
-            if analytics_filter:
-                policies_qs = analytics_filter.apply_to_policies(policies_qs)
-                payments_qs = analytics_filter.apply_to_payments(payments_qs)
-                date_range = analytics_filter.get_date_range_dict()
-            else:
-                date_range = None
-
-            # Get insurers that have policies
-            insurers_with_data = Insurer.objects.filter(
-                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
-            )
-
-            insurer_metrics = []
-            total_premium = Decimal("0")
-            total_insurance_sum = Decimal("0")
-
-            for insurer in insurers_with_data:
-                # Filter data for this insurer
-                insurer_policies = policies_qs.filter(insurer=insurer)
-                insurer_payments = payments_qs.filter(policy__insurer=insurer)
-
-                # Calculate metrics for this insurer
-                premium_volume = self.calculator.calculate_premium_volume(
-                    insurer_payments, date_range
-                )
-                commission_revenue = self.calculator.calculate_commission_revenue(
-                    insurer_payments, date_range
-                )
-                policy_count = self.calculator.calculate_policy_count(
-                    insurer_policies, date_range
-                )
-                insurance_sum = self.calculator.calculate_insurance_sum(
-                    insurer_payments, date_range
-                )
-
-                total_premium += premium_volume
-                total_insurance_sum += insurance_sum
-
-                # Get insurance type distribution for this insurer
-                insurance_type_distribution = dict(
-                    insurer_policies.values("insurance_type__name")
-                    .annotate(count=Count("id"))
-                    .values_list("insurance_type__name", "count")
-                )
-
-                # Sort insurance types in preferred order
-                insurance_type_distribution = sort_insurance_types(
-                    insurance_type_distribution
-                )
-
-                insurer_metrics.append(
+            chart_ready_metrics = []
+            for metric in insurer_metrics:
+                insurer = metric.get("insurer")
+                chart_ready_metrics.append(
                     {
                         "insurer": {
-                            "id": insurer.id,
-                            "name": insurer.insurer_name,
-                        },  # Упрощенные данные для графиков
-                        "premium_volume": premium_volume,
-                        "commission_revenue": commission_revenue,
-                        "policy_count": policy_count,
-                        "insurance_sum": insurance_sum,
-                        "insurance_type_distribution": insurance_type_distribution,
+                            "id": insurer.id if insurer else None,
+                            "name": insurer.insurer_name
+                            if insurer
+                            else "Неизвестный страховщик",
+                        },
+                        "premium_volume": metric["premium_volume"],
+                        "commission_revenue": metric["commission_revenue"],
+                        "policy_count": metric["policy_count"],
+                        "insurance_sum": metric["insurance_sum"],
+                        "insurance_type_distribution": metric[
+                            "insurance_type_distribution"
+                        ],
+                        "market_share": metric.get("market_share", Decimal("0")),
+                        "market_share_by_sum": metric.get(
+                            "market_share_by_sum", Decimal("0")
+                        ),
                     }
                 )
 
-            # Calculate market share
-            for metric in insurer_metrics:
-                if total_premium > 0:
-                    metric["market_share"] = (
-                        metric["premium_volume"] / total_premium
-                    ) * Decimal("100")
-                else:
-                    metric["market_share"] = Decimal("0")
-
-                # Calculate market share by insurance sum
-                if total_insurance_sum > 0:
-                    metric["market_share_by_sum"] = (
-                        metric["insurance_sum"] / total_insurance_sum
-                    ) * Decimal("100")
-                else:
-                    metric["market_share_by_sum"] = Decimal("0")
-
-            return {
-                "insurer_metrics": insurer_metrics,
-                "total_insurers": len(insurer_metrics),
-                "filter_applied": analytics_filter.has_filters()
-                if analytics_filter
-                else False,
+            response = {
+                "insurer_metrics": chart_ready_metrics,
+                "total_insurers": insurer_data.get("total_insurers", 0),
+                "filter_applied": insurer_data.get("filter_applied", False),
             }
+            if "error" in insurer_data:
+                response["error"] = insurer_data["error"]
+            return response
 
         except Exception as e:
             import logging
@@ -870,33 +852,53 @@ class AnalyticsService:
                 payments_qs
             )
 
-            insurers_with_data = Insurer.objects.filter(
-                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
+            insurer_ids = list(
+                policies_qs.order_by().values_list("insurer_id", flat=True).distinct()
+            )
+            if not insurer_ids:
+                return []
+
+            insurers_with_data = Insurer.objects.filter(id__in=insurer_ids).order_by(
+                "insurer_name"
+            )
+
+            planned_metrics_map = self._build_payment_metrics_map(
+                payments_qs.filter(due_date__gte=current_month_start),
+                "policy__insurer_id",
+            )
+            actual_metrics_map = self._build_payment_metrics_map(
+                payments_qs.filter(
+                    due_date__lt=current_month_start,
+                    paid_date__isnull=False,
+                ),
+                "policy__insurer_id",
             )
 
             rows = []
             for insurer in insurers_with_data:
-                insurer_payments = payments_qs.filter(policy__insurer=insurer)
-                insurer_closed_actual = insurer_payments.filter(
-                    due_date__lt=current_month_start,
-                    paid_date__isnull=False,
+                planned_metrics = planned_metrics_map.get(
+                    insurer.id,
+                    {
+                        "premium_volume": Decimal("0"),
+                        "commission_revenue": Decimal("0"),
+                        "insurance_sum": Decimal("0"),
+                    },
                 )
-                insurer_current_future = insurer_payments.filter(
-                    due_date__gte=current_month_start
+                actual_metrics = actual_metrics_map.get(
+                    insurer.id,
+                    {
+                        "premium_volume": Decimal("0"),
+                        "commission_revenue": Decimal("0"),
+                        "insurance_sum": Decimal("0"),
+                    },
                 )
 
-                planned = self.calculator.calculate_premium_volume(
-                    insurer_current_future
-                )
-                actual = self.calculator.calculate_premium_volume(insurer_closed_actual)
+                planned = planned_metrics["premium_volume"]
+                actual = actual_metrics["premium_volume"]
                 bridge_premium = planned + actual
 
-                planned_commission = self.calculator.calculate_commission_revenue(
-                    insurer_current_future
-                )
-                actual_commission = self.calculator.calculate_commission_revenue(
-                    insurer_closed_actual
-                )
+                planned_commission = planned_metrics["commission_revenue"]
+                actual_commission = actual_metrics["commission_revenue"]
                 bridge_commission = planned_commission + actual_commission
 
                 rows.append(
@@ -935,7 +937,6 @@ class AnalyticsService:
         try:
             from apps.policies.models import Policy, PaymentSchedule
             from apps.clients.models import Client
-            from django.db.models import Count
 
             # Get base querysets
             policies_qs = Policy.objects.all()
@@ -945,82 +946,91 @@ class AnalyticsService:
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)
                 payments_qs = analytics_filter.apply_to_payments(payments_qs)
-                date_range = analytics_filter.get_date_range_dict()
-            else:
-                date_range = None
+            policy_count_map = self._build_policy_count_map(policies_qs, "client_id")
+            if not policy_count_map:
+                return {
+                    "top_clients_by_insurance_sum": [],
+                    "top_clients_by_premium": [],
+                    "top_clients_by_commission": [],
+                    "top_clients_by_policy_count": [],
+                    "client_distribution_by_branch": {},
+                    "client_distribution_by_insurance_type": {},
+                    "all_client_metrics": [],
+                    "total_clients": 0,
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                }
 
-            # Get clients that have policies
-            clients_with_data = Client.objects.filter(
-                id__in=policies_qs.values_list("client_id", flat=True).distinct()
+            payment_metrics_map = self._build_payment_metrics_map(
+                payments_qs, "policy__client_id"
+            )
+            type_distribution_map = self._build_type_distribution_map(
+                policies_qs, "client_id"
             )
 
+            branch_distribution_rows = (
+                policies_qs.values("client_id", "branch__branch_name")
+                .annotate(count=Count("id"))
+                .order_by("client_id", "-count", "branch__branch_name")
+            )
+            branch_distribution_map: Dict[int, Dict[str, int]] = defaultdict(dict)
+            for row in branch_distribution_rows:
+                client_id = row.get("client_id")
+                if client_id is None:
+                    continue
+                branch_name = row.get("branch__branch_name") or "Не указан филиал"
+                branch_distribution_map[int(client_id)][branch_name] = int(
+                    row.get("count") or 0
+                )
+
+            clients_with_data = Client.objects.filter(
+                id__in=policy_count_map.keys()
+            ).order_by("client_name")
             client_metrics = []
 
             for client in clients_with_data:
-                # Filter data for this client
-                client_policies = policies_qs.filter(client=client)
-                client_payments = payments_qs.filter(policy__client=client)
-
-                # Calculate metrics for this client
-                premium_volume = self.calculator.calculate_premium_volume(
-                    client_payments, date_range
+                payment_metrics = payment_metrics_map.get(
+                    client.id,
+                    {
+                        "premium_volume": Decimal("0"),
+                        "commission_revenue": Decimal("0"),
+                        "insurance_sum": Decimal("0"),
+                    },
                 )
-                commission_revenue = self.calculator.calculate_commission_revenue(
-                    client_payments, date_range
-                )
-                policy_count = self.calculator.calculate_policy_count(
-                    client_policies, date_range
-                )
-                insurance_sum = self.calculator.calculate_insurance_sum(
-                    client_payments, date_range
+                policy_count = policy_count_map.get(client.id, 0)
+                insurance_sum = payment_metrics["insurance_sum"]
+                average_policy_value = (
+                    insurance_sum / Decimal(str(policy_count))
+                    if policy_count > 0
+                    else Decimal("0")
                 )
 
-                # Calculate average policy value
-                if policy_count > 0:
-                    average_policy_value = insurance_sum / Decimal(str(policy_count))
-                else:
-                    average_policy_value = Decimal("0")
-
-                # Get insurance type distribution for this client
-                insurance_type_distribution = dict(
-                    client_policies.values("insurance_type__name")
-                    .annotate(count=Count("id"))
-                    .values_list("insurance_type__name", "count")
+                branch_distribution = branch_distribution_map.get(client.id, {})
+                primary_branch = (
+                    max(branch_distribution.items(), key=lambda x: x[1])[0]
+                    if branch_distribution
+                    else None
                 )
-
-                # Sort insurance types in preferred order
-                insurance_type_distribution = sort_insurance_types(
-                    insurance_type_distribution
-                )
-
-                # Get branch distribution for this client
-                branch_distribution = dict(
-                    client_policies.values("branch__branch_name")
-                    .annotate(count=Count("id"))
-                    .values_list("branch__branch_name", "count")
-                )
-
-                # Determine primary branch (branch with most policies)
-                primary_branch = None
-                if branch_distribution:
-                    primary_branch = max(
-                        branch_distribution.items(), key=lambda x: x[1]
-                    )[0]
 
                 client_metrics.append(
                     {
                         "client": {
                             "id": client.id,
                             "name": client.client_name,
-                            "inn": getattr(client, "inn", ""),
+                            "inn": getattr(
+                                client, "inn", getattr(client, "client_inn", "")
+                            ),
                             "contact_person": getattr(client, "contact_person", ""),
                         },
-                        "premium_volume": premium_volume,
-                        "commission_revenue": commission_revenue,
+                        "premium_volume": payment_metrics["premium_volume"],
+                        "commission_revenue": payment_metrics["commission_revenue"],
                         "policy_count": policy_count,
                         "insurance_sum": insurance_sum,
                         "average_policy_value": average_policy_value,
-                        "insurance_type_distribution": insurance_type_distribution,
+                        "insurance_type_distribution": type_distribution_map.get(
+                            client.id, {}
+                        ),
                         "branch_distribution": branch_distribution,
                         "primary_branch": primary_branch,
                     }
@@ -1321,133 +1331,158 @@ class AnalyticsService:
             # Calculate average commission rates by different dimensions
             average_commission_rates = {}
 
-            # By insurance type
-            from apps.policies.models import InsuranceType
-
-            insurance_types = InsuranceType.objects.filter(
-                id__in=policies_qs.values_list(
-                    "insurance_type_id", flat=True
-                ).distinct()
+            # By insurance type (single grouped query)
+            insurance_type_rate_rows = (
+                payments_qs.values("policy__insurance_type__name")
+                .annotate(
+                    total_commission=Coalesce(Sum("kv_rub"), Decimal("0")),
+                    total_premium=Coalesce(Sum("amount"), Decimal("0")),
+                )
+                .order_by("policy__insurance_type__name")
             )
+            for row in insurance_type_rate_rows:
+                type_name = row.get("policy__insurance_type__name") or "Не указан вид"
+                total_type_premium = row.get("total_premium") or Decimal("0")
+                total_type_commission = row.get("total_commission") or Decimal("0")
+                if total_type_premium > 0:
+                    avg_rate = (total_type_commission / total_type_premium) * Decimal(
+                        "100"
+                    )
+                else:
+                    avg_rate = Decimal("0")
+                average_commission_rates[f"insurance_type_{type_name}"] = avg_rate
 
-            for insurance_type in insurance_types:
-                type_payments = payments_qs.filter(
-                    policy__insurance_type=insurance_type
+            # By insurer (single grouped query)
+            insurer_rate_rows = (
+                payments_qs.values("policy__insurer__insurer_name")
+                .annotate(
+                    total_commission=Coalesce(Sum("kv_rub"), Decimal("0")),
+                    total_premium=Coalesce(Sum("amount"), Decimal("0")),
                 )
-                avg_rate = self.calculator.calculate_average_commission_rate(
-                    type_payments
-                )
-                average_commission_rates[
-                    f"insurance_type_{insurance_type.name}"
-                ] = avg_rate
-
-            # By insurer
-            from apps.insurers.models import Insurer
-
-            insurers = Insurer.objects.filter(
-                id__in=policies_qs.values_list("insurer_id", flat=True).distinct()
+                .order_by("policy__insurer__insurer_name")
             )
-
-            for insurer in insurers:
-                insurer_payments = payments_qs.filter(policy__insurer=insurer)
-                avg_rate = self.calculator.calculate_average_commission_rate(
-                    insurer_payments
+            for row in insurer_rate_rows:
+                insurer_name = (
+                    row.get("policy__insurer__insurer_name") or "Неизвестный страховщик"
                 )
-                average_commission_rates[f"insurer_{insurer.insurer_name}"] = avg_rate
+                total_insurer_premium = row.get("total_premium") or Decimal("0")
+                total_insurer_commission = row.get("total_commission") or Decimal("0")
+                if total_insurer_premium > 0:
+                    avg_rate = (
+                        total_insurer_commission / total_insurer_premium
+                    ) * Decimal("100")
+                else:
+                    avg_rate = Decimal("0")
+                average_commission_rates[f"insurer_{insurer_name}"] = avg_rate
 
             # Analyze overdue payments
             overdue_payments_qs = payments_qs.filter(
                 paid_date__isnull=True, due_date__lt=today
             )
 
-            # Breakdown by days overdue
-            overdue_by_days = {}
-            for payment in overdue_payments_qs:
-                days_overdue = (today - payment.due_date).days
-                if days_overdue <= 30:
-                    category = "1-30 days"
-                elif days_overdue <= 60:
-                    category = "31-60 days"
-                elif days_overdue <= 90:
-                    category = "61-90 days"
-                else:
-                    category = "90+ days"
-
-                if category not in overdue_by_days:
-                    overdue_by_days[category] = Decimal("0")
-                overdue_by_days[category] += payment.amount
-
-            # Breakdown by branch
-            overdue_by_branch = {}
-            from apps.insurers.models import Branch
-
-            branches = Branch.objects.filter(
-                id__in=overdue_payments_qs.values_list(
-                    "policy__branch_id", flat=True
-                ).distinct()
+            # Breakdown by days overdue (single grouped query)
+            overdue_by_days_rows = (
+                overdue_payments_qs.annotate(
+                    overdue_bucket=Case(
+                        When(
+                            due_date__gte=today - timedelta(days=30),
+                            then=Value("1-30 days"),
+                        ),
+                        When(
+                            due_date__gte=today - timedelta(days=60),
+                            then=Value("31-60 days"),
+                        ),
+                        When(
+                            due_date__gte=today - timedelta(days=90),
+                            then=Value("61-90 days"),
+                        ),
+                        default=Value("90+ days"),
+                        output_field=CharField(),
+                    )
+                )
+                .values("overdue_bucket")
+                .annotate(total_amount=Coalesce(Sum("amount"), Decimal("0")))
+                .order_by()
             )
+            overdue_by_days = {
+                row["overdue_bucket"]: row["total_amount"] or Decimal("0")
+                for row in overdue_by_days_rows
+            }
 
-            for branch in branches:
-                branch_overdue = self.calculator.calculate_premium_volume(
-                    overdue_payments_qs.filter(policy__branch=branch)
+            # Breakdown by branch (single grouped query)
+            overdue_by_branch_rows = (
+                overdue_payments_qs.values("policy__branch__branch_name")
+                .annotate(total_amount=Coalesce(Sum("amount"), Decimal("0")))
+                .order_by("policy__branch__branch_name")
+            )
+            overdue_by_branch = {
+                (row.get("policy__branch__branch_name") or "Не указан филиал"): (
+                    row.get("total_amount") or Decimal("0")
                 )
-                overdue_by_branch[branch.branch_name] = branch_overdue
+                for row in overdue_by_branch_rows
+            }
 
-            # Breakdown by insurer
+            # Breakdown by insurer (single grouped query)
+            overdue_by_insurer_rows = (
+                overdue_payments_qs.values("policy__insurer__insurer_name")
+                .annotate(total_amount=Coalesce(Sum("amount"), Decimal("0")))
+                .order_by("policy__insurer__insurer_name")
+            )
             overdue_by_insurer = {}
-            for insurer in insurers:
-                insurer_overdue = self.calculator.calculate_premium_volume(
-                    overdue_payments_qs.filter(policy__insurer=insurer)
+            for row in overdue_by_insurer_rows:
+                insurer_name = (
+                    row.get("policy__insurer__insurer_name") or "Неизвестный страховщик"
                 )
-                if insurer_overdue > 0:
-                    overdue_by_insurer[insurer.insurer_name] = insurer_overdue
+                insurer_total = row.get("total_amount") or Decimal("0")
+                if insurer_total > 0:
+                    overdue_by_insurer[insurer_name] = insurer_total
 
-            # Calculate average overdue days
-            if overdue_payments_qs.exists():
+            # Calculate average overdue days (single column fetch)
+            overdue_due_dates = list(
+                overdue_payments_qs.values_list("due_date", flat=True)
+            )
+            if overdue_due_dates:
                 total_overdue_days = sum(
-                    (today - payment.due_date).days for payment in overdue_payments_qs
+                    (today - due_date).days for due_date in overdue_due_dates
                 )
                 average_overdue_days = Decimal(str(total_overdue_days)) / Decimal(
-                    str(overdue_payments_qs.count())
+                    str(len(overdue_due_dates))
                 )
             else:
                 average_overdue_days = Decimal("0")
 
             # Find worst performing clients (by overdue amount)
-            from apps.clients.models import Client
-
-            worst_performing_clients = []
-            clients_with_overdue = Client.objects.filter(
-                id__in=overdue_payments_qs.values_list(
-                    "policy__client_id", flat=True
-                ).distinct()
-            )
-
-            for client in clients_with_overdue:
-                client_overdue = self.calculator.calculate_premium_volume(
-                    overdue_payments_qs.filter(policy__client=client)
+            worst_client_rows = (
+                overdue_payments_qs.values(
+                    "policy__client_id",
+                    "policy__client__client_name",
                 )
-                if client_overdue > 0:
-                    worst_performing_clients.append(
-                        {
-                            "client": {
-                                "id": client.id,
-                                "name": client.client_name,
-                                "inn": getattr(client, "inn", ""),
-                                "contact_person": getattr(client, "contact_person", ""),
-                            },
-                            "overdue_amount": client_overdue,
-                            "overdue_count": overdue_payments_qs.filter(
-                                policy__client=client
-                            ).count(),
-                        }
-                    )
-
-            # Sort by overdue amount (descending)
-            worst_performing_clients.sort(
-                key=lambda x: x["overdue_amount"], reverse=True
+                .annotate(
+                    overdue_amount=Coalesce(Sum("amount"), Decimal("0")),
+                    overdue_count=Count("id"),
+                )
+                .order_by("-overdue_amount")
             )
-            worst_performing_clients = worst_performing_clients[:10]  # Top 10 worst
+            worst_performing_clients = []
+            for row in worst_client_rows:
+                client_overdue = row.get("overdue_amount") or Decimal("0")
+                if client_overdue <= 0:
+                    continue
+                worst_performing_clients.append(
+                    {
+                        "client": {
+                            "id": row.get("policy__client_id"),
+                            "name": row.get("policy__client__client_name")
+                            or "Неизвестный клиент",
+                            "inn": "",
+                            "contact_person": "",
+                        },
+                        "overdue_amount": client_overdue,
+                        "overdue_count": int(row.get("overdue_count") or 0),
+                    }
+                )
+                if len(worst_performing_clients) >= 10:
+                    break
 
             overdue_payments_analysis = {
                 "total_overdue_amount": overdue_amount,
@@ -2735,64 +2770,84 @@ class AnalyticsService:
         self, payments_qs, policies_qs, analytics_filter
     ):
         """Calculate breakdown by different dimensions."""
-        from apps.insurers.models import Branch, Insurer
-        from apps.policies.models import InsuranceType
-        from django.db.models import Sum, Count
-
-        # Branch breakdown
-        branch_breakdown = []
-        branches = Branch.objects.filter(
-            id__in=policies_qs.values_list("branch_id", flat=True).distinct()
-        )
-
-        for branch in branches:
-            branch_payments = payments_qs.filter(
-                policy__branch=branch, paid_date__isnull=False
+        # Branch breakdown (batched)
+        branch_policy_count_map = self._build_policy_count_map(policies_qs, "branch_id")
+        branch_payment_rows = (
+            payments_qs.filter(paid_date__isnull=False)
+            .values("policy__branch_id", "policy__branch__branch_name")
+            .annotate(
+                premium=Coalesce(Sum("amount"), Decimal("0")),
+                commission=Coalesce(Sum("kv_rub"), Decimal("0")),
             )
-            branch_policies = policies_qs.filter(branch=branch)
+            .order_by("policy__branch__branch_name")
+        )
+        branch_payment_map = {
+            int(row["policy__branch_id"]): {
+                "name": row.get("policy__branch__branch_name") or "Не указан филиал",
+                "premium": row.get("premium") or Decimal("0"),
+                "commission": row.get("commission") or Decimal("0"),
+            }
+            for row in branch_payment_rows
+            if row.get("policy__branch_id") is not None
+        }
 
-            premium = branch_payments.aggregate(total=Sum("amount"))[
-                "total"
-            ] or Decimal("0")
-            commission = branch_payments.aggregate(total=Sum("kv_rub"))[
-                "total"
-            ] or Decimal("0")
-            policy_count = branch_policies.count()
-
+        branch_breakdown = []
+        for branch_id, policy_count in branch_policy_count_map.items():
+            payment_data = branch_payment_map.get(
+                branch_id,
+                {
+                    "name": "Не указан филиал",
+                    "premium": Decimal("0"),
+                    "commission": Decimal("0"),
+                },
+            )
             branch_breakdown.append(
                 {
-                    "name": branch.branch_name,
-                    "premium": premium,
-                    "commission": commission,
+                    "name": payment_data["name"],
+                    "premium": payment_data["premium"],
+                    "commission": payment_data["commission"],
                     "policy_count": policy_count,
                 }
             )
 
-        # Insurance type breakdown
-        insurance_breakdown = []
-        insurance_types = InsuranceType.objects.filter(
-            id__in=policies_qs.values_list("insurance_type_id", flat=True).distinct()
+        # Insurance type breakdown (batched)
+        insurance_policy_count_map = self._build_policy_count_map(
+            policies_qs, "insurance_type_id"
         )
-
-        for ins_type in insurance_types:
-            type_payments = payments_qs.filter(
-                policy__insurance_type=ins_type, paid_date__isnull=False
+        insurance_payment_rows = (
+            payments_qs.filter(paid_date__isnull=False)
+            .values("policy__insurance_type_id", "policy__insurance_type__name")
+            .annotate(
+                premium=Coalesce(Sum("amount"), Decimal("0")),
+                commission=Coalesce(Sum("kv_rub"), Decimal("0")),
             )
-            type_policies = policies_qs.filter(insurance_type=ins_type)
+            .order_by("policy__insurance_type__name")
+        )
+        insurance_payment_map = {
+            int(row["policy__insurance_type_id"]): {
+                "name": row.get("policy__insurance_type__name") or "Не указан вид",
+                "premium": row.get("premium") or Decimal("0"),
+                "commission": row.get("commission") or Decimal("0"),
+            }
+            for row in insurance_payment_rows
+            if row.get("policy__insurance_type_id") is not None
+        }
 
-            premium = type_payments.aggregate(total=Sum("amount"))["total"] or Decimal(
-                "0"
+        insurance_breakdown = []
+        for insurance_type_id, policy_count in insurance_policy_count_map.items():
+            payment_data = insurance_payment_map.get(
+                insurance_type_id,
+                {
+                    "name": "Не указан вид",
+                    "premium": Decimal("0"),
+                    "commission": Decimal("0"),
+                },
             )
-            commission = type_payments.aggregate(total=Sum("kv_rub"))[
-                "total"
-            ] or Decimal("0")
-            policy_count = type_policies.count()
-
             insurance_breakdown.append(
                 {
-                    "name": ins_type.name,
-                    "premium": premium,
-                    "commission": commission,
+                    "name": payment_data["name"],
+                    "premium": payment_data["premium"],
+                    "commission": payment_data["commission"],
                     "policy_count": policy_count,
                 }
             )
@@ -2885,10 +2940,9 @@ class AnalyticsService:
         """
         try:
             from apps.policies.models import Policy, PaymentSchedule
-            from apps.insurers.models import Branch
             from datetime import datetime, timedelta
             from django.db.models import Count, Sum
-            from django.db.models.functions import TruncMonth, TruncYear
+            from django.db.models.functions import TruncMonth
             from collections import defaultdict
             import calendar
 
@@ -3067,34 +3121,28 @@ class AnalyticsService:
 
             # Calculate branch growth trends
             branch_growth_trends = {}
-            branches_with_data = Branch.objects.filter(
-                id__in=policies_in_range.values_list("branch_id", flat=True).distinct()
+            branch_monthly_data = (
+                policies_in_range.annotate(month=TruncMonth("start_date"))
+                .values("branch_id", "branch__branch_name", "month")
+                .annotate(count=Count("id"))
+                .order_by("branch__branch_name", "month")
             )
+            for item in branch_monthly_data:
+                branch_name = item.get("branch__branch_name") or "Не указан филиал"
+                if branch_name not in branch_growth_trends:
+                    branch_growth_trends[branch_name] = []
 
-            for branch in branches_with_data:
-                branch_policies = policies_in_range.filter(branch=branch)
-                branch_monthly_data = (
-                    branch_policies.annotate(month=TruncMonth("start_date"))
-                    .values("month")
-                    .annotate(count=Count("id"))
-                    .order_by("month")
+                branch_growth_trends[branch_name].append(
+                    {
+                        "date": item["month"],
+                        "value": Decimal(str(item["count"])),
+                        "label": item["month"].strftime("%Y-%m"),
+                        "additional_data": {
+                            "branch_id": item.get("branch_id"),
+                            "branch_name": branch_name,
+                        },
+                    }
                 )
-
-                branch_trend = []
-                for item in branch_monthly_data:
-                    branch_trend.append(
-                        {
-                            "date": item["month"],
-                            "value": Decimal(str(item["count"])),
-                            "label": item["month"].strftime("%Y-%m"),
-                            "additional_data": {
-                                "branch_id": branch.id,
-                                "branch_name": branch.branch_name,
-                            },
-                        }
-                    )
-
-                branch_growth_trends[branch.branch_name] = branch_trend
 
             # Calculate year-over-year growth rates
             year_over_year_growth = {}

@@ -84,26 +84,15 @@ body {
     border: none;
     color: #ffffff;
     font-weight: 500;
-    border-top: none;
+    border-top: 2px solid rgba(255, 255, 255, 0.85);
     border-bottom: none;
+    padding-top: 3px;
     box-shadow: none;
 }
 
 .navbar .nav-link.active:not(.ecosystem-main-link)::before,
 .navbar .nav-link[aria-current="page"]:not(.ecosystem-main-link)::before {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow:
-        0 0 0 4px rgba(255, 255, 255, 0.18),
-        0 0 12px rgba(255, 255, 255, 0.45);
-    pointer-events: none;
+    content: none;
 }
 
 @media (min-width: 992px) {

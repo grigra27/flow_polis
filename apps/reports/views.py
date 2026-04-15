@@ -693,18 +693,40 @@ class CustomExportView(LoginRequiredMixin, FormView):
 
     def optimize_queryset(self, queryset, fields):
         """Оптимизирует queryset на основе выбранных полей"""
-        select_related_fields = []
+        from django.core.exceptions import FieldDoesNotExist
 
-        for field in fields:
-            if "__" in field:
-                # Извлекаем связанную модель (первый уровень)
-                parts = field.split("__")
-                related_field = parts[0]
-                if related_field not in select_related_fields:
-                    select_related_fields.append(related_field)
+        select_related_fields = set()
+        root_model = queryset.model
+
+        for field_path in fields:
+            if "__" not in field_path:
+                continue
+
+            parts = field_path.split("__")
+            current_model = root_model
+            relation_chain = []
+
+            # Add every intermediate FK/O2O relation in the chain:
+            # policy__client__client_name -> policy, policy__client
+            for part in parts[:-1]:
+                try:
+                    field_obj = current_model._meta.get_field(part)
+                except FieldDoesNotExist:
+                    break
+
+                if not field_obj.is_relation:
+                    break
+
+                if field_obj.many_to_many or field_obj.one_to_many:
+                    # select_related does not work for M2M/reverse relations
+                    break
+
+                relation_chain.append(part)
+                select_related_fields.add("__".join(relation_chain))
+                current_model = field_obj.related_model
 
         if select_related_fields:
-            queryset = queryset.select_related(*select_related_fields)
+            queryset = queryset.select_related(*sorted(select_related_fields))
 
         return queryset
 

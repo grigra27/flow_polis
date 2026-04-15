@@ -47,12 +47,12 @@
 
                 {% if branches %}
                 <div class="mt-4">
-                    <p class="mb-2"><strong>Филиалы в работе:</strong></p>
-                    <div class="manager-branch-links d-flex flex-wrap gap-2">
+                    <p class="mb-2"><strong>Филиал:</strong></p>
+                    <div class="d-flex flex-column gap-2">
                         {% for branch in branches %}
                         <a href="{% url 'insurers:branch_detail' branch.pk %}"
-                           class="manager-branch-link">
-                            {{ branch.branch_name }}
+                           class="text-decoration-none">
+                            {% branch_logo branch size='medium' %}
                         </a>
                         {% endfor %}
                     </div>

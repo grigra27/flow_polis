@@ -5,6 +5,7 @@ app_name = "insurers"
 
 urlpatterns = [
     path("", views.InsurerListView.as_view(), name="list"),
+    path("ecosystem/", views.EcosystemHubView.as_view(), name="ecosystem"),
     path("branches/", views.BranchListView.as_view(), name="branches_list"),
     path("branches/<int:pk>/", views.BranchDetailView.as_view(), name="branch_detail"),
     path("managers/", views.LeasingManagerListView.as_view(), name="managers_list"),

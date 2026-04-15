@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load insurer_tags %}
+{% load l10n %}
+
+{% block title %}Экосистема{% endblock %}
+
+{% block content %}
+<div class="ecosystem-hub-page">
+    <div class="d-flex justify-content-between flex-wrap align-items-end pt-3 pb-2 mb-4 border-bottom">
+        <div>
+            <h1 class="h2 mb-1">Экосистема</h1>
+            <p class="text-muted mb-0">Выберите раздел для перехода к связанным сущностям и сделкам.</p>
+        </div>
+    </div>
+
+    <div class="ecosystem-hub-shell mx-auto">
+        <div class="ecosystem-hub-grid">
+            <a href="{% url 'insurers:branches_list' %}" class="ecosystem-hub-tile">
+                <div class="ecosystem-hub-icon"><i class="bi bi-diagram-3"></i></div>
+                <h3 class="ecosystem-hub-title">Филиалы</h3>
+                <p class="ecosystem-hub-description">Статистика филиалов, карточки и полисы по каждому филиалу.</p>
+                <div class="ecosystem-hub-meta">{{ branch_count|localize }} {{ branch_count|ru_pluralize:"филиал,филиала,филиалов" }}</div>
+            </a>
+
+            <a href="{% url 'insurers:managers_list' %}" class="ecosystem-hub-tile">
+                <div class="ecosystem-hub-icon"><i class="bi bi-person-badge"></i></div>
+                <h3 class="ecosystem-hub-title">Менеджеры</h3>
+                <p class="ecosystem-hub-description">Карточки менеджеров и все сделки, в которых они участвуют.</p>
+                <div class="ecosystem-hub-meta">{{ manager_count|localize }} {{ manager_count|ru_pluralize:"менеджер,менеджера,менеджеров" }}</div>
+            </a>
+
+            <a href="{% url 'clients:list' %}" class="ecosystem-hub-tile">
+                <div class="ecosystem-hub-icon"><i class="bi bi-people"></i></div>
+                <h3 class="ecosystem-hub-title">Лизингополучатели</h3>
+                <p class="ecosystem-hub-description">Клиенты, их карточки, статистика и связанные полисы.</p>
+                <div class="ecosystem-hub-meta">{{ client_count|localize }} {{ client_count|ru_pluralize:"лизингополучатель,лизингополучателя,лизингополучателей" }}</div>
+            </a>
+
+            <a href="{% url 'insurers:list' %}" class="ecosystem-hub-tile">
+                <div class="ecosystem-hub-icon"><i class="bi bi-building"></i></div>
+                <h3 class="ecosystem-hub-title">Страховщики</h3>
+                <p class="ecosystem-hub-description">Список страховщиков, карточки компаний и их срезы по полисам.</p>
+                <div class="ecosystem-hub-meta">{{ insurer_count|localize }} {{ insurer_count|ru_pluralize:"страховщик,страховщика,страховщиков" }}</div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

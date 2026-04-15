@@ -91,7 +91,9 @@
                 {% for item in managers_info %}
                 <div class="mb-3 {% if not forloop.last %}pb-3 border-bottom{% endif %}">
                     <p class="mb-1">
-                        <strong><i class="bi bi-person-badge"></i> {{ item.manager.name }}</strong>
+                        <a href="{% url 'insurers:manager_detail' item.manager.pk %}" class="fw-semibold text-decoration-none">
+                            <i class="bi bi-person-badge"></i> {{ item.manager.name }}
+                        </a>
                     </p>
                     {% if item.manager.full_name %}
                     <p class="mb-1 text-muted">

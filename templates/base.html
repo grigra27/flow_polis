@@ -48,7 +48,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a id="ecosystemTopLink" class="nav-link ecosystem-main-link{% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'insurers:branches_list' %}" {% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
+                        <a id="ecosystemTopLink" class="nav-link ecosystem-main-link{% if current_namespace == 'clients' or current_view == 'insurers:ecosystem' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}{% if current_view == 'insurers:ecosystem' %} ecosystem-main-link-current{% endif %}" href="{% url 'insurers:ecosystem' %}" {% if current_namespace == 'clients' or current_view == 'insurers:ecosystem' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
                             <i class="bi bi-diagram-3"></i> Экосистема
                         </a>
                     </li>
@@ -192,6 +192,7 @@
                 topLink.offsetParent === null
             ) {
                 links.style.marginLeft = '0px';
+                strip.style.removeProperty('--ecosystem-anchor-x');
                 return;
             }
 
@@ -208,6 +209,11 @@
             left = Math.max(0, Math.min(left, maxLeft));
 
             links.style.marginLeft = Math.round(left) + 'px';
+            const stripRect = strip.getBoundingClientRect();
+            strip.style.setProperty(
+                '--ecosystem-anchor-x',
+                `${Math.round(targetCenter - stripRect.left)}px`
+            );
         }
 
         document.addEventListener('DOMContentLoaded', alignEcosystemStrip);

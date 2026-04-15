@@ -717,6 +717,43 @@ class BranchDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertContains(response, self.branch_a.branch_name)
 
 
+class EcosystemHubViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="ecosystem_user", password="testpass123"
+        )
+        self.client.login(username="ecosystem_user", password="testpass123")
+
+    def test_ecosystem_hub_requires_authentication(self):
+        self.client.logout()
+        response = self.client.get(reverse("insurers:ecosystem"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_ecosystem_hub_renders_links_and_counts(self):
+        Branch.objects.create(branch_name="Тестовый филиал")
+        LeasingManager.objects.create(name="Смирнов")
+        Insurer.objects.create(insurer_name="Тестовый страховщик")
+        LeasingClient.objects.create(
+            client_name="Тестовый лизингополучатель", client_inn="7700000001"
+        )
+
+        response = self.client.get(reverse("insurers:ecosystem"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("insurers:branches_list"))
+        self.assertContains(response, reverse("insurers:managers_list"))
+        self.assertContains(response, reverse("clients:list"))
+        self.assertContains(response, reverse("insurers:list"))
+        self.assertEqual(response.context["branch_count"], Branch.objects.count())
+        self.assertEqual(
+            response.context["manager_count"], LeasingManager.objects.count()
+        )
+        self.assertEqual(
+            response.context["client_count"], LeasingClient.objects.count()
+        )
+        self.assertEqual(response.context["insurer_count"], Insurer.objects.count())
+
+
 class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
     def setUp(self):
         self.setUp_statistics_data()

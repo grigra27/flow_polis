@@ -1,11 +1,12 @@
 from datetime import date
 
-from django.views.generic import ListView, DetailView
+from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Avg, Count, Q
+from apps.clients.models import Client as LeasingClient
 from .models import (
     Insurer,
     CommissionRate,
@@ -172,6 +173,18 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
             stats_filters
         )
 
+        return context
+
+
+class EcosystemHubView(LoginRequiredMixin, TemplateView):
+    template_name = "insurers/ecosystem_hub.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["branch_count"] = Branch.objects.count()
+        context["manager_count"] = LeasingManager.objects.count()
+        context["client_count"] = LeasingClient.objects.count()
+        context["insurer_count"] = Insurer.objects.count()
         return context
 
 

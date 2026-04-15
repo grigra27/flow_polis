@@ -85,6 +85,25 @@ body {
     box-shadow: inset 0 -2px 0 rgba(244, 248, 255, 0.9);
 }
 
+@media (min-width: 992px) {
+    .navbar .navbar-collapse {
+        align-items: flex-end;
+    }
+
+    .navbar .navbar-nav.me-auto {
+        align-items: flex-end;
+    }
+
+    .navbar .navbar-nav.me-auto > .nav-item {
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .navbar .navbar-nav.me-auto > .nav-item > .nav-link:not(.ecosystem-main-link) {
+        padding-bottom: 10px;
+    }
+}
+
 .navbar .dropdown-menu .dropdown-item.active,
 .navbar .dropdown-menu .dropdown-item:active {
     background-color: var(--app-color-primary-soft);
@@ -93,37 +112,40 @@ body {
 
 .navbar .ecosystem-main-link {
     position: relative;
+    align-self: flex-end;
+    margin-bottom: -1px;
     border: 1px solid #bcc9da;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
     background: #dde5ef;
     color: #1a3a62;
-    box-shadow: 0 8px 18px rgba(26, 76, 132, 0.18);
+    font-weight: 500;
+    padding: 6px 14px 8px;
+    box-shadow: none;
 }
 
 .navbar .ecosystem-main-link:hover {
-    background: #e7edf5;
+    background: #ebf0f7;
     border-color: #bcc9da;
     color: #1a3a62;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
 }
 
 .navbar .ecosystem-main-link::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: -11px;
-    width: 24px;
-    height: 12px;
-    transform: translateX(-50%);
-    background: #dde5ef;
-    clip-path: polygon(50% 100%, 0 0, 100% 0);
-    opacity: 0.95;
+    display: none;
 }
 
 .navbar .ecosystem-main-link.active,
 .navbar .ecosystem-main-link[aria-current="page"] {
     background: #dde5ef;
     border: 1px solid #bcc9da;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
     color: #1a3a62;
-    box-shadow: 0 8px 18px rgba(26, 76, 132, 0.18);
+    font-weight: 500;
+    box-shadow: none;
 }
 
 .ecosystem-strip {
@@ -131,20 +153,14 @@ body {
     position: sticky;
     top: var(--app-navbar-height, 64px);
     z-index: 1028;
+    border-top: 1px solid #bcc9da;
     border-bottom: 1px solid #bcc9da;
     background: #dde5ef;
     box-shadow: 0 8px 16px rgba(18, 35, 61, 0.24);
 }
 
 .ecosystem-strip::before {
-    content: "";
-    position: absolute;
-    top: -12px;
-    left: calc(var(--ecosystem-anchor-x, 50%) - 18px);
-    width: 36px;
-    height: 14px;
-    background: #dde5ef;
-    clip-path: polygon(50% 0, 0 100%, 100% 100%);
+    display: none;
 }
 
 .ecosystem-strip .container-fluid {

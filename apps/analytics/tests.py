@@ -78,3 +78,20 @@ class AnalyticsServiceQueryOptimizationTest(TestCase):
 
         self.assertEqual(len(rows), 3)
         self.assertLessEqual(len(queries), 6)
+
+    def test_get_branch_portfolio_analytics_v2_returns_expected_shape(self):
+        data = self.service.get_branch_portfolio_analytics_v2(horizon_months=12)
+
+        self.assertIn("summary", data)
+        self.assertIn("branch_metrics", data)
+        self.assertIn("branch_drilldown", data)
+        self.assertEqual(data["summary"]["total_branches"], 3)
+        self.assertEqual(data["summary"]["total_active_policies"], 3)
+        self.assertEqual(len(data["branch_metrics"]), 3)
+
+    def test_get_branch_portfolio_analytics_v2_runs_in_bounded_queries(self):
+        with CaptureQueriesContext(connection) as queries:
+            data = self.service.get_branch_portfolio_analytics_v2(horizon_months=12)
+
+        self.assertEqual(data["summary"]["total_branches"], 3)
+        self.assertLessEqual(len(queries), 10)

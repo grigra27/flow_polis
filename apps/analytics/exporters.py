@@ -384,6 +384,217 @@ class AnalyticsExporter:
             logger.error(f"Error exporting branch analytics: {e}")
             raise
 
+    def export_branch_portfolio_analytics_v2(
+        self,
+        analytics: Dict[str, Any],
+        applied_filters: Optional[Dict[str, Any]] = None,
+    ) -> HttpResponse:
+        """Export branch portfolio analytics v2 to Excel."""
+        try:
+            workbook = Workbook()
+            worksheet = workbook.active
+            worksheet.title = "Branch Portfolio v2"
+
+            worksheet.cell(row=1, column=1, value="Branch Portfolio Analytics v2")
+            worksheet.cell(row=1, column=1).font = Font(size=16, bold=True)
+            worksheet.merge_cells("A1:N1")
+
+            as_of_date = analytics.get("as_of_date")
+            horizon_months = analytics.get("horizon_months", 12)
+            worksheet.cell(
+                row=2,
+                column=1,
+                value=f"As of: {as_of_date} | Horizon: {horizon_months} months",
+            )
+
+            current_row = 4
+            if applied_filters:
+                worksheet.cell(row=current_row, column=1, value="Applied Filters:")
+                worksheet.cell(row=current_row, column=1).font = Font(bold=True)
+                current_row += 1
+                for filter_name, filter_value in applied_filters.items():
+                    if filter_value:
+                        worksheet.cell(
+                            row=current_row,
+                            column=1,
+                            value=f"  {filter_name}: {filter_value}",
+                        )
+                        current_row += 1
+                current_row += 1
+
+            summary = analytics.get("summary", {})
+            summary_rows = [
+                ("Total Branches", summary.get("total_branches", 0)),
+                ("Total Active Policies", summary.get("total_active_policies", 0)),
+                ("Total Active Clients", summary.get("total_active_clients", 0)),
+                ("Total Portfolio Premium", summary.get("total_portfolio_premium", 0)),
+                ("Planned Premium (Horizon)", summary.get("total_planned_premium", 0)),
+                (
+                    "Planned Commission (Horizon)",
+                    summary.get("total_planned_commission", 0),
+                ),
+                (
+                    "Average Commission Rate (%)",
+                    summary.get("average_commission_rate", 0),
+                ),
+                (
+                    "Top-3 Branch Concentration (%)",
+                    summary.get("top3_branch_concentration", 0),
+                ),
+                ("Total Overdue Amount", summary.get("total_overdue_amount", 0)),
+                ("Total Overdue Count", summary.get("total_overdue_count", 0)),
+                ("Renewals 30d", summary.get("total_renewals_30", 0)),
+                ("Renewals 60d", summary.get("total_renewals_60", 0)),
+                ("Renewals 90d", summary.get("total_renewals_90", 0)),
+            ]
+
+            worksheet.cell(row=current_row, column=1, value="Summary Metric")
+            worksheet.cell(row=current_row, column=2, value="Value")
+            self._apply_header_style(worksheet, current_row, 2)
+            current_row += 1
+
+            summary_start = current_row
+            for label, value in summary_rows:
+                worksheet.cell(row=current_row, column=1, value=label)
+                worksheet.cell(
+                    row=current_row, column=2, value=self._format_value(value)
+                )
+                current_row += 1
+            self._apply_data_style(worksheet, summary_start, current_row - 1, 2)
+
+            current_row += 2
+            headers = [
+                "Branch",
+                "Active Policies",
+                "Active Clients",
+                "Portfolio Premium",
+                "Planned Premium",
+                "Planned Commission",
+                "Commission Rate (%)",
+                "Market Share (%)",
+                "Overdue Count",
+                "Overdue Amount",
+                "Renewals 30d",
+                "Renewals 60d",
+                "Renewals 90d",
+                "Top-3 Client Concentration (%)",
+                "Top Insurance Types",
+            ]
+
+            for col, header in enumerate(headers, 1):
+                worksheet.cell(row=current_row, column=col, value=header)
+            self._apply_header_style(worksheet, current_row, len(headers))
+            current_row += 1
+
+            branch_metrics = analytics.get("branch_metrics", [])
+            details_start = current_row
+
+            for metric in branch_metrics:
+                branch_info = metric.get("branch", {})
+                distribution = metric.get("insurance_type_distribution", {})
+                top_types = (
+                    ", ".join(list(distribution.keys())[:3]) if distribution else ""
+                )
+
+                worksheet.cell(
+                    row=current_row,
+                    column=1,
+                    value=branch_info.get("name", ""),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=2,
+                    value=self._format_value(metric.get("active_policies", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=3,
+                    value=self._format_value(metric.get("active_clients", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=4,
+                    value=self._format_value(metric.get("portfolio_premium", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=5,
+                    value=self._format_value(metric.get("planned_premium", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=6,
+                    value=self._format_value(metric.get("planned_commission", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=7,
+                    value=self._format_value(metric.get("commission_rate", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=8,
+                    value=self._format_value(metric.get("market_share", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=9,
+                    value=self._format_value(metric.get("overdue_count", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=10,
+                    value=self._format_value(metric.get("overdue_amount", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=11,
+                    value=self._format_value(metric.get("renewals_30", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=12,
+                    value=self._format_value(metric.get("renewals_60", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=13,
+                    value=self._format_value(metric.get("renewals_90", 0)),
+                )
+                worksheet.cell(
+                    row=current_row,
+                    column=14,
+                    value=self._format_value(
+                        metric.get("concentration_top3_clients", 0)
+                    ),
+                )
+                worksheet.cell(row=current_row, column=15, value=top_types)
+                current_row += 1
+
+            if current_row > details_start:
+                self._apply_data_style(
+                    worksheet, details_start, current_row - 1, len(headers)
+                )
+
+            self._auto_adjust_columns(worksheet)
+
+            output = BytesIO()
+            workbook.save(output)
+            output.seek(0)
+
+            response = HttpResponse(
+                output.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response[
+                "Content-Disposition"
+            ] = f'attachment; filename="branch_portfolio_v2_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+            return response
+
+        except Exception as e:
+            logger.error(f"Error exporting branch portfolio analytics v2: {e}")
+            raise
+
     def export_insurer_analytics(
         self,
         analytics: Dict[str, Any],

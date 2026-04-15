@@ -6,6 +6,11 @@ app_name = "analytics"
 urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
     path("branches/", views.BranchAnalyticsView.as_view(), name="branch_analytics"),
+    path(
+        "branches-v2/",
+        views.BranchPortfolioAnalyticsV2View.as_view(),
+        name="branch_portfolio_analytics_v2",
+    ),
     path("insurers/", views.InsurerAnalyticsView.as_view(), name="insurer_analytics"),
     path("clients/", views.ClientAnalyticsView.as_view(), name="client_analytics"),
     path(

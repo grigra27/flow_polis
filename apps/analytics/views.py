@@ -731,6 +731,356 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             return self.get(self.request)
 
 
+class BranchPortfolioAnalyticsV2View(SuperuserRequiredMixin, TemplateView):
+    """
+    Branch portfolio analytics v2.
+
+    Focused on active portfolio management by branch:
+    scale, margin, concentration, risk and renewal profile.
+    """
+
+    template_name = "analytics/branch_analytics_v2.html"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.analytics_service = AnalyticsService()
+        self.exporter = AnalyticsExporter()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        security_logger.info(
+            f"Branch analytics v2 accessed by user {self.request.user.username} "
+            f"from IP {self.request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+
+        try:
+            analytics_filter = self._get_analytics_filter()
+            horizon_months = self._get_horizon_months()
+            as_of_date = self._get_as_of_date()
+
+            portfolio_data = self.analytics_service.get_branch_portfolio_analytics_v2(
+                analytics_filter,
+                as_of_date=as_of_date,
+                horizon_months=horizon_months,
+            )
+
+            branch_metrics = portfolio_data.get("branch_metrics", [])
+            summary = portfolio_data.get("summary", {})
+            branch_drilldown = portfolio_data.get("branch_drilldown", {})
+
+            # Enrich rows with branch model objects and derived risk indicators
+            branch_ids = [
+                metric.get("branch", {}).get("id")
+                for metric in branch_metrics
+                if metric.get("branch", {}).get("id")
+            ]
+            branches_map = Branch.objects.in_bulk(branch_ids) if branch_ids else {}
+
+            for metric in branch_metrics:
+                branch_id = metric.get("branch", {}).get("id")
+                branch_obj = branches_map.get(branch_id)
+                metric["branch_obj"] = branch_obj
+                metric["branch_name"] = (
+                    branch_obj.branch_name
+                    if branch_obj
+                    else metric.get("branch", {}).get("name", "Не указан")
+                )
+                active_policies = metric.get("active_policies", 0)
+                overdue_count = metric.get("overdue_count", 0)
+                metric["overdue_rate"] = (
+                    (Decimal(str(overdue_count)) / Decimal(str(active_policies)))
+                    * Decimal("100")
+                    if active_policies > 0
+                    else Decimal("0")
+                )
+
+            ranking_chart_data = self._prepare_ranking_chart_data(branch_metrics)
+            structure_chart_data = self._prepare_structure_chart_data(branch_metrics)
+            drilldown_json = self._serialize_for_json(branch_drilldown)
+
+            context.update(
+                {
+                    "summary": summary,
+                    "branch_metrics": branch_metrics,
+                    "branch_drilldown": branch_drilldown,
+                    "branch_drilldown_json": drilldown_json,
+                    "overall_insurance_type_distribution": portfolio_data.get(
+                        "overall_insurance_type_distribution", {}
+                    ),
+                    "ranking_chart_data": ranking_chart_data,
+                    "structure_chart_data": structure_chart_data,
+                    "as_of_date": portfolio_data.get("as_of_date", as_of_date),
+                    "horizon_months": portfolio_data.get(
+                        "horizon_months", horizon_months
+                    ),
+                    "horizon_end": portfolio_data.get("horizon_end"),
+                    "policy_status": self.request.GET.get("policy_status", "active"),
+                    "branches": Branch.objects.all().order_by("branch_name"),
+                    "insurers": Insurer.objects.all().order_by("insurer_name"),
+                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "clients": Client.objects.all().order_by("client_name")[:100],
+                    "current_filter": analytics_filter,
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                }
+            )
+
+            if "error" in portfolio_data:
+                messages.error(
+                    self.request,
+                    f"Ошибка при расчете аналитики портфеля по филиалам: {portfolio_data['error']}",
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error in BranchPortfolioAnalyticsV2View.get_context_data: {e}"
+            )
+            messages.error(
+                self.request, "Произошла ошибка при загрузке аналитики по филиалам v2"
+            )
+            context.update(
+                {
+                    "summary": {
+                        "total_branches": 0,
+                        "total_active_policies": 0,
+                        "total_active_clients": 0,
+                        "total_portfolio_premium": Decimal("0"),
+                        "total_planned_premium": Decimal("0"),
+                        "total_planned_commission": Decimal("0"),
+                        "average_commission_rate": Decimal("0"),
+                        "top3_branch_concentration": Decimal("0"),
+                        "total_overdue_amount": Decimal("0"),
+                        "total_overdue_count": 0,
+                        "total_renewals_30": 0,
+                        "total_renewals_60": 0,
+                        "total_renewals_90": 0,
+                    },
+                    "branch_metrics": [],
+                    "branch_drilldown": {},
+                    "branch_drilldown_json": "{}",
+                    "overall_insurance_type_distribution": {},
+                    "ranking_chart_data": "{}",
+                    "structure_chart_data": "{}",
+                    "as_of_date": datetime.now().date(),
+                    "horizon_months": self._get_horizon_months(),
+                    "horizon_end": self.analytics_service._add_months(
+                        datetime.now().date(), self._get_horizon_months()
+                    ),
+                    "policy_status": "active",
+                    "branches": Branch.objects.none(),
+                    "insurers": Insurer.objects.none(),
+                    "insurance_types": InsuranceType.objects.none(),
+                    "clients": Client.objects.none(),
+                    "current_filter": None,
+                    "filter_applied": False,
+                }
+            )
+
+        return context
+
+    def _get_analytics_filter(self):
+        """Get AnalyticsFilter from GET parameters."""
+        try:
+            filter_data = {}
+
+            if self.request.GET.get("date_from"):
+                filter_data["date_from"] = self.request.GET.get("date_from")
+            if self.request.GET.get("date_to"):
+                filter_data["date_to"] = self.request.GET.get("date_to")
+
+            policy_status = self.request.GET.get("policy_status", "active")
+            if policy_status in ["active", "inactive"]:
+                filter_data["policy_active"] = policy_status == "active"
+
+            if self.request.GET.getlist("branches"):
+                filter_data["branch_ids"] = self.request.GET.getlist("branches")
+            if self.request.GET.getlist("insurers"):
+                filter_data["insurer_ids"] = self.request.GET.getlist("insurers")
+            if self.request.GET.getlist("insurance_types"):
+                filter_data["insurance_type_ids"] = self.request.GET.getlist(
+                    "insurance_types"
+                )
+            if self.request.GET.getlist("clients"):
+                filter_data["client_ids"] = self.request.GET.getlist("clients")
+
+            if filter_data or policy_status != "all":
+                return self.analytics_service.validate_filter_input(filter_data)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating analytics filter from GET (v2): {e}")
+            return None
+
+    def _get_horizon_months(self):
+        """Parse and validate horizon in months."""
+        default_horizon = 12
+        raw = self.request.GET.get("horizon_months", str(default_horizon))
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return default_horizon
+
+        allowed = {3, 6, 12, 24}
+        return value if value in allowed else default_horizon
+
+    def _get_as_of_date(self):
+        """Parse as-of date from query parameters."""
+        raw = self.request.GET.get("as_of_date")
+        if not raw:
+            return datetime.now().date()
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return datetime.now().date()
+
+    def _prepare_ranking_chart_data(self, branch_metrics):
+        """Prepare top-12 branch ranking chart data."""
+        import json
+
+        top_rows = branch_metrics[:12]
+        chart_data = {
+            "labels": [row.get("branch_name", "") for row in top_rows],
+            "planned_premium": [
+                float(row.get("planned_premium", 0)) for row in top_rows
+            ],
+            "planned_commission": [
+                float(row.get("planned_commission", 0)) for row in top_rows
+            ],
+            "overdue_amount": [float(row.get("overdue_amount", 0)) for row in top_rows],
+        }
+        return json.dumps(chart_data)
+
+    def _prepare_structure_chart_data(self, branch_metrics):
+        """Prepare stacked chart data for branch/type portfolio structure."""
+        import json
+        from collections import defaultdict
+
+        labels = [row.get("branch_name", "") for row in branch_metrics[:10]]
+        branch_rows = branch_metrics[:10]
+
+        type_totals = defaultdict(int)
+        for row in branch_rows:
+            for insurance_type, count in row.get(
+                "insurance_type_distribution", {}
+            ).items():
+                type_totals[insurance_type] += int(count)
+
+        top_types = [
+            item[0]
+            for item in sorted(type_totals.items(), key=lambda x: x[1], reverse=True)[
+                :5
+            ]
+        ]
+        palette = ["#1f4e79", "#1f7a5c", "#3d6ea7", "#4d8c73", "#8ca6c1"]
+
+        datasets = []
+        for idx, insurance_type in enumerate(top_types):
+            datasets.append(
+                {
+                    "label": insurance_type,
+                    "backgroundColor": palette[idx % len(palette)],
+                    "data": [
+                        int(
+                            row.get("insurance_type_distribution", {}).get(
+                                insurance_type, 0
+                            )
+                        )
+                        for row in branch_rows
+                    ],
+                }
+            )
+
+        return json.dumps({"labels": labels, "datasets": datasets})
+
+    def _serialize_for_json(self, data):
+        """Serialize Decimal/date recursively and dump to JSON string."""
+        import json
+
+        def convert(value):
+            if isinstance(value, Decimal):
+                return float(value)
+            if isinstance(value, (datetime, date)):
+                return value.isoformat()
+            if isinstance(value, list):
+                return [convert(item) for item in value]
+            if isinstance(value, dict):
+                return {key: convert(val) for key, val in value.items()}
+            return value
+
+        return json.dumps(convert(data))
+
+    def get(self, request, *args, **kwargs):
+        """Handle GET requests including export requests."""
+        if request.GET.get("export") == "excel":
+            return self.export_data()
+        return super().get(request, *args, **kwargs)
+
+    def export_data(self):
+        """Export branch portfolio analytics v2 to Excel."""
+        security_logger.info(
+            f"Branch analytics v2 export by user {self.request.user.username} "
+            f"from IP {self.request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+
+        try:
+            analytics_filter = self._get_analytics_filter()
+            horizon_months = self._get_horizon_months()
+            as_of_date = self._get_as_of_date()
+
+            portfolio_data = self.analytics_service.get_branch_portfolio_analytics_v2(
+                analytics_filter,
+                as_of_date=as_of_date,
+                horizon_months=horizon_months,
+            )
+
+            applied_filters = {
+                "As Of Date": as_of_date.strftime("%Y-%m-%d"),
+                "Horizon Months": str(horizon_months),
+                "Policy Status": self.request.GET.get("policy_status", "active"),
+            }
+            if analytics_filter:
+                if analytics_filter.date_from:
+                    applied_filters["Date From"] = analytics_filter.date_from.strftime(
+                        "%Y-%m-%d"
+                    )
+                if analytics_filter.date_to:
+                    applied_filters["Date To"] = analytics_filter.date_to.strftime(
+                        "%Y-%m-%d"
+                    )
+                if analytics_filter.branch_ids:
+                    branch_names = Branch.objects.filter(
+                        id__in=analytics_filter.branch_ids
+                    ).values_list("branch_name", flat=True)
+                    applied_filters["Branches"] = ", ".join(branch_names)
+                if analytics_filter.insurer_ids:
+                    insurer_names = Insurer.objects.filter(
+                        id__in=analytics_filter.insurer_ids
+                    ).values_list("insurer_name", flat=True)
+                    applied_filters["Insurers"] = ", ".join(insurer_names)
+                if analytics_filter.insurance_type_ids:
+                    type_names = InsuranceType.objects.filter(
+                        id__in=analytics_filter.insurance_type_ids
+                    ).values_list("name", flat=True)
+                    applied_filters["Insurance Types"] = ", ".join(type_names)
+                if analytics_filter.client_ids:
+                    client_names = Client.objects.filter(
+                        id__in=analytics_filter.client_ids
+                    ).values_list("client_name", flat=True)
+                    applied_filters["Clients"] = ", ".join(client_names)
+
+            return self.exporter.export_branch_portfolio_analytics_v2(
+                portfolio_data, applied_filters
+            )
+
+        except Exception as e:
+            logger.error(f"Error exporting branch analytics v2: {e}")
+            messages.error(self.request, "Произошла ошибка при экспорте данных")
+            return self.get(self.request)
+
+
 class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
     """
     Insurer analytics view displaying detailed metrics by insurer.

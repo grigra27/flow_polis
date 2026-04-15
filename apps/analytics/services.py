@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 import calendar
 from collections import defaultdict
 from typing import Optional, Dict, Any
-from django.db.models import QuerySet, Sum, Count, Avg
+from django.db.models import QuerySet, Sum, Count, Avg, Q
 from django.db.models.functions import Coalesce
 from .chart_providers import ChartDataProvider
 
@@ -397,6 +397,19 @@ class AnalyticsService:
             sorted_distributions[group_id] = sort_insurance_types(type_distribution)
         return sorted_distributions
 
+    @staticmethod
+    def _add_months(base_date: date, months: int) -> date:
+        """Add months to date preserving day as much as possible."""
+        if months <= 0:
+            return base_date
+
+        month_index = base_date.month - 1 + months
+        year = base_date.year + (month_index // 12)
+        month = (month_index % 12) + 1
+        max_day = calendar.monthrange(year, month)[1]
+        day = min(base_date.day, max_day)
+        return date(year, month, day)
+
     def _split_bridge_payments_by_month_boundary(self, payments_qs, current_date=None):
         """
         Split payments for the month-based bridge model:
@@ -643,6 +656,440 @@ class AnalyticsService:
             return {
                 "branch_metrics": [],
                 "total_branches": 0,
+                "filter_applied": False,
+                "error": str(e),
+            }
+
+    def get_branch_portfolio_analytics_v2(
+        self,
+        analytics_filter: Optional[AnalyticsFilter] = None,
+        *,
+        as_of_date: Optional[date] = None,
+        horizon_months: int = 12,
+    ) -> Dict[str, Any]:
+        """
+        Get branch portfolio analytics for active policies (v2 page).
+
+        Focuses on management metrics: active portfolio scale, planned premium/commission,
+        risk profile and concentration by branch.
+        """
+        try:
+            from apps.policies.models import Policy, PaymentSchedule
+
+            as_of_date = as_of_date or datetime.now().date()
+            horizon_months = max(1, min(int(horizon_months), 36))
+            horizon_end = self._add_months(as_of_date, horizon_months)
+
+            # Base querysets for portfolio analytics.
+            # The default "active only" behavior is controlled by AnalyticsFilter in view.
+            policies_qs = Policy.objects.all()
+            payments_qs = PaymentSchedule.objects.all()
+
+            # Apply optional segment filters
+            if analytics_filter:
+                policies_qs = analytics_filter.apply_to_policies(policies_qs)
+                payments_qs = analytics_filter.apply_to_payments(payments_qs)
+
+            renewal_30_end = as_of_date + timedelta(days=30)
+            renewal_60_end = as_of_date + timedelta(days=60)
+            renewal_90_end = as_of_date + timedelta(days=90)
+
+            branch_rows = (
+                policies_qs.values("branch_id", "branch__branch_name")
+                .annotate(
+                    active_policies=Count("id"),
+                    active_clients=Count("client_id", distinct=True),
+                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                    renewals_30=Count(
+                        "id",
+                        filter=Q(
+                            end_date__gte=as_of_date,
+                            end_date__lte=renewal_30_end,
+                        ),
+                    ),
+                    renewals_60=Count(
+                        "id",
+                        filter=Q(
+                            end_date__gte=as_of_date,
+                            end_date__lte=renewal_60_end,
+                        ),
+                    ),
+                    renewals_90=Count(
+                        "id",
+                        filter=Q(
+                            end_date__gte=as_of_date,
+                            end_date__lte=renewal_90_end,
+                        ),
+                    ),
+                )
+                .order_by("branch__branch_name")
+            )
+
+            if not branch_rows:
+                return {
+                    "as_of_date": as_of_date,
+                    "horizon_months": horizon_months,
+                    "horizon_end": horizon_end,
+                    "summary": {
+                        "total_branches": 0,
+                        "total_active_policies": 0,
+                        "total_active_clients": 0,
+                        "total_portfolio_premium": Decimal("0"),
+                        "total_planned_premium": Decimal("0"),
+                        "total_planned_commission": Decimal("0"),
+                        "average_commission_rate": Decimal("0"),
+                        "top3_branch_concentration": Decimal("0"),
+                        "total_overdue_amount": Decimal("0"),
+                        "total_overdue_count": 0,
+                        "total_renewals_30": 0,
+                        "total_renewals_60": 0,
+                        "total_renewals_90": 0,
+                    },
+                    "branch_metrics": [],
+                    "overall_insurance_type_distribution": {},
+                    "branch_drilldown": {},
+                    "filter_applied": analytics_filter.has_filters()
+                    if analytics_filter
+                    else False,
+                }
+
+            # Planned horizon metrics by branch
+            horizon_rows = (
+                payments_qs.filter(due_date__gte=as_of_date, due_date__lte=horizon_end)
+                .values("policy__branch_id")
+                .annotate(
+                    planned_premium=Coalesce(Sum("amount"), Decimal("0")),
+                    planned_commission=Coalesce(Sum("kv_rub"), Decimal("0")),
+                )
+            )
+            horizon_map = {
+                int(row["policy__branch_id"]): {
+                    "planned_premium": row.get("planned_premium") or Decimal("0"),
+                    "planned_commission": row.get("planned_commission") or Decimal("0"),
+                }
+                for row in horizon_rows
+                if row.get("policy__branch_id") is not None
+            }
+
+            # Current overdue profile by branch
+            overdue_rows = (
+                payments_qs.filter(due_date__lt=as_of_date, paid_date__isnull=True)
+                .values("policy__branch_id")
+                .annotate(
+                    overdue_count=Count("id"),
+                    overdue_amount=Coalesce(Sum("amount"), Decimal("0")),
+                )
+            )
+            overdue_map = {
+                int(row["policy__branch_id"]): {
+                    "overdue_count": int(row.get("overdue_count") or 0),
+                    "overdue_amount": row.get("overdue_amount") or Decimal("0"),
+                }
+                for row in overdue_rows
+                if row.get("policy__branch_id") is not None
+            }
+
+            # Insurance type distributions
+            type_rows = (
+                policies_qs.values("branch_id", "insurance_type__name")
+                .annotate(count=Count("id"))
+                .order_by("branch_id", "-count", "insurance_type__name")
+            )
+            type_map: Dict[int, Dict[str, int]] = defaultdict(dict)
+            for row in type_rows:
+                branch_id = row.get("branch_id")
+                if branch_id is None:
+                    continue
+                type_name = row.get("insurance_type__name") or "Не указан вид"
+                type_map[int(branch_id)][type_name] = int(row.get("count") or 0)
+
+            overall_type_rows = (
+                policies_qs.values("insurance_type__name")
+                .annotate(count=Count("id"))
+                .order_by("-count", "insurance_type__name")
+            )
+            overall_distribution = {}
+            for row in overall_type_rows:
+                type_name = row.get("insurance_type__name") or "Не указан вид"
+                overall_distribution[type_name] = int(row.get("count") or 0)
+            overall_distribution = sort_insurance_types(overall_distribution)
+
+            # Drill-down: top clients per branch
+            client_rows = (
+                policies_qs.values("branch_id", "client__client_name")
+                .annotate(
+                    policy_count=Count("id"),
+                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                )
+                .order_by("branch_id", "-premium_total", "client__client_name")
+            )
+            top_clients_by_branch: Dict[int, list] = defaultdict(list)
+            for row in client_rows:
+                branch_id = row.get("branch_id")
+                if branch_id is None:
+                    continue
+                top_clients_by_branch[int(branch_id)].append(
+                    {
+                        "client_name": row.get("client__client_name") or "Не указан",
+                        "policy_count": int(row.get("policy_count") or 0),
+                        "premium_total": row.get("premium_total") or Decimal("0"),
+                    }
+                )
+
+            # Drill-down: top insurers per branch
+            insurer_rows = (
+                policies_qs.values("branch_id", "insurer__insurer_name")
+                .annotate(
+                    policy_count=Count("id"),
+                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                )
+                .order_by("branch_id", "-premium_total", "insurer__insurer_name")
+            )
+            top_insurers_by_branch: Dict[int, list] = defaultdict(list)
+            for row in insurer_rows:
+                branch_id = row.get("branch_id")
+                if branch_id is None:
+                    continue
+                top_insurers_by_branch[int(branch_id)].append(
+                    {
+                        "insurer_name": row.get("insurer__insurer_name") or "Не указан",
+                        "policy_count": int(row.get("policy_count") or 0),
+                        "premium_total": row.get("premium_total") or Decimal("0"),
+                    }
+                )
+
+            # Drill-down: upcoming renewals (nearest)
+            upcoming_rows = (
+                policies_qs.filter(
+                    end_date__gte=as_of_date, end_date__lte=renewal_90_end
+                )
+                .select_related("branch", "client", "insurer")
+                .order_by("end_date", "policy_number")
+            )
+            upcoming_by_branch: Dict[int, list] = defaultdict(list)
+            for policy in upcoming_rows:
+                branch_id = policy.branch_id
+                if len(upcoming_by_branch[branch_id]) >= 8:
+                    continue
+                upcoming_by_branch[branch_id].append(
+                    {
+                        "policy_number": policy.policy_number,
+                        "client_name": policy.client.client_name,
+                        "insurer_name": policy.insurer.insurer_name,
+                        "end_date": policy.end_date,
+                        "premium_total": policy.premium_total or Decimal("0"),
+                    }
+                )
+
+            # Build branch metric rows
+            branch_metrics = []
+            for row in branch_rows:
+                branch_id = row.get("branch_id")
+                if branch_id is None:
+                    continue
+                branch_id = int(branch_id)
+
+                planned_data = horizon_map.get(
+                    branch_id,
+                    {
+                        "planned_premium": Decimal("0"),
+                        "planned_commission": Decimal("0"),
+                    },
+                )
+                overdue_data = overdue_map.get(
+                    branch_id,
+                    {
+                        "overdue_count": 0,
+                        "overdue_amount": Decimal("0"),
+                    },
+                )
+
+                planned_premium = planned_data["planned_premium"]
+                planned_commission = planned_data["planned_commission"]
+                premium_total = row.get("premium_total") or Decimal("0")
+                commission_rate = (
+                    (planned_commission / planned_premium) * Decimal("100")
+                    if planned_premium > 0
+                    else Decimal("0")
+                )
+
+                top_clients = top_clients_by_branch.get(branch_id, [])
+                top3_clients_total = sum(
+                    (client["premium_total"] for client in top_clients[:3]),
+                    Decimal("0"),
+                )
+                concentration_top3_clients = (
+                    (top3_clients_total / premium_total) * Decimal("100")
+                    if premium_total > 0
+                    else Decimal("0")
+                )
+
+                branch_metrics.append(
+                    {
+                        "branch": {
+                            "id": branch_id,
+                            "name": row.get("branch__branch_name") or "Не указан",
+                        },
+                        "active_policies": int(row.get("active_policies") or 0),
+                        "active_clients": int(row.get("active_clients") or 0),
+                        "portfolio_premium": premium_total,
+                        "planned_premium": planned_premium,
+                        "planned_commission": planned_commission,
+                        "commission_rate": commission_rate,
+                        "overdue_count": overdue_data["overdue_count"],
+                        "overdue_amount": overdue_data["overdue_amount"],
+                        "renewals_30": int(row.get("renewals_30") or 0),
+                        "renewals_60": int(row.get("renewals_60") or 0),
+                        "renewals_90": int(row.get("renewals_90") or 0),
+                        "insurance_type_distribution": sort_insurance_types(
+                            type_map.get(branch_id, {})
+                        ),
+                        "concentration_top3_clients": concentration_top3_clients,
+                    }
+                )
+
+            branch_metrics.sort(
+                key=lambda item: (
+                    item["planned_premium"],
+                    item["portfolio_premium"],
+                    item["active_policies"],
+                ),
+                reverse=True,
+            )
+
+            total_planned_premium = sum(
+                (item["planned_premium"] for item in branch_metrics), Decimal("0")
+            )
+            total_planned_commission = sum(
+                (item["planned_commission"] for item in branch_metrics), Decimal("0")
+            )
+            total_portfolio_premium = sum(
+                (item["portfolio_premium"] for item in branch_metrics), Decimal("0")
+            )
+
+            market_share_base = (
+                total_planned_premium
+                if total_planned_premium > 0
+                else total_portfolio_premium
+            )
+            for item in branch_metrics:
+                item_base = (
+                    item["planned_premium"]
+                    if total_planned_premium > 0
+                    else item["portfolio_premium"]
+                )
+                item["market_share"] = (
+                    (item_base / market_share_base) * Decimal("100")
+                    if market_share_base > 0
+                    else Decimal("0")
+                )
+
+            top3_branch_total = sum(
+                (
+                    (
+                        item["planned_premium"]
+                        if total_planned_premium > 0
+                        else item["portfolio_premium"]
+                    )
+                    for item in branch_metrics[:3]
+                ),
+                Decimal("0"),
+            )
+            top3_branch_concentration = (
+                (top3_branch_total / market_share_base) * Decimal("100")
+                if market_share_base > 0
+                else Decimal("0")
+            )
+
+            total_active_policies = sum(
+                (item["active_policies"] for item in branch_metrics), 0
+            )
+            total_active_clients = sum(
+                (item["active_clients"] for item in branch_metrics), 0
+            )
+            total_overdue_count = sum(
+                (item["overdue_count"] for item in branch_metrics), 0
+            )
+            total_overdue_amount = sum(
+                (item["overdue_amount"] for item in branch_metrics), Decimal("0")
+            )
+            total_renewals_30 = sum((item["renewals_30"] for item in branch_metrics), 0)
+            total_renewals_60 = sum((item["renewals_60"] for item in branch_metrics), 0)
+            total_renewals_90 = sum((item["renewals_90"] for item in branch_metrics), 0)
+
+            average_commission_rate = (
+                (total_planned_commission / total_planned_premium) * Decimal("100")
+                if total_planned_premium > 0
+                else Decimal("0")
+            )
+
+            # Build drill-down map
+            branch_drilldown = {}
+            for item in branch_metrics:
+                branch_id = item["branch"]["id"]
+                branch_drilldown[str(branch_id)] = {
+                    "top_clients": top_clients_by_branch.get(branch_id, [])[:10],
+                    "top_insurers": top_insurers_by_branch.get(branch_id, [])[:6],
+                    "upcoming_renewals": upcoming_by_branch.get(branch_id, []),
+                }
+
+            return {
+                "as_of_date": as_of_date,
+                "horizon_months": horizon_months,
+                "horizon_end": horizon_end,
+                "summary": {
+                    "total_branches": len(branch_metrics),
+                    "total_active_policies": total_active_policies,
+                    "total_active_clients": total_active_clients,
+                    "total_portfolio_premium": total_portfolio_premium,
+                    "total_planned_premium": total_planned_premium,
+                    "total_planned_commission": total_planned_commission,
+                    "average_commission_rate": average_commission_rate,
+                    "top3_branch_concentration": top3_branch_concentration,
+                    "total_overdue_amount": total_overdue_amount,
+                    "total_overdue_count": total_overdue_count,
+                    "total_renewals_30": total_renewals_30,
+                    "total_renewals_60": total_renewals_60,
+                    "total_renewals_90": total_renewals_90,
+                },
+                "branch_metrics": branch_metrics,
+                "overall_insurance_type_distribution": overall_distribution,
+                "branch_drilldown": branch_drilldown,
+                "filter_applied": analytics_filter.has_filters()
+                if analytics_filter
+                else False,
+            }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating branch portfolio analytics v2: {e}")
+
+            return {
+                "as_of_date": as_of_date or datetime.now().date(),
+                "horizon_months": horizon_months,
+                "horizon_end": self._add_months(
+                    as_of_date or datetime.now().date(), horizon_months
+                ),
+                "summary": {
+                    "total_branches": 0,
+                    "total_active_policies": 0,
+                    "total_active_clients": 0,
+                    "total_portfolio_premium": Decimal("0"),
+                    "total_planned_premium": Decimal("0"),
+                    "total_planned_commission": Decimal("0"),
+                    "average_commission_rate": Decimal("0"),
+                    "top3_branch_concentration": Decimal("0"),
+                    "total_overdue_amount": Decimal("0"),
+                    "total_overdue_count": 0,
+                    "total_renewals_30": 0,
+                    "total_renewals_60": 0,
+                    "total_renewals_90": 0,
+                },
+                "branch_metrics": [],
+                "overall_insurance_type_distribution": {},
+                "branch_drilldown": {},
                 "filter_applied": False,
                 "error": str(e),
             }

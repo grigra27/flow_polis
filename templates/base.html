@@ -70,6 +70,9 @@
                             <li><a class="dropdown-item{% if current_view == 'analytics:branch_analytics' %} active{% endif %}" href="{% url 'analytics:branch_analytics' %}">
                                 <i class="bi bi-geo-alt"></i> По филиалам
                             </a></li>
+                            <li><a class="dropdown-item{% if current_view == 'analytics:branch_portfolio_analytics_v2' %} active{% endif %}" href="{% url 'analytics:branch_portfolio_analytics_v2' %}">
+                                <i class="bi bi-geo-fill"></i> По филиалам v2
+                            </a></li>
                             <li><a class="dropdown-item{% if current_view == 'analytics:insurer_analytics' %} active{% endif %}" href="{% url 'analytics:insurer_analytics' %}">
                                 <i class="bi bi-building"></i> По страховщикам
                             </a></li>

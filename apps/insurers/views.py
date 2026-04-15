@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date
 
 from django.views.generic import ListView, DetailView, TemplateView
@@ -7,6 +8,7 @@ from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Avg, Count, Q
 from apps.clients.models import Client as LeasingClient
+from apps.policies.models import Policy
 from .models import (
     Insurer,
     CommissionRate,
@@ -17,6 +19,15 @@ from .models import (
 from .services import BranchStatisticsService, InsurerStatisticsService
 
 
+INSURANCE_TYPE_COLORS = {
+    "КАСКО": "#3498db",
+    "Спецтехника": "#ff8c00",
+    "Имущество": "#dc3545",
+    "Грузы": "#228b22",
+}
+DEFAULT_INSURANCE_TYPE_COLOR = "#95a5a6"
+
+
 class InsurerListView(LoginRequiredMixin, ListView):
     model = Insurer
     template_name = "insurers/insurer_list.html"
@@ -25,80 +36,104 @@ class InsurerListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = (
-            super().get_queryset().prefetch_related("commission_rates__insurance_type")
+            super()
+            .get_queryset()
+            .prefetch_related("commission_rates__insurance_type")
+            .annotate(
+                total_policies=Count("policies", distinct=True),
+                active_policies=Count(
+                    "policies",
+                    filter=Q(policies__policy_active=True),
+                    distinct=True,
+                ),
+                broker_participation=Count(
+                    "policies",
+                    filter=Q(
+                        policies__policy_active=True,
+                        policies__broker_participation=True,
+                    ),
+                    distinct=True,
+                ),
+            )
         )
         search = self.request.GET.get("search")
         if search:
             queryset = queryset.filter(insurer_name__icontains=search)
-        return queryset
+        return queryset.order_by("insurer_name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Add statistics for each insurer
-        insurers_with_stats = []
-        for insurer in context["insurers"]:
-            insurer.stats = self._calculate_insurer_statistics(insurer)
-            insurers_with_stats.append(insurer)
+        insurers = list(context["insurers"])
+        insurer_ids = [insurer.id for insurer in insurers]
+        type_distribution_map = self._build_type_distribution_map(insurer_ids)
 
+        insurers_with_stats = []
+        for insurer in insurers:
+            total_policies = int(getattr(insurer, "total_policies", 0) or 0)
+            active_policies = int(getattr(insurer, "active_policies", 0) or 0)
+            broker_participation = int(getattr(insurer, "broker_participation", 0) or 0)
+
+            raw_type_distribution = type_distribution_map.get(insurer.id, [])
+            type_distribution = []
+            for type_stat in raw_type_distribution:
+                percentage = (
+                    (type_stat["count"] / active_policies * 100)
+                    if active_policies > 0
+                    else 0
+                )
+                type_distribution.append(
+                    {
+                        "name": type_stat["name"],
+                        "count": type_stat["count"],
+                        "percentage": round(percentage, 1),
+                        "color": type_stat["color"],
+                    }
+                )
+
+            broker_percentage = (
+                (broker_participation / active_policies * 100)
+                if active_policies > 0
+                else 0
+            )
+
+            insurer.stats = {
+                "total_policies": total_policies,
+                "active_policies": active_policies,
+                "type_distribution": type_distribution,
+                "broker_participation": broker_participation,
+                "broker_percentage": round(broker_percentage, 1),
+            }
+
+            insurers_with_stats.append(insurer)
         context["insurers"] = insurers_with_stats
         return context
 
-    def _calculate_insurer_statistics(self, insurer):
-        """Calculate statistics for a single insurer"""
-        all_policies = insurer.policies.all()
-        active_policies = all_policies.filter(policy_active=True)
+    def _build_type_distribution_map(self, insurer_ids):
+        if not insurer_ids:
+            return {}
 
-        # Total counts
-        total_policies = all_policies.count()
-        active_count = active_policies.count()
-
-        # Distribution by insurance types (only active policies)
         type_stats = (
-            active_policies.values("insurance_type__name")
+            Policy.objects.filter(insurer_id__in=insurer_ids, policy_active=True)
+            .values("insurer_id", "insurance_type__name")
             .annotate(count=Count("id"))
-            .order_by("-count")
+            .order_by("insurer_id", "-count", "insurance_type__name")
         )
 
-        # Calculate percentages for insurance types
-        type_distribution = []
-
-        # Фиксированные цвета для видов страхования
-        insurance_type_colors = {
-            "КАСКО": "#3498db",  # синий (оставляем как есть)
-            "Спецтехника": "#ff8c00",  # оранжевый
-            "Имущество": "#dc3545",  # красный
-            "Грузы": "#228b22",  # темно-зеленый
-        }
-        default_color = "#95a5a6"  # серый цвет для неизвестных видов
-
+        distribution_map = defaultdict(list)
         for stat in type_stats:
-            percentage = (stat["count"] / active_count * 100) if active_count > 0 else 0
-            insurance_type_name = stat["insurance_type__name"]
-            color = insurance_type_colors.get(insurance_type_name, default_color)
-
-            type_distribution.append(
+            insurance_type_name = stat["insurance_type__name"] or "Не указан вид"
+            distribution_map[stat["insurer_id"]].append(
                 {
                     "name": insurance_type_name,
-                    "count": stat["count"],
-                    "percentage": round(percentage, 1),
-                    "color": color,
+                    "count": int(stat["count"] or 0),
+                    "color": INSURANCE_TYPE_COLORS.get(
+                        insurance_type_name, DEFAULT_INSURANCE_TYPE_COLOR
+                    ),
                 }
             )
 
-        # Broker participation (only active policies)
-        broker_participation = active_policies.filter(broker_participation=True).count()
-        broker_percentage = (
-            (broker_participation / active_count * 100) if active_count > 0 else 0
-        )
-
-        return {
-            "total_policies": total_policies,
-            "active_policies": active_count,
-            "type_distribution": type_distribution,
-            "broker_participation": broker_participation,
-            "broker_percentage": round(broker_percentage, 1),
-        }
+        return distribution_map
 
 
 class InsurerDetailView(LoginRequiredMixin, DetailView):
@@ -195,71 +230,104 @@ class BranchListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = (
+            super()
+            .get_queryset()
+            .annotate(
+                total_policies=Count("policies", distinct=True),
+                active_policies=Count(
+                    "policies",
+                    filter=Q(policies__policy_active=True),
+                    distinct=True,
+                ),
+                broker_participation=Count(
+                    "policies",
+                    filter=Q(
+                        policies__policy_active=True,
+                        policies__broker_participation=True,
+                    ),
+                    distinct=True,
+                ),
+            )
+        )
         search = self.request.GET.get("search")
         if search:
             queryset = queryset.filter(branch_name__icontains=search)
-        return queryset
+        return queryset.order_by("branch_name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        branches_with_stats = []
-        for branch in context["branches"]:
-            branch.stats = self._calculate_branch_statistics(branch)
-            branches_with_stats.append(branch)
+        branches = list(context["branches"])
+        branch_ids = [branch.id for branch in branches]
+        type_distribution_map = self._build_type_distribution_map(branch_ids)
 
+        branches_with_stats = []
+        for branch in branches:
+            total_policies = int(getattr(branch, "total_policies", 0) or 0)
+            active_policies = int(getattr(branch, "active_policies", 0) or 0)
+            broker_participation = int(getattr(branch, "broker_participation", 0) or 0)
+
+            raw_type_distribution = type_distribution_map.get(branch.id, [])
+            type_distribution = []
+            for type_stat in raw_type_distribution:
+                percentage = (
+                    (type_stat["count"] / active_policies * 100)
+                    if active_policies > 0
+                    else 0
+                )
+                type_distribution.append(
+                    {
+                        "name": type_stat["name"],
+                        "count": type_stat["count"],
+                        "percentage": round(percentage, 1),
+                        "color": type_stat["color"],
+                    }
+                )
+
+            broker_percentage = (
+                (broker_participation / active_policies * 100)
+                if active_policies > 0
+                else 0
+            )
+
+            branch.stats = {
+                "total_policies": total_policies,
+                "active_policies": active_policies,
+                "type_distribution": type_distribution,
+                "broker_participation": broker_participation,
+                "broker_percentage": round(broker_percentage, 1),
+            }
+
+            branches_with_stats.append(branch)
         context["branches"] = branches_with_stats
         return context
 
-    def _calculate_branch_statistics(self, branch):
-        all_policies = branch.policies.all()
-        active_policies = all_policies.filter(policy_active=True)
-
-        total_policies = all_policies.count()
-        active_count = active_policies.count()
+    def _build_type_distribution_map(self, branch_ids):
+        if not branch_ids:
+            return {}
 
         type_stats = (
-            active_policies.values("insurance_type__name")
+            Policy.objects.filter(branch_id__in=branch_ids, policy_active=True)
+            .values("branch_id", "insurance_type__name")
             .annotate(count=Count("id"))
-            .order_by("-count")
+            .order_by("branch_id", "-count", "insurance_type__name")
         )
 
-        type_distribution = []
-        insurance_type_colors = {
-            "КАСКО": "#3498db",
-            "Спецтехника": "#ff8c00",
-            "Имущество": "#dc3545",
-            "Грузы": "#228b22",
-        }
-        default_color = "#95a5a6"
-
+        distribution_map = defaultdict(list)
         for stat in type_stats:
-            percentage = (stat["count"] / active_count * 100) if active_count > 0 else 0
-            insurance_type_name = stat["insurance_type__name"]
-            color = insurance_type_colors.get(insurance_type_name, default_color)
-
-            type_distribution.append(
+            insurance_type_name = stat["insurance_type__name"] or "Не указан вид"
+            distribution_map[stat["branch_id"]].append(
                 {
                     "name": insurance_type_name,
-                    "count": stat["count"],
-                    "percentage": round(percentage, 1),
-                    "color": color,
+                    "count": int(stat["count"] or 0),
+                    "color": INSURANCE_TYPE_COLORS.get(
+                        insurance_type_name, DEFAULT_INSURANCE_TYPE_COLOR
+                    ),
                 }
             )
 
-        broker_participation = active_policies.filter(broker_participation=True).count()
-        broker_percentage = (
-            (broker_participation / active_count * 100) if active_count > 0 else 0
-        )
-
-        return {
-            "total_policies": total_policies,
-            "active_policies": active_count,
-            "type_distribution": type_distribution,
-            "broker_participation": broker_participation,
-            "broker_percentage": round(broker_percentage, 1),
-        }
+        return distribution_map
 
 
 class BranchDetailView(LoginRequiredMixin, DetailView):

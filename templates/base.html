@@ -48,7 +48,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'clients:list' %}" {% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
+                        <a id="ecosystemTopLink" class="nav-link ecosystem-main-link{% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'insurers:branches_list' %}" {% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
                             <i class="bi bi-diagram-3"></i> Экосистема
                         </a>
                     </li>
@@ -119,12 +119,17 @@
         </div>
     </nav>
 
-    <div class="ecosystem-strip">
-        <div class="container-fluid ecosystem-strip-inner">
-            <div class="ecosystem-strip-title">
-                <i class="bi bi-diagram-3"></i> Экосистема
-            </div>
-            <div class="ecosystem-strip-links">
+    <div id="ecosystemStrip" class="ecosystem-strip">
+        <div class="container-fluid">
+            <div id="ecosystemStripLinks" class="ecosystem-strip-links">
+                <a class="ecosystem-strip-link{% if current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' %} active{% endif %}"
+                   href="{% url 'insurers:branches_list' %}">
+                    <i class="bi bi-diagram-3"></i> Филиалы
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}"
+                   href="{% url 'insurers:managers_list' %}">
+                    <i class="bi bi-person-badge"></i> Менеджеры
+                </a>
                 <a class="ecosystem-strip-link{% if current_namespace == 'clients' %} active{% endif %}"
                    href="{% url 'clients:list' %}">
                     <i class="bi bi-people"></i> Лизингополучатели
@@ -132,14 +137,6 @@
                 <a class="ecosystem-strip-link{% if current_view == 'insurers:list' or current_view == 'insurers:detail' %} active{% endif %}"
                    href="{% url 'insurers:list' %}">
                     <i class="bi bi-building"></i> Страховщики
-                </a>
-                <a class="ecosystem-strip-link{% if current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' %} active{% endif %}"
-                   href="{% url 'insurers:branches_list' %}">
-                    <i class="bi bi-diagram-3"></i> Филиалы ЛК
-                </a>
-                <a class="ecosystem-strip-link{% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}"
-                   href="{% url 'insurers:managers_list' %}">
-                    <i class="bi bi-person-badge"></i> Менеджеры ЛК
                 </a>
             </div>
         </div>
@@ -173,6 +170,51 @@
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function() {
+        function alignEcosystemStrip() {
+            const topLink = document.getElementById('ecosystemTopLink');
+            const strip = document.getElementById('ecosystemStrip');
+            const links = document.getElementById('ecosystemStripLinks');
+
+            if (!strip || !links) {
+                return;
+            }
+
+            const container = strip.querySelector('.container-fluid');
+            if (!container) {
+                return;
+            }
+
+            if (
+                window.matchMedia('(max-width: 991.98px)').matches ||
+                !topLink ||
+                topLink.offsetParent === null
+            ) {
+                links.style.marginLeft = '0px';
+                return;
+            }
+
+            const topRect = topLink.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const linksWidth = links.offsetWidth;
+            if (!linksWidth) {
+                return;
+            }
+
+            const targetCenter = topRect.left + topRect.width / 2;
+            let left = targetCenter - containerRect.left - linksWidth / 2;
+            const maxLeft = Math.max(containerRect.width - linksWidth, 0);
+            left = Math.max(0, Math.min(left, maxLeft));
+
+            links.style.marginLeft = Math.round(left) + 'px';
+        }
+
+        document.addEventListener('DOMContentLoaded', alignEcosystemStrip);
+        window.addEventListener('load', alignEcosystemStrip);
+        window.addEventListener('resize', alignEcosystemStrip);
+    })();
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

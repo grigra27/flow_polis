@@ -376,30 +376,20 @@ class LeasingManagerDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        raw_branch_id = self.request.GET.get("branch")
-        try:
-            selected_branch_id = int(raw_branch_id) if raw_branch_id else None
-        except (TypeError, ValueError):
-            selected_branch_id = None
 
         branches = (
             Branch.objects.filter(policies__leasing_manager=self.object)
             .distinct()
             .order_by("branch_name")
         )
-        if selected_branch_id and not branches.filter(id=selected_branch_id).exists():
-            selected_branch_id = None
 
         policies_qs = self.object.policies.select_related(
             "client", "insurer", "branch", "insurance_type"
         ).order_by("-start_date", "-id")
-        if selected_branch_id:
-            policies_qs = policies_qs.filter(branch_id=selected_branch_id)
 
         context["policies"] = policies_qs
         context["policies_count"] = policies_qs.count()
         context["branches"] = branches
-        context["selected_branch_id"] = selected_branch_id
 
         overview_data = policies_qs.aggregate(
             total_policies=Count("id"),

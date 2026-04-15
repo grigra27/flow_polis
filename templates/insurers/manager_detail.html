@@ -49,13 +49,9 @@
                 <div class="mt-4">
                     <p class="mb-2"><strong>Филиалы в работе:</strong></p>
                     <div class="manager-branch-links d-flex flex-wrap gap-2">
-                        <a href="?{% update_query branch='' %}"
-                           class="manager-branch-link{% if not selected_branch_id %} active{% endif %}">
-                            Все филиалы
-                        </a>
                         {% for branch in branches %}
-                        <a href="?{% update_query branch=branch.id %}"
-                           class="manager-branch-link{% if selected_branch_id == branch.id %} active{% endif %}">
+                        <a href="{% url 'insurers:branch_detail' branch.pk %}"
+                           class="manager-branch-link">
                             {{ branch.branch_name }}
                         </a>
                         {% endfor %}

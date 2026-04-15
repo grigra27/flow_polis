@@ -47,7 +47,7 @@ body {
 
 .navbar.navbar-dark.bg-primary {
     background: linear-gradient(90deg, var(--app-color-primary) 0%, var(--app-color-primary-strong) 100%) !important;
-    box-shadow: var(--app-shadow-sm);
+    box-shadow: none;
 }
 
 .app-navbar-sticky {
@@ -158,6 +158,7 @@ body {
     position: sticky;
     top: var(--app-navbar-height, 64px);
     z-index: 1028;
+    margin-top: -1px;
     border-top: 1px solid #bcc9da;
     border-bottom: 1px solid #bcc9da;
     background: #dde5ef;
@@ -210,13 +211,13 @@ body {
 }
 
 .ecosystem-strip-link:hover {
-    background: rgba(255, 255, 255, 0.75);
+    background: #d8e8f8;
     color: #1a3a62;
 }
 
 .ecosystem-strip-link.active {
-    background: #1a3e6e;
-    color: #eef4ff;
+    background: #e6f0fa;
+    color: #1b3a5b;
     text-shadow: none;
     box-shadow:
         inset 0 0 0 1px rgba(212, 224, 245, 0.58),

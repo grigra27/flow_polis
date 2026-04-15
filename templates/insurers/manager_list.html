@@ -3,8 +3,9 @@
 {% block title %}Менеджеры ЛК{% endblock %}
 
 {% block content %}
+<div class="manager-list-page">
 <div class="pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Менеджеры лизинговой компании</h1>
+    <h1 class="h2 manager-list-title">Менеджеры лизинговой компании</h1>
 </div>
 
 <div class="mb-4">
@@ -27,7 +28,7 @@
 </div>
 
 {% if managers %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2">
     {% for manager in managers %}
     <div class="col">
         <div class="client-item p-3" onclick="window.location.href='{% url 'insurers:manager_detail' manager.pk %}'">
@@ -86,4 +87,5 @@
     </ul>
 </nav>
 {% endif %}
+</div>
 {% endblock %}

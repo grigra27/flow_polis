@@ -495,6 +495,18 @@ class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(overview["terminated_policies"], 0)
         self.assertEqual(overview["nearest_end_date"], self.policy_a1.end_date)
 
+    def test_manager_detail_filters_by_branch(self):
+        response = self.client.get(
+            reverse("insurers:manager_detail", args=[self.manager_ivan.id]),
+            {"branch": str(self.branch_b.id)},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        policies = list(response.context["policies"])
+        self.assertEqual(len(policies), 1)
+        self.assertEqual(policies[0].id, self.policy_b1.id)
+        self.assertEqual(response.context["selected_branch_id"], self.branch_b.id)
+
     def test_policy_detail_contains_link_to_manager_card(self):
         response = self.client.get(reverse("policies:detail", args=[self.policy_a1.id]))
         self.assertEqual(response.status_code, 200)

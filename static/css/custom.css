@@ -296,36 +296,138 @@ tr.table-secondary:hover > td {
 }
 
 .overview-grid {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
+    padding: 0.85rem;
+    border: 1px solid #c7daf7;
+    border-radius: var(--app-radius-md);
+    background: linear-gradient(140deg, #eaf3ff 0%, #f2f8ff 45%, #f8fbff 100%);
+    box-shadow: 0 8px 20px rgba(13, 110, 253, 0.12);
 }
 
 .overview-card {
     height: 100%;
-    background-color: var(--app-color-surface-muted);
-    border: 1px solid var(--app-color-border);
-    border-radius: var(--app-radius-sm);
-    padding: 0.75rem;
+    background-color: #fff;
+    border: 1px solid #b9d0f3;
+    border-radius: var(--app-radius-md);
+    padding: 0.95rem 1rem;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
 
 .overview-value {
-    font-size: 1.15rem;
-    font-weight: 700;
-    line-height: 1.2;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: 0.2px;
 }
 
 .overview-label {
-    margin-top: 0.2rem;
-    font-size: 0.72rem;
+    margin-top: 0.3rem;
+    font-size: 0.8rem;
     color: var(--app-color-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.35px;
+    letter-spacing: 0.45px;
     font-weight: 600;
 }
 
 .overview-meta {
-    margin-top: 0.2rem;
-    font-size: 0.75rem;
+    margin-top: 0.3rem;
+    font-size: 0.82rem;
     color: var(--app-color-text-muted);
+}
+
+.overview-value-date {
+    color: #0a58ca;
+}
+
+.manager-list-page .manager-list-title {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.manager-list-page .search-box {
+    padding: 1rem !important;
+}
+
+.manager-list-page .form-control {
+    font-size: 1.02rem;
+    padding: 0.65rem 0.8rem;
+}
+
+.manager-list-page .btn {
+    font-size: 1rem;
+    padding: 0.6rem 0.75rem;
+}
+
+.manager-list-page .client-item {
+    padding: 1rem !important;
+    min-height: 190px;
+}
+
+.manager-list-page .client-name {
+    font-size: 1.18rem;
+    font-weight: 700;
+}
+
+.manager-list-page .text-muted.small {
+    font-size: 0.95rem !important;
+}
+
+.manager-list-page .badge {
+    font-size: 0.82rem;
+}
+
+.manager-detail-page .manager-profile-card .card-body {
+    padding: 1.1rem 1.15rem;
+}
+
+.manager-detail-page .manager-profile-card p {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.manager-detail-page .manager-profile-card p strong {
+    font-size: 0.88rem;
+    color: var(--app-color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.manager-detail-page .manager-profile-card a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.manager-detail-page .manager-profile-card a:hover {
+    text-decoration: underline;
+}
+
+.manager-branch-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--app-color-border-strong);
+    background-color: #fff;
+    color: var(--app-color-primary-strong);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.manager-branch-link:hover {
+    background-color: var(--app-color-primary-soft);
+    border-color: var(--app-color-primary);
+}
+
+.manager-branch-link.active {
+    background: linear-gradient(
+        135deg,
+        var(--app-color-primary) 0%,
+        var(--app-color-primary-strong) 100%
+    );
+    border-color: var(--app-color-primary);
+    color: #fff;
 }
 
 .insurance-type-icon-cell {
@@ -368,5 +470,13 @@ tr.table-secondary:hover > td {
     .navbar .nav-link {
         border-radius: var(--app-radius-sm);
         padding: 0.5rem 0.65rem;
+    }
+
+    .overview-value {
+        font-size: 1.3rem;
+    }
+
+    .manager-list-page .manager-list-title {
+        font-size: 1.7rem;
     }
 }

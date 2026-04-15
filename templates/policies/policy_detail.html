@@ -78,7 +78,7 @@
                         <div class="mt-3">
                             <strong>Менеджер:</strong><br>
                             {% if policy.leasing_manager %}
-                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}">
+                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" class="text-decoration-none">
                                     {{ policy.leasing_manager }}
                                 </a>
                             {% else %}

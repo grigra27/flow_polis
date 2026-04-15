@@ -6,17 +6,10 @@
 
 {% block content %}
 <div class="ecosystem-hub-page">
-    <div class="d-flex justify-content-between flex-wrap align-items-end pt-3 pb-2 mb-4 border-bottom">
-        <div>
-            <h1 class="h2 mb-1">Экосистема</h1>
-            <p class="text-muted mb-0">Выберите раздел для перехода к связанным сущностям и сделкам.</p>
-        </div>
-    </div>
-
     <div class="ecosystem-hub-shell mx-auto">
         <div class="ecosystem-hub-grid">
             <a href="{% url 'insurers:branches_list' %}" class="ecosystem-hub-tile">
-                <div class="ecosystem-hub-icon"><i class="bi bi-diagram-3"></i></div>
+                <div class="ecosystem-hub-icon"><i class="bi bi-geo-alt"></i></div>
                 <h3 class="ecosystem-hub-title">Филиалы</h3>
                 <p class="ecosystem-hub-description">Статистика филиалов, карточки и полисы по каждому филиалу.</p>
                 <div class="ecosystem-hub-meta">{{ branch_count|localize }} {{ branch_count|ru_pluralize:"филиал,филиала,филиалов" }}</div>

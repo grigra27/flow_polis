@@ -62,27 +62,27 @@ body {
     letter-spacing: 0.2px;
 }
 
-.navbar .nav-link {
+.navbar .nav-link:not(.ecosystem-main-link) {
     font-weight: 600;
-    border-radius: 10px;
-    border: 1px solid transparent;
-    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 0;
+    border: none;
+    background: transparent;
     color: #eef3fc;
-    transition: all 0.18s ease;
+    transition: color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.navbar .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.24);
+.navbar .nav-link:not(.ecosystem-main-link):hover {
+    background: transparent;
+    border: none;
     color: #fff;
 }
 
 .navbar .nav-link.active:not(.ecosystem-main-link),
 .navbar .nav-link[aria-current="page"]:not(.ecosystem-main-link) {
-    background: #f4f8ff;
-    border-color: #d3e0f5;
-    color: #1a4c84;
-    box-shadow: 0 5px 12px rgba(18, 70, 126, 0.2);
+    background: transparent;
+    border: none;
+    color: #f4f8ff;
+    box-shadow: inset 0 -2px 0 rgba(244, 248, 255, 0.9);
 }
 
 .navbar .dropdown-menu .dropdown-item.active,
@@ -93,16 +93,16 @@ body {
 
 .navbar .ecosystem-main-link {
     position: relative;
-    border: 1px solid rgba(202, 218, 239, 0.9);
-    background: linear-gradient(135deg, #3a577d 0%, #344e73 100%);
-    color: #f3f6fd;
-    box-shadow: 0 8px 18px rgba(24, 46, 78, 0.28);
+    border: 1px solid #bcc9da;
+    background: #dde5ef;
+    color: #1a3a62;
+    box-shadow: 0 8px 18px rgba(26, 76, 132, 0.18);
 }
 
 .navbar .ecosystem-main-link:hover {
-    background: linear-gradient(135deg, #415f87 0%, #385275 100%);
-    border-color: rgba(219, 230, 247, 0.98);
-    color: #fff;
+    background: #e7edf5;
+    border-color: #bcc9da;
+    color: #1a3a62;
 }
 
 .navbar .ecosystem-main-link::after {
@@ -113,23 +113,17 @@ body {
     width: 24px;
     height: 12px;
     transform: translateX(-50%);
-    background: linear-gradient(135deg, #3a577d 0%, #344e73 100%);
+    background: #dde5ef;
     clip-path: polygon(50% 100%, 0 0, 100% 0);
     opacity: 0.95;
 }
 
 .navbar .ecosystem-main-link.active,
 .navbar .ecosystem-main-link[aria-current="page"] {
-    background: linear-gradient(135deg, #3a577d 0%, #344e73 100%);
-    border: 1px solid #d0ddee;
-    color: #f3f6fd;
-    box-shadow: 0 10px 22px rgba(24, 46, 78, 0.34);
-}
-
-.navbar .ecosystem-main-link.ecosystem-main-link-current {
-    box-shadow:
-        0 10px 22px rgba(24, 46, 78, 0.34),
-        0 0 0 2px rgba(229, 238, 255, 0.95) inset;
+    background: #dde5ef;
+    border: 1px solid #bcc9da;
+    color: #1a3a62;
+    box-shadow: 0 8px 18px rgba(26, 76, 132, 0.18);
 }
 
 .ecosystem-strip {
@@ -137,8 +131,8 @@ body {
     position: sticky;
     top: var(--app-navbar-height, 64px);
     z-index: 1028;
-    border-bottom: 1px solid #1f3450;
-    background: linear-gradient(135deg, #2f4668 0%, #2a4061 100%);
+    border-bottom: 1px solid #bcc9da;
+    background: #dde5ef;
     box-shadow: 0 8px 16px rgba(18, 35, 61, 0.24);
 }
 
@@ -149,7 +143,7 @@ body {
     left: calc(var(--ecosystem-anchor-x, 50%) - 18px);
     width: 36px;
     height: 14px;
-    background: linear-gradient(135deg, #3a577d 0%, #344e73 100%);
+    background: #dde5ef;
     clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
@@ -169,7 +163,7 @@ body {
     scrollbar-width: thin;
     margin-left: 0;
     border-radius: 12px;
-    border: 1px solid rgba(200, 214, 236, 0.56);
+    border: 1px solid #c2cedf;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.25),
         0 6px 12px rgba(12, 26, 46, 0.22);
@@ -180,9 +174,9 @@ body {
     align-items: center;
     gap: 0.36rem;
     padding: 0.42rem 0.96rem;
-    border-right: 1px solid rgba(196, 211, 234, 0.3);
-    background: #3a577d;
-    color: #eef3fd;
+    border-right: 1px solid #c2cedf;
+    background: rgba(255, 255, 255, 0.55);
+    color: #2a4268;
     font-size: 0.84rem;
     font-weight: 700;
     text-decoration: none;
@@ -195,15 +189,17 @@ body {
 }
 
 .ecosystem-strip-link:hover {
-    background: #45648f;
-    color: #fff;
+    background: rgba(255, 255, 255, 0.75);
+    color: #1a3a62;
 }
 
 .ecosystem-strip-link.active {
-    background: #e5eeff;
-    color: #1a467d;
+    background: #1a3e6e;
+    color: #eef4ff;
     text-shadow: none;
-    box-shadow: inset 0 0 0 1px rgba(194, 209, 233, 0.8);
+    box-shadow:
+        inset 0 0 0 1px rgba(212, 224, 245, 0.58),
+        0 0 0 1px rgba(212, 224, 245, 0.22);
 }
 
 footer.bg-light {
@@ -529,11 +525,11 @@ tr.table-secondary:hover > td {
 
 .ecosystem-hub-shell {
     max-width: 980px;
-    border: 1px solid #d3e0f5;
+    border: 1px solid #bcc9da;
     border-radius: 20px;
-    background: linear-gradient(145deg, #f4f8ff 0%, #e8f0ff 100%);
+    background: #dde5ef;
     padding: 1.1rem;
-    box-shadow: 0 14px 28px rgba(26, 76, 132, 0.14);
+    box-shadow: 0 12px 24px rgba(26, 58, 98, 0.14);
 }
 
 .ecosystem-hub-grid {
@@ -548,19 +544,20 @@ tr.table-secondary:hover > td {
     min-height: 220px;
     padding: 1.05rem 1.1rem;
     border-radius: 15px;
-    border: 1px solid #d4e1f4;
-    background: linear-gradient(165deg, #ffffff 0%, #f3f7ff 100%);
-    color: #1f3f69;
+    border: 1px solid #c2cedf;
+    background: rgba(255, 255, 255, 0.55);
+    color: #2a4268;
     text-decoration: none;
-    box-shadow: 0 8px 18px rgba(26, 76, 132, 0.09);
+    box-shadow: 0 8px 18px rgba(26, 58, 98, 0.1);
     transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .ecosystem-hub-tile:hover {
     transform: translateY(-2px);
-    border-color: #bfd2ef;
-    box-shadow: 0 12px 24px rgba(26, 76, 132, 0.15);
-    color: #1a3760;
+    border-color: #c2cedf;
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 12px 24px rgba(26, 58, 98, 0.14);
+    color: #1a3a62;
 }
 
 .ecosystem-hub-icon {
@@ -571,9 +568,9 @@ tr.table-secondary:hover > td {
     align-items: center;
     justify-content: center;
     font-size: 1.2rem;
-    color: #35537d;
-    background: linear-gradient(145deg, #e7efff 0%, #dbe8ff 100%);
-    border: 1px solid #c2d3ee;
+    color: #1a3a62;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #c2cedf;
 }
 
 .ecosystem-hub-title {
@@ -581,14 +578,14 @@ tr.table-secondary:hover > td {
     margin-bottom: 0.45rem;
     font-size: 1.3rem;
     font-weight: 750;
-    color: #2a4c78;
+    color: #1a3a62;
 }
 
 .ecosystem-hub-description {
     margin-bottom: 0.9rem;
     font-size: 0.94rem;
     line-height: 1.4;
-    color: #4f6686;
+    color: #3f587c;
 }
 
 .ecosystem-hub-meta {
@@ -598,9 +595,9 @@ tr.table-secondary:hover > td {
     align-self: flex-start;
     padding: 0.33rem 0.62rem;
     border-radius: 999px;
-    border: 1px solid #c4d2e8;
-    background: linear-gradient(135deg, #3a577d 0%, #344e73 100%);
-    color: #f3f6fd;
+    border: 1px solid #c2cedf;
+    background: #1a3e6e;
+    color: #eef4ff;
     font-size: 0.83rem;
     font-weight: 700;
 }
@@ -642,8 +639,8 @@ tr.table-secondary:hover > td {
 }
 
 @media (max-width: 991.98px) {
-    .navbar .nav-link {
-        border-radius: 9px;
+    .navbar .nav-link:not(.ecosystem-main-link) {
+        border-radius: 0;
         padding: 0.5rem 0.65rem;
     }
 
@@ -671,8 +668,8 @@ tr.table-secondary:hover > td {
     }
 
     .ecosystem-strip-link {
-        border: 1px solid rgba(200, 214, 236, 0.56);
-        border-right: 1px solid rgba(200, 214, 236, 0.56);
+        border: 1px solid #c2cedf;
+        border-right: 1px solid #c2cedf;
         border-radius: 10px;
     }
 

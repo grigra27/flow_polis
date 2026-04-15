@@ -90,6 +90,14 @@ body {
 }
 
 @media (min-width: 992px) {
+    .navbar.navbar-dark.bg-primary.app-navbar-sticky {
+        padding-bottom: 0;
+    }
+
+    .navbar.navbar-dark.bg-primary.app-navbar-sticky > .container-fluid {
+        align-items: flex-end;
+    }
+
     .navbar .navbar-collapse {
         align-items: flex-end;
     }
@@ -159,7 +167,7 @@ body {
     top: var(--app-navbar-height, 64px);
     z-index: 1028;
     margin-top: -1px;
-    border-top: 1px solid #bcc9da;
+    border-top: none;
     border-bottom: 1px solid #bcc9da;
     background: #dde5ef;
     box-shadow: 0 10px 20px -14px rgba(18, 35, 61, 0.45);
@@ -211,13 +219,13 @@ body {
 }
 
 .ecosystem-strip-link:hover {
-    background: #d8e8f8;
+    background: #bbd7f3;
     color: #1a3a62;
 }
 
 .ecosystem-strip-link.active {
-    background: #e6f0fa;
-    color: #1b3a5b;
+    background: #cde3f8;
+    color: #16324f;
     text-shadow: none;
     box-shadow:
         inset 0 0 0 1px rgba(212, 224, 245, 0.58),

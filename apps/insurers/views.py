@@ -13,7 +13,7 @@ from .models import (
     InsuranceType,
     LeasingManager,
 )
-from .services import InsurerStatisticsService
+from .services import BranchStatisticsService, InsurerStatisticsService
 
 
 class InsurerListView(LoginRequiredMixin, ListView):
@@ -169,6 +169,170 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
         ).order_by("insurance_type__name")
 
         context["statistics"] = InsurerStatisticsService(self.object).calculate(
+            stats_filters
+        )
+
+        return context
+
+
+class BranchListView(LoginRequiredMixin, ListView):
+    model = Branch
+    template_name = "insurers/branch_list.html"
+    context_object_name = "branches"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search = self.request.GET.get("search")
+        if search:
+            queryset = queryset.filter(branch_name__icontains=search)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        branches_with_stats = []
+        for branch in context["branches"]:
+            branch.stats = self._calculate_branch_statistics(branch)
+            branches_with_stats.append(branch)
+
+        context["branches"] = branches_with_stats
+        return context
+
+    def _calculate_branch_statistics(self, branch):
+        all_policies = branch.policies.all()
+        active_policies = all_policies.filter(policy_active=True)
+
+        total_policies = all_policies.count()
+        active_count = active_policies.count()
+
+        type_stats = (
+            active_policies.values("insurance_type__name")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        type_distribution = []
+        insurance_type_colors = {
+            "КАСКО": "#3498db",
+            "Спецтехника": "#ff8c00",
+            "Имущество": "#dc3545",
+            "Грузы": "#228b22",
+        }
+        default_color = "#95a5a6"
+
+        for stat in type_stats:
+            percentage = (stat["count"] / active_count * 100) if active_count > 0 else 0
+            insurance_type_name = stat["insurance_type__name"]
+            color = insurance_type_colors.get(insurance_type_name, default_color)
+
+            type_distribution.append(
+                {
+                    "name": insurance_type_name,
+                    "count": stat["count"],
+                    "percentage": round(percentage, 1),
+                    "color": color,
+                }
+            )
+
+        broker_participation = active_policies.filter(broker_participation=True).count()
+        broker_percentage = (
+            (broker_participation / active_count * 100) if active_count > 0 else 0
+        )
+
+        return {
+            "total_policies": total_policies,
+            "active_policies": active_count,
+            "type_distribution": type_distribution,
+            "broker_participation": broker_participation,
+            "broker_percentage": round(broker_percentage, 1),
+        }
+
+
+class BranchDetailView(LoginRequiredMixin, DetailView):
+    model = Branch
+    template_name = "insurers/branch_detail.html"
+    context_object_name = "branch"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        raw_insurer_id = self.request.GET.get("insurer")
+        raw_insurance_type_id = self.request.GET.get("insurance_type")
+        stats_filters = BranchStatisticsService.parse_filters(
+            selected_insurer_id=raw_insurer_id,
+            selected_insurance_type_id=raw_insurance_type_id,
+            stats_scope=self.request.GET.get("stats_scope"),
+            policy_scope=self.request.GET.get("policy_scope"),
+            metric=self.request.GET.get("metric"),
+            date_from=self.request.GET.get("date_from"),
+            date_to=self.request.GET.get("date_to"),
+        )
+
+        policies_qs = self.object.policies.select_related(
+            "client", "insurer", "insurance_type", "leasing_manager"
+        )
+        if stats_filters.selected_insurer_id:
+            policies_qs = policies_qs.filter(
+                insurer_id=stats_filters.selected_insurer_id
+            )
+        if stats_filters.selected_insurance_type_id:
+            policies_qs = policies_qs.filter(
+                insurance_type_id=stats_filters.selected_insurance_type_id
+            )
+
+        context["policies"] = policies_qs.order_by("-start_date", "-id")
+        context["policies_count"] = policies_qs.count()
+        overview_data = policies_qs.aggregate(
+            total_policies=Count("id"),
+            active_policies=Count("id", filter=Q(policy_active=True)),
+            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            avg_premium=Avg("premium_total"),
+        )
+        context["branch_overview"] = {
+            "total_policies": overview_data["total_policies"],
+            "active_policies": overview_data["active_policies"],
+            "terminated_policies": overview_data["terminated_policies"],
+            "avg_premium": overview_data["avg_premium"] or 0,
+        }
+
+        context["insurers"] = (
+            Insurer.objects.filter(policies__branch=self.object)
+            .distinct()
+            .order_by("insurer_name")
+        )
+        context["insurance_types"] = (
+            InsuranceType.objects.filter(policies__branch=self.object)
+            .distinct()
+            .order_by("name")
+        )
+        context["managers"] = (
+            LeasingManager.objects.filter(policies__branch=self.object)
+            .annotate(
+                total_policies=Count(
+                    "policies", filter=Q(policies__branch=self.object)
+                ),
+                active_policies=Count(
+                    "policies",
+                    filter=Q(
+                        policies__branch=self.object,
+                        policies__policy_active=True,
+                    ),
+                ),
+            )
+            .distinct()
+            .order_by("name")
+        )
+
+        context["selected_insurer_id"] = stats_filters.selected_insurer_id
+        context["selected_insurance_type_id"] = stats_filters.selected_insurance_type_id
+        context["stats_scope"] = stats_filters.stats_scope
+        context["policy_scope"] = stats_filters.policy_scope
+        context["metric"] = stats_filters.metric
+        context["date_from"] = stats_filters.date_from
+        context["date_to"] = stats_filters.date_to
+
+        context["statistics"] = BranchStatisticsService(self.object).calculate(
             stats_filters
         )
 

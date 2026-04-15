@@ -1,3 +1,3 @@
-from .statistics import InsurerStatisticsService
+from .statistics import BranchStatisticsService, InsurerStatisticsService
 
-__all__ = ["InsurerStatisticsService"]
+__all__ = ["InsurerStatisticsService", "BranchStatisticsService"]

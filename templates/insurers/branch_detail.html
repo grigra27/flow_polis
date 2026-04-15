@@ -1,0 +1,561 @@
+{% extends 'base.html' %}
+{% load insurer_tags %}
+{% load currency_filters %}
+{% load l10n %}
+
+{% block title %}{{ branch.branch_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .insurer-filter-pills .nav-link {
+        color: #495057;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.4rem 0.8rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        margin: 0 0.25rem 0.5rem 0;
+        transition: all 0.2s ease;
+        background-color: #fff;
+    }
+    .insurer-filter-pills .nav-link:hover {
+        background-color: #f8f9fa;
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+    .insurer-filter-pills .nav-link.active {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+        font-weight: 600;
+    }
+    .insurer-filter-pills .nav-link i {
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+    .stats-filter-panel {
+        border: 1px solid #dce3eb;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        padding: 0.75rem;
+    }
+    .stats-filter-panel .form-label {
+        font-size: 0.75rem;
+        color: #5f6f82;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+        margin-bottom: 0.2rem;
+    }
+    .stat-box {
+        transition: all 0.2s ease;
+    }
+    .stat-box:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    }
+    .stat-value {
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .stats-scope-badge {
+        font-size: 0.72rem;
+    }
+    .stats-progress {
+        height: 12px;
+        border-radius: 999px;
+        background-color: #edf2f8;
+    }
+    .stats-progress-bar {
+        border-radius: 999px;
+        transition: width 0.45s ease;
+    }
+    .stats-legend-item {
+        color: inherit;
+        text-decoration: none;
+        border: 1px solid #e3e8ef;
+        transition: all 0.15s ease;
+    }
+    .stats-legend-item:hover {
+        border-color: #a7c4ff;
+        background-color: #f3f8ff !important;
+    }
+    .stats-legend-item.active {
+        border-color: #0d6efd;
+        box-shadow: inset 0 0 0 1px #0d6efd;
+    }
+    .legend-color {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+    }
+    tr.table-terminated,
+    tr.table-terminated > td {
+        background-color: #f8d7da !important;
+    }
+    tr.table-terminated:hover,
+    tr.table-terminated:hover > td {
+        background-color: #f5c2c7 !important;
+    }
+    tr.table-secondary,
+    tr.table-secondary > td {
+        background-color: #e9ecef !important;
+    }
+    tr.table-secondary:hover,
+    tr.table-secondary:hover > td {
+        background-color: #dee2e6 !important;
+    }
+    @media (max-width: 575.98px) {
+        .stats-filter-panel .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{% branch_logo branch size='large' %}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if can_edit %}
+        <a href="{% url 'admin:insurers_branch_change' branch.pk %}" class="btn btn-warning me-2">
+            <i class="bi bi-pencil"></i> Редактировать
+        </a>
+        {% endif %}
+        <a href="{% url 'insurers:branches_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Назад к списку
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Информация о филиале</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Название:</strong><br>{{ branch.branch_name }}</p>
+                <p class="mb-0 text-muted small">Страница показывает полисы, страховщиков и менеджеров, связанных с этим филиалом.</p>
+            </div>
+        </div>
+
+        {% if managers %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Менеджеры филиала</h5>
+            </div>
+            <div class="card-body">
+                {% for manager in managers %}
+                <div class="{% if not forloop.last %}mb-3 pb-3 border-bottom{% endif %}">
+                    <p class="mb-1">
+                        <a href="{% url 'insurers:manager_detail' manager.pk %}" class="fw-semibold text-decoration-none">
+                            <i class="bi bi-person-badge"></i> {{ manager.name }}
+                        </a>
+                    </p>
+                    {% if manager.full_name %}
+                    <p class="mb-1 text-muted small">{{ manager.full_name }}</p>
+                    {% endif %}
+                    {% if manager.phone %}
+                    <p class="mb-1 text-muted small">
+                        <i class="bi bi-telephone"></i>
+                        <a href="tel:{{ manager.phone }}" class="text-decoration-none">{{ manager.phone }}</a>
+                    </p>
+                    {% endif %}
+                    {% if manager.email %}
+                    <p class="mb-1 text-muted small">
+                        <i class="bi bi-envelope"></i>
+                        <a href="mailto:{{ manager.email }}" class="text-decoration-none">{{ manager.email }}</a>
+                    </p>
+                    {% endif %}
+                    <p class="mb-0 text-muted small">
+                        <i class="bi bi-file-text"></i>
+                        Полисов: {{ manager.total_policies }}, активных: {{ manager.active_policies }}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if statistics.total_policies > 0 %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Статистика по сделкам филиала</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" class="stats-filter-panel mb-3">
+                    {% if selected_insurer_id %}
+                    <input type="hidden" name="insurer" value="{{ selected_insurer_id }}">
+                    {% endif %}
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="stats-scope">Срез статистики</label>
+                            <select id="stats-scope" name="stats_scope" class="form-select form-select-sm">
+                                <option value="all" {% if stats_scope == 'all' %}selected{% endif %}>По всем страховщикам</option>
+                                <option value="current" {% if stats_scope == 'current' %}selected{% endif %}>По выбранному страховщику</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="policy-scope">Учитывать полисы</label>
+                            <select id="policy-scope" name="policy_scope" class="form-select form-select-sm">
+                                <option value="active" {% if policy_scope == 'active' %}selected{% endif %}>Только активные</option>
+                                <option value="all" {% if policy_scope == 'all' %}selected{% endif %}>Все (включая закрытые)</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="metric">Метрика распределения</label>
+                            <select id="metric" name="metric" class="form-select form-select-sm">
+                                <option value="premium" {% if metric == 'premium' %}selected{% endif %}>Сумма премии</option>
+                                <option value="count" {% if metric == 'count' %}selected{% endif %}>Количество полисов</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="insurance-type-filter">Вид страхования</label>
+                            <select id="insurance-type-filter" name="insurance_type" class="form-select form-select-sm">
+                                <option value="">Все виды</option>
+                                {% for insurance_type in insurance_types %}
+                                <option value="{{ insurance_type.id }}" {% if selected_insurance_type_id == insurance_type.id %}selected{% endif %}>
+                                    {{ insurance_type.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="date-from">Дата начала (с)</label>
+                            <input id="date-from" type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="date-to">Дата начала (по)</label>
+                            <input id="date-to" type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to|date:'Y-m-d' }}">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-funnel"></i> Применить
+                        </button>
+                        <a href="{% url 'insurers:branch_detail' branch.pk %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-counterclockwise"></i> Сбросить
+                        </a>
+                    </div>
+                </form>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="badge rounded-pill bg-light text-dark border stats-scope-badge">
+                        Срез:
+                        {% if statistics.stats_scope == "current" and selected_insurer_id %}
+                        выбранный страховщик
+                        {% else %}
+                        все страховщики
+                        {% endif %}
+                    </span>
+                    <span class="badge rounded-pill bg-light text-dark border stats-scope-badge">
+                        Полисы: {% if statistics.policy_scope == "active" %}только активные{% else %}все{% endif %}
+                    </span>
+                    <span class="badge rounded-pill bg-light text-dark border stats-scope-badge">
+                        Метрика: {% if statistics.metric == "premium" %}сумма премии{% else %}количество полисов{% endif %}
+                    </span>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-primary fw-bold fs-4">{{ statistics.total_policies }}</div>
+                            <div class="stat-label">Всего в выборке</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-success fw-bold fs-4">{{ statistics.active_policies }}</div>
+                            <div class="stat-label">Активных</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value text-info fw-bold fs-6">{{ statistics.total_premium|rub }} ₽</div>
+                            <div class="stat-label">Премия (в текущем срезе)</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box text-center p-2 bg-light rounded">
+                            <div class="stat-value fw-bold fs-6">{{ statistics.avg_premium|rub }} ₽</div>
+                            <div class="stat-label">Средняя премия</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if statistics.insurer_distribution %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-building"></i> Распределение по страховщикам</h6>
+                    {% if selected_insurer_id %}
+                    <a href="?{% update_query insurer='' stats_scope='all' %}" class="small text-decoration-none">
+                        Показать всех страховщиков
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <canvas id="insurerChart" style="max-height: 250px;"></canvas>
+                </div>
+
+                <div class="insurer-legend">
+                    {% for insurer in statistics.insurer_distribution %}
+                    <a class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded stats-legend-item {% if selected_insurer_id == insurer.id and stats_scope == 'current' %}active{% endif %}"
+                       href="?{% update_query insurer=insurer.id stats_scope='current' %}">
+                        <div class="d-flex align-items-center">
+                            <span class="legend-color me-2" style="background-color: {{ insurer.color }};"></span>
+                            <span class="small fw-semibold">{{ insurer.name }}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="small">
+                                <span class="badge bg-primary">{{ insurer.percentage }}%</span>
+                                <span class="text-muted ms-1">{{ insurer.count }} {{ insurer.count|ru_pluralize:"полис,полиса,полисов" }}</span>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.72rem;">
+                                СП: {{ insurer.total_premium|rub }} ₽
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <hr class="my-3">
+
+                {% if statistics.type_distribution %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-shield-check"></i> Распределение по видам страхования</h6>
+                    {% if selected_insurance_type_id %}
+                    <a href="?{% update_query insurance_type='' %}" class="small text-decoration-none">
+                        Сбросить фильтр вида
+                    </a>
+                    {% endif %}
+                </div>
+
+                {% for insurance_type in statistics.type_distribution %}
+                <a href="?{% update_query insurance_type=insurance_type.id %}" class="text-decoration-none text-reset d-block mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold">{{ insurance_type.name }}</span>
+                        <span class="badge bg-light text-dark border">{{ insurance_type.percentage }}%</span>
+                    </div>
+                    <div class="progress stats-progress" role="progressbar"
+                         aria-valuenow="{{ insurance_type.percentage }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                        <div class="progress-bar stats-progress-bar"
+                             style="width: {{ insurance_type.percentage|unlocalize }}%; background-color: {{ insurance_type.color }};">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted small">{{ insurance_type.count }} {{ insurance_type.count|ru_pluralize:"полис,полиса,полисов" }}</span>
+                        <span class="text-muted small">Премия: {{ insurance_type.total_premium|rub }} ₽</span>
+                    </div>
+                </a>
+                {% endfor %}
+                {% endif %}
+
+                <hr class="my-3">
+
+                <div class="text-center p-3 bg-light rounded">
+                    <div class="mb-2">
+                        <i class="bi bi-briefcase fs-3 text-warning"></i>
+                    </div>
+                    <div class="fw-bold">Участие брокера</div>
+                    <div class="fs-4 text-warning fw-bold">{{ statistics.broker_percentage }}%</div>
+                    <div class="text-muted small">
+                        {{ statistics.broker_participation }} из {{ statistics.scoped_policies }} {{ statistics.scoped_policies|ru_pluralize:"полис,полиса,полисов" }} в текущем срезе
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Полисы филиала</h5>
+                <small class="text-muted">{{ policies_count }} {{ policies_count|ru_pluralize:"полис,полиса,полисов" }}</small>
+            </div>
+            <div class="card-body">
+                <div class="overview-grid">
+                    <div class="row g-2">
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-primary">{{ branch_overview.total_policies }}</div>
+                                <div class="overview-label">Всего полисов</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-success">{{ branch_overview.active_policies }}</div>
+                                <div class="overview-label">Активные</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-danger">{{ branch_overview.terminated_policies }}</div>
+                                <div class="overview-label">Расторгнутые</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="overview-card">
+                                <div class="overview-value text-info">{{ branch_overview.avg_premium|rub }} ₽</div>
+                                <div class="overview-label">Средняя премия</div>
+                                <div class="overview-meta">по текущему списку</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if insurers|length > 1 %}
+                <div class="mb-3">
+                    <ul class="nav insurer-filter-pills flex-wrap">
+                        <li class="nav-item">
+                            <a class="nav-link {% if not selected_insurer_id %}active{% endif %}" href="?{% update_query insurer='' stats_scope='all' %}">
+                                <i class="bi bi-grid-3x3-gap"></i> Все страховщики
+                            </a>
+                        </li>
+                        {% for insurer in insurers %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if selected_insurer_id == insurer.id %}active{% endif %}" href="?{% update_query insurer=insurer.id stats_scope='current' %}">
+                                <i class="bi bi-building"></i> {{ insurer.insurer_name }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if policies %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Номер полиса</th>
+                                <th>ЛП</th>
+                                <th>Страховщик</th>
+                                <th>Менеджер ЛК</th>
+                                <th>Вид страхования</th>
+                                <th>Объект страхования</th>
+                                <th>Период</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for policy in policies %}
+                            <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" data-href="{% url 'policies:detail' policy.pk %}">
+                                <td>
+                                    <strong>{{ policy.policy_number }}</strong>
+                                    {% if not policy.policy_active %}
+                                    <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
+                                    {% endif %}
+                                    {% if not policy.broker_participation %}
+                                    <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ policy.client.client_name }}</td>
+                                <td>{% insurer_logo policy.insurer size='small' %}</td>
+                                <td>
+                                    {% if policy.leasing_manager %}
+                                    <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" class="text-decoration-none">
+                                        {{ policy.leasing_manager.name }}
+                                    </a>
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
+                                <td>{% insurance_type_icon policy.insurance_type size='small' %}</td>
+                                <td><small>{{ policy.property_description|truncatewords:10 }}</small></td>
+                                <td><small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small></td>
+                                <td>
+                                    {% if policy.policy_active %}
+                                    <span class="badge bg-success">Активен</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Закрыт</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">По текущим фильтрам полисы не найдены.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if statistics.insurer_distribution %}
+{{ statistics.insurer_chart_data|json_script:"branch-insurer-chart-data" }}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".clickable-row").forEach((row) => {
+        row.addEventListener("click", function () {
+            window.location.href = this.dataset.href;
+        });
+    });
+
+    const chartElement = document.getElementById("insurerChart");
+    const insurerChartDataTag = document.getElementById("branch-insurer-chart-data");
+    if (!chartElement || !insurerChartDataTag) {
+        return;
+    }
+
+    const chartData = JSON.parse(insurerChartDataTag.textContent);
+    if (!Array.isArray(chartData.values) || chartData.values.length === 0) {
+        return;
+    }
+
+    const total = chartData.values.reduce((acc, value) => acc + Number(value || 0), 0);
+    const formatNumber = (value) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
+
+    new Chart(chartElement, {
+        type: "pie",
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    data: chartData.values,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 2,
+                    borderColor: "#fff"
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.label || "";
+                            const value = Number(context.parsed || 0);
+                            const share = total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
+
+                            if (chartData.metric === "premium") {
+                                return label + ": " + formatNumber(value) + " ₽ (" + share + "%)";
+                            }
+
+                            return label + ": " + formatNumber(value) + " (" + share + "%)";
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

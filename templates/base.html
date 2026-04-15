@@ -48,18 +48,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_namespace == 'clients' %} active{% endif %}" href="{% url 'clients:list' %}" {% if current_namespace == 'clients' %}aria-current="page"{% endif %}>
-                            <i class="bi bi-people"></i> Лизингополучатели
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link{% if current_view == 'insurers:list' or current_view == 'insurers:detail' %} active{% endif %}" href="{% url 'insurers:list' %}" {% if current_view == 'insurers:list' or current_view == 'insurers:detail' %}aria-current="page"{% endif %}>
-                            <i class="bi bi-building"></i> Страховщики
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link{% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'insurers:managers_list' %}" {% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
-                            <i class="bi bi-person-badge"></i> Менеджеры ЛК
+                        <a class="nav-link{% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}" href="{% url 'clients:list' %}" {% if current_namespace == 'clients' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
+                            <i class="bi bi-diagram-3"></i> Экосистема
                         </a>
                     </li>
                     <li class="nav-item">
@@ -128,6 +118,32 @@
             </div>
         </div>
     </nav>
+
+    <div class="ecosystem-strip">
+        <div class="container-fluid ecosystem-strip-inner">
+            <div class="ecosystem-strip-title">
+                <i class="bi bi-diagram-3"></i> Экосистема
+            </div>
+            <div class="ecosystem-strip-links">
+                <a class="ecosystem-strip-link{% if current_namespace == 'clients' %} active{% endif %}"
+                   href="{% url 'clients:list' %}">
+                    <i class="bi bi-people"></i> Лизингополучатели
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'insurers:list' or current_view == 'insurers:detail' %} active{% endif %}"
+                   href="{% url 'insurers:list' %}">
+                    <i class="bi bi-building"></i> Страховщики
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' %} active{% endif %}"
+                   href="{% url 'insurers:branches_list' %}">
+                    <i class="bi bi-diagram-3"></i> Филиалы ЛК
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}"
+                   href="{% url 'insurers:managers_list' %}">
+                    <i class="bi bi-person-badge"></i> Менеджеры ЛК
+                </a>
+            </div>
+        </div>
+    </div>
     {% endwith %}
 
     <!-- Main Content -->

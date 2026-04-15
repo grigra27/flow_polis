@@ -74,7 +74,9 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Филиал:</strong><br>
-                        {% branch_logo policy.branch size='medium' %}
+                        <a href="{% url 'insurers:branch_detail' policy.branch.pk %}" class="text-decoration-none">
+                            {% branch_logo policy.branch size='medium' %}
+                        </a>
                         <div class="mt-3">
                             <strong>Менеджер:</strong><br>
                             {% if policy.leasing_manager %}

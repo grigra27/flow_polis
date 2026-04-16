@@ -346,7 +346,33 @@ class DashboardV2Service:
             "insurance_sum": actual["insurance_sum"] + planned["insurance_sum"],
         }
 
-        premium_actual_share = _safe_percent(actual["premium"], bridge["premium"])
+        # Прогресс-бар: факт = оплачено в этом году, ожидается = неоплаченное до конца года,
+        # цель = всё запланированное за год (знаменатель).
+        collected_qs = active_payments_qs.filter(
+            paid_date__gte=year_start,
+            paid_date__lte=today,
+        )
+        remaining_qs = active_payments_qs.filter(
+            due_date__gt=today,
+            due_date__lte=year_end,
+            paid_date__isnull=True,
+        )
+        year_plan_qs = active_payments_qs.filter(
+            due_date__gte=year_start,
+            due_date__lte=year_end,
+        )
+        collected_premium = _sum_amount(collected_qs, "amount")
+        remaining_premium = _sum_amount(remaining_qs, "amount")
+        year_plan_premium = _sum_amount(year_plan_qs, "amount")
+
+        collected_ins_sum = _sum_amount(collected_qs, "insurance_sum")
+        remaining_ins_sum = _sum_amount(remaining_qs, "insurance_sum")
+        year_plan_ins_sum = _sum_amount(year_plan_qs, "insurance_sum")
+
+        premium_actual_share = _safe_percent(collected_premium, year_plan_premium)
+        premium_remaining_share = _safe_percent(remaining_premium, year_plan_premium)
+        ins_sum_actual_share = _safe_percent(collected_ins_sum, year_plan_ins_sum)
+        ins_sum_remaining_share = _safe_percent(remaining_ins_sum, year_plan_ins_sum)
         premium_plan_share = _safe_percent(planned["premium"], bridge["premium"])
 
         if current_month_start > year_start:
@@ -374,7 +400,16 @@ class DashboardV2Service:
             "actual": actual,
             "planned": planned,
             "bridge": bridge,
+            "collected_premium": collected_premium,
+            "remaining_premium": remaining_premium,
+            "year_plan_premium": year_plan_premium,
+            "collected_ins_sum": collected_ins_sum,
+            "remaining_ins_sum": remaining_ins_sum,
+            "year_plan_ins_sum": year_plan_ins_sum,
             "premium_actual_share": premium_actual_share.quantize(Decimal("0.1")),
+            "premium_remaining_share": premium_remaining_share.quantize(Decimal("0.1")),
+            "ins_sum_actual_share": ins_sum_actual_share.quantize(Decimal("0.1")),
+            "ins_sum_remaining_share": ins_sum_remaining_share.quantize(Decimal("0.1")),
             "premium_plan_share": premium_plan_share.quantize(Decimal("0.1")),
         }
 

@@ -257,6 +257,97 @@
         border-color: #cfe9d8;
     }
 
+    /* Goal progress bar — блок 2 */
+    .v2-goal {
+        background: #f4f8ff;
+        border: 1px solid #d0e2f5;
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem 0.6rem;
+    }
+    .v2-goal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .v2-goal-title {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--v2-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .v2-goal-pct {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1d4ed8;
+        line-height: 1;
+    }
+    .v2-goal-pct-label {
+        font-size: 0.68rem;
+        color: var(--v2-muted);
+        text-align: right;
+    }
+    .v2-goal-bar {
+        height: 8px;
+        background: #dbeafe;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.55rem;
+        display: flex;
+    }
+    .v2-goal-bar-collected {
+        height: 100%;
+        background: linear-gradient(90deg, #1e40af, #3b82f6);
+        border-radius: 999px 0 0 999px;
+        flex-shrink: 0;
+    }
+    .v2-goal-bar-remaining {
+        height: 100%;
+        background: linear-gradient(90deg, #93c5fd, #bfdbfe);
+        flex-shrink: 0;
+    }
+    .v2-goal-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.4rem;
+        font-size: 0.78rem;
+    }
+    .v2-goal-stat {
+        display: flex;
+        flex-direction: column;
+    }
+    .v2-goal-stat-value {
+        font-weight: 700;
+        color: var(--v2-title);
+        font-size: 0.82rem;
+    }
+    .v2-goal-stat-value.is-collected { color: #1d4ed8; }
+    .v2-goal-stat-label {
+        font-size: 0.7rem;
+        color: var(--v2-muted);
+        margin-top: 0.05rem;
+    }
+    .v2-goal-stat-sep {
+        color: #cbd5e1;
+        font-size: 0.9rem;
+        align-self: center;
+    }
+    .v2-goal-total {
+        margin-top: 0.45rem;
+        padding-top: 0.45rem;
+        border-top: 1px dashed #d0e2f5;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.73rem;
+        color: var(--v2-muted);
+    }
+    .v2-goal-total-value {
+        font-weight: 700;
+        color: var(--v2-title);
+    }
+
     .v2-card--tinted {
         background: #eef4fc;
         border-color: #c4d8ef;
@@ -1118,45 +1209,67 @@
             <section class="v2-card">
                 <div class="v2-kicker">Блок 2</div>
                 <h5 class="v2-title">Мост факт + план · {{ dashboard_v2_bridge.calendar_year }}</h5>
-                <p class="v2-subtitle">Совокупный объём платежей за год: прошедшие месяцы (факт) и предстоящие (план).</p>
+                <p class="v2-subtitle">Прогресс сбора премий за {{ dashboard_v2_bridge.calendar_year }} год и структура страхового портфеля.</p>
 
-                <div class="v2-bridge-period">
-                    <span>
-                        <span class="v2-bridge-period-dot" style="background:#1d4ed8;"></span>
-                        Факт — {{ dashboard_v2_bridge.actual_period_label }}
-                    </span>
-                    <span>
-                        <span class="v2-bridge-period-dot" style="background:#bfdbfe;"></span>
-                        План — {{ dashboard_v2_bridge.planned_period_label }}
-                    </span>
+<div class="v2-bridge-metric">
+                    <div class="v2-goal">
+                        <div class="v2-goal-header">
+                            <span class="v2-goal-title">Страховая сумма</span>
+                            <div class="text-end">
+                                <div class="v2-goal-pct">{{ dashboard_v2_bridge.ins_sum_actual_share|floatformat:1 }}%</div>
+                                <div class="v2-goal-pct-label">выполнено</div>
+                            </div>
+                        </div>
+                        <div class="v2-goal-bar">
+                            <div class="v2-goal-bar-collected" style="width: {{ dashboard_v2_bridge.ins_sum_actual_share }}%;"></div>
+                            <div class="v2-goal-bar-remaining" style="width: {{ dashboard_v2_bridge.ins_sum_remaining_share }}%;"></div>
+                        </div>
+                        <div class="v2-goal-stats">
+                            <div class="v2-goal-stat">
+                                <span class="v2-goal-stat-value is-collected">{{ dashboard_v2_bridge.collected_ins_sum|rub }} ₽</span>
+                                <span class="v2-goal-stat-label">✓ Собрано</span>
+                            </div>
+                            <span class="v2-goal-stat-sep">+</span>
+                            <div class="v2-goal-stat">
+                                <span class="v2-goal-stat-value">{{ dashboard_v2_bridge.remaining_ins_sum|rub }} ₽</span>
+                                <span class="v2-goal-stat-label">⏳ Ожидается</span>
+                            </div>
+                        </div>
+                        <div class="v2-goal-total">
+                            <span>Сумма по портфелю на год</span>
+                            <span class="v2-goal-total-value">{{ dashboard_v2_bridge.year_plan_ins_sum|rub }} ₽</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="v2-bridge-metric">
-                    <div class="v2-bridge-metric-header">
-                        <span class="v2-bridge-metric-name">Страховая сумма</span>
-                        <span class="v2-bridge-metric-total">{{ dashboard_v2_bridge.bridge.insurance_sum|rub }} ₽</span>
-                    </div>
-                    {% widthratio dashboard_v2_bridge.actual.insurance_sum dashboard_v2_bridge.bridge.insurance_sum 100 as sum_fact_pct %}
-                    <div class="v2-bridge-bar">
-                        <div class="v2-bridge-bar-fact" style="width: {{ sum_fact_pct }}%;"></div>
-                    </div>
-                    <div class="v2-bridge-labels">
-                        <span class="v2-bridge-label-fact">Факт {{ dashboard_v2_bridge.actual.insurance_sum|rub }} ₽ · {{ sum_fact_pct }}%</span>
-                        <span class="v2-bridge-label-plan">План {{ dashboard_v2_bridge.planned.insurance_sum|rub }} ₽</span>
-                    </div>
-                </div>
-
-                <div class="v2-bridge-metric">
-                    <div class="v2-bridge-metric-header">
-                        <span class="v2-bridge-metric-name">Страховая премия</span>
-                        <span class="v2-bridge-metric-total">{{ dashboard_v2_bridge.bridge.premium|rub }} ₽</span>
-                    </div>
-                    <div class="v2-bridge-bar">
-                        <div class="v2-bridge-bar-fact" style="width: {{ dashboard_v2_bridge.premium_actual_share }}%;"></div>
-                    </div>
-                    <div class="v2-bridge-labels">
-                        <span class="v2-bridge-label-fact">Факт {{ dashboard_v2_bridge.actual.premium|rub }} ₽ · {{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</span>
-                        <span class="v2-bridge-label-plan">План {{ dashboard_v2_bridge.planned.premium|rub }} ₽</span>
+                    <div class="v2-goal">
+                        <div class="v2-goal-header">
+                            <span class="v2-goal-title">Страховая премия</span>
+                            <div class="text-end">
+                                <div class="v2-goal-pct">{{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</div>
+                                <div class="v2-goal-pct-label">выполнено</div>
+                            </div>
+                        </div>
+                        <div class="v2-goal-bar">
+                            <div class="v2-goal-bar-collected" style="width: {{ dashboard_v2_bridge.premium_actual_share }}%;"></div>
+                            <div class="v2-goal-bar-remaining" style="width: {{ dashboard_v2_bridge.premium_remaining_share }}%;"></div>
+                        </div>
+                        <div class="v2-goal-stats">
+                            <div class="v2-goal-stat">
+                                <span class="v2-goal-stat-value is-collected">{{ dashboard_v2_bridge.collected_premium|rub }} ₽</span>
+                                <span class="v2-goal-stat-label">✓ Собрано</span>
+                            </div>
+                            <span class="v2-goal-stat-sep">+</span>
+                            <div class="v2-goal-stat">
+                                <span class="v2-goal-stat-value">{{ dashboard_v2_bridge.remaining_premium|rub }} ₽</span>
+                                <span class="v2-goal-stat-label">⏳ Ожидается</span>
+                            </div>
+                        </div>
+                        <div class="v2-goal-total">
+                            <span>Сумма по портфелю на год</span>
+                            <span class="v2-goal-total-value">{{ dashboard_v2_bridge.year_plan_premium|rub }} ₽</span>
+                        </div>
                     </div>
                 </div>
             </section>

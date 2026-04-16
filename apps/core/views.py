@@ -3,6 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -58,6 +61,101 @@ def dashboard(request):
     }
 
     return render(request, "core/dashboard.html", context)
+
+
+@login_required
+def dashboard_v2(request):
+    """
+    Dashboard 2.0 skeleton page.
+
+    This is a temporary standalone prototype for iterative testing.
+    It intentionally does not replace the current main dashboard.
+    """
+    try:
+        from apps.core.services.dashboard_v2_service import DashboardV2Service
+
+        context = DashboardV2Service().get_dashboard_context()
+    except Exception as exc:
+        logger.error("Error building Dashboard 2.0 context: %s", exc, exc_info=True)
+        context = {
+            "dashboard_v2_meta": {
+                "generated_at": timezone.now(),
+                "today": timezone.localdate(),
+                "period_label": "Ошибка расчета",
+            },
+            "dashboard_v2_health": {
+                "score": 0,
+                "previous_score": 0,
+                "delta": 0,
+                "delta_label": "0.0",
+                "delta_direction": "flat",
+                "components": [],
+                "weights": {},
+                "interpretation": "Недоступно",
+            },
+            "dashboard_v2_bridge": {
+                "actual": {"premium": 0, "commission": 0, "insurance_sum": 0},
+                "planned": {"premium": 0, "commission": 0, "insurance_sum": 0},
+                "bridge": {"premium": 0, "commission": 0, "insurance_sum": 0},
+                "premium_actual_share": 0,
+                "premium_plan_share": 0,
+            },
+            "dashboard_v2_payment_contour": {
+                "snapshot": None,
+                "window_30": {},
+                "statuses": [],
+            },
+            "dashboard_v2_aging": {"buckets": [], "total_amount": 0, "total_count": 0},
+            "dashboard_v2_renewal": {"active_total": 0, "horizons": []},
+            "dashboard_v2_data_quality": {"quality_score": 0, "problems": []},
+            "dashboard_v2_structure": {
+                "by_branch": [],
+                "by_insurer": [],
+                "by_type": [],
+                "top_branch": None,
+                "top_insurer": None,
+                "top_type": None,
+            },
+            "dashboard_v2_concentration": {
+                "insurer": {
+                    "hhi": 0,
+                    "top1_share": 0,
+                    "top3_share": 0,
+                    "level": "Низкий",
+                },
+                "branch": {
+                    "hhi": 0,
+                    "top1_share": 0,
+                    "top3_share": 0,
+                    "level": "Низкий",
+                },
+                "overall_hhi": 0,
+                "overall_level": "Низкий",
+            },
+            "dashboard_v2_dynamics": {
+                "window_30": {
+                    "days": 30,
+                    "created_count": 0,
+                    "deactivated_count": 0,
+                    "net_growth": 0,
+                    "net_growth_label": "+0",
+                },
+                "window_90": {
+                    "days": 90,
+                    "created_count": 0,
+                    "deactivated_count": 0,
+                    "net_growth": 0,
+                    "net_growth_label": "+0",
+                },
+                "overdue_share_current": 0,
+                "overdue_share_previous": 0,
+                "overdue_share_delta_pp": 0,
+                "overdue_share_delta_pp_label": "0.0",
+            },
+            "dashboard_v2_insights": {"insights": [], "quick_actions": []},
+        }
+
+    return render(request, "core/dashboard_v2.html", context)
 
 
 @login_required

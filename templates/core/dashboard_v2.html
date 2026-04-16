@@ -1,0 +1,635 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+
+{% block title %}Дашборд версия 2.0{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+        --v2-success: #1f8b4c;
+        --v2-warning: #cc8b00;
+        --v2-danger: #cf3e4f;
+    }
+
+    .v2-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1rem;
+    }
+
+    .v2-card {
+        border: 1px solid var(--v2-border);
+        border-radius: 14px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 12px rgba(14, 28, 46, 0.06);
+        padding: 1rem;
+        height: 100%;
+    }
+
+    .v2-kicker {
+        color: var(--v2-muted);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.25rem;
+    }
+
+    .v2-title {
+        color: var(--v2-title);
+        margin-bottom: 0.55rem;
+        font-weight: 700;
+        font-size: 1.05rem;
+    }
+
+    .v2-subtitle {
+        color: var(--v2-muted);
+        font-size: 0.88rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .v2-main-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        line-height: 1;
+    }
+
+    .v2-pill {
+        border: 1px solid var(--v2-border);
+        background: #f4f9ff;
+        color: #2d527b;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    .v2-delta-up {
+        color: var(--v2-success);
+        font-weight: 700;
+    }
+
+    .v2-delta-down {
+        color: var(--v2-danger);
+        font-weight: 700;
+    }
+
+    .v2-delta-flat {
+        color: var(--v2-muted);
+        font-weight: 700;
+    }
+
+    .v2-grid-2,
+    .v2-grid-3 {
+        display: grid;
+        gap: 0.65rem;
+    }
+
+    .v2-grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .v2-grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .v2-cell {
+        border: 1px solid #e5edf7;
+        border-radius: 10px;
+        background: #fbfdff;
+        padding: 0.6rem 0.7rem;
+    }
+
+    .v2-cell-label {
+        color: var(--v2-muted);
+        font-size: 0.78rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .v2-cell-value {
+        color: var(--v2-title);
+        font-weight: 700;
+    }
+
+    .v2-track {
+        width: 100%;
+        height: 8px;
+        background: #edf3fb;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 0.45rem;
+    }
+
+    .v2-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #2f80ed 0%, #1e6cc4 100%);
+        border-radius: 999px;
+    }
+
+    .v2-fill.warning {
+        background: linear-gradient(90deg, #f6c343 0%, #d99e10 100%);
+    }
+
+    .v2-fill.danger {
+        background: linear-gradient(90deg, #ef6b78 0%, #cf3e4f 100%);
+    }
+
+    .v2-fill.success {
+        background: linear-gradient(90deg, #4dbb77 0%, #1f8b4c 100%);
+    }
+
+    .v2-table-sm {
+        font-size: 0.86rem;
+    }
+
+    .v2-insight {
+        border: 1px solid #dce8f8;
+        border-left: 4px solid #2f80ed;
+        border-radius: 10px;
+        background: #f7fbff;
+        padding: 0.7rem 0.75rem;
+        margin-bottom: 0.55rem;
+    }
+
+    .v2-insight-title {
+        font-weight: 700;
+        color: #214365;
+        margin-bottom: 0.2rem;
+    }
+
+    .v2-insight-text {
+        color: #476582;
+        font-size: 0.86rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .v2-insight.warning {
+        border-left-color: var(--v2-warning);
+        background: #fffaf0;
+        border-color: #f1ddb2;
+    }
+
+    .v2-insight.danger {
+        border-left-color: var(--v2-danger);
+        background: #fff5f6;
+        border-color: #f2c8cd;
+    }
+
+    .v2-insight.success {
+        border-left-color: var(--v2-success);
+        background: #f3fbf6;
+        border-color: #cfe9d8;
+    }
+
+    .v2-soft-note {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+    }
+
+    .v2-actions a {
+        white-space: nowrap;
+    }
+
+    @media (max-width: 992px) {
+        .v2-grid-3 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 576px) {
+        .v2-grid-2,
+        .v2-grid-3 {
+            grid-template-columns: 1fr;
+        }
+
+        .v2-main-value {
+            font-size: 1.7rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2 mb-0">Дашборд версия 2.0</h1>
+    <div class="d-flex gap-2 align-items-center mt-2 mt-md-0">
+        <span class="v2-pill">{{ dashboard_v2_meta.period_label }}</span>
+        <span class="v2-pill">Обновлено: {{ dashboard_v2_meta.generated_at|date:"d.m.Y H:i" }}</span>
+    </div>
+</div>
+
+<div class="alert alert-primary mb-3" role="alert">
+    Пилотная версия: агрегированные показатели по портфелю без чувствительных клиентских данных.
+</div>
+
+<div class="v2-root">
+    <div class="row g-3 mb-1">
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 1</div>
+                <h5 class="v2-title">Индекс здоровья портфеля</h5>
+                <p class="v2-subtitle">Интегральный показатель качества портфеля и платежной дисциплины.</p>
+
+                <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                    <div class="v2-main-value">{{ dashboard_v2_health.score|floatformat:1 }}</div>
+                    {% if dashboard_v2_health.delta_direction == "up" %}
+                    <div class="v2-delta-up">{{ dashboard_v2_health.delta_label }}</div>
+                    {% elif dashboard_v2_health.delta_direction == "down" %}
+                    <div class="v2-delta-down">{{ dashboard_v2_health.delta_label }}</div>
+                    {% else %}
+                    <div class="v2-delta-flat">{{ dashboard_v2_health.delta_label }}</div>
+                    {% endif %}
+                    <span class="badge bg-light text-dark border">{{ dashboard_v2_health.interpretation }}</span>
+                </div>
+                <div class="v2-soft-note mb-2">Предыдущий срез: {{ dashboard_v2_health.previous_score|floatformat:1 }} (30 дней назад).</div>
+
+                <div class="v2-grid-2">
+                    {% for component in dashboard_v2_health.components %}
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">{{ component.label }} · вес {{ component.weight }}%</div>
+                        <div class="v2-cell-value">{{ component.value|floatformat:1 }}%</div>
+                        <div class="v2-track">
+                            <div class="v2-fill" style="width: {{ component.value }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 2</div>
+                <h5 class="v2-title">Мост факт + план</h5>
+                <p class="v2-subtitle">Факт (закрытые периоды) + план (текущий/будущие) в единой витрине.</p>
+
+                <div class="table-responsive">
+                    <table class="table table-sm v2-table-sm mb-2">
+                        <thead>
+                            <tr>
+                                <th>Метрика</th>
+                                <th class="text-end">Факт</th>
+                                <th class="text-end">План</th>
+                                <th class="text-end">Мост</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Премия</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.actual.premium|rub }} ₽</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.planned.premium|rub }} ₽</td>
+                                <td class="text-end fw-semibold">{{ dashboard_v2_bridge.bridge.premium|rub }} ₽</td>
+                            </tr>
+                            <tr>
+                                <td>Комиссия</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.actual.commission|rub }} ₽</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.planned.commission|rub }} ₽</td>
+                                <td class="text-end fw-semibold">{{ dashboard_v2_bridge.bridge.commission|rub }} ₽</td>
+                            </tr>
+                            <tr>
+                                <td>Страховая сумма</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.actual.insurance_sum|rub }} ₽</td>
+                                <td class="text-end">{{ dashboard_v2_bridge.planned.insurance_sum|rub }} ₽</td>
+                                <td class="text-end fw-semibold">{{ dashboard_v2_bridge.bridge.insurance_sum|rub }} ₽</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="v2-grid-2">
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Доля факта в премии</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Доля плана в премии</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_bridge.premium_plan_share|floatformat:1 }}%</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-1">
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 3</div>
+                <h5 class="v2-title">Контур платежей</h5>
+                <p class="v2-subtitle">Срез по статусам оплат и динамика к предыдущему 30-дневному окну.</p>
+
+                <div class="v2-grid-3 mb-2">
+                    {% for row in dashboard_v2_payment_contour.statuses %}
+                    <div class="v2-cell">
+                        <div class="d-flex justify-content-between align-items-start gap-1">
+                            <div class="v2-cell-label mb-0">{{ row.label }}</div>
+                            <span class="badge {{ row.badge_class }}">{{ row.share|floatformat:1 }}%</span>
+                        </div>
+                        <div class="v2-cell-value">{{ row.count }}</div>
+                        <div class="small text-muted">{{ row.amount|rub }} ₽</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="v2-grid-3">
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Δ оплачено (30д)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_paid_count|default:0 }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Δ ожидает (30д)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_pending_count|default:0 }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Δ просрочено (30д)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_overdue_count|default:0 }}</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 4</div>
+                <h5 class="v2-title">Старение просрочки</h5>
+                <p class="v2-subtitle">Распределение просроченных платежей по давности задолженности.</p>
+
+                {% if dashboard_v2_aging.buckets %}
+                {% for bucket in dashboard_v2_aging.buckets %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small">
+                        <span>{{ bucket.label }} дней</span>
+                        <span>{{ bucket.count }} шт. · {{ bucket.amount|rub }} ₽</span>
+                    </div>
+                    <div class="v2-track">
+                        <div class="v2-fill {% if bucket.label == '90+' %}danger{% else %}warning{% endif %}" style="width: {{ bucket.share }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-muted small">Просроченных платежей на текущую дату нет.</div>
+                {% endif %}
+
+                <div class="v2-soft-note mt-2">
+                    Всего просрочки: {{ dashboard_v2_aging.total_count }} платежей на {{ dashboard_v2_aging.total_amount|rub }} ₽.
+                    {% if dashboard_v2_aging.critical_bucket %}
+                    Критичный сегмент: {{ dashboard_v2_aging.critical_bucket.label }} дней.
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-1">
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 5</div>
+                <h5 class="v2-title">Renewal radar</h5>
+                <p class="v2-subtitle">Горизонты истечения активных полисов (30/60/90 дней).</p>
+
+                <div class="v2-grid-3 mb-2">
+                    {% for horizon in dashboard_v2_renewal.horizons %}
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Горизонт {{ horizon.days }} дней</div>
+                        <div class="v2-cell-value">{{ horizon.count }}</div>
+                        <div class="small text-muted">Доля: {{ horizon.share|floatformat:1 }}% · Δ {{ horizon.delta_label }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="v2-soft-note">Активных полисов: {{ dashboard_v2_renewal.active_total }}.</div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 6</div>
+                <h5 class="v2-title">Качество данных портфеля</h5>
+                <p class="v2-subtitle">Технические потери качества данных, влияющие на управляемость портфеля.</p>
+
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="v2-main-value">{{ dashboard_v2_data_quality.quality_score|floatformat:1 }}</div>
+                    <span class="badge bg-light text-dark border">Data Quality Score</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm v2-table-sm mb-2">
+                        <thead>
+                            <tr>
+                                <th>Проблема</th>
+                                <th class="text-end">Кол-во</th>
+                                <th class="text-end">Доля</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for problem in dashboard_v2_data_quality.problems %}
+                            <tr>
+                                <td>{{ problem.label }}</td>
+                                <td class="text-end">{{ problem.count }}</td>
+                                <td class="text-end">{{ problem.ratio|floatformat:1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="v2-soft-note">
+                    Конфликты статусов: активные с датой расторжения — {{ dashboard_v2_data_quality.active_with_termination_count }},
+                    неактивные без даты расторжения — {{ dashboard_v2_data_quality.inactive_without_termination_count }}.
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-1" id="portfolio-structure">
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 7</div>
+                <h5 class="v2-title">Структура портфеля</h5>
+                <p class="v2-subtitle">Распределение премии по ключевым срезам (факт+план).</p>
+
+                <div class="small fw-semibold text-muted mb-1">Филиалы (топ-5)</div>
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm v2-table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Сегмент</th>
+                                <th class="text-end">Мост</th>
+                                <th class="text-end">Доля</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in dashboard_v2_structure.by_branch|slice:":5" %}
+                            <tr>
+                                <td>{{ row.name }}</td>
+                                <td class="text-end">{{ row.bridge_premium|rub }} ₽</td>
+                                <td class="text-end">{{ row.share|floatformat:1 }}%</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-muted">Нет данных</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small fw-semibold text-muted mb-1">Страховщики (топ-5)</div>
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm v2-table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Сегмент</th>
+                                <th class="text-end">Мост</th>
+                                <th class="text-end">Доля</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in dashboard_v2_structure.by_insurer|slice:":5" %}
+                            <tr>
+                                <td>{{ row.name }}</td>
+                                <td class="text-end">{{ row.bridge_premium|rub }} ₽</td>
+                                <td class="text-end">{{ row.share|floatformat:1 }}%</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-muted">Нет данных</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small fw-semibold text-muted mb-1">Виды страхования (топ-5)</div>
+                <div class="table-responsive">
+                    <table class="table table-sm v2-table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Сегмент</th>
+                                <th class="text-end">Мост</th>
+                                <th class="text-end">Доля</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in dashboard_v2_structure.by_type|slice:":5" %}
+                            <tr>
+                                <td>{{ row.name }}</td>
+                                <td class="text-end">{{ row.bridge_premium|rub }} ₽</td>
+                                <td class="text-end">{{ row.share|floatformat:1 }}%</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-muted">Нет данных</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 8</div>
+                <h5 class="v2-title">Концентрационные риски</h5>
+                <p class="v2-subtitle">Оценка зависимости от ограниченного числа страховщиков и филиалов.</p>
+
+                <div class="v2-grid-2 mb-2">
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">HHI (страховщики)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_concentration.insurer.hhi|floatformat:1 }}</div>
+                        <div class="small text-muted">Риск: {{ dashboard_v2_concentration.insurer.level }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">HHI (филиалы)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_concentration.branch.hhi|floatformat:1 }}</div>
+                        <div class="small text-muted">Риск: {{ dashboard_v2_concentration.branch.level }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Top-1 (страховщики)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_concentration.insurer.top1_share|floatformat:1 }}%</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Top-3 (страховщики)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_concentration.insurer.top3_share|floatformat:1 }}%</div>
+                    </div>
+                </div>
+
+                <div class="alert {% if dashboard_v2_concentration.overall_level == 'Высокий' %}alert-danger{% elif dashboard_v2_concentration.overall_level == 'Средний' %}alert-warning{% else %}alert-success{% endif %} py-2 mb-0">
+                    Общий уровень риска: <strong>{{ dashboard_v2_concentration.overall_level }}</strong>
+                    (HHI {{ dashboard_v2_concentration.overall_hhi|floatformat:1 }}).
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 9</div>
+                <h5 class="v2-title">Динамика 30/90 дней</h5>
+                <p class="v2-subtitle">Поток полисов и движение доли просрочки между окнами.</p>
+
+                <div class="v2-grid-2 mb-2">
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">30 дней: создано</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.created_count }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">30 дней: деактивировано</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.deactivated_count }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">30 дней: чистый прирост</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.net_growth_label }}</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">90 дней: чистый прирост</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.net_growth_label }}</div>
+                    </div>
+                </div>
+
+                <div class="v2-grid-2">
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Доля просрочки (текущее окно)</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.overdue_share_current|floatformat:1 }}%</div>
+                    </div>
+                    <div class="v2-cell">
+                        <div class="v2-cell-label">Δ доли просрочки к прошлому окну</div>
+                        <div class="v2-cell-value">{{ dashboard_v2_dynamics.overdue_share_delta_pp_label }} п.п.</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-6">
+            <section class="v2-card">
+                <div class="v2-kicker">Блок 10</div>
+                <h5 class="v2-title">Инсайты и быстрые действия</h5>
+                <p class="v2-subtitle">Ключевые сигналы и переходы к рабочим разделам.</p>
+
+                {% for insight in dashboard_v2_insights.insights %}
+                <div class="v2-insight {{ insight.level }}">
+                    <div class="v2-insight-title">{{ insight.title }}</div>
+                    <div class="v2-insight-text">{{ insight.message }}</div>
+                    <a href="{{ insight.action_url }}" class="small">{{ insight.action_label }}</a>
+                </div>
+                {% endfor %}
+
+                <div class="v2-actions mt-3">
+                    <div class="small text-muted mb-2">Быстрые переходы</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for action in dashboard_v2_insights.quick_actions %}
+                        <a href="{{ action.url }}" class="btn btn-sm btn-outline-primary">{{ action.label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

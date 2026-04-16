@@ -3,7 +3,14 @@ repos:
     rev: v1.4.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
+        args:
+          - --baseline
+          - .secrets.baseline
+          # Reduce false positives for explicit test/example placeholders.
+          - --exclude-lines
+          - "(?i)password\\s*=\\s*[\"'](?:test|dummy|example|changeme|not-a-secret)[^\"']*[\"']"
+          - --exclude-lines
+          - "(?i)SECRET_KEY\\s*=\\s*(?:django-insecure-[^\\s\"']*|your-secret-key-here[^\\s\"']*|test-secret-key[^\\s\"']*)"
         exclude: |
           (?x)^(
             .*\.lock$|

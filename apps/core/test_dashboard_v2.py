@@ -176,6 +176,7 @@ class DashboardV2ServiceTests(TestCase):
 
         expected_keys = {
             "dashboard_v2_meta",
+            "dashboard_v2_snapshot",
             "dashboard_v2_health",
             "dashboard_v2_bridge",
             "dashboard_v2_payment_contour",
@@ -186,6 +187,7 @@ class DashboardV2ServiceTests(TestCase):
             "dashboard_v2_concentration",
             "dashboard_v2_dynamics",
             "dashboard_v2_insights",
+            "dashboard_v2_legacy_relay",
         }
         self.assertTrue(expected_keys.issubset(context.keys()))
 
@@ -194,8 +196,26 @@ class DashboardV2ServiceTests(TestCase):
         self.assertLessEqual(health["score"], Decimal("100"))
         self.assertEqual(len(health["components"]), 4)
 
+        snapshot = context["dashboard_v2_snapshot"]
+        self.assertEqual(len(snapshot["cards"]), 4)
+        self.assertGreaterEqual(snapshot["active_policies_count"], 1)
+
         contour = context["dashboard_v2_payment_contour"]
         self.assertEqual(len(contour["statuses"]), 3)
+
+        bridge = context["dashboard_v2_bridge"]
+        current_month_start = timezone.localdate().replace(day=1)
+        self.assertIn("calendar_year", bridge)
+        self.assertIn("year_start", bridge)
+        self.assertIn("year_end", bridge)
+        self.assertTrue(
+            bridge["planned_period_label"].startswith(
+                current_month_start.strftime("%d.%m.%Y")
+            )
+        )
+        self.assertNotIn("commission", bridge["actual"])
+        self.assertNotIn("commission", bridge["planned"])
+        self.assertNotIn("commission", bridge["bridge"])
 
         aging = context["dashboard_v2_aging"]
         self.assertGreaterEqual(aging["total_count"], 1)
@@ -203,8 +223,20 @@ class DashboardV2ServiceTests(TestCase):
         data_quality = context["dashboard_v2_data_quality"]
         self.assertEqual(len(data_quality["problems"]), 3)
 
+        structure = context["dashboard_v2_structure"]
+        self.assertIn("branch_breakdown", structure)
+        self.assertIn("insurer_breakdown", structure)
+        self.assertIn("type_breakdown", structure)
+        self.assertGreaterEqual(len(structure["branch_breakdown"]["top"]), 1)
+        self.assertGreaterEqual(len(structure["branch_breakdown"]["chart"]), 1)
+
         insights = context["dashboard_v2_insights"]
         self.assertGreaterEqual(len(insights["quick_actions"]), 1)
+
+        legacy_relay = context["dashboard_v2_legacy_relay"]
+        self.assertEqual(len(legacy_relay["cards"]), 4)
+        self.assertEqual(legacy_relay["cards"][0]["title"], "Предстоящие платежи")
+        self.assertIn("link_url", legacy_relay["cards"][0])
 
 
 class DashboardV2ViewTests(TestCase):
@@ -227,6 +259,7 @@ class DashboardV2ViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Дашборд версия 2.0")
+        self.assertContains(response, "Ключевые списки из основного дашборда")
         self.assertIn("dashboard_v2_health", response.context)
         self.assertIn("dashboard_v2_insights", response.context)
 

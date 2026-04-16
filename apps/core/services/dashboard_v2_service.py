@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any
 
+from django.conf import settings
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.urls import reverse
@@ -38,6 +39,16 @@ def _signed(value: Decimal) -> str:
     if value > 0:
         return f"+{value:.1f}"
     return f"{value:.1f}"
+
+
+def _media_url(path: Any) -> str | None:
+    if not path:
+        return None
+
+    media_url = settings.MEDIA_URL or "/media/"
+    if not media_url.endswith("/"):
+        media_url = f"{media_url}/"
+    return f"{media_url}{str(path).lstrip('/')}"
 
 
 @dataclass(frozen=True)
@@ -83,6 +94,7 @@ class DashboardV2Service:
         bridge = self._build_bridge_metrics(
             active_payments_qs=active_payments_qs,
             current_month_start=current_month_start,
+            today=today,
         )
 
         payment_contour = self._build_payment_contour(
@@ -106,6 +118,14 @@ class DashboardV2Service:
             active_payments_qs=active_payments_qs,
         )
 
+        snapshot = self._build_system_snapshot(
+            active_policies_qs=active_policies_qs,
+            active_payments_qs=active_payments_qs,
+            health=health,
+            data_quality=data_quality,
+            today=today,
+        )
+
         structure = self._build_portfolio_structure(
             active_payments_qs=active_payments_qs,
             current_month_start=current_month_start,
@@ -127,6 +147,11 @@ class DashboardV2Service:
             concentration=concentration,
             dynamics=dynamics,
         )
+        legacy_relay = self._build_legacy_relay(
+            policies_qs=policies_qs,
+            active_payments_qs=active_payments_qs,
+            today=today,
+        )
 
         return {
             "dashboard_v2_meta": {
@@ -134,6 +159,7 @@ class DashboardV2Service:
                 "today": today,
                 "period_label": f"{today.strftime('%d.%m.%Y')} (срез)",
             },
+            "dashboard_v2_snapshot": snapshot,
             "dashboard_v2_health": health,
             "dashboard_v2_bridge": bridge,
             "dashboard_v2_payment_contour": payment_contour,
@@ -144,6 +170,7 @@ class DashboardV2Service:
             "dashboard_v2_concentration": concentration,
             "dashboard_v2_dynamics": dynamics,
             "dashboard_v2_insights": insights,
+            "dashboard_v2_legacy_relay": legacy_relay,
         }
 
     def _build_health_index(
@@ -271,34 +298,60 @@ class DashboardV2Service:
         *,
         active_payments_qs,
         current_month_start: date,
+        today: date,
     ) -> Dict[str, Any]:
+        year_start = date(today.year, 1, 1)
+        year_end = date(today.year, 12, 31)
+
         actual_qs = active_payments_qs.filter(
-            due_date__lt=current_month_start, paid_date__isnull=False
+            due_date__gte=year_start,
+            due_date__lt=current_month_start,
+            paid_date__isnull=False,
         )
-        planned_qs = active_payments_qs.filter(due_date__gte=current_month_start)
+        planned_qs = active_payments_qs.filter(
+            due_date__gte=current_month_start,
+            due_date__lte=year_end,
+        )
 
         actual = {
             "premium": _sum_amount(actual_qs, "amount"),
-            "commission": _sum_amount(actual_qs, "kv_rub"),
             "insurance_sum": _sum_amount(actual_qs, "insurance_sum"),
         }
         planned = {
             "premium": _sum_amount(planned_qs, "amount"),
-            "commission": _sum_amount(planned_qs, "kv_rub"),
             "insurance_sum": _sum_amount(planned_qs, "insurance_sum"),
         }
 
         bridge = {
             "premium": actual["premium"] + planned["premium"],
-            "commission": actual["commission"] + planned["commission"],
             "insurance_sum": actual["insurance_sum"] + planned["insurance_sum"],
         }
 
         premium_actual_share = _safe_percent(actual["premium"], bridge["premium"])
         premium_plan_share = _safe_percent(planned["premium"], bridge["premium"])
 
+        if current_month_start > year_start:
+            actual_period_label = (
+                f"{year_start.strftime('%d.%m.%Y')}–"
+                f"{(current_month_start - timedelta(days=1)).strftime('%d.%m.%Y')}"
+            )
+        else:
+            actual_period_label = "Прошедших месяцев в этом году еще нет"
+
+        if current_month_start <= year_end:
+            planned_period_label = (
+                f"{current_month_start.strftime('%d.%m.%Y')}–"
+                f"{year_end.strftime('%d.%m.%Y')}"
+            )
+        else:
+            planned_period_label = "Текущий и будущие месяцы в этом году отсутствуют"
+
         return {
-            "cutoff_month_start": current_month_start,
+            "calendar_year": today.year,
+            "year_start": year_start,
+            "year_end": year_end,
+            "actual_period_label": actual_period_label,
+            "planned_period_label": planned_period_label,
             "actual": actual,
             "planned": planned,
             "bridge": bridge,
@@ -555,6 +608,83 @@ class DashboardV2Service:
             "active_with_termination_count": active_with_termination_count,
         }
 
+    def _build_system_snapshot(
+        self,
+        *,
+        active_policies_qs,
+        active_payments_qs,
+        health: Dict[str, Any],
+        data_quality: Dict[str, Any],
+        today: date,
+    ) -> Dict[str, Any]:
+        upcoming_qs = active_payments_qs.filter(
+            due_date__gte=today,
+            due_date__lte=today + timedelta(days=30),
+            paid_date__isnull=True,
+        )
+        overdue_qs = active_payments_qs.filter(
+            due_date__lt=today, paid_date__isnull=True
+        )
+
+        active_policies_count = active_policies_qs.count()
+        not_uploaded_count = active_policies_qs.filter(policy_uploaded=False).count()
+
+        upcoming_count = upcoming_qs.count()
+        overdue_count = overdue_qs.count()
+
+        upcoming_amount = _sum_amount(upcoming_qs, "amount")
+        overdue_amount = _sum_amount(overdue_qs, "amount")
+
+        not_uploaded_share = _safe_percent(
+            _to_decimal(not_uploaded_count), _to_decimal(active_policies_count)
+        ).quantize(Decimal("0.1"))
+
+        return {
+            "active_policies_count": active_policies_count,
+            "not_uploaded_policies_count": not_uploaded_count,
+            "not_uploaded_policies_share": not_uploaded_share,
+            "upcoming_payments_count": upcoming_count,
+            "upcoming_payments_amount": upcoming_amount,
+            "no_payment_data_count": overdue_count,
+            "no_payment_data_amount": overdue_amount,
+            "health_score": health["score"],
+            "data_quality_score": data_quality["quality_score"],
+            "cards": [
+                {
+                    "key": "active_policies",
+                    "label": "Активные полисы",
+                    "count": active_policies_count,
+                    "hint": "текущий активный портфель",
+                    "amount": None,
+                    "tone": "primary",
+                },
+                {
+                    "key": "not_uploaded",
+                    "label": "Не подгружен полис",
+                    "count": not_uploaded_count,
+                    "hint": f"{not_uploaded_share:.1f}% от активных",
+                    "amount": None,
+                    "tone": "info",
+                },
+                {
+                    "key": "upcoming_30",
+                    "label": "Предстоящие платежи (30д)",
+                    "count": upcoming_count,
+                    "hint": "без факта оплаты",
+                    "amount": upcoming_amount,
+                    "tone": "warning",
+                },
+                {
+                    "key": "no_payment_data",
+                    "label": "Нет данных об оплате",
+                    "count": overdue_count,
+                    "hint": "просроченные платежи",
+                    "amount": overdue_amount,
+                    "tone": "danger",
+                },
+            ],
+        }
+
     def _build_portfolio_structure(
         self,
         *,
@@ -570,16 +700,22 @@ class DashboardV2Service:
             actual_qs=actual_qs,
             planned_qs=planned_qs,
             label_field="policy__branch__branch_name",
+            id_field="policy__branch_id",
+            logo_field="policy__branch__logo",
         )
         by_insurer = self._build_bridge_distribution(
             actual_qs=actual_qs,
             planned_qs=planned_qs,
             label_field="policy__insurer__insurer_name",
+            id_field="policy__insurer_id",
+            logo_field="policy__insurer__logo",
         )
         by_type = self._build_bridge_distribution(
             actual_qs=actual_qs,
             planned_qs=planned_qs,
             label_field="policy__insurance_type__name",
+            id_field="policy__insurance_type_id",
+            logo_field="policy__insurance_type__icon",
         )
 
         return {
@@ -589,6 +725,9 @@ class DashboardV2Service:
             "top_branch": by_branch[0] if by_branch else None,
             "top_insurer": by_insurer[0] if by_insurer else None,
             "top_type": by_type[0] if by_type else None,
+            "branch_breakdown": self._build_segment_breakdown(by_branch),
+            "insurer_breakdown": self._build_segment_breakdown(by_insurer),
+            "type_breakdown": self._build_segment_breakdown(by_type),
         }
 
     def _build_bridge_distribution(
@@ -597,42 +736,78 @@ class DashboardV2Service:
         actual_qs,
         planned_qs,
         label_field: str,
+        id_field: str | None = None,
+        logo_field: str | None = None,
     ) -> List[Dict[str, Any]]:
+        value_fields = [label_field]
+        if id_field:
+            value_fields.append(id_field)
+        if logo_field:
+            value_fields.append(logo_field)
+
         actual_rows = (
-            actual_qs.values(label_field)
+            actual_qs.values(*value_fields)
             .annotate(total=Coalesce(Sum("amount"), DECIMAL_ZERO))
             .order_by()
         )
         planned_rows = (
-            planned_qs.values(label_field)
+            planned_qs.values(*value_fields)
             .annotate(total=Coalesce(Sum("amount"), DECIMAL_ZERO))
             .order_by()
         )
 
-        aggregate_map: Dict[str, Dict[str, Decimal]] = {}
+        aggregate_map: Dict[str, Dict[str, Any]] = {}
 
         for row in actual_rows:
             label = row.get(label_field) or "Не указано"
+            entity_id = row.get(id_field) if id_field else None
+            logo_url = _media_url(row.get(logo_field)) if logo_field else None
+            key = f"{entity_id}:{label}" if entity_id is not None else label
+
             aggregate_map.setdefault(
-                label, {"fact": DECIMAL_ZERO, "plan": DECIMAL_ZERO}
+                key,
+                {
+                    "id": entity_id,
+                    "name": label,
+                    "logo_url": logo_url,
+                    "fact": DECIMAL_ZERO,
+                    "plan": DECIMAL_ZERO,
+                },
             )
-            aggregate_map[label]["fact"] = _to_decimal(row.get("total"))
+            if logo_url and not aggregate_map[key]["logo_url"]:
+                aggregate_map[key]["logo_url"] = logo_url
+            aggregate_map[key]["fact"] = _to_decimal(row.get("total"))
 
         for row in planned_rows:
             label = row.get(label_field) or "Не указано"
+            entity_id = row.get(id_field) if id_field else None
+            logo_url = _media_url(row.get(logo_field)) if logo_field else None
+            key = f"{entity_id}:{label}" if entity_id is not None else label
+
             aggregate_map.setdefault(
-                label, {"fact": DECIMAL_ZERO, "plan": DECIMAL_ZERO}
+                key,
+                {
+                    "id": entity_id,
+                    "name": label,
+                    "logo_url": logo_url,
+                    "fact": DECIMAL_ZERO,
+                    "plan": DECIMAL_ZERO,
+                },
             )
-            aggregate_map[label]["plan"] = _to_decimal(row.get("total"))
+            if logo_url and not aggregate_map[key]["logo_url"]:
+                aggregate_map[key]["logo_url"] = logo_url
+            aggregate_map[key]["plan"] = _to_decimal(row.get("total"))
 
         rows = []
         total_bridge = DECIMAL_ZERO
-        for label, totals in aggregate_map.items():
+        for totals in aggregate_map.values():
             bridge = totals["fact"] + totals["plan"]
             total_bridge += bridge
             rows.append(
                 {
-                    "name": label,
+                    "id": totals["id"],
+                    "name": totals["name"],
+                    "logo_url": totals["logo_url"],
                     "fact_premium": totals["fact"],
                     "plan_premium": totals["plan"],
                     "bridge_premium": bridge,
@@ -647,6 +822,39 @@ class DashboardV2Service:
             )
 
         return rows
+
+    def _build_segment_breakdown(self, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+        top_rows = rows[:5]
+        top_share = sum((row["share"] for row in top_rows), DECIMAL_ZERO)
+        other_share = max(DECIMAL_ZERO, DECIMAL_HUNDRED - top_share).quantize(
+            Decimal("0.1")
+        )
+
+        chart_rows = [
+            {
+                "name": row["name"],
+                "share": row["share"],
+                "logo_url": row.get("logo_url"),
+                "is_other": False,
+            }
+            for row in top_rows
+        ]
+
+        if other_share > 0:
+            chart_rows.append(
+                {
+                    "name": "Прочие",
+                    "share": other_share,
+                    "logo_url": None,
+                    "is_other": True,
+                }
+            )
+
+        return {
+            "top": top_rows,
+            "other_share": other_share,
+            "chart": chart_rows,
+        }
 
     def _build_concentration_risk(self, *, structure: Dict[str, Any]) -> Dict[str, Any]:
         insurer = self._concentration_stats(structure.get("by_insurer", []))
@@ -878,4 +1086,144 @@ class DashboardV2Service:
         return {
             "insights": insights[:5],
             "quick_actions": quick_actions,
+        }
+
+    def _build_legacy_relay(
+        self,
+        *,
+        policies_qs,
+        active_payments_qs,
+        today: date,
+    ) -> Dict[str, Any]:
+        preview_limit = 5
+        upcoming_horizon = today + timedelta(days=30)
+
+        upcoming_qs = (
+            active_payments_qs.filter(
+                due_date__range=[today, upcoming_horizon],
+                paid_date__isnull=True,
+            )
+            .select_related("policy", "policy__client")
+            .order_by("due_date", "policy__policy_number")
+        )
+        overdue_qs = (
+            active_payments_qs.filter(
+                due_date__lt=today,
+                paid_date__isnull=True,
+            )
+            .select_related("policy", "policy__client")
+            .order_by("due_date", "policy__policy_number")
+        )
+        recent_policies_qs = policies_qs.select_related(
+            "client", "insurer", "branch"
+        ).order_by("-created_at")
+        not_uploaded_qs = (
+            policies_qs.filter(policy_uploaded=False)
+            .select_related("client", "insurer", "branch")
+            .order_by("-created_at")
+        )
+
+        upcoming_rows = [
+            self._serialize_payment_relay_row(
+                payment=payment, today=today, overdue=False
+            )
+            for payment in upcoming_qs[:preview_limit]
+        ]
+        overdue_rows = [
+            self._serialize_payment_relay_row(
+                payment=payment, today=today, overdue=True
+            )
+            for payment in overdue_qs[:preview_limit]
+        ]
+        recent_rows = [
+            self._serialize_policy_relay_row(policy)
+            for policy in recent_policies_qs[:preview_limit]
+        ]
+        not_uploaded_rows = [
+            self._serialize_policy_relay_row(policy)
+            for policy in not_uploaded_qs[:preview_limit]
+        ]
+
+        return {
+            "cards": [
+                {
+                    "key": "upcoming",
+                    "type": "payment",
+                    "tone": "warning",
+                    "title": "Предстоящие платежи",
+                    "count": upcoming_qs.count(),
+                    "rows": upcoming_rows,
+                    "link_url": reverse("policies:payments") + "?status=upcoming",
+                    "link_label": "Все предстоящие платежи",
+                },
+                {
+                    "key": "overdue",
+                    "type": "payment",
+                    "tone": "danger",
+                    "title": "Нет данных об оплате",
+                    "count": overdue_qs.count(),
+                    "rows": overdue_rows,
+                    "link_url": reverse("policies:payments") + "?status=overdue",
+                    "link_label": "Все не оплаченные платежи",
+                },
+                {
+                    "key": "recent",
+                    "type": "policy",
+                    "tone": "primary",
+                    "title": "Недавно добавленные полисы",
+                    "count": recent_policies_qs.count(),
+                    "rows": recent_rows,
+                    "link_url": reverse("policies:list"),
+                    "link_label": "Все полисы",
+                },
+                {
+                    "key": "not_uploaded",
+                    "type": "policy",
+                    "tone": "info",
+                    "title": "Полисы неподгруженные",
+                    "count": not_uploaded_qs.count(),
+                    "rows": not_uploaded_rows,
+                    "link_url": reverse("policies:list") + "?policy_uploaded=False",
+                    "link_label": "Все не подгруженные полисы",
+                },
+            ]
+        }
+
+    def _serialize_payment_relay_row(
+        self,
+        *,
+        payment,
+        today: date,
+        overdue: bool,
+    ) -> Dict[str, Any]:
+        policy = payment.policy
+        client = getattr(policy, "client", None)
+        overdue_days = max((today - payment.due_date).days, 0)
+
+        return {
+            "policy_id": policy.pk,
+            "policy_number": policy.policy_number or "—",
+            "dfa_number": policy.dfa_number or "—",
+            "client_name": getattr(client, "client_name", "Не указано"),
+            "due_date": payment.due_date,
+            "amount": payment.amount,
+            "hint": (
+                f"{overdue_days} дн. проср."
+                if overdue
+                else f"{payment.year_number}/{payment.installment_number}"
+            ),
+        }
+
+    def _serialize_policy_relay_row(self, policy) -> Dict[str, Any]:
+        client = getattr(policy, "client", None)
+        insurer = getattr(policy, "insurer", None)
+
+        return {
+            "policy_id": policy.pk,
+            "policy_number": policy.policy_number or "—",
+            "dfa_number": policy.dfa_number or "—",
+            "client_name": getattr(client, "client_name", "Не указано"),
+            "start_date": policy.start_date,
+            "end_date": policy.end_date,
+            "hint": getattr(insurer, "insurer_name", "Не указано"),
         }

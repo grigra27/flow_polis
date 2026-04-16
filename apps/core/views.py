@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
+from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
 import logging
@@ -83,6 +84,18 @@ def dashboard_v2(request):
                 "today": timezone.localdate(),
                 "period_label": "Ошибка расчета",
             },
+            "dashboard_v2_snapshot": {
+                "active_policies_count": 0,
+                "not_uploaded_policies_count": 0,
+                "not_uploaded_policies_share": 0,
+                "upcoming_payments_count": 0,
+                "upcoming_payments_amount": 0,
+                "no_payment_data_count": 0,
+                "no_payment_data_amount": 0,
+                "health_score": 0,
+                "data_quality_score": 0,
+                "cards": [],
+            },
             "dashboard_v2_health": {
                 "score": 0,
                 "previous_score": 0,
@@ -94,9 +107,14 @@ def dashboard_v2(request):
                 "interpretation": "Недоступно",
             },
             "dashboard_v2_bridge": {
-                "actual": {"premium": 0, "commission": 0, "insurance_sum": 0},
-                "planned": {"premium": 0, "commission": 0, "insurance_sum": 0},
-                "bridge": {"premium": 0, "commission": 0, "insurance_sum": 0},
+                "calendar_year": timezone.localdate().year,
+                "year_start": timezone.localdate().replace(month=1, day=1),
+                "year_end": timezone.localdate().replace(month=12, day=31),
+                "actual_period_label": "Прошедших месяцев в этом году еще нет",
+                "planned_period_label": "Текущий и будущие месяцы в этом году отсутствуют",
+                "actual": {"premium": 0, "insurance_sum": 0},
+                "planned": {"premium": 0, "insurance_sum": 0},
+                "bridge": {"premium": 0, "insurance_sum": 0},
                 "premium_actual_share": 0,
                 "premium_plan_share": 0,
             },
@@ -115,6 +133,9 @@ def dashboard_v2(request):
                 "top_branch": None,
                 "top_insurer": None,
                 "top_type": None,
+                "branch_breakdown": {"top": [], "other_share": 0, "chart": []},
+                "insurer_breakdown": {"top": [], "other_share": 0, "chart": []},
+                "type_breakdown": {"top": [], "other_share": 0, "chart": []},
             },
             "dashboard_v2_concentration": {
                 "insurer": {
@@ -153,6 +174,50 @@ def dashboard_v2(request):
                 "overdue_share_delta_pp_label": "0.0",
             },
             "dashboard_v2_insights": {"insights": [], "quick_actions": []},
+            "dashboard_v2_legacy_relay": {
+                "cards": [
+                    {
+                        "key": "upcoming",
+                        "type": "payment",
+                        "tone": "warning",
+                        "title": "Предстоящие платежи",
+                        "count": 0,
+                        "rows": [],
+                        "link_url": reverse("policies:payments") + "?status=upcoming",
+                        "link_label": "Все предстоящие платежи",
+                    },
+                    {
+                        "key": "overdue",
+                        "type": "payment",
+                        "tone": "danger",
+                        "title": "Нет данных об оплате",
+                        "count": 0,
+                        "rows": [],
+                        "link_url": reverse("policies:payments") + "?status=overdue",
+                        "link_label": "Все не оплаченные платежи",
+                    },
+                    {
+                        "key": "recent",
+                        "type": "policy",
+                        "tone": "primary",
+                        "title": "Недавно добавленные полисы",
+                        "count": 0,
+                        "rows": [],
+                        "link_url": reverse("policies:list"),
+                        "link_label": "Все полисы",
+                    },
+                    {
+                        "key": "not_uploaded",
+                        "type": "policy",
+                        "tone": "info",
+                        "title": "Полисы неподгруженные",
+                        "count": 0,
+                        "rows": [],
+                        "link_url": reverse("policies:list") + "?policy_uploaded=False",
+                        "link_label": "Все не подгруженные полисы",
+                    },
+                ]
+            },
         }
 
     return render(request, "core/dashboard_v2.html", context)

@@ -38,6 +38,9 @@
             {% if selected_branch %}
             <input type="hidden" name="branch" value="{{ selected_branch }}">
             {% endif %}
+            {% if request.GET.status %}
+            <input type="hidden" name="status" value="{{ request.GET.status }}">
+            {% endif %}
             <div class="col-md-3">
                 <label class="form-label">Дата платежа от:</label>
                 <input type="date" name="date_from" class="form-control" value="{{ request.GET.date_from }}">
@@ -70,21 +73,20 @@
 </div>
 
 <!-- Filter Buttons -->
-{% if not request.GET.date_from and not request.GET.date_to %}
 <div class="mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <!-- Past payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-               class="btn btn-outline-success {% if request.GET.status == 'approved' %}active{% endif %}">
+            <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+               class="btn btn-outline-success {% if selected_status == 'approved' %}active{% endif %}">
                 <i class="bi bi-check2-circle"></i> Акт согласован СК
             </a>
-            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-               class="btn btn-outline-primary {% if request.GET.status == 'paid' %}active{% endif %}">
+            <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+               class="btn btn-outline-primary {% if selected_status == 'paid' %}active{% endif %}">
                 <i class="bi bi-check-circle"></i> Оплаченные
             </a>
-            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-               class="btn btn-outline-danger {% if request.GET.status == 'overdue' %}active{% endif %}">
+            <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+               class="btn btn-outline-danger {% if selected_status == 'overdue' %}active{% endif %}">
                 <i class="bi bi-exclamation-triangle"></i> Не оплаченные
             </a>
         </div>
@@ -93,12 +95,12 @@
 
         <!-- Future payments group -->
         <div class="btn-group" role="group">
-            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-               class="btn btn-outline-warning {% if request.GET.status == 'upcoming' or not request.GET.status %}active{% endif %}">
+            <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+               class="btn btn-outline-warning {% if selected_status == 'upcoming' %}active{% endif %}">
                 <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
             </a>
-            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-               class="btn btn-outline-info {% if request.GET.status == 'future' %}active{% endif %}">
+            <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+               class="btn btn-outline-info {% if selected_status == 'future' %}active{% endif %}">
                 <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
             </a>
         </div>
@@ -106,8 +108,8 @@
         <div class="vr" style="height: 38px;"></div>
 
         <!-- All payments -->
-        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}"
-           class="btn btn-outline-primary {% if request.GET.status == 'all' %}active{% endif %}">
+        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+           class="btn btn-outline-primary {% if selected_status == 'all' %}active{% endif %}">
             <i class="bi bi-list-ul"></i> Все платежи
         </a>
 
@@ -127,7 +129,7 @@
         </small>
     </div>
 </div>
-{% else %}
+{% if request.GET.date_from or request.GET.date_to %}
 <div class="alert alert-info mb-3">
     <i class="bi bi-funnel-fill"></i>
     Применен фильтр по датам:

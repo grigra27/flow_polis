@@ -121,66 +121,68 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         if date_to:
             queryset = queryset.filter(due_date__lte=date_to)
 
-        # Filter by status (only if no date range specified)
-        status = None
-        if not date_from and not date_to:
-            status = self.request.GET.get("status", "upcoming")  # Default to 'upcoming'
-            if status == "all":
-                # Все платежи: без фильтрации по статусу
-                pass
-            elif status == "approved":
-                # Согласованные со СК: платежи с указанной датой согласования СК
-                queryset = queryset.filter(insurer_date__isnull=False)
-            elif status == "paid":
-                # Оплаченные: платежи с указанной датой оплаты (дата платежа <= сегодня)
-                # но БЕЗ даты согласования СК (иначе они попадают в "Акт согласован СК")
-                from django.utils import timezone
+        # Filter by status (applies together with branch/insurer/date filters)
+        # If date filter is set without explicit status, show all statuses in this date range.
+        status = self.request.GET.get("status")
+        if not status:
+            status = "all" if (date_from or date_to) else "upcoming"
+        if status == "all":
+            # Все платежи: без фильтрации по статусу
+            pass
+        elif status == "approved":
+            # Согласованные со СК: платежи с указанной датой согласования СК
+            queryset = queryset.filter(insurer_date__isnull=False)
+        elif status == "paid":
+            # Оплаченные: платежи с указанной датой оплаты (дата платежа <= сегодня)
+            # но БЕЗ даты согласования СК (иначе они попадают в "Акт согласован СК")
+            from django.utils import timezone
 
-                queryset = queryset.filter(
-                    paid_date__isnull=False,
-                    due_date__lte=timezone.now().date(),
-                    insurer_date__isnull=True,
-                )
-            elif status == "cancelled":
-                # Отмененные: неоплаченные платежи по неактивным полисам
-                queryset = queryset.filter(
-                    paid_date__isnull=True, policy__policy_active=False
-                )
-            elif status == "overdue":
-                # Не оплаченные: неоплаченные платежи с датой ранее сегодня (только для активных полисов)
-                from django.utils import timezone
+            queryset = queryset.filter(
+                paid_date__isnull=False,
+                due_date__lte=timezone.now().date(),
+                insurer_date__isnull=True,
+            )
+        elif status == "cancelled":
+            # Отмененные: неоплаченные платежи по неактивным полисам
+            queryset = queryset.filter(
+                paid_date__isnull=True,
+                policy__policy_active=False,
+            )
+        elif status == "overdue":
+            # Не оплаченные: неоплаченные платежи с датой ранее сегодня (только для активных полисов)
+            from django.utils import timezone
 
-                queryset = queryset.filter(
-                    due_date__lt=timezone.now().date(),
-                    paid_date__isnull=True,
-                    policy__policy_active=True,
-                )
-            elif status == "upcoming":
-                # Предстоит в ближайшие 30 дней: неоплаченные платежи от сегодня до +30 дней включительно
-                # только для активных полисов
-                from django.utils import timezone
-                from datetime import timedelta
+            queryset = queryset.filter(
+                due_date__lt=timezone.now().date(),
+                paid_date__isnull=True,
+                policy__policy_active=True,
+            )
+        elif status == "upcoming":
+            # Предстоит в ближайшие 30 дней: неоплаченные платежи от сегодня до +30 дней включительно
+            # только для активных полисов
+            from django.utils import timezone
+            from datetime import timedelta
 
-                today = timezone.now().date()
-                next_month = today + timedelta(days=30)
-                queryset = queryset.filter(
-                    due_date__range=[today, next_month],
-                    paid_date__isnull=True,
-                    policy__policy_active=True,
-                )
-            elif status == "future":
-                # Будущие: неоплаченные платежи более чем через 30 дней
-                # только для активных полисов
-                from django.utils import timezone
-                from datetime import timedelta
+            today = timezone.now().date()
+            next_month = today + timedelta(days=30)
+            queryset = queryset.filter(
+                due_date__range=[today, next_month],
+                paid_date__isnull=True,
+                policy__policy_active=True,
+            )
+        elif status == "future":
+            # Будущие: неоплаченные платежи более чем через 30 дней
+            # только для активных полисов
+            from django.utils import timezone
+            from datetime import timedelta
 
-                today = timezone.now().date()
-                future_date = today + timedelta(days=31)
-                queryset = queryset.filter(
-                    due_date__gte=future_date,
-                    paid_date__isnull=True,
-                    policy__policy_active=True,
-                )
+            today = timezone.now().date()
+            future_date = today + timedelta(days=31)
+            queryset = queryset.filter(
+                due_date__gte=future_date,
+                paid_date__isnull=True,
+                policy__policy_active=True,
+            )
 
         # Сортировка:
         # - для согласованных: по дате согласования (от новых к старым)
@@ -207,5 +209,15 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         context["insurers"] = Insurer.objects.all()
         context["selected_branch"] = self.request.GET.get("branch")
         context["selected_insurer"] = self.request.GET.get("insurer")
+        selected_status = self.request.GET.get("status")
+        if not selected_status:
+            selected_status = (
+                "all"
+                if (
+                    self.request.GET.get("date_from") or self.request.GET.get("date_to")
+                )
+                else "upcoming"
+            )
+        context["selected_status"] = selected_status
         context["can_edit"] = self.request.user.is_staff
         return context

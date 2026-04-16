@@ -1,5 +1,5 @@
 """
-Django management команда для отправки ежедневного дайджеста в Telegram
+Django management команда для отправки ежедневного дайджеста в Telegram и VK
 """
 import logging
 from datetime import datetime, timedelta, date
@@ -28,6 +28,16 @@ class Command(BaseCommand):
             "--test",
             action="store_true",
             help="Тестовый режим - отправить дайджест за последние 2 часа",
+        )
+        parser.add_argument(
+            "--no-telegram",
+            action="store_true",
+            help="Не отправлять дайджест в Telegram",
+        )
+        parser.add_argument(
+            "--no-vk",
+            action="store_true",
+            help="Не отправлять дайджест в VK",
         )
 
     def handle(self, *args, **options):
@@ -77,33 +87,54 @@ class Command(BaseCommand):
                 period_name, logins_data, policies_data, payments_data
             )
 
-            # Отправляем в Telegram (разделяем на части если нужно)
             full_message = f"📊 Дайджест за {period_name}\n\n{message}"
 
-            # Разделяем на части если сообщение слишком длинное
-            message_parts = self._split_message_into_parts(full_message)
+            # Разделяем на части для Telegram (лимит 3900 символов)
+            telegram_parts = self._split_message_into_parts(
+                full_message, max_length=3900
+            )
+            # Разделяем на части для VK (лимит 4096 символов)
+            vk_parts = self._split_message_into_parts(full_message, max_length=4096)
 
-            print(f"DEBUG: Message split into {len(message_parts)} parts")
-            for i, part in enumerate(message_parts):
-                print(f"DEBUG: Part {i+1} length: {len(part)}")
+            print(
+                f"DEBUG: Telegram parts: {len(telegram_parts)}, VK parts: {len(vk_parts)}"
+            )
 
-            success = self._send_telegram_messages(message_parts)
-
-            if success:
-                if len(message_parts) > 1:
+            # --- Telegram ---
+            if not options.get("no_telegram"):
+                tg_success = self._send_telegram_messages(telegram_parts)
+                if tg_success:
+                    suffix = (
+                        f" ({len(telegram_parts)} частей)"
+                        if len(telegram_parts) > 1
+                        else ""
+                    )
                     self.stdout.write(
-                        self.style.SUCCESS(
-                            f"✅ Дайджест отправлен в Telegram ({len(message_parts)} частей)"
-                        )
+                        self.style.SUCCESS(f"✅ Дайджест отправлен в Telegram{suffix}")
                     )
                 else:
                     self.stdout.write(
-                        self.style.SUCCESS("✅ Дайджест отправлен в Telegram")
+                        self.style.WARNING(
+                            "⚠️ Не удалось отправить дайджест в Telegram"
+                        )
                     )
             else:
-                self.stdout.write(
-                    self.style.WARNING("⚠️ Не удалось отправить дайджест в Telegram")
-                )
+                self.stdout.write("⏭️ Telegram: пропущено (--no-telegram)")
+
+            # --- VK ---
+            if not options.get("no_vk"):
+                vk_success = self._send_vk_messages(vk_parts)
+                if vk_success:
+                    suffix = f" ({len(vk_parts)} частей)" if len(vk_parts) > 1 else ""
+                    self.stdout.write(
+                        self.style.SUCCESS(f"✅ Дайджест отправлен в VK{suffix}")
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING("⚠️ Не удалось отправить дайджест в VK")
+                    )
+            else:
+                self.stdout.write("⏭️ VK: пропущено (--no-vk)")
 
         except Exception as e:
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
@@ -1263,3 +1294,32 @@ class Command(BaseCommand):
             )
             logger.error(f"Error sending telegram message: {e}")
             return False
+
+    def _send_vk_messages(self, messages):
+        """Отправляет несколько сообщений в VK с задержкой между ними"""
+        import time
+        from apps.core.vk_handler import send_vk_message
+
+        success_count = 0
+        total = len(messages)
+
+        for i, message in enumerate(messages):
+            if total > 1:
+                if i == 0:
+                    message = f"{message}\n\n📄 Часть 1/{total}"
+                else:
+                    message = f"📄 Часть {i + 1}/{total}\n\n{message}"
+
+            print(f"DEBUG: Sending VK message {i + 1}/{total} (length: {len(message)})")
+            ok = send_vk_message(message)
+
+            if ok:
+                success_count += 1
+                print(f"DEBUG: VK message {i + 1}/{total} sent successfully")
+                if i < total - 1:
+                    time.sleep(1)
+            else:
+                print(f"ERROR: Failed to send VK message {i + 1}/{total}")
+
+        print(f"DEBUG: VK sent {success_count}/{total} messages")
+        return success_count > 0

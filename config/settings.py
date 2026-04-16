@@ -264,6 +264,12 @@ else:
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Backup files (optional)
+# Can point to mounted server backup directory in containerized deployments
+BACKUP_BASE_DIR = config("BACKUP_BASE_DIR", default="")
+BACKUP_DB_DIR = config("BACKUP_DB_DIR", default="")
+BACKUP_MEDIA_DIR = config("BACKUP_MEDIA_DIR", default="")
+
 # Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -1,5 +1,8 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
+from django.urls import reverse
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from .models import CustomExportTemplate
 
 
@@ -827,3 +830,89 @@ class PaymentExporterTest(TestCase):
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         self.assertIn("payments_", response["Content-Disposition"])
+
+
+class BackupExportViewTest(TestCase):
+    """Тесты скачивания backup-файлов на странице экспортов."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="regular_user", password="testpass123"
+        )
+        self.admin = User.objects.create_user(
+            username="admin_user", password="testpass123", is_staff=True
+        )
+
+    def _prepare_backup_files(self, root_dir):
+        db_dir = Path(root_dir) / "database"
+        media_dir = Path(root_dir) / "media"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        media_dir.mkdir(parents=True, exist_ok=True)
+
+        db_backup = db_dir / "latest_backup.sql.gz"
+        media_backup = media_dir / "latest_backup.tar.gz"
+        db_backup.write_bytes(b"db-backup-content")
+        media_backup.write_bytes(b"media-backup-content")
+
+        return db_backup, media_backup
+
+    def test_backup_download_requires_login(self):
+        """Тест: скачивание backup требует авторизации."""
+        with TemporaryDirectory() as temp_dir:
+            self._prepare_backup_files(temp_dir)
+            with override_settings(BACKUP_BASE_DIR=temp_dir):
+                response = self.client.get(reverse("reports:export_database_backup"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login/", response.url)
+
+    def test_non_admin_cannot_download_backup(self):
+        """Тест: обычный пользователь не может скачать backup."""
+        self.client.login(username="regular_user", password="testpass123")
+        with TemporaryDirectory() as temp_dir:
+            self._prepare_backup_files(temp_dir)
+            with override_settings(BACKUP_BASE_DIR=temp_dir):
+                response = self.client.get(reverse("reports:export_database_backup"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("reports:index"))
+
+    def test_admin_can_download_database_backup(self):
+        """Тест: админ может скачать backup базы данных."""
+        self.client.login(username="admin_user", password="testpass123")
+        with TemporaryDirectory() as temp_dir:
+            db_backup, _ = self._prepare_backup_files(temp_dir)
+            with override_settings(BACKUP_BASE_DIR=temp_dir):
+                response = self.client.get(reverse("reports:export_database_backup"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertIn(db_backup.name, response["Content-Disposition"])
+        self.assertEqual(b"".join(response.streaming_content), b"db-backup-content")
+
+    def test_admin_can_download_media_backup(self):
+        """Тест: админ может скачать backup media."""
+        self.client.login(username="admin_user", password="testpass123")
+        with TemporaryDirectory() as temp_dir:
+            _, media_backup = self._prepare_backup_files(temp_dir)
+            with override_settings(BACKUP_BASE_DIR=temp_dir):
+                response = self.client.get(reverse("reports:export_media_backup"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertIn(media_backup.name, response["Content-Disposition"])
+        self.assertEqual(b"".join(response.streaming_content), b"media-backup-content")
+
+    def test_admin_exports_page_contains_backup_context(self):
+        """Тест: для админа в контексте страницы экспортов есть данные по backup."""
+        self.client.login(username="admin_user", password="testpass123")
+        with TemporaryDirectory() as temp_dir:
+            self._prepare_backup_files(temp_dir)
+            with override_settings(BACKUP_BASE_DIR=temp_dir):
+                response = self.client.get(reverse("reports:index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("database_backup_info", response.context)
+        self.assertIn("media_backup_info", response.context)
+        self.assertTrue(response.context["database_backup_info"]["available"])
+        self.assertTrue(response.context["media_backup_info"]["available"])

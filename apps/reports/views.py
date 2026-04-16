@@ -3,10 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView, FormView, View
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
+from django.conf import settings
+from django.utils import timezone
 from django.db import DatabaseError
+from datetime import datetime, timezone as dt_timezone
+from pathlib import Path
 from apps.policies.models import Policy, PaymentSchedule
-from apps.clients.models import Client
 from apps.insurers.models import Insurer
 from .models import CustomExportTemplate
 from .forms import CustomExportForm
@@ -18,6 +21,200 @@ from .exporters import CustomExporter, PolicyExporter
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _is_admin_user(user):
+    return user.is_staff or user.is_superuser
+
+
+def _format_file_size(size_bytes):
+    """Форматирует размер файла в человекочитаемый вид."""
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(size_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{int(size_bytes)} B"
+
+
+def _is_path_within_directory(path, directory):
+    """Проверяет, что path находится внутри directory (защита от path traversal)."""
+    try:
+        path.resolve().relative_to(directory.resolve())
+        return True
+    except ValueError:
+        return False
+    except FileNotFoundError:
+        return False
+
+
+def _get_backup_search_dirs(backup_type):
+    """
+    Возвращает список директорий для поиска backup-файлов.
+    Поддерживает как docker/mount сценарий, так и локальный запуск без контейнера.
+    """
+    subdir = "database" if backup_type == "database" else "media"
+    explicit_dir = (
+        settings.BACKUP_DB_DIR
+        if backup_type == "database"
+        else settings.BACKUP_MEDIA_DIR
+    )
+
+    candidates = []
+
+    if explicit_dir:
+        candidates.append(Path(explicit_dir))
+
+    if settings.BACKUP_BASE_DIR:
+        base_path = Path(settings.BACKUP_BASE_DIR)
+        candidates.append(base_path / subdir)
+        candidates.append(base_path)
+
+    candidates.extend(
+        [
+            Path("/app/server_backups") / subdir,
+            Path("/app/server_backups"),
+            Path("/app/backups") / subdir,
+            Path("/app/backups"),
+            Path.home() / "insurance_broker_backups" / subdir,
+            Path(settings.BASE_DIR) / "backups" / subdir,
+            Path(settings.BASE_DIR) / "backups",
+        ]
+    )
+
+    unique_dirs = []
+    seen = set()
+    for candidate in candidates:
+        normalized = str(candidate.expanduser())
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_dirs.append(candidate.expanduser())
+
+    return unique_dirs
+
+
+def _find_latest_backup_file(backup_type):
+    """Находит актуальный backup-файл по типу (database/media)."""
+    latest_filename = (
+        "latest_backup.sql.gz" if backup_type == "database" else "latest_backup.tar.gz"
+    )
+    fallback_patterns = (
+        ["db_backup_*.sql.gz", "*.sql.gz"]
+        if backup_type == "database"
+        else ["media_backup_*.tar.gz", "*.tar.gz"]
+    )
+
+    for backup_dir in _get_backup_search_dirs(backup_type):
+        try:
+            if not backup_dir.exists() or not backup_dir.is_dir():
+                continue
+        except OSError:
+            continue
+
+        latest_file = backup_dir / latest_filename
+        if latest_file.exists() and latest_file.is_file():
+            try:
+                resolved_latest = latest_file.resolve()
+                if _is_path_within_directory(resolved_latest, backup_dir):
+                    return resolved_latest
+            except OSError:
+                pass
+
+        for pattern in fallback_patterns:
+            try:
+                matches = sorted(
+                    [p for p in backup_dir.glob(pattern) if p.is_file()],
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+            except OSError:
+                continue
+
+            if matches:
+                try:
+                    resolved_match = matches[0].resolve()
+                    if _is_path_within_directory(resolved_match, backup_dir):
+                        return resolved_match
+                except OSError:
+                    continue
+
+    return None
+
+
+def _get_backup_file_info(backup_type):
+    """Возвращает информацию о найденном backup-файле для отображения в UI."""
+    backup_file = _find_latest_backup_file(backup_type)
+    if not backup_file:
+        return {
+            "available": False,
+            "filename": None,
+            "size": None,
+            "modified_at": None,
+        }
+
+    try:
+        stat = backup_file.stat()
+    except OSError:
+        return {
+            "available": False,
+            "filename": None,
+            "size": None,
+            "modified_at": None,
+        }
+
+    modified_at = timezone.localtime(
+        datetime.fromtimestamp(stat.st_mtime, tz=dt_timezone.utc)
+    )
+
+    return {
+        "available": True,
+        "filename": backup_file.name,
+        "size": _format_file_size(stat.st_size),
+        "modified_at": modified_at,
+    }
+
+
+def _download_backup_file(request, backup_type):
+    """Общий обработчик скачивания backup-файлов."""
+    if not _is_admin_user(request.user):
+        messages.error(request, "У вас нет прав для выполнения этого действия")
+        return redirect("reports:index")
+
+    backup_file = _find_latest_backup_file(backup_type)
+    if not backup_file:
+        messages.error(
+            request,
+            "Актуальный backup-файл не найден. Проверьте настройки backup-директории.",
+        )
+        return redirect("reports:index")
+
+    try:
+        file_handle = open(backup_file, "rb")
+    except OSError as exc:
+        logger.error(f"Failed to open backup file {backup_file}: {exc}")
+        messages.error(request, "Не удалось открыть backup-файл для скачивания")
+        return redirect("reports:index")
+
+    content_type = "application/gzip"
+    response = FileResponse(
+        file_handle,
+        as_attachment=True,
+        filename=backup_file.name,
+        content_type=content_type,
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+
+    logger.info(
+        "User %s downloaded %s backup file: %s",
+        request.user.username,
+        backup_type,
+        backup_file,
+    )
+    return response
 
 
 @login_required
@@ -492,6 +689,18 @@ def export_commission_report(request):
         return redirect("reports:index")
 
 
+@login_required
+def export_database_backup(request):
+    """Скачивание актуального backup-файла базы данных."""
+    return _download_backup_file(request, "database")
+
+
+@login_required
+def export_media_backup(request):
+    """Скачивание актуального backup-файла media."""
+    return _download_backup_file(request, "media")
+
+
 class ExportsIndexView(LoginRequiredMixin, TemplateView):
     """Главная страница экспорта"""
 
@@ -515,6 +724,11 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
             .order_by("-year")
         )
         context["years"] = [year for year in years if year]
+
+        if _is_admin_user(self.request.user):
+            context["database_backup_info"] = _get_backup_file_info("database")
+            context["media_backup_info"] = _get_backup_file_info("media")
+
         return context
 
 

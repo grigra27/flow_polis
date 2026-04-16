@@ -34,4 +34,14 @@ urlpatterns = [
         views.export_policies_csv,
         name="export_policies_csv",
     ),
+    path(
+        "export/backups/database/",
+        views.export_database_backup,
+        name="export_database_backup",
+    ),
+    path(
+        "export/backups/media/",
+        views.export_media_backup,
+        name="export_media_backup",
+    ),
 ]

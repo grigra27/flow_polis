@@ -554,6 +554,78 @@
             </div>
         </div>
     </div>
+
+    <div class="col-12">
+        <div class="card mb-4 shadow-sm border-dark">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-hdd-stack"></i> Скачать backup
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Актуальные серверные backup-файлы</strong>
+                </p>
+                <p class="text-muted small mb-3">
+                    Скачивание последней доступной версии backup базы данных и media
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <h6 class="mb-2">
+                                <i class="bi bi-database"></i> Backup базы данных
+                            </h6>
+
+                            {% if database_backup_info.available %}
+                            <div class="small text-muted mb-3">
+                                <div><strong>Файл:</strong> {{ database_backup_info.filename }}</div>
+                                <div><strong>Размер:</strong> {{ database_backup_info.size }}</div>
+                                <div><strong>Обновлен:</strong> {{ database_backup_info.modified_at|date:"d.m.Y H:i" }}</div>
+                            </div>
+                            <a href="{% url 'reports:export_database_backup' %}" class="btn btn-dark btn-sm">
+                                <i class="bi bi-download"></i> Скачать backup БД
+                            </a>
+                            {% else %}
+                            <div class="small text-muted mb-3">
+                                Файл не найден. Проверьте настройки директории backup.
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                                <i class="bi bi-download"></i> Backup БД недоступен
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <h6 class="mb-2">
+                                <i class="bi bi-images"></i> Backup media
+                            </h6>
+
+                            {% if media_backup_info.available %}
+                            <div class="small text-muted mb-3">
+                                <div><strong>Файл:</strong> {{ media_backup_info.filename }}</div>
+                                <div><strong>Размер:</strong> {{ media_backup_info.size }}</div>
+                                <div><strong>Обновлен:</strong> {{ media_backup_info.modified_at|date:"d.m.Y H:i" }}</div>
+                            </div>
+                            <a href="{% url 'reports:export_media_backup' %}" class="btn btn-dark btn-sm">
+                                <i class="bi bi-download"></i> Скачать backup media
+                            </a>
+                            {% else %}
+                            <div class="small text-muted mb-3">
+                                Файл не найден. Проверьте настройки директории backup.
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                                <i class="bi bi-download"></i> Backup media недоступен
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 </div>
 

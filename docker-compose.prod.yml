@@ -55,6 +55,7 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
       - ./logs:/app/logs
+      - /root/insurance_broker_backups:/app/server_backups:ro
     env_file:
       - .env.prod
     restart: unless-stopped

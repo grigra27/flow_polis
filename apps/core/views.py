@@ -133,9 +133,24 @@ def dashboard_v2(request):
                 "top_branch": None,
                 "top_insurer": None,
                 "top_type": None,
-                "branch_breakdown": {"top": [], "other_share": 0, "chart": []},
-                "insurer_breakdown": {"top": [], "other_share": 0, "chart": []},
-                "type_breakdown": {"top": [], "other_share": 0, "chart": []},
+                "branch_breakdown": {
+                    "top": [],
+                    "other_share": 0,
+                    "chart": [],
+                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
+                },
+                "insurer_breakdown": {
+                    "top": [],
+                    "other_share": 0,
+                    "chart": [],
+                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
+                },
+                "type_breakdown": {
+                    "top": [],
+                    "other_share": 0,
+                    "chart": [],
+                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
+                },
             },
             "dashboard_v2_concentration": {
                 "insurer": {

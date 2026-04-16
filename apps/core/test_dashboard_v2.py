@@ -24,6 +24,7 @@ class DashboardV2ServiceTests(TestCase):
 
         insurer = Insurer.objects.create(insurer_name="СК Тест")
         branch = Branch.objects.create(branch_name="Москва")
+        inactive_branch = Branch.objects.create(branch_name="Неактивный филиал")
         insurance_type = InsuranceType.objects.create(name="КАСКО")
 
         commission_rate = CommissionRate.objects.create(
@@ -84,12 +85,12 @@ class DashboardV2ServiceTests(TestCase):
             termination_date=today - timedelta(days=2),
         )
 
-        Policy.objects.create(
+        policy_inactive = Policy.objects.create(
             policy_number="P-004",
             dfa_number="DFA-004",
             client=leasing_client,
             insurer=insurer,
-            branch=branch,
+            branch=inactive_branch,
             insurance_type=insurance_type,
             property_description="Оборудование",
             start_date=today - timedelta(days=90),
@@ -122,6 +123,18 @@ class DashboardV2ServiceTests(TestCase):
             insurance_sum=Decimal("10000.00"),
             commission_rate=commission_rate,
             kv_rub=Decimal("150.00"),
+            paid_date=None,
+        )
+
+        PaymentSchedule.objects.create(
+            policy=policy_inactive,
+            year_number=1,
+            installment_number=1,
+            due_date=today + timedelta(days=5),
+            amount=Decimal("99999.00"),
+            insurance_sum=Decimal("9999999.00"),
+            commission_rate=commission_rate,
+            kv_rub=Decimal("999.99"),
             paid_date=None,
         )
 
@@ -229,6 +242,12 @@ class DashboardV2ServiceTests(TestCase):
         self.assertIn("type_breakdown", structure)
         self.assertGreaterEqual(len(structure["branch_breakdown"]["top"]), 1)
         self.assertGreaterEqual(len(structure["branch_breakdown"]["chart"]), 1)
+        self.assertTrue(
+            structure["branch_breakdown"]["pie_css"].startswith("conic-gradient(")
+        )
+        self.assertIn("color", structure["branch_breakdown"]["chart"][0])
+        branch_names = [row["name"] for row in structure["by_branch"]]
+        self.assertNotIn("Неактивный филиал", branch_names)
 
         insights = context["dashboard_v2_insights"]
         self.assertGreaterEqual(len(insights["quick_actions"]), 1)

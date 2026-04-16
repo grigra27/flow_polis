@@ -14,6 +14,14 @@ from django.utils import timezone
 
 DECIMAL_ZERO = Decimal("0")
 DECIMAL_HUNDRED = Decimal("100")
+PIE_PALETTE = [
+    "#2f80ed",
+    "#1f6fca",
+    "#0dcaf0",
+    "#20c997",
+    "#ffc107",
+    "#9eb3cc",
+]
 
 
 def _to_decimal(value: Any) -> Decimal:
@@ -691,10 +699,13 @@ class DashboardV2Service:
         active_payments_qs,
         current_month_start: date,
     ) -> Dict[str, Any]:
-        actual_qs = active_payments_qs.filter(
+        # Safety filter: block 7 must always be based only on active policies.
+        scoped_payments_qs = active_payments_qs.filter(policy__policy_active=True)
+
+        actual_qs = scoped_payments_qs.filter(
             due_date__lt=current_month_start, paid_date__isnull=False
         )
-        planned_qs = active_payments_qs.filter(due_date__gte=current_month_start)
+        planned_qs = scoped_payments_qs.filter(due_date__gte=current_month_start)
 
         by_branch = self._build_bridge_distribution(
             actual_qs=actual_qs,
@@ -702,6 +713,7 @@ class DashboardV2Service:
             label_field="policy__branch__branch_name",
             id_field="policy__branch_id",
             logo_field="policy__branch__logo",
+            value_field="insurance_sum",
         )
         by_insurer = self._build_bridge_distribution(
             actual_qs=actual_qs,
@@ -709,6 +721,7 @@ class DashboardV2Service:
             label_field="policy__insurer__insurer_name",
             id_field="policy__insurer_id",
             logo_field="policy__insurer__logo",
+            value_field="insurance_sum",
         )
         by_type = self._build_bridge_distribution(
             actual_qs=actual_qs,
@@ -716,6 +729,7 @@ class DashboardV2Service:
             label_field="policy__insurance_type__name",
             id_field="policy__insurance_type_id",
             logo_field="policy__insurance_type__icon",
+            value_field="insurance_sum",
         )
 
         return {
@@ -738,6 +752,7 @@ class DashboardV2Service:
         label_field: str,
         id_field: str | None = None,
         logo_field: str | None = None,
+        value_field: str = "amount",
     ) -> List[Dict[str, Any]]:
         value_fields = [label_field]
         if id_field:
@@ -747,12 +762,12 @@ class DashboardV2Service:
 
         actual_rows = (
             actual_qs.values(*value_fields)
-            .annotate(total=Coalesce(Sum("amount"), DECIMAL_ZERO))
+            .annotate(total=Coalesce(Sum(value_field), DECIMAL_ZERO))
             .order_by()
         )
         planned_rows = (
             planned_qs.values(*value_fields)
-            .annotate(total=Coalesce(Sum("amount"), DECIMAL_ZERO))
+            .annotate(total=Coalesce(Sum(value_field), DECIMAL_ZERO))
             .order_by()
         )
 
@@ -799,27 +814,28 @@ class DashboardV2Service:
             aggregate_map[key]["plan"] = _to_decimal(row.get("total"))
 
         rows = []
-        total_bridge = DECIMAL_ZERO
+        total_bridge_insurance_sum = DECIMAL_ZERO
         for totals in aggregate_map.values():
-            bridge = totals["fact"] + totals["plan"]
-            total_bridge += bridge
+            bridge_insurance_sum = totals["fact"] + totals["plan"]
+            total_bridge_insurance_sum += bridge_insurance_sum
             rows.append(
                 {
                     "id": totals["id"],
                     "name": totals["name"],
                     "logo_url": totals["logo_url"],
-                    "fact_premium": totals["fact"],
-                    "plan_premium": totals["plan"],
-                    "bridge_premium": bridge,
+                    "fact_insurance_sum": totals["fact"],
+                    "plan_insurance_sum": totals["plan"],
+                    "bridge_insurance_sum": bridge_insurance_sum,
                 }
             )
 
-        rows.sort(key=lambda item: item["bridge_premium"], reverse=True)
+        rows.sort(key=lambda item: item["bridge_insurance_sum"], reverse=True)
 
         for row in rows:
-            row["share"] = _safe_percent(row["bridge_premium"], total_bridge).quantize(
-                Decimal("0.1")
-            )
+            row["share"] = _safe_percent(
+                row["bridge_insurance_sum"],
+                total_bridge_insurance_sum,
+            ).quantize(Decimal("0.1"))
 
         return rows
 
@@ -830,15 +846,17 @@ class DashboardV2Service:
             Decimal("0.1")
         )
 
-        chart_rows = [
-            {
-                "name": row["name"],
-                "share": row["share"],
-                "logo_url": row.get("logo_url"),
-                "is_other": False,
-            }
-            for row in top_rows
-        ]
+        chart_rows = []
+        for index, row in enumerate(top_rows):
+            chart_rows.append(
+                {
+                    "name": row["name"],
+                    "share": row["share"],
+                    "logo_url": row.get("logo_url"),
+                    "color": PIE_PALETTE[index % len(PIE_PALETTE)],
+                    "is_other": False,
+                }
+            )
 
         if other_share > 0:
             chart_rows.append(
@@ -846,6 +864,7 @@ class DashboardV2Service:
                     "name": "Прочие",
                     "share": other_share,
                     "logo_url": None,
+                    "color": PIE_PALETTE[-1],
                     "is_other": True,
                 }
             )
@@ -854,7 +873,31 @@ class DashboardV2Service:
             "top": top_rows,
             "other_share": other_share,
             "chart": chart_rows,
+            "pie_css": self._build_pie_gradient(chart_rows),
         }
+
+    def _build_pie_gradient(self, chart_rows: List[Dict[str, Any]]) -> str:
+        if not chart_rows:
+            return "conic-gradient(#e3ecf8 0% 100%)"
+
+        segments: List[str] = []
+        cursor = DECIMAL_ZERO
+        for index, row in enumerate(chart_rows):
+            share = _to_decimal(row.get("share")).quantize(Decimal("0.1"))
+            start = cursor
+            cursor += share
+            end = DECIMAL_HUNDRED if index == len(chart_rows) - 1 else cursor
+
+            if end <= start:
+                continue
+
+            color = row.get("color") or PIE_PALETTE[index % len(PIE_PALETTE)]
+            segments.append(f"{color} {float(start):.1f}% {float(end):.1f}%")
+
+        if not segments:
+            return "conic-gradient(#e3ecf8 0% 100%)"
+
+        return f"conic-gradient({', '.join(segments)})"
 
     def _build_concentration_risk(self, *, structure: Dict[str, Any]) -> Dict[str, Any]:
         insurer = self._concentration_stats(structure.get("by_insurer", []))

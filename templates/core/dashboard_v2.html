@@ -144,6 +144,76 @@
         background: linear-gradient(90deg, #4dbb77 0%, #1f8b4c 100%);
     }
 
+    .v2-bridge-metric {
+        padding: 0.9rem 0;
+        border-top: 1px solid #edf3fb;
+    }
+    .v2-bridge-metric:first-child {
+        padding-top: 0;
+        border-top: none;
+    }
+    .v2-bridge-metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.55rem;
+    }
+    .v2-bridge-metric-name {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--v2-muted);
+    }
+    .v2-bridge-metric-total {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--v2-title);
+        letter-spacing: -0.01em;
+    }
+    .v2-bridge-bar {
+        height: 8px;
+        background: #dbeafe;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+    .v2-bridge-bar-fact {
+        height: 100%;
+        background: linear-gradient(90deg, #1d4ed8, #3b82f6);
+        border-radius: 999px;
+    }
+    .v2-bridge-labels {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.78rem;
+    }
+    .v2-bridge-label-fact {
+        color: #1d4ed8;
+        font-weight: 600;
+    }
+    .v2-bridge-label-plan {
+        color: #64748b;
+        text-align: right;
+    }
+    .v2-bridge-period {
+        font-size: 0.74rem;
+        color: var(--v2-muted);
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 1.25rem;
+    }
+    .v2-bridge-period span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .v2-bridge-period-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
     .v2-table-sm {
         font-size: 0.86rem;
     }
@@ -187,13 +257,98 @@
         border-color: #cfe9d8;
     }
 
+    .v2-card--tinted {
+        background: #eef4fc;
+        border-color: #c4d8ef;
+        box-shadow: 0 2px 14px rgba(14, 38, 80, 0.09);
+    }
+
     .v2-soft-note {
         font-size: 0.82rem;
         color: var(--v2-muted);
     }
 
+    .v2-dyn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .v2-dyn-group + .v2-dyn-group {
+        margin-top: 0.9rem;
+        padding-top: 0.9rem;
+        border-top: 1px dashed #dde8f5;
+    }
+    .v2-dyn-period {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #4a6483;
+    }
+    .v2-dyn-period::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: #dde8f5;
+    }
+
+    .v2-dyn-panel {
+        background: #e8f1fb;
+        border: 1px solid #b8cfe8;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(30, 60, 110, 0.1);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .v2-dyn-panel-header {
+        background: #1e3a5f;
+        color: #e8f3ff;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 0.65rem 1rem;
+        flex-shrink: 0;
+    }
+    .v2-dyn-panel-body {
+        padding: 1rem 1rem 0.85rem;
+    }
+    .v2-dyn-panel .v2-cell {
+        background: #ffffff;
+        border-color: #c2d5eb;
+    }
+    .v2-dyn-panel .v2-dyn-period {
+        color: #2d5282;
+    }
+    .v2-dyn-panel .v2-dyn-period::after {
+        background: #c2d5eb;
+    }
+    .v2-dyn-panel .v2-dyn-group + .v2-dyn-group {
+        border-top-color: #c2d5eb;
+    }
+
     .v2-actions a {
         white-space: nowrap;
+    }
+
+    .v2-info-btn {
+        line-height: 1;
+        vertical-align: middle;
+        opacity: 0.45;
+        transition: opacity 0.15s;
+    }
+    .v2-info-btn:hover,
+    .v2-info-btn:focus {
+        opacity: 1;
+        box-shadow: none;
+    }
+    .popover {
+        max-width: 380px;
+        font-size: 0.82rem;
     }
 
     .v2-snapshot-shell {
@@ -284,14 +439,14 @@
 
     .v2-pie-layout {
         display: grid;
-        grid-template-columns: 120px 1fr;
+        grid-template-columns: 140px 1fr;
         align-items: center;
-        gap: 0.85rem;
+        gap: 1rem;
     }
 
     .v2-pie-chart {
-        width: 120px;
-        height: 120px;
+        width: 140px;
+        height: 140px;
         border-radius: 50%;
         border: 1px solid #d6e3f4;
         flex-shrink: 0;
@@ -299,30 +454,119 @@
 
     .v2-pie-legend {
         display: grid;
-        gap: 0.3rem;
+        gap: 0.4rem;
         min-width: 0;
     }
 
     .v2-pie-legend-row {
         display: grid;
-        grid-template-columns: auto minmax(90px, 1fr) auto;
+        grid-template-columns: auto 1fr auto;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.45rem;
         min-width: 0;
     }
 
     .v2-pie-dot {
-        width: 9px;
-        height: 9px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.1);
         flex-shrink: 0;
     }
 
     .v2-chart-value {
-        font-size: 0.78rem;
-        color: #4f647d;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #3a5270;
         white-space: nowrap;
+    }
+
+    /* ── Portfolio sub-sections ── */
+    .v2-sub-section {
+        padding: 1.25rem 1.25rem 1.1rem;
+        border-radius: 12px;
+        border-left: 4px solid transparent;
+    }
+    .v2-sub-section + .v2-sub-section {
+        margin-top: 1rem;
+    }
+
+    /* Light variant — страховая сумма */
+    .v2-sub-section--light {
+        background: #f4f8fd;
+        border-left-color: #1d4ed8;
+    }
+    .v2-sub-section--light .v2-cell {
+        background: #ffffff;
+        border-color: #d3e0f4;
+    }
+
+    /* Dark variant — страховая премия */
+    .v2-sub-section--dark {
+        background: #16253a;
+        border-left-color: #f59e0b;
+    }
+    .v2-sub-section--dark .v2-cell {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.1);
+    }
+    .v2-sub-section--dark .v2-cell-label {
+        color: #7fa5c8;
+    }
+    .v2-sub-section--dark .v2-cell-value {
+        color: #e8f1fb;
+    }
+    .v2-sub-section--dark .v2-entity {
+        color: #e8f1fb;
+    }
+    .v2-sub-section--dark .v2-entity-fallback {
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.15);
+        color: #c5d8ee;
+    }
+    .v2-sub-section--dark .v2-entity-logo {
+        border-color: rgba(255,255,255,0.15);
+    }
+    .v2-sub-section--dark .v2-pie-chart {
+        border-color: rgba(255,255,255,0.12);
+    }
+    .v2-sub-section--dark .v2-chart-value {
+        color: #c8ddf2;
+    }
+    .v2-sub-section--dark .v2-sub-desc {
+        color: #6a91b4;
+    }
+    .v2-sub-section--dark .fw-semibold {
+        color: #7fa5c8 !important;
+    }
+
+    .v2-sub-header {
+        margin-bottom: 1rem;
+    }
+    .v2-sub-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        margin-bottom: 0.35rem;
+    }
+    .v2-sub-label-sum {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .v2-sub-label-premium {
+        background: rgba(245,158,11,0.18);
+        color: #f59e0b;
+    }
+    .v2-sub-desc {
+        font-size: 0.8rem;
+        color: #5f7a96;
+        margin: 0;
     }
 
     .v2-relay-card {
@@ -473,10 +717,6 @@
     </div>
 </div>
 
-<div class="alert alert-primary mb-3" role="alert">
-    Пилотная версия: агрегированные показатели по портфелю без чувствительных клиентских данных.
-</div>
-
 <div class="v2-root">
     <div class="row g-3 mb-2">
         <div class="col-12">
@@ -531,42 +771,307 @@
                     </div>
 
                     <div class="col-lg-4">
-                        <div class="v2-soft-note mb-2">Динамика 30/90 дней</div>
-                        <div class="v2-grid-2">
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">30 дней: создано</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.created_count }}</div>
-                            </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">30 дней: деактивировано</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.deactivated_count }}</div>
-                            </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">30 дней: чистый прирост</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.net_growth_label }}</div>
-                            </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">90 дней: создано</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.created_count }}</div>
-                            </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">90 дней: деактивировано</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.deactivated_count }}</div>
-                            </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">90 дней: чистый прирост</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.net_growth_label }}</div>
+                    <div class="v2-dyn-panel">
+                        <div class="v2-dyn-panel-header">Динамика 30 / 90 дней</div>
+                        <div class="v2-dyn-panel-body">
+
+                        <div class="v2-dyn-group">
+                            <div class="v2-dyn-period">30 дней</div>
+                            <div class="v2-grid-3">
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Создано</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.created_count }}</div>
+                                </div>
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Деактивировано</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.deactivated_count }}</div>
+                                </div>
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Чистый прирост</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_30.net_growth_label }}</div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="v2-grid-2 mt-2">
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">Доля просрочки (текущее окно)</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.overdue_share_current|floatformat:1 }}%</div>
+                        <div class="v2-dyn-group">
+                            <div class="v2-dyn-period">90 дней</div>
+                            <div class="v2-grid-3">
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Создано</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.created_count }}</div>
+                                </div>
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Деактивировано</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.deactivated_count }}</div>
+                                </div>
+                                <div class="v2-cell">
+                                    <div class="v2-cell-label">Чистый прирост</div>
+                                    <div class="v2-cell-value">{{ dashboard_v2_dynamics.window_90.net_growth_label }}</div>
+                                </div>
                             </div>
-                            <div class="v2-cell">
-                                <div class="v2-cell-label">Δ доли просрочки к прошлому окну</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_dynamics.overdue_share_delta_pp_label }} п.п.</div>
+                        </div>
+
+                        </div>{# /v2-dyn-panel-body #}
+                    </div>{# /v2-dyn-panel #}
+                    </div>{# /col-lg-4 #}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-1" id="portfolio-structure">
+        <div class="col-12">
+            <section class="v2-card">
+                <h5 class="v2-title">Структура портфеля</h5>
+                <p class="v2-subtitle">Ключевые сегменты по филиалам, страховщикам и видам страхования (только активные полисы).</p>
+
+                {# ── Подраздел: Страховая сумма ── #}
+                <div class="v2-sub-section v2-sub-section--light">
+                    <div class="v2-sub-header">
+                        <div><span class="v2-sub-label v2-sub-label-sum">Страховая сумма</span></div>
+                        <p class="v2-sub-desc">Данные аггрегируются и суммирутся по СТРАХОВОЙ СУММЕ, на основании этого считается лидерборд.</p>
+                    </div>
+                    <div class="v2-grid-3 mb-3">
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер среди филиалов по СС</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_branch %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_branch.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_branch.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_branch.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_branch.name }} · {{ dashboard_v2_structure.top_branch.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер среди страховщиков по СС</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_insurer %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_insurer.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_insurer.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_insurer.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_insurer.name }} · {{ dashboard_v2_structure.top_insurer.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер по видам страхования - СС</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_type %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_type.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_type.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_type.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_type.name }} · {{ dashboard_v2_structure.top_type.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Филиалы</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.branch_breakdown.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.branch_breakdown.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Страховщики</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.insurer_breakdown.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.insurer_breakdown.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Виды страхования</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.type_breakdown.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.type_breakdown.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# ── Подраздел: Страховая премия ── #}
+                <div class="v2-sub-section v2-sub-section--dark">
+                    <div class="v2-sub-header">
+                        <div><span class="v2-sub-label v2-sub-label-premium">Страховая премия</span></div>
+                        <p class="v2-sub-desc">Данные аггрегируются и суммирутся по СТРАХОВОЙ ПРЕМИИ, на основании этого считается лидерборд.</p>
+                    </div>
+                    <div class="v2-grid-3 mb-3">
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер среди филиалов по СП</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_branch_premium %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_branch_premium.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_branch_premium.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_branch_premium.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_branch_premium.name }} · {{ dashboard_v2_structure.top_branch_premium.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер среди страховщиков по СП</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_insurer_premium %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_insurer_premium.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_insurer_premium.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_insurer_premium.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_insurer_premium.name }} · {{ dashboard_v2_structure.top_insurer_premium.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="v2-cell">
+                            <div class="v2-cell-label">Лидер по видам страхования - СП</div>
+                            <div class="v2-cell-value">
+                                {% if dashboard_v2_structure.top_type_premium %}
+                                <span class="v2-entity">
+                                    {% if dashboard_v2_structure.top_type_premium.logo_url %}
+                                    <img src="{{ dashboard_v2_structure.top_type_premium.logo_url }}" alt="" class="v2-entity-logo">
+                                    {% else %}
+                                    <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_type_premium.name|slice:":1" }}</span>
+                                    {% endif %}
+                                    <span>{{ dashboard_v2_structure.top_type_premium.name }} · {{ dashboard_v2_structure.top_type_premium.share|floatformat:1 }}%</span>
+                                </span>
+                                {% else %}
+                                Нет данных
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Филиалы</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.branch_breakdown_premium.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.branch_breakdown_premium.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Страховщики</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.insurer_breakdown_premium.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.insurer_breakdown_premium.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="small fw-semibold text-muted mb-2">Виды страхования</div>
+                            <div class="v2-pie-layout">
+                                <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.type_breakdown_premium.pie_css }};"></div>
+                                <div class="v2-pie-legend">
+                                {% for row in dashboard_v2_structure.type_breakdown_premium.chart %}
+                                <div class="v2-pie-legend-row">
+                                    <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
+                                    <span class="v2-entity small">
+                                        {% if row.logo_url and not row.is_other %}<img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
+                                        {% elif not row.is_other %}<span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
+                                        {% endif %}
+                                        <span>{{ row.name }}</span>
+                                    </span>
+                                    <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
+                                </div>
+                                {% empty %}<div class="small text-muted">Нет данных</div>
+                                {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -612,47 +1117,46 @@
         <div class="col-lg-6">
             <section class="v2-card">
                 <div class="v2-kicker">Блок 2</div>
-                <h5 class="v2-title">Мост факт + план</h5>
-                <p class="v2-subtitle">Все платежи календарного {{ dashboard_v2_bridge.calendar_year }} года ({{ dashboard_v2_bridge.year_start|date:"d.m.Y" }}–{{ dashboard_v2_bridge.year_end|date:"d.m.Y" }}): факт — прошедшие месяцы, план — текущий и будущие месяцы.</p>
-                <div class="v2-soft-note mb-2">
-                    Факт: {{ dashboard_v2_bridge.actual_period_label }} · План: {{ dashboard_v2_bridge.planned_period_label }}.
+                <h5 class="v2-title">Мост факт + план · {{ dashboard_v2_bridge.calendar_year }}</h5>
+                <p class="v2-subtitle">Совокупный объём платежей за год: прошедшие месяцы (факт) и предстоящие (план).</p>
+
+                <div class="v2-bridge-period">
+                    <span>
+                        <span class="v2-bridge-period-dot" style="background:#1d4ed8;"></span>
+                        Факт — {{ dashboard_v2_bridge.actual_period_label }}
+                    </span>
+                    <span>
+                        <span class="v2-bridge-period-dot" style="background:#bfdbfe;"></span>
+                        План — {{ dashboard_v2_bridge.planned_period_label }}
+                    </span>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-sm v2-table-sm mb-2">
-                        <thead>
-                            <tr>
-                                <th>Метрика</th>
-                                <th class="text-end">Факт</th>
-                                <th class="text-end">План</th>
-                                <th class="text-end">Мост</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Страховая сумма</td>
-                                <td class="text-end">{{ dashboard_v2_bridge.actual.insurance_sum|rub }} ₽</td>
-                                <td class="text-end">{{ dashboard_v2_bridge.planned.insurance_sum|rub }} ₽</td>
-                                <td class="text-end fw-semibold">{{ dashboard_v2_bridge.bridge.insurance_sum|rub }} ₽</td>
-                            </tr>
-                            <tr>
-                                <td>Премия</td>
-                                <td class="text-end">{{ dashboard_v2_bridge.actual.premium|rub }} ₽</td>
-                                <td class="text-end">{{ dashboard_v2_bridge.planned.premium|rub }} ₽</td>
-                                <td class="text-end fw-semibold">{{ dashboard_v2_bridge.bridge.premium|rub }} ₽</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="v2-grid-2">
-                    <div class="v2-cell">
-                        <div class="v2-cell-label">Доля факта в премии</div>
-                        <div class="v2-cell-value">{{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</div>
+                <div class="v2-bridge-metric">
+                    <div class="v2-bridge-metric-header">
+                        <span class="v2-bridge-metric-name">Страховая сумма</span>
+                        <span class="v2-bridge-metric-total">{{ dashboard_v2_bridge.bridge.insurance_sum|rub }} ₽</span>
                     </div>
-                    <div class="v2-cell">
-                        <div class="v2-cell-label">Доля плана в премии</div>
-                        <div class="v2-cell-value">{{ dashboard_v2_bridge.premium_plan_share|floatformat:1 }}%</div>
+                    {% widthratio dashboard_v2_bridge.actual.insurance_sum dashboard_v2_bridge.bridge.insurance_sum 100 as sum_fact_pct %}
+                    <div class="v2-bridge-bar">
+                        <div class="v2-bridge-bar-fact" style="width: {{ sum_fact_pct }}%;"></div>
+                    </div>
+                    <div class="v2-bridge-labels">
+                        <span class="v2-bridge-label-fact">Факт {{ dashboard_v2_bridge.actual.insurance_sum|rub }} ₽ · {{ sum_fact_pct }}%</span>
+                        <span class="v2-bridge-label-plan">План {{ dashboard_v2_bridge.planned.insurance_sum|rub }} ₽</span>
+                    </div>
+                </div>
+
+                <div class="v2-bridge-metric">
+                    <div class="v2-bridge-metric-header">
+                        <span class="v2-bridge-metric-name">Страховая премия</span>
+                        <span class="v2-bridge-metric-total">{{ dashboard_v2_bridge.bridge.premium|rub }} ₽</span>
+                    </div>
+                    <div class="v2-bridge-bar">
+                        <div class="v2-bridge-bar-fact" style="width: {{ dashboard_v2_bridge.premium_actual_share }}%;"></div>
+                    </div>
+                    <div class="v2-bridge-labels">
+                        <span class="v2-bridge-label-fact">Факт {{ dashboard_v2_bridge.actual.premium|rub }} ₽ · {{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</span>
+                        <span class="v2-bridge-label-plan">План {{ dashboard_v2_bridge.planned.premium|rub }} ₽</span>
                     </div>
                 </div>
             </section>
@@ -661,10 +1165,34 @@
 
     <div class="row g-3 mb-1">
         <div class="col-lg-6">
-            <section class="v2-card">
+            <section class="v2-card v2-card--tinted">
                 <div class="v2-kicker">Блок 3</div>
-                <h5 class="v2-title">Контур платежей</h5>
-                <p class="v2-subtitle">Срез по статусам оплат и динамика к предыдущему 30-дневному окну.</p>
+                <h5 class="v2-title d-flex align-items-center gap-2">
+                    Ликвидность платежей
+                    <button type="button"
+                        class="btn btn-link p-0 text-muted v2-info-btn"
+                        data-bs-toggle="popover"
+                        data-bs-placement="left"
+                        data-bs-trigger="click"
+                        data-bs-html="true"
+                        data-bs-title="Как считается блок 3"
+                        data-bs-content="
+                            <p class='mb-2'>Три карточки показывают картину денежного потока вокруг текущего момента — что пришло, что придёт и что было потеряно.</p>
+                            <ul class='mb-2 ps-3'>
+                                <li><strong>Получено (30 дн.)</strong> — платежи, у которых <em>paid_date</em> попал в последние 30 дней</li>
+                                <li><strong>К получению (30 дн.)</strong> — платежи с <em>due_date</em> в ближайшие 30 дней, ещё не оплаченные</li>
+                                <li><strong>Пропущено (30 дн.)</strong> — платежи с <em>due_date</em> в последние 30 дней, которые так и не были оплачены</li>
+                            </ul>
+                            <p class='mb-1 fw-semibold'>Процент в бейдже</p>
+                            <p class='mb-2'>Доля суммы премий каждой карточки от суммарной премии всех трёх — показывает пропорцию денежного потока.</p>
+                            <p class='mb-1 fw-semibold'>Дельты Δ</p>
+                            <p class='mb-0'>Сравнение с аналогичным окном предыдущих 30 дней. Плюс — поток растёт, минус — снижается.</p>
+                        "
+                        aria-label="Подробнее о методологии">
+                        <i class="bi bi-info-circle" style="font-size:1rem;"></i>
+                    </button>
+                </h5>
+                <p class="v2-subtitle">Денежный поток по платежам: получено, ожидается и пропущено в 30-дневном окне.</p>
 
                 <div class="v2-grid-3 mb-2">
                     {% for row in dashboard_v2_payment_contour.statuses %}
@@ -681,15 +1209,15 @@
 
                 <div class="v2-grid-3">
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ оплачено (30д)</div>
+                        <div class="v2-cell-label">Δ получено (30д)</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_paid_count|default:0 }}</div>
                     </div>
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ ожидает (30д)</div>
+                        <div class="v2-cell-label">Δ к получению (30д)</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_pending_count|default:0 }}</div>
                     </div>
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ просрочено (30д)</div>
+                        <div class="v2-cell-label">Δ пропущено (30д)</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_overdue_count|default:0 }}</div>
                     </div>
                 </div>
@@ -697,7 +1225,7 @@
         </div>
 
         <div class="col-lg-6">
-            <section class="v2-card">
+            <section class="v2-card v2-card--tinted">
                 <div class="v2-kicker">Блок 4</div>
                 <h5 class="v2-title">Концентрационные риски</h5>
                 <p class="v2-subtitle">Оценка зависимости от ограниченного числа страховщиков и филиалов.</p>
@@ -735,7 +1263,33 @@
         <div class="col-lg-6">
             <section class="v2-card">
                 <div class="v2-kicker">Блок 5</div>
-                <h5 class="v2-title">Renewal radar</h5>
+                <h5 class="v2-title d-flex align-items-center gap-2">
+                    Renewal radar
+                    <button type="button"
+                        class="btn btn-link p-0 text-muted v2-info-btn"
+                        data-bs-toggle="popover"
+                        data-bs-placement="left"
+                        data-bs-trigger="click"
+                        data-bs-html="true"
+                        data-bs-title="Как считается блок 5"
+                        data-bs-content="
+                            <p class='mb-2'>Показывает, сколько активных полисов заканчивается в ближайшие 30, 60 и 90 дней — инструмент планирования работы по продлению.</p>
+                            <p class='mb-1 fw-semibold'>Для каждого горизонта:</p>
+                            <ul class='mb-2 ps-3'>
+                                <li><strong>Кол-во</strong> — активные полисы с <em>end_date</em> от сегодня до сегодня + N дней</li>
+                                <li><strong>Доля</strong> — от всех активных полисов в портфеле</li>
+                                <li><strong>Δ</strong> — сравнение с тем же горизонтом 30 дней назад: плюс означает рост нагрузки, минус — снижение</li>
+                            </ul>
+                            <p class='mb-1 fw-semibold'>Важно:</p>
+                            <ul class='mb-2 ps-3'>
+                                <li>Горизонты <strong>кумулятивные</strong>: 60 дней включает всё что войдёт в 30, 90 включает 60</li>
+                                <li>Если горизонт 30 дней ≥ 10% портфеля — снапшот генерирует предупреждение</li>
+                            </ul>
+                        "
+                        aria-label="Подробнее о методологии">
+                        <i class="bi bi-info-circle" style="font-size:1rem;"></i>
+                    </button>
+                </h5>
                 <p class="v2-subtitle">Горизонты истечения активных полисов (30/60/90 дней).</p>
 
                 <div class="v2-grid-3 mb-2">
@@ -754,7 +1308,30 @@
         <div class="col-lg-6">
             <section class="v2-card">
                 <div class="v2-kicker">Блок 6</div>
-                <h5 class="v2-title">Качество данных портфеля</h5>
+                <h5 class="v2-title d-flex align-items-center gap-2">
+                    Качество данных портфеля
+                    <button type="button"
+                        class="btn btn-link p-0 text-muted v2-info-btn"
+                        data-bs-toggle="popover"
+                        data-bs-placement="left"
+                        data-bs-trigger="click"
+                        data-bs-html="true"
+                        data-bs-title="Как считается блок 6"
+                        data-bs-content="
+                            <p class='mb-2'>Единый балл <strong>Data Quality Score</strong> (0–100) — штрафная формула:</p>
+                            <p class='mb-2'><code>Score = 100 − (доля_незагруженных × 40%) − (доля_без_комиссии × 40%) − (доля_конфликтов × 20%)</code></p>
+                            <p class='mb-1 fw-semibold'>Три источника штрафов:</p>
+                            <ul class='mb-2 ps-3'>
+                                <li><strong>Активные полисы без файла</strong> — полисы с флагом <em>не загружен</em>, доля от всех активных (вес 40%)</li>
+                                <li><strong>Платежи без ставки комиссии</strong> — платежи без <em>commission_rate</em>, доля от всех активных платежей (вес 40%)</li>
+                                <li><strong>Конфликты статусов</strong> — активный полис с датой расторжения или неактивный без неё, доля от всех полисов (вес 20%)</li>
+                            </ul>
+                            <p class='mb-0 text-muted small'>Балл ниже 85 генерирует предупреждение в Оперативном снапшоте.</p>
+                        "
+                        aria-label="Подробнее о методологии">
+                        <i class="bi bi-info-circle" style="font-size:1rem;"></i>
+                    </button>
+                </h5>
                 <p class="v2-subtitle">Технические потери качества данных, влияющие на управляемость портфеля.</p>
 
                 <div class="d-flex align-items-center gap-2 mb-2">
@@ -786,237 +1363,6 @@
                 <div class="v2-soft-note">
                     Конфликты статусов: активные с датой расторжения — {{ dashboard_v2_data_quality.active_with_termination_count }},
                     неактивные без даты расторжения — {{ dashboard_v2_data_quality.inactive_without_termination_count }}.
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-1" id="portfolio-structure">
-        <div class="col-12">
-            <section class="v2-card">
-                <div class="v2-kicker">Блок 7</div>
-                <h5 class="v2-title">Структура портфеля (топ-5 долей)</h5>
-                <p class="v2-subtitle">Ключевые сегменты по филиалам, страховщикам и видам страхования с визуализацией долей по страховой сумме (только активные полисы).</p>
-
-                <div class="v2-grid-3 mb-3">
-                    <div class="v2-cell">
-                        <div class="v2-cell-label">Лидер по филиалам</div>
-                        <div class="v2-cell-value">
-                            {% if dashboard_v2_structure.top_branch %}
-                            <span class="v2-entity">
-                                {% if dashboard_v2_structure.top_branch.logo_url %}
-                                <img src="{{ dashboard_v2_structure.top_branch.logo_url }}" alt="" class="v2-entity-logo">
-                                {% else %}
-                                <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_branch.name|slice:":1" }}</span>
-                                {% endif %}
-                                <span>{{ dashboard_v2_structure.top_branch.name }} · {{ dashboard_v2_structure.top_branch.share|floatformat:1 }}%</span>
-                            </span>
-                            {% else %}
-                            Нет данных
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="v2-cell">
-                        <div class="v2-cell-label">Лидер по страховщикам</div>
-                        <div class="v2-cell-value">
-                            {% if dashboard_v2_structure.top_insurer %}
-                            <span class="v2-entity">
-                                {% if dashboard_v2_structure.top_insurer.logo_url %}
-                                <img src="{{ dashboard_v2_structure.top_insurer.logo_url }}" alt="" class="v2-entity-logo">
-                                {% else %}
-                                <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_insurer.name|slice:":1" }}</span>
-                                {% endif %}
-                                <span>{{ dashboard_v2_structure.top_insurer.name }} · {{ dashboard_v2_structure.top_insurer.share|floatformat:1 }}%</span>
-                            </span>
-                            {% else %}
-                            Нет данных
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="v2-cell">
-                        <div class="v2-cell-label">Лидер по видам страхования</div>
-                        <div class="v2-cell-value">
-                            {% if dashboard_v2_structure.top_type %}
-                            <span class="v2-entity">
-                                {% if dashboard_v2_structure.top_type.logo_url %}
-                                <img src="{{ dashboard_v2_structure.top_type.logo_url }}" alt="" class="v2-entity-logo">
-                                {% else %}
-                                <span class="v2-entity-fallback">{{ dashboard_v2_structure.top_type.name|slice:":1" }}</span>
-                                {% endif %}
-                                <span>{{ dashboard_v2_structure.top_type.name }} · {{ dashboard_v2_structure.top_type.share|floatformat:1 }}%</span>
-                            </span>
-                            {% else %}
-                            Нет данных
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row g-3">
-                    <div class="col-xl-4">
-                        <div class="small fw-semibold text-muted mb-2">Филиалы: график долей</div>
-                        <div class="v2-pie-layout mb-2">
-                            <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.branch_breakdown.pie_css }};"></div>
-                            <div class="v2-pie-legend">
-                            {% for row in dashboard_v2_structure.branch_breakdown.chart %}
-                            <div class="v2-pie-legend-row">
-                                <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
-                                <span class="v2-entity small">
-                                    {% if row.logo_url and not row.is_other %}
-                                    <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                    {% elif not row.is_other %}
-                                    <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                    {% endif %}
-                                    <span>{{ row.name }}</span>
-                                </span>
-                                <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
-                            </div>
-                            {% empty %}
-                            <div class="small text-muted">Нет данных</div>
-                            {% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm v2-table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Топ-5 филиалов</th>
-                                        <th class="text-end">Доля</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in dashboard_v2_structure.branch_breakdown.top %}
-                                    <tr>
-                                        <td>
-                                            <span class="v2-entity">
-                                                {% if row.logo_url %}
-                                                <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                                {% else %}
-                                                <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                                {% endif %}
-                                                <span>{{ row.name }}</span>
-                                            </span>
-                                        </td>
-                                        <td class="text-end">{{ row.share|floatformat:1 }}%</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr><td colspan="2" class="text-muted">Нет данных</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-4">
-                        <div class="small fw-semibold text-muted mb-2">Страховщики: график долей</div>
-                        <div class="v2-pie-layout mb-2">
-                            <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.insurer_breakdown.pie_css }};"></div>
-                            <div class="v2-pie-legend">
-                            {% for row in dashboard_v2_structure.insurer_breakdown.chart %}
-                            <div class="v2-pie-legend-row">
-                                <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
-                                <span class="v2-entity small">
-                                    {% if row.logo_url and not row.is_other %}
-                                    <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                    {% elif not row.is_other %}
-                                    <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                    {% endif %}
-                                    <span>{{ row.name }}</span>
-                                </span>
-                                <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
-                            </div>
-                            {% empty %}
-                            <div class="small text-muted">Нет данных</div>
-                            {% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm v2-table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Топ-5 страховщиков</th>
-                                        <th class="text-end">Доля</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in dashboard_v2_structure.insurer_breakdown.top %}
-                                    <tr>
-                                        <td>
-                                            <span class="v2-entity">
-                                                {% if row.logo_url %}
-                                                <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                                {% else %}
-                                                <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                                {% endif %}
-                                                <span>{{ row.name }}</span>
-                                            </span>
-                                        </td>
-                                        <td class="text-end">{{ row.share|floatformat:1 }}%</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr><td colspan="2" class="text-muted">Нет данных</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-4">
-                        <div class="small fw-semibold text-muted mb-2">Виды страхования: график долей</div>
-                        <div class="v2-pie-layout mb-2">
-                            <div class="v2-pie-chart" style="background: {{ dashboard_v2_structure.type_breakdown.pie_css }};"></div>
-                            <div class="v2-pie-legend">
-                            {% for row in dashboard_v2_structure.type_breakdown.chart %}
-                            <div class="v2-pie-legend-row">
-                                <span class="v2-pie-dot" style="background: {{ row.color }};"></span>
-                                <span class="v2-entity small">
-                                    {% if row.logo_url and not row.is_other %}
-                                    <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                    {% elif not row.is_other %}
-                                    <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                    {% endif %}
-                                    <span>{{ row.name }}</span>
-                                </span>
-                                <span class="v2-chart-value">{{ row.share|floatformat:1 }}%</span>
-                            </div>
-                            {% empty %}
-                            <div class="small text-muted">Нет данных</div>
-                            {% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm v2-table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Топ-5 видов страхования</th>
-                                        <th class="text-end">Доля</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in dashboard_v2_structure.type_breakdown.top %}
-                                    <tr>
-                                        <td>
-                                            <span class="v2-entity">
-                                                {% if row.logo_url %}
-                                                <img src="{{ row.logo_url }}" alt="" class="v2-entity-logo">
-                                                {% else %}
-                                                <span class="v2-entity-fallback">{{ row.name|slice:":1" }}</span>
-                                                {% endif %}
-                                                <span>{{ row.name }}</span>
-                                            </span>
-                                        </td>
-                                        <td class="text-end">{{ row.share|floatformat:1 }}%</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr><td colspan="2" class="text-muted">Нет данных</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </section>
         </div>
@@ -1081,4 +1427,20 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+        new bootstrap.Popover(el, { sanitize: false });
+    });
+    // Закрываем popover кликом вне него
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+            if (!el.contains(e.target) && !document.querySelector('.popover')?.contains(e.target)) {
+                bootstrap.Popover.getInstance(el)?.hide();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

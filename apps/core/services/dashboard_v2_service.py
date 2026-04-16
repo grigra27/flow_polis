@@ -14,13 +14,24 @@ from django.utils import timezone
 
 DECIMAL_ZERO = Decimal("0")
 DECIMAL_HUNDRED = Decimal("100")
+# Light section — страховая сумма: оттенки синего
 PIE_PALETTE = [
-    "#2f80ed",
-    "#1f6fca",
-    "#0dcaf0",
-    "#20c997",
-    "#ffc107",
-    "#9eb3cc",
+    "#1e3a8a",  # deep navy
+    "#1d4ed8",  # royal blue
+    "#2563eb",  # bright blue
+    "#60a5fa",  # sky blue
+    "#93c5fd",  # pale blue
+    "#bfdbfe",  # lightest blue — "Прочие"
+]
+
+# Dark section — страховая премия: яркие тона, читаемые на тёмном фоне
+PIE_PALETTE_PREMIUM = [
+    "#fbbf24",  # golden amber
+    "#34d399",  # emerald
+    "#60a5fa",  # sky blue
+    "#f472b6",  # pink
+    "#a78bfa",  # lavender
+    "#64748b",  # muted slate — "Прочие"
 ]
 
 
@@ -370,60 +381,90 @@ class DashboardV2Service:
     def _build_payment_contour(
         self, *, active_payments_qs, today: date
     ) -> Dict[str, Any]:
-        current = self._status_snapshot(active_payments_qs, as_of=today)
+        window_start = today - timedelta(days=29)
+        prev_start = today - timedelta(days=59)
+        prev_end = today - timedelta(days=30)
+        future_end = today + timedelta(days=29)
 
-        current_window_start = today - timedelta(days=29)
-        prev_window_start = today - timedelta(days=59)
-        prev_window_end = today - timedelta(days=30)
+        unpaid_today = Q(paid_date__isnull=True) | Q(paid_date__gt=today)
+        unpaid_prev = Q(paid_date__isnull=True) | Q(paid_date__gt=prev_end)
 
-        current_window_qs = active_payments_qs.filter(
-            due_date__gte=current_window_start, due_date__lte=today
+        # Card 1 — received: paid in the last 30 days
+        received_qs = active_payments_qs.filter(
+            paid_date__gte=window_start, paid_date__lte=today
         )
-        prev_window_qs = active_payments_qs.filter(
-            due_date__gte=prev_window_start, due_date__lte=prev_window_end
+        received_prev_qs = active_payments_qs.filter(
+            paid_date__gte=prev_start, paid_date__lte=prev_end
         )
 
-        current_window = self._status_snapshot(current_window_qs, as_of=today)
-        previous_window = self._status_snapshot(prev_window_qs, as_of=prev_window_end)
+        # Card 2 — upcoming: due in the next 30 days, not yet paid
+        upcoming_qs = active_payments_qs.filter(
+            due_date__gte=today, due_date__lte=future_end
+        ).filter(unpaid_today)
+        upcoming_prev_qs = active_payments_qs.filter(
+            due_date__gte=prev_end, due_date__lte=today - timedelta(days=1)
+        ).filter(unpaid_prev)
+
+        # Card 3 — missed: due in the last 30 days, never paid
+        missed_qs = active_payments_qs.filter(
+            due_date__gte=window_start, due_date__lte=today
+        ).filter(unpaid_today)
+        missed_prev_qs = active_payments_qs.filter(
+            due_date__gte=prev_start, due_date__lte=prev_end
+        ).filter(unpaid_prev)
+
+        received_count = received_qs.count()
+        upcoming_count = upcoming_qs.count()
+        missed_count = missed_qs.count()
+
+        received_amount = _sum_amount(received_qs, "amount")
+        upcoming_amount = _sum_amount(upcoming_qs, "amount")
+        missed_amount = _sum_amount(missed_qs, "amount")
+        total_amount = received_amount + upcoming_amount + missed_amount
+
+        def _share(amt):
+            return _safe_percent(amt, total_amount).quantize(Decimal("0.1"))
+
+        received_prev_count = received_prev_qs.count()
+        upcoming_prev_count = upcoming_prev_qs.count()
+        missed_prev_count = missed_prev_qs.count()
+
+        # kept for _build_insights which checks global overdue
+        global_snapshot = self._status_snapshot(active_payments_qs, as_of=today)
 
         return {
-            "snapshot": current,
-            "window_30": {
-                "current": current_window,
-                "previous": previous_window,
-                "delta_paid_count": current_window.paid_count
-                - previous_window.paid_count,
-                "delta_pending_count": current_window.pending_count
-                - previous_window.pending_count,
-                "delta_overdue_count": current_window.overdue_count
-                - previous_window.overdue_count,
-            },
+            "snapshot": global_snapshot,
             "statuses": [
                 {
-                    "key": "paid",
-                    "label": "Оплачено",
-                    "count": current.paid_count,
-                    "amount": current.paid_amount,
-                    "share": current.paid_share,
+                    "key": "received",
+                    "label": "Получено (30 дн.)",
+                    "count": received_count,
+                    "amount": received_amount,
+                    "share": _share(received_amount),
                     "badge_class": "bg-success",
                 },
                 {
-                    "key": "pending",
-                    "label": "Ожидает оплаты",
-                    "count": current.pending_count,
-                    "amount": current.pending_amount,
-                    "share": current.pending_share,
+                    "key": "upcoming",
+                    "label": "К получению (30 дн.)",
+                    "count": upcoming_count,
+                    "amount": upcoming_amount,
+                    "share": _share(upcoming_amount),
                     "badge_class": "bg-warning text-dark",
                 },
                 {
-                    "key": "overdue",
-                    "label": "Просрочено",
-                    "count": current.overdue_count,
-                    "amount": current.overdue_amount,
-                    "share": current.overdue_share,
+                    "key": "missed",
+                    "label": "Пропущено (30 дн.)",
+                    "count": missed_count,
+                    "amount": missed_amount,
+                    "share": _share(missed_amount),
                     "badge_class": "bg-danger",
                 },
             ],
+            "window_30": {
+                "delta_paid_count": received_count - received_prev_count,
+                "delta_pending_count": upcoming_count - upcoming_prev_count,
+                "delta_overdue_count": missed_count - missed_prev_count,
+            },
         }
 
     def _status_snapshot(self, qs, *, as_of: date) -> _SnapshotStatus:
@@ -732,6 +773,31 @@ class DashboardV2Service:
             value_field="insurance_sum",
         )
 
+        by_branch_premium = self._build_bridge_distribution(
+            actual_qs=actual_qs,
+            planned_qs=planned_qs,
+            label_field="policy__branch__branch_name",
+            id_field="policy__branch_id",
+            logo_field="policy__branch__logo",
+            value_field="amount",
+        )
+        by_insurer_premium = self._build_bridge_distribution(
+            actual_qs=actual_qs,
+            planned_qs=planned_qs,
+            label_field="policy__insurer__insurer_name",
+            id_field="policy__insurer_id",
+            logo_field="policy__insurer__logo",
+            value_field="amount",
+        )
+        by_type_premium = self._build_bridge_distribution(
+            actual_qs=actual_qs,
+            planned_qs=planned_qs,
+            label_field="policy__insurance_type__name",
+            id_field="policy__insurance_type_id",
+            logo_field="policy__insurance_type__icon",
+            value_field="amount",
+        )
+
         return {
             "by_branch": by_branch,
             "by_insurer": by_insurer,
@@ -742,6 +808,20 @@ class DashboardV2Service:
             "branch_breakdown": self._build_segment_breakdown(by_branch),
             "insurer_breakdown": self._build_segment_breakdown(by_insurer),
             "type_breakdown": self._build_segment_breakdown(by_type),
+            "top_branch_premium": by_branch_premium[0] if by_branch_premium else None,
+            "top_insurer_premium": by_insurer_premium[0]
+            if by_insurer_premium
+            else None,
+            "top_type_premium": by_type_premium[0] if by_type_premium else None,
+            "branch_breakdown_premium": self._build_segment_breakdown(
+                by_branch_premium, palette=PIE_PALETTE_PREMIUM
+            ),
+            "insurer_breakdown_premium": self._build_segment_breakdown(
+                by_insurer_premium, palette=PIE_PALETTE_PREMIUM
+            ),
+            "type_breakdown_premium": self._build_segment_breakdown(
+                by_type_premium, palette=PIE_PALETTE_PREMIUM
+            ),
         }
 
     def _build_bridge_distribution(
@@ -839,7 +919,12 @@ class DashboardV2Service:
 
         return rows
 
-    def _build_segment_breakdown(self, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _build_segment_breakdown(
+        self,
+        rows: List[Dict[str, Any]],
+        palette: List[str] | None = None,
+    ) -> Dict[str, Any]:
+        palette = palette or PIE_PALETTE
         top_rows = rows[:5]
         top_share = sum((row["share"] for row in top_rows), DECIMAL_ZERO)
         other_share = max(DECIMAL_ZERO, DECIMAL_HUNDRED - top_share).quantize(
@@ -853,7 +938,7 @@ class DashboardV2Service:
                     "name": row["name"],
                     "share": row["share"],
                     "logo_url": row.get("logo_url"),
-                    "color": PIE_PALETTE[index % len(PIE_PALETTE)],
+                    "color": palette[index % len(palette)],
                     "is_other": False,
                 }
             )
@@ -864,7 +949,7 @@ class DashboardV2Service:
                     "name": "Прочие",
                     "share": other_share,
                     "logo_url": None,
-                    "color": PIE_PALETTE[-1],
+                    "color": palette[-1],
                     "is_other": True,
                 }
             )
@@ -1157,9 +1242,12 @@ class DashboardV2Service:
             .select_related("policy", "policy__client")
             .order_by("due_date", "policy__policy_number")
         )
-        recent_policies_qs = policies_qs.select_related(
-            "client", "insurer", "branch"
-        ).order_by("-created_at")
+        week_ago = today - timedelta(days=7)
+        recent_policies_qs = (
+            policies_qs.filter(created_at__date__gte=week_ago)
+            .select_related("client", "insurer", "branch")
+            .order_by("-created_at")
+        )
         not_uploaded_qs = (
             policies_qs.filter(policy_uploaded=False)
             .select_related("client", "insurer", "branch")
@@ -1213,17 +1301,18 @@ class DashboardV2Service:
                     "key": "recent",
                     "type": "policy",
                     "tone": "primary",
-                    "title": "Недавно добавленные полисы",
+                    "title": "Добавлено за 7 дней",
                     "count": recent_policies_qs.count(),
                     "rows": recent_rows,
-                    "link_url": reverse("policies:list"),
-                    "link_label": "Все полисы",
+                    "link_url": reverse("policies:list")
+                    + f"?created_from={week_ago.isoformat()}",
+                    "link_label": "Все последние полисы",
                 },
                 {
                     "key": "not_uploaded",
                     "type": "policy",
                     "tone": "info",
-                    "title": "Полисы неподгруженные",
+                    "title": "Полис не подгружен",
                     "count": not_uploaded_qs.count(),
                     "rows": not_uploaded_rows,
                     "link_url": reverse("policies:list") + "?policy_uploaded=False",

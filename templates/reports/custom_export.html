@@ -4,314 +4,553 @@
 
 {% block extra_css %}
 <style>
-.sortable-list {
-    min-height: 60px;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 10px;
-    background-color: #f8f9fa;
-}
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
 
-.sortable-item {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
-    cursor: move;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    transition: all 0.2s ease;
-    user-select: none;
-}
+    /* Root wrapper */
+    .exp-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
 
-.sortable-item:hover {
-    border-color: #0d6efd;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    /* Page header */
+    .exp-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .exp-page-kicker {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .exp-page-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+    }
 
-.sortable-item.dragging {
-    opacity: 0.5;
-    transform: rotate(5deg);
-}
+    /* Step card */
+    .exp-step {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .exp-step-head {
+        background: #dce8f8;
+        border-bottom: 1px solid #c4d8f0;
+        padding: 0.6rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .exp-step-num {
+        font-size: 0.66rem;
+        font-weight: 700;
+        background: #1e3a5f;
+        color: #fff;
+        border-radius: 4px;
+        padding: 0.12rem 0.45rem;
+        flex-shrink: 0;
+    }
+    .exp-step-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #17324f;
+        margin: 0;
+    }
+    .exp-step-body {
+        padding: 1rem;
+    }
 
-.sortable-item .drag-handle {
-    color: #6c757d;
-    font-size: 18px;
-    margin-right: 10px;
-}
+    /* Form controls */
+    .exp-step .form-control,
+    .exp-step .form-select {
+        border-color: var(--v2-border);
+        border-radius: 8px;
+        font-size: 0.82rem;
+        color: var(--v2-title);
+    }
+    .exp-step .form-control:focus,
+    .exp-step .form-select:focus {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
+    .exp-step .form-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--v2-muted);
+        margin-bottom: 0.3rem;
+    }
+    .exp-step .form-check-label {
+        font-size: 0.82rem;
+        color: var(--v2-title);
+    }
+    .exp-step .form-check-input:checked {
+        background-color: var(--v2-accent);
+        border-color: var(--v2-accent);
+    }
+    .exp-step h6 {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.65rem;
+    }
 
-.sortable-item .field-label {
-    flex-grow: 1;
-    font-weight: 500;
-}
+    /* Sortable */
+    .sortable-list {
+        min-height: 60px;
+        border: 2px dashed #c4d8f0;
+        border-radius: 8px;
+        padding: 8px;
+        background: #f4f8ff;
+    }
+    .sortable-item {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        padding: 0.55rem 0.75rem;
+        margin-bottom: 6px;
+        cursor: move;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        user-select: none;
+    }
+    .sortable-item:hover {
+        border-color: var(--v2-accent);
+        box-shadow: 0 2px 6px rgba(21,101,192,0.1);
+    }
+    .sortable-item.dragging {
+        opacity: 0.5;
+        transform: rotate(3deg);
+    }
+    .sortable-item .drag-handle {
+        color: var(--v2-muted);
+        font-size: 16px;
+        margin-right: 8px;
+    }
+    .sortable-item .field-label {
+        flex-grow: 1;
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: var(--v2-title);
+    }
+    .sortable-item .remove-field {
+        color: #cf3e4f;
+        cursor: pointer;
+        font-size: 15px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        transition: background 0.15s;
+        line-height: 1;
+    }
+    .sortable-item .remove-field:hover {
+        background: #fee2e2;
+    }
+    .sortable-list.drag-over {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+    }
+    .sortable-list.empty {
+        text-align: center;
+        color: var(--v2-muted);
+        font-style: italic;
+        font-size: 0.8rem;
+        padding: 24px;
+    }
+    .field-counter {
+        background: var(--v2-accent);
+        color: #fff;
+        border-radius: 999px;
+        padding: 1px 7px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        margin-right: 6px;
+    }
 
-.sortable-item .remove-field {
-    color: #dc3545;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 4px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
+    /* Action buttons */
+    .exp-actions {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+    }
+    .btn-exp-primary {
+        background: var(--v2-accent);
+        border: none;
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.55rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 0.15s;
+        cursor: pointer;
+    }
+    .btn-exp-primary:hover { background: #1251a3; color: #fff; }
+    .btn-exp-secondary {
+        background: transparent;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.82rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.55rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: border-color 0.15s, background 0.15s;
+        cursor: pointer;
+    }
+    .btn-exp-secondary:hover { border-color: var(--v2-accent); background: #f0f6ff; color: var(--v2-accent); }
+    .btn-exp-back {
+        background: transparent;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-exp-back:hover { border-color: var(--v2-accent); color: var(--v2-accent); }
 
-.sortable-item .remove-field:hover {
-    background-color: #f8d7da;
-}
+    /* Sidebar */
+    .exp-sidebar {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        overflow: hidden;
+    }
+    .exp-sidebar-head {
+        background: #dce8f8;
+        border-bottom: 1px solid #c4d8f0;
+        padding: 0.6rem 1rem;
+    }
+    .exp-sidebar-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #17324f;
+        margin: 0;
+    }
+    .exp-sidebar-body { padding: 0.75rem; }
+    .exp-tmpl-item {
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.4rem;
+    }
+    .exp-tmpl-name { font-size: 0.8rem; font-weight: 600; color: var(--v2-title); }
+    .exp-tmpl-sub  { font-size: 0.7rem; color: var(--v2-muted); margin-bottom: 0.4rem; }
+    .exp-tmpl-actions { display: flex; gap: 0.4rem; }
+    .btn-tmpl-load {
+        font-size: 0.7rem; font-weight: 600;
+        background: #eff5ff; color: var(--v2-accent);
+        border: 1px solid #c7dbf8; border-radius: 6px;
+        padding: 0.18rem 0.6rem; cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-tmpl-load:hover { background: #dbeafe; }
+    .btn-tmpl-del {
+        font-size: 0.7rem; font-weight: 600;
+        background: #fff0f0; color: #cf3e4f;
+        border: 1px solid #fecdd3; border-radius: 6px;
+        padding: 0.18rem 0.6rem; cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-tmpl-del:hover { background: #fee2e2; }
+    .exp-empty-note {
+        font-size: 0.78rem;
+        color: var(--v2-muted);
+        font-style: italic;
+        text-align: center;
+        padding: 1rem 0;
+    }
 
-.sortable-list.drag-over {
-    border-color: #0d6efd;
-    background-color: #e7f3ff;
-}
+    /* Alert messages */
+    .exp-alert {
+        border-radius: 8px;
+        padding: 0.6rem 0.9rem;
+        font-size: 0.82rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .exp-alert--success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .exp-alert--error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .exp-alert--info    { background: #eff5ff; border: 1px solid #c7dbf8; color: #1251a3; }
 
-.sortable-list.empty {
-    text-align: center;
-    color: #6c757d;
-    font-style: italic;
-    padding: 30px;
-}
-
-.field-counter {
-    background: #0d6efd;
-    color: white;
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-left: 8px;
-}
+    /* Modal overrides */
+    .exp-modal-header {
+        background: #1e3a5f;
+        color: #fff;
+    }
+    .exp-modal-header .btn-close { filter: invert(1) brightness(2); }
+    .exp-modal .form-label { font-size: 0.8rem; font-weight: 600; color: var(--v2-muted); }
+    .exp-modal .form-control {
+        border-color: var(--v2-border); border-radius: 8px;
+        font-size: 0.82rem; color: var(--v2-title);
+    }
+    .exp-modal .form-control:focus {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Кастомный экспорт</h1>
-    <a href="{% url 'reports:index' %}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Назад
-    </a>
-</div>
+<div class="exp-root">
 
-{% if messages %}
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {% endfor %}
-{% endif %}
-
-<div class="row">
-    <!-- Основная форма -->
-    <div class="col-md-9">
-        <form method="post" id="exportForm">
-            {% csrf_token %}
-            <input type="hidden" name="action" id="formAction" value="export">
-
-            <!-- Шаг 1: Выбор источника данных -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">1. Выберите источник данных</h5>
-                </div>
-                <div class="card-body">
-                    {% for choice in form.data_source %}
-                    <div class="form-check">
-                        {{ choice.tag }}
-                        <label class="form-check-label" for="{{ choice.id_for_label }}">
-                            {{ choice.choice_label }}
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Шаг 2: Выбор полей -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">2. Выберите поля для экспорта</h5>
-                </div>
-                <div class="card-body" id="fieldsContainer">
-                    {% for source, field_groups in available_fields.items %}
-                    <div class="fields-group" data-source="{{ source }}" style="display: none;">
-                        <h6>Основные поля</h6>
-                        <div class="row">
-                            {% for field_name, field_label in field_groups.basic %}
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="fields"
-                                           value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
-                                    <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
-                                        {{ field_label }}
-                                    </label>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        {% if field_groups.related %}
-                        <h6 class="mt-3">Связанные поля</h6>
-                        <div class="row">
-                            {% for field_name, field_label in field_groups.related %}
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="fields"
-                                           value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
-                                    <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
-                                        {{ field_label }}
-                                    </label>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Шаг 2.5: Порядок полей -->
-            <div class="card mb-3" id="fieldsOrderCard" style="display: none;">
-                <div class="card-header">
-                    <h5 class="mb-0">2.5. Настройте порядок полей</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-3">Перетащите поля для изменения их порядка в экспорте:</p>
-                    <div id="sortableFields" class="sortable-list">
-                        <!-- Сюда динамически добавляются выбранные поля -->
-                    </div>
-                    <input type="hidden" name="fields_order" id="fieldsOrder" value="">
-                </div>
-            </div>
-
-            <!-- Шаг 3: Фильтры -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">3. Примените фильтры (опционально)</h5>
-                </div>
-                <div class="card-body" id="filtersContainer">
-                    <p class="text-muted">Выберите источник данных для отображения доступных фильтров</p>
-                </div>
-            </div>
-
-            <!-- Кнопки действий -->
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary" onclick="setAction('export')">
-                    <i class="bi bi-download"></i> Экспортировать
-                </button>
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#saveTemplateModal">
-                    <i class="bi bi-bookmark-plus"></i> Сохранить как шаблон
-                </button>
-            </div>
-        </form>
+    <!-- Page header -->
+    <div class="exp-page-header">
+        <div>
+            <div class="exp-page-kicker">Отчётность и аналитика</div>
+            <h1 class="exp-page-title">Кастомный экспорт</h1>
+        </div>
+        <a href="{% url 'reports:index' %}" class="btn-exp-back">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
     </div>
 
-    <!-- Боковая панель с шаблонами -->
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">Сохраненные шаблоны</h6>
-            </div>
-            <div class="card-body">
-                {% if templates %}
-                <div class="list-group">
-                    {% for template in templates %}
-                    <div class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="mb-1">{{ template.name }}</h6>
-                                <small class="text-muted">{{ template.get_data_source_display }}</small>
-                            </div>
+    {% if messages %}
+        {% for message in messages %}
+        <div class="exp-alert exp-alert--{{ message.tags }}">
+            <i class="bi bi-info-circle"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-3">
+
+        <!-- Main form -->
+        <div class="col-md-9">
+            <form method="post" id="exportForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" id="formAction" value="export">
+
+                <!-- Шаг 1 -->
+                <div class="exp-step">
+                    <div class="exp-step-head">
+                        <span class="exp-step-num">1</span>
+                        <h5 class="exp-step-title">Выберите источник данных</h5>
+                    </div>
+                    <div class="exp-step-body">
+                        {% for choice in form.data_source %}
+                        <div class="form-check">
+                            {{ choice.tag }}
+                            <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                {{ choice.choice_label }}
+                            </label>
                         </div>
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary"
-                                    onclick="loadTemplate({{ template.id }})">
-                                Загрузить
-                            </button>
-                            <form method="post" action="{% url 'reports:delete_template' template.id %}"
-                                  style="display: inline;" onsubmit="return confirm('Удалить шаблон?')">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    Удалить
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Шаг 2 -->
+                <div class="exp-step">
+                    <div class="exp-step-head">
+                        <span class="exp-step-num">2</span>
+                        <h5 class="exp-step-title">Выберите поля для экспорта</h5>
+                    </div>
+                    <div class="exp-step-body" id="fieldsContainer">
+                        {% for source, field_groups in available_fields.items %}
+                        <div class="fields-group" data-source="{{ source }}" style="display: none;">
+                            <h6>Основные поля</h6>
+                            <div class="row">
+                                {% for field_name, field_label in field_groups.basic %}
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="fields"
+                                               value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
+                                        <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
+                                            {{ field_label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if field_groups.related %}
+                            <h6 class="mt-3">Связанные поля</h6>
+                            <div class="row">
+                                {% for field_name, field_label in field_groups.related %}
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="fields"
+                                               value="{{ field_name }}" id="field_{{ source }}_{{ field_name }}">
+                                        <label class="form-check-label" for="field_{{ source }}_{{ field_name }}">
+                                            {{ field_label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Шаг 2.5 -->
+                <div class="exp-step" id="fieldsOrderCard" style="display: none;">
+                    <div class="exp-step-head">
+                        <span class="exp-step-num">2.5</span>
+                        <h5 class="exp-step-title">Настройте порядок полей</h5>
+                    </div>
+                    <div class="exp-step-body">
+                        <p style="font-size:0.8rem; color:var(--v2-muted); margin-bottom:0.75rem;">Перетащите поля для изменения их порядка в экспорте:</p>
+                        <div id="sortableFields" class="sortable-list"></div>
+                        <input type="hidden" name="fields_order" id="fieldsOrder" value="">
+                    </div>
+                </div>
+
+                <!-- Шаг 3 -->
+                <div class="exp-step">
+                    <div class="exp-step-head">
+                        <span class="exp-step-num">3</span>
+                        <h5 class="exp-step-title">Примените фильтры (опционально)</h5>
+                    </div>
+                    <div class="exp-step-body" id="filtersContainer">
+                        <p style="font-size:0.8rem; color:var(--v2-muted); margin:0;">Выберите источник данных для отображения доступных фильтров</p>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="exp-actions">
+                    <button type="submit" class="btn-exp-primary" onclick="setAction('export')">
+                        <i class="bi bi-download"></i> Экспортировать
+                    </button>
+                    <button type="button" class="btn-exp-secondary"
+                            data-bs-toggle="modal" data-bs-target="#saveTemplateModal">
+                        <i class="bi bi-bookmark-plus"></i> Сохранить как шаблон
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <div class="exp-sidebar">
+                <div class="exp-sidebar-head">
+                    <div class="exp-sidebar-title">Сохраненные шаблоны</div>
+                </div>
+                <div class="exp-sidebar-body">
+                    {% if templates %}
+                        {% for template in templates %}
+                        <div class="exp-tmpl-item">
+                            <div class="exp-tmpl-name">{{ template.name }}</div>
+                            <div class="exp-tmpl-sub">{{ template.get_data_source_display }}</div>
+                            <div class="exp-tmpl-actions">
+                                <button type="button" class="btn-tmpl-load"
+                                        onclick="loadTemplate({{ template.id }})">
+                                    Загрузить
                                 </button>
-                            </form>
+                                <form method="post" action="{% url 'reports:delete_template' template.id %}"
+                                      style="display:inline;" onsubmit="return confirm('Удалить шаблон?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-tmpl-del">Удалить</button>
+                                </form>
+                            </div>
                         </div>
-                    </div>
-                    {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="exp-empty-note">Нет сохраненных шаблонов</div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <p class="text-muted">Нет сохраненных шаблонов</p>
-                {% endif %}
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Модальное окно для сохранения шаблона -->
-<div class="modal fade" id="saveTemplateModal" tabindex="-1">
+    </div><!-- /row -->
+
+</div><!-- /exp-root -->
+
+<!-- Modal: Сохранить шаблон -->
+<div class="modal fade exp-modal" id="saveTemplateModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header exp-modal-header">
                 <h5 class="modal-title">Сохранить шаблон</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="templateName" class="form-label">Название шаблона</label>
+                    <label for="templateName" class="form-label" style="font-size:0.8rem;font-weight:600;color:var(--v2-muted);">Название шаблона</label>
                     <input type="text" class="form-control" id="templateName"
-                           placeholder="Например: Отчет по активным полисам">
+                           placeholder="Например: Отчет по активным полисам"
+                           style="border-color:var(--v2-border);border-radius:8px;font-size:0.82rem;">
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-success" onclick="saveTemplate()">Сохранить</button>
+                <button type="button" class="btn-exp-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn-exp-primary" onclick="saveTemplate()">
+                    <i class="bi bi-bookmark-check"></i> Сохранить
+                </button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// Данные для фильтров
 const filterData = {{ filter_data|safe }};
-
-// Глобальные переменные для drag & drop
 let draggedElement = null;
-let selectedFields = new Map(); // field_name -> field_label
+let selectedFields = new Map();
 
-// Переключение источника данных
 document.querySelectorAll('input[name="data_source"]').forEach(radio => {
     radio.addEventListener('change', function() {
         const source = this.value;
-
-        // Показываем соответствующие поля
         document.querySelectorAll('.fields-group').forEach(group => {
             group.style.display = group.dataset.source === source ? 'block' : 'none';
         });
-
-        // Сбрасываем выбранные поля и порядок
         document.querySelectorAll('input[name="fields"]').forEach(cb => cb.checked = false);
         selectedFields.clear();
         updateSortableFields();
         hideFieldsOrderCard();
-
-        // Обновляем фильтры
         updateFilters(source);
     });
 });
 
-// Обработка изменения checkbox полей
 document.addEventListener('change', function(e) {
     if (e.target.name === 'fields') {
         const fieldName = e.target.value;
         const fieldLabel = e.target.labels[0].textContent.trim();
-
         if (e.target.checked) {
             selectedFields.set(fieldName, fieldLabel);
         } else {
             selectedFields.delete(fieldName);
         }
-
         updateSortableFields();
-
         if (selectedFields.size > 0) {
             showFieldsOrderCard();
         } else {
@@ -323,36 +562,28 @@ document.addEventListener('change', function(e) {
 function showFieldsOrderCard() {
     document.getElementById('fieldsOrderCard').style.display = 'block';
 }
-
 function hideFieldsOrderCard() {
     document.getElementById('fieldsOrderCard').style.display = 'none';
 }
 
 function updateSortableFields() {
     const container = document.getElementById('sortableFields');
-
     if (selectedFields.size === 0) {
         container.innerHTML = '<div class="empty">Выберите поля для настройки их порядка</div>';
         container.classList.add('empty');
         updateFieldsOrder();
         return;
     }
-
     container.classList.remove('empty');
-
-    // Сохраняем текущий порядок если он есть
     const currentOrder = Array.from(container.children).map(item => item.dataset.field);
     const newFields = Array.from(selectedFields.keys()).filter(field => !currentOrder.includes(field));
     const finalOrder = [...currentOrder.filter(field => selectedFields.has(field)), ...newFields];
-
     container.innerHTML = '';
-
     finalOrder.forEach((fieldName, index) => {
         const fieldLabel = selectedFields.get(fieldName);
         const item = createSortableItem(fieldName, fieldLabel, index + 1);
         container.appendChild(item);
     });
-
     updateFieldsOrder();
 }
 
@@ -361,39 +592,27 @@ function createSortableItem(fieldName, fieldLabel, position) {
     item.className = 'sortable-item';
     item.dataset.field = fieldName;
     item.draggable = true;
-
     item.innerHTML = `
         <span class="drag-handle">⋮⋮</span>
         <span class="field-label">${fieldLabel}</span>
         <span class="field-counter">${position}</span>
         <span class="remove-field" onclick="removeField('${fieldName}')" title="Убрать поле">×</span>
     `;
-
-    // Drag events
     item.addEventListener('dragstart', handleDragStart);
     item.addEventListener('dragend', handleDragEnd);
     item.addEventListener('dragover', handleDragOver);
     item.addEventListener('drop', handleDrop);
     item.addEventListener('dragenter', handleDragEnter);
     item.addEventListener('dragleave', handleDragLeave);
-
     return item;
 }
 
 function removeField(fieldName) {
-    // Снимаем галочку с checkbox
     const checkbox = document.querySelector(`input[name="fields"][value="${fieldName}"]`);
-    if (checkbox) {
-        checkbox.checked = false;
-    }
-
-    // Удаляем из выбранных полей
+    if (checkbox) checkbox.checked = false;
     selectedFields.delete(fieldName);
     updateSortableFields();
-
-    if (selectedFields.size === 0) {
-        hideFieldsOrderCard();
-    }
+    if (selectedFields.size === 0) hideFieldsOrderCard();
 }
 
 function handleDragStart(e) {
@@ -402,61 +621,39 @@ function handleDragStart(e) {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', this.outerHTML);
 }
-
 function handleDragEnd(e) {
     this.classList.remove('dragging');
     draggedElement = null;
-
-    // Обновляем номера позиций
     updatePositionNumbers();
     updateFieldsOrder();
 }
-
 function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
+    if (e.preventDefault) e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     return false;
 }
-
-function handleDragEnter(e) {
-    this.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    this.classList.remove('drag-over');
-}
-
+function handleDragEnter(e) { this.classList.add('drag-over'); }
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
 function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
-    }
-
+    if (e.stopPropagation) e.stopPropagation();
     this.classList.remove('drag-over');
-
     if (draggedElement !== this) {
         const container = this.parentNode;
         const draggedIndex = Array.from(container.children).indexOf(draggedElement);
         const targetIndex = Array.from(container.children).indexOf(this);
-
         if (draggedIndex < targetIndex) {
             container.insertBefore(draggedElement, this.nextSibling);
         } else {
             container.insertBefore(draggedElement, this);
         }
     }
-
     return false;
 }
 
 function updatePositionNumbers() {
-    const items = document.querySelectorAll('.sortable-item');
-    items.forEach((item, index) => {
+    document.querySelectorAll('.sortable-item').forEach((item, index) => {
         const counter = item.querySelector('.field-counter');
-        if (counter) {
-            counter.textContent = index + 1;
-        }
+        if (counter) counter.textContent = index + 1;
     });
 }
 
@@ -465,22 +662,17 @@ function updateFieldsOrder() {
     const order = Array.from(container.children)
         .filter(item => item.dataset.field)
         .map(item => item.dataset.field);
-
     document.getElementById('fieldsOrder').value = JSON.stringify(order);
 }
 
-// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', function() {
     const selectedSource = document.querySelector('input[name="data_source"]:checked');
-    if (selectedSource) {
-        selectedSource.dispatchEvent(new Event('change'));
-    }
+    if (selectedSource) selectedSource.dispatchEvent(new Event('change'));
 });
 
 function updateFilters(source) {
     const container = document.getElementById('filtersContainer');
     let filtersHtml = '';
-
     switch(source) {
         case 'policies':
             filtersHtml = `
@@ -611,7 +803,6 @@ function updateFilters(source) {
                 </div>
             `;
             break;
-
         case 'payments':
             filtersHtml = `
                 <div class="row">
@@ -726,11 +917,9 @@ function updateFilters(source) {
                 </div>
             `;
             break;
-
         default:
-            filtersHtml = '<p class="text-muted">Выберите источник данных для отображения доступных фильтров</p>';
+            filtersHtml = '<p style="font-size:0.8rem;color:var(--v2-muted);margin:0;">Выберите источник данных для отображения доступных фильтров</p>';
     }
-
     container.innerHTML = filtersHtml;
 }
 
@@ -740,16 +929,10 @@ function setAction(action) {
 
 function saveTemplate() {
     const name = document.getElementById('templateName').value;
-    if (!name) {
-        alert('Введите название шаблона');
-        return;
-    }
-
-    // Собираем значения фильтров
+    if (!name) { alert('Введите название шаблона'); return; }
     const filterInputs = document.querySelectorAll('#filtersContainer input, #filtersContainer select');
     filterInputs.forEach(input => {
         if (input.value) {
-            // Создаем скрытое поле для каждого фильтра
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';
             hiddenInput.name = input.name;
@@ -757,16 +940,12 @@ function saveTemplate() {
             document.getElementById('exportForm').appendChild(hiddenInput);
         }
     });
-
-    // Добавляем скрытое поле с названием шаблона
     const form = document.getElementById('exportForm');
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'template_name';
     input.value = name;
     form.appendChild(input);
-
-    // Меняем action и отправляем форму
     document.getElementById('formAction').value = 'save_template';
     form.submit();
 }
@@ -783,15 +962,10 @@ function loadTemplate(templateId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Устанавливаем источник данных
             document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).checked = true;
             document.querySelector(`input[name="data_source"][value="${data.data_source}"]`).dispatchEvent(new Event('change'));
-
-            // Устанавливаем выбранные поля в правильном порядке
             setTimeout(() => {
                 selectedFields.clear();
-
-                // Загружаем поля в том порядке, в котором они сохранены
                 data.fields.forEach(field => {
                     const checkbox = document.querySelector(`input[name="fields"][value="${field}"]`);
                     if (checkbox) {
@@ -800,25 +974,15 @@ function loadTemplate(templateId) {
                         selectedFields.set(field, fieldLabel);
                     }
                 });
-
-                // Обновляем sortable список с сохраненным порядком
                 updateSortableFieldsWithOrder(data.fields);
-
-                if (selectedFields.size > 0) {
-                    showFieldsOrderCard();
-                }
-
-                // Устанавливаем фильтры
+                if (selectedFields.size > 0) showFieldsOrderCard();
                 if (data.filters) {
                     Object.keys(data.filters).forEach(filterName => {
                         const filterInput = document.querySelector(`[name="${filterName}"]`);
-                        if (filterInput) {
-                            filterInput.value = data.filters[filterName];
-                        }
+                        if (filterInput) filterInput.value = data.filters[filterName];
                     });
                 }
             }, 200);
-
             alert('Шаблон загружен');
         } else {
             alert('Ошибка: ' + data.error);
@@ -832,17 +996,14 @@ function loadTemplate(templateId) {
 
 function updateSortableFieldsWithOrder(fieldsOrder) {
     const container = document.getElementById('sortableFields');
-
     if (fieldsOrder.length === 0) {
         container.innerHTML = '<div class="empty">Выберите поля для настройки их порядка</div>';
         container.classList.add('empty');
         updateFieldsOrder();
         return;
     }
-
     container.classList.remove('empty');
     container.innerHTML = '';
-
     fieldsOrder.forEach((fieldName, index) => {
         if (selectedFields.has(fieldName)) {
             const fieldLabel = selectedFields.get(fieldName);
@@ -850,7 +1011,6 @@ function updateSortableFieldsWithOrder(fieldsOrder) {
             container.appendChild(item);
         }
     });
-
     updateFieldsOrder();
 }
 </script>

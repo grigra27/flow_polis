@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Dict, List, Any
 
 from django.conf import settings
-from django.db.models import Q, Sum
+from django.db.models import Max, Q, Sum
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
@@ -68,6 +68,82 @@ def _media_url(path: Any) -> str | None:
     if not media_url.endswith("/"):
         media_url = f"{media_url}/"
     return f"{media_url}{str(path).lstrip('/')}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# New Business Index — source of truth for the calculation methodology.
+#
+# The index measures the momentum of new business (policies whose start_date
+# falls within the calculation window) on a 0–100 scale:
+#   0–35  declining  |  35–45 weak  |  45–55 plateau
+#   55–70 moderate growth  |  70–85 strong  |  85–100 very strong
+#
+# Four metrics are tracked: policy count (P), premium (Pr),
+# insurance sum (S), commission (C).
+#
+# For each metric X over windows of 30 / 60 / 90 days:
+#   daily rate  Xnd = X_n / n                       (normalize by window length)
+#   momentum    M_X = 0.6*(X30d/X60d) + 0.4*(X30d/X90d)
+#               division-by-zero rules:
+#                 • denom=0 and numer>0  → ratio treated as 1.5 (strong growth)
+#                 • denom=0 and numer=0  → ratio treated as 1.0 (plateau)
+#   clipping    M_X_c = clip(M_X, 0.5, 1.5)
+#   score       Score_X = 100 * (M_X_c − 0.5) / 1.0
+#
+# Final index  = 0.35*Score_C + 0.30*Score_Pr + 0.20*Score_P + 0.15*Score_S
+# ──────────────────────────────────────────────────────────────────────────────
+
+_NB_WEIGHTS = {
+    "commission": Decimal("0.35"),
+    "premium": Decimal("0.30"),
+    "count": Decimal("0.20"),
+    "insurance_sum": Decimal("0.15"),
+}
+
+_NB_CLIP_LO = Decimal("0.5")
+_NB_CLIP_HI = Decimal("1.5")
+_NB_CLIP_RANGE = _NB_CLIP_HI - _NB_CLIP_LO  # 1.0
+
+
+def _nb_safe_ratio(numerator: Decimal, denominator: Decimal) -> Decimal:
+    """Return numerator/denominator with defined behaviour on zero denominator."""
+    if denominator > DECIMAL_ZERO:
+        return numerator / denominator
+    # denominator is zero: positive numerator signals growth, zero is plateau
+    return _NB_CLIP_HI if numerator > DECIMAL_ZERO else Decimal("1.0")
+
+
+def _nb_momentum(x30d: Decimal, x60d: Decimal, x90d: Decimal) -> Decimal:
+    """Weighted momentum of daily rates: 60% short-vs-mid, 40% short-vs-long."""
+    r60 = _nb_safe_ratio(x30d, x60d)
+    r90 = _nb_safe_ratio(x30d, x90d)
+    return Decimal("0.6") * r60 + Decimal("0.4") * r90
+
+
+def _nb_score(x30: Decimal, x60: Decimal, x90: Decimal) -> Decimal:
+    """Convert raw window totals to a 0–100 score for one metric."""
+    x30d = x30 / Decimal("30")
+    x60d = x60 / Decimal("60")
+    x90d = x90 / Decimal("90")
+    m = _nb_momentum(x30d, x60d, x90d)
+    m_clipped = min(_NB_CLIP_HI, max(_NB_CLIP_LO, m))
+    return (DECIMAL_HUNDRED * (m_clipped - _NB_CLIP_LO) / _NB_CLIP_RANGE).quantize(
+        Decimal("0.1")
+    )
+
+
+def _nb_interpretation(score: Decimal) -> str:
+    if score < Decimal("35"):
+        return "Снижение"
+    if score < Decimal("45"):
+        return "Слабая динамика"
+    if score < Decimal("55"):
+        return "Плато"
+    if score < Decimal("70"):
+        return "Умеренный рост"
+    if score < Decimal("85"):
+        return "Сильный рост"
+    return "Очень сильный рост"
 
 
 @dataclass(frozen=True)
@@ -172,6 +248,11 @@ class DashboardV2Service:
             today=today,
         )
 
+        nb_index = self._build_new_business_index(
+            policies_qs=policies_qs,
+            today=today,
+        )
+
         return {
             "dashboard_v2_meta": {
                 "generated_at": timezone.now(),
@@ -190,6 +271,7 @@ class DashboardV2Service:
             "dashboard_v2_dynamics": dynamics,
             "dashboard_v2_insights": insights,
             "dashboard_v2_legacy_relay": legacy_relay,
+            "dashboard_v2_nb_index": nb_index,
         }
 
     def _build_health_index(
@@ -1354,6 +1436,153 @@ class DashboardV2Service:
                     "link_label": "Все не подгруженные полисы",
                 },
             ]
+        }
+
+    def _build_new_business_index(
+        self,
+        *,
+        policies_qs,
+        today: date,
+    ) -> Dict[str, Any]:
+        """
+        Compute the New Business Development Index for Dashboard v2 Block 1.
+
+        "New business" = policies whose start_date falls within the window.
+        Windows are rolling: today-30d, today-60d, today-90d.
+
+        Returns a dict with score (0–100), component breakdown, raw window
+        values, and a has_data flag (False when the 90-day window is empty).
+        """
+        from apps.policies.models import Policy, PaymentSchedule
+
+        w30_start = today - timedelta(days=30)
+        w60_start = today - timedelta(days=60)
+        w90_start = today - timedelta(days=90)
+
+        def _window_policies(start: date):
+            return policies_qs.filter(start_date__gte=start, start_date__lte=today)
+
+        p30_qs = _window_policies(w30_start)
+        p60_qs = _window_policies(w60_start)
+        p90_qs = _window_policies(w90_start)
+
+        # Policy count
+        cnt30 = _to_decimal(p30_qs.count())
+        cnt60 = _to_decimal(p60_qs.count())
+        cnt90 = _to_decimal(p90_qs.count())
+
+        # Premium — sum policy.premium_total to avoid double-counting payments
+        def _sum_premium(qs) -> Decimal:
+            return _to_decimal(
+                qs.aggregate(t=Coalesce(Sum("premium_total"), DECIMAL_ZERO))["t"]
+            )
+
+        pr30 = _sum_premium(p30_qs)
+        pr60 = _sum_premium(p60_qs)
+        pr90 = _sum_premium(p90_qs)
+
+        # Insurance sum — one value per policy (max across its payments)
+        def _sum_ins(qs) -> Decimal:
+            total = (
+                PaymentSchedule.objects.filter(policy__in=qs)
+                .values("policy_id")
+                .annotate(policy_max=Max("insurance_sum"))
+                .aggregate(t=Coalesce(Sum("policy_max"), DECIMAL_ZERO))["t"]
+            )
+            return _to_decimal(total)
+
+        s30 = _sum_ins(p30_qs)
+        s60 = _sum_ins(p60_qs)
+        s90 = _sum_ins(p90_qs)
+
+        # Commission — total kv_rub across all payments of new policies
+        def _sum_kv(qs) -> Decimal:
+            return _to_decimal(
+                PaymentSchedule.objects.filter(policy__in=qs).aggregate(
+                    t=Coalesce(Sum("kv_rub"), DECIMAL_ZERO)
+                )["t"]
+            )
+
+        c30 = _sum_kv(p30_qs)
+        c60 = _sum_kv(p60_qs)
+        c90 = _sum_kv(p90_qs)
+
+        # If the 90-day window has no data at all, the index is not meaningful
+        has_data = cnt90 > DECIMAL_ZERO
+
+        if not has_data:
+            return {
+                "has_data": False,
+                "score": None,
+                "interpretation": "Недостаточно данных",
+                "components": [],
+                "windows": {"30": {}, "60": {}, "90": {}},
+            }
+
+        score_c = _nb_score(c30, c60, c90)
+        score_pr = _nb_score(pr30, pr60, pr90)
+        score_p = _nb_score(cnt30, cnt60, cnt90)
+        score_s = _nb_score(s30, s60, s90)
+
+        index = (
+            _NB_WEIGHTS["commission"] * score_c
+            + _NB_WEIGHTS["premium"] * score_pr
+            + _NB_WEIGHTS["count"] * score_p
+            + _NB_WEIGHTS["insurance_sum"] * score_s
+        ).quantize(Decimal("0.1"))
+
+        components = [
+            {
+                "key": "commission",
+                "label": "Комиссия",
+                "weight": 35,
+                "score": score_c,
+            },
+            {
+                "key": "premium",
+                "label": "Страховая премия",
+                "weight": 30,
+                "score": score_pr,
+            },
+            {
+                "key": "count",
+                "label": "Количество полисов",
+                "weight": 20,
+                "score": score_p,
+            },
+            {
+                "key": "insurance_sum",
+                "label": "Страховая сумма",
+                "weight": 15,
+                "score": score_s,
+            },
+        ]
+
+        return {
+            "has_data": True,
+            "score": index,
+            "interpretation": _nb_interpretation(index),
+            "components": components,
+            "windows": {
+                "30": {
+                    "count": int(cnt30),
+                    "premium": pr30,
+                    "ins_sum": s30,
+                    "commission": c30,
+                },
+                "60": {
+                    "count": int(cnt60),
+                    "premium": pr60,
+                    "ins_sum": s60,
+                    "commission": c60,
+                },
+                "90": {
+                    "count": int(cnt90),
+                    "premium": pr90,
+                    "ins_sum": s90,
+                    "commission": c90,
+                },
+            },
         }
 
     def _serialize_payment_relay_row(

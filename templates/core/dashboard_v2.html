@@ -1175,33 +1175,64 @@
         <div class="col-lg-6">
             <section class="v2-card">
                 <div class="v2-kicker">Блок 1</div>
-                <h5 class="v2-title">Индекс здоровья портфеля</h5>
-                <p class="v2-subtitle">Интегральный показатель качества портфеля и платежной дисциплины.</p>
+                <h5 class="v2-title d-flex align-items-center gap-2">
+                    Индекс нового бизнеса
+                    <button type="button"
+                        class="btn btn-link p-0 text-muted v2-info-btn"
+                        data-bs-toggle="popover"
+                        data-bs-placement="left"
+                        data-bs-trigger="click"
+                        data-bs-html="true"
+                        data-bs-title="Как считается индекс нового бизнеса"
+                        data-bs-content="
+                            <p class='mb-2'><strong>Что измеряет:</strong> динамику развития нового бизнеса — растёт, плато или снижается. Шкала 0–100.</p>
+                            <p class='mb-1 fw-semibold'>Что считается новым бизнесом</p>
+                            <p class='mb-2'>Полисы, у которых <em>дата начала страхования</em> попадает в скользящее окно расчёта (последние 30 / 60 / 90 дней).</p>
+                            <p class='mb-1 fw-semibold'>Шаг 1 — среднедневные значения</p>
+                            <p class='mb-2'>Для каждой метрики X и окна n: X_nd = X_n / n. Нужно, чтобы окна разной длины можно было сравнивать.</p>
+                            <p class='mb-1 fw-semibold'>Шаг 2 — моментум</p>
+                            <p class='mb-2'>M_X = 0.6 × (X30d / X60d) + 0.4 × (X30d / X90d). M > 1 = рост, M ≈ 1 = плато, M &lt; 1 = снижение.</p>
+                            <p class='mb-1 fw-semibold'>Шаг 3 — ограничение выбросов</p>
+                            <p class='mb-2'>M обрезается до диапазона [0.5, 1.5], чтобы разовый всплеск не искажал картину.</p>
+                            <p class='mb-1 fw-semibold'>Шаг 4 — перевод в 0–100</p>
+                            <p class='mb-2'>Score_X = 100 × (M_clipped − 0.5) / 1.0</p>
+                            <p class='mb-1 fw-semibold'>Шаг 5 — итоговый индекс</p>
+                            <p class='mb-2'>Index = 0.35 × Score_комиссия + 0.30 × Score_премия + 0.20 × Score_полисы + 0.15 × Score_сумма</p>
+                            <p class='mb-1 fw-semibold'>Интерпретация шкалы</p>
+                            <p class='mb-0'>0–35 снижение · 35–45 слабая · 45–55 плато · 55–70 умеренный рост · 70–85 сильный · 85–100 очень сильный</p>
+                        "
+                        aria-label="Подробнее о методологии">
+                        <i class="bi bi-info-circle" style="font-size:1rem;"></i>
+                    </button>
+                </h5>
+                <p class="v2-subtitle">Momentum нового бизнеса: 30-дневное окно против 60- и 90-дневных.</p>
 
+                {% if dashboard_v2_nb_index.has_data %}
                 <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-                    <div class="v2-main-value">{{ dashboard_v2_health.score|floatformat:1 }}</div>
-                    {% if dashboard_v2_health.delta_direction == "up" %}
-                    <div class="v2-delta-up">{{ dashboard_v2_health.delta_label }}</div>
-                    {% elif dashboard_v2_health.delta_direction == "down" %}
-                    <div class="v2-delta-down">{{ dashboard_v2_health.delta_label }}</div>
-                    {% else %}
-                    <div class="v2-delta-flat">{{ dashboard_v2_health.delta_label }}</div>
-                    {% endif %}
-                    <span class="badge bg-light text-dark border">{{ dashboard_v2_health.interpretation }}</span>
+                    <div class="v2-main-value">{{ dashboard_v2_nb_index.score|floatformat:1 }}</div>
+                    <span class="badge bg-light text-dark border">{{ dashboard_v2_nb_index.interpretation }}</span>
                 </div>
-                <div class="v2-soft-note mb-2">Предыдущий срез: {{ dashboard_v2_health.previous_score|floatformat:1 }} (30 дней назад).</div>
 
                 <div class="v2-grid-2">
-                    {% for component in dashboard_v2_health.components %}
+                    {% for component in dashboard_v2_nb_index.components %}
                     <div class="v2-cell">
-                        <div class="v2-cell-label">{{ component.label }} · вес {{ component.weight }}%</div>
-                        <div class="v2-cell-value">{{ component.value|floatformat:1 }}%</div>
+                        <div class="v2-cell-label">{{ component.label }} · {{ component.weight }}%</div>
+                        <div class="v2-cell-value">{{ component.score|floatformat:1 }}</div>
                         <div class="v2-track">
-                            <div class="v2-fill" style="width: {{ component.value }}%;"></div>
+                            <div class="v2-fill" style="width: {{ component.score }}%;"></div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
+
+                <div class="v2-soft-note mt-2">
+                    Новых полисов: 30 дн. — {{ dashboard_v2_nb_index.windows.30.count }},
+                    60 дн. — {{ dashboard_v2_nb_index.windows.60.count }},
+                    90 дн. — {{ dashboard_v2_nb_index.windows.90.count }}.
+                </div>
+                {% else %}
+                <div class="v2-soft-note mt-3">Недостаточно данных для расчёта индекса — нет новых полисов за последние 90 дней.</div>
+                {% endif %}
             </section>
         </div>
 

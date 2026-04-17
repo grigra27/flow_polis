@@ -257,96 +257,103 @@
         border-color: #cfe9d8;
     }
 
-    /* Goal progress bar — блок 2 */
-    .v2-goal {
-        background: #f4f8ff;
-        border: 1px solid #d0e2f5;
-        border-radius: 10px;
-        padding: 0.65rem 0.85rem 0.6rem;
+    /* Bridge metric — блок 2 */
+    .v2-bm {
+        padding: 0.75rem 0;
+        border-top: 1px solid #edf3fb;
     }
-    .v2-goal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-    }
-    .v2-goal-title {
-        font-size: 0.76rem;
-        font-weight: 600;
-        color: var(--v2-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-    .v2-goal-pct {
-        font-size: 1.25rem;
-        font-weight: 800;
-        color: #1d4ed8;
-        line-height: 1;
-    }
-    .v2-goal-pct-label {
-        font-size: 0.68rem;
-        color: var(--v2-muted);
-        text-align: right;
-    }
-    .v2-goal-bar {
-        height: 8px;
-        background: #dbeafe;
-        border-radius: 999px;
-        overflow: hidden;
-        margin-bottom: 0.55rem;
-        display: flex;
-    }
-    .v2-goal-bar-collected {
-        height: 100%;
-        background: linear-gradient(90deg, #1e40af, #3b82f6);
-        border-radius: 999px 0 0 999px;
-        flex-shrink: 0;
-    }
-    .v2-goal-bar-remaining {
-        height: 100%;
-        background: linear-gradient(90deg, #93c5fd, #bfdbfe);
-        flex-shrink: 0;
-    }
-    .v2-goal-stats {
+    .v2-bm:first-child { border-top: none; padding-top: 0; }
+    .v2-bm-head {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        gap: 0.4rem;
-        font-size: 0.78rem;
+        margin-bottom: 0.55rem;
     }
-    .v2-goal-stat {
+    .v2-bm-name {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--v2-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .v2-bm-total {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--v2-title);
+        letter-spacing: -0.01em;
+    }
+    .v2-bm-bar {
+        height: 6px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #e8f0fb;
+        display: flex;
+        margin-bottom: 0.6rem;
+    }
+    .v2-bm-bar-fact {
+        height: 100%;
+        background: #2563eb;
+        border-radius: 999px 0 0 999px;
+        flex-shrink: 0;
+    }
+    .v2-bm-bar-plan {
+        height: 100%;
+        background: #bfdbfe;
+        flex-shrink: 0;
+    }
+    .v2-bm-rows {
         display: flex;
         flex-direction: column;
+        gap: 0.25rem;
     }
-    .v2-goal-stat-value {
-        font-weight: 700;
-        color: var(--v2-title);
-        font-size: 0.82rem;
-    }
-    .v2-goal-stat-value.is-collected { color: #1d4ed8; }
-    .v2-goal-stat-label {
-        font-size: 0.7rem;
-        color: var(--v2-muted);
-        margin-top: 0.05rem;
-    }
-    .v2-goal-stat-sep {
-        color: #cbd5e1;
-        font-size: 0.9rem;
-        align-self: center;
-    }
-    .v2-goal-total {
-        margin-top: 0.45rem;
-        padding-top: 0.45rem;
-        border-top: 1px dashed #d0e2f5;
+    .v2-bm-row {
         display: flex;
-        justify-content: space-between;
-        font-size: 0.73rem;
-        color: var(--v2-muted);
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.8rem;
     }
-    .v2-goal-total-value {
-        font-weight: 700;
+    .v2-bm-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        flex-shrink: 0;
+    }
+    .v2-bm-row-label {
+        color: var(--v2-muted);
+        flex: 1;
+    }
+    .v2-bm-row-amount {
+        font-weight: 600;
         color: var(--v2-title);
     }
+
+    .v2-card--dark {
+        background: #1e3a5f;
+        border-color: #16304f;
+        box-shadow: 0 2px 16px rgba(10, 25, 50, 0.18);
+    }
+    .v2-card--dark .v2-kicker  { color: #7aadda; }
+    .v2-card--dark .v2-title   { color: #e8f3ff; }
+    .v2-card--dark .v2-subtitle { color: #93b8d4; }
+
+    .v2-nb-badge {
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        padding: 0.18rem 0.5rem;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+    .v2-nb-badge--up   { background: #dcfce7; color: #15803d; }
+    .v2-nb-badge--mid  { background: #fef9c3; color: #854d0e; }
+    .v2-nb-badge--down { background: #fee2e2; color: #b91c1c; }
+    .v2-risk-footer { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #1e3a5f; border: 1px solid #16304f; border-radius: 6px; padding: 0.3rem 0.9rem; margin-top: 1rem; }
+    .v2-risk-label { font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.85); }
+    .v2-risk-badge { font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px; }
+    .v2-risk-badge--high { background: #fee2e2; color: #b91c1c; }
+    .v2-risk-badge--mid  { background: #fef9c3; color: #854d0e; }
+    .v2-risk-badge--low  { background: #dcfce7; color: #15803d; }
+    .v2-risk-hhi { font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.75); }
 
     .v2-card--tinted {
         background: #eef4fc;
@@ -411,6 +418,7 @@
     .v2-dyn-panel .v2-cell {
         background: #ffffff;
         border-color: #c2d5eb;
+        text-align: center;
     }
     .v2-dyn-panel .v2-dyn-period {
         color: #2d5282;
@@ -458,6 +466,7 @@
         border: 1px solid #d7e4f5;
         background: #ffffff;
         padding: 0.7rem 0.8rem;
+        text-align: center;
     }
 
     .v2-snapshot-card .v2-count {
@@ -826,15 +835,27 @@
                                 {% if card.amount %}
                                 <div class="small text-muted">{{ card.amount|rub }} ₽</div>
                                 {% endif %}
-                                <div class="v2-note">{{ card.hint }}</div>
+                                {% if card.hint %}<div class="v2-note">{{ card.hint }}</div>{% endif %}
                             </div>
                             {% endfor %}
                         </div>
 
                         <div class="v2-grid-2 mt-2">
                             <div class="v2-cell">
-                                <div class="v2-cell-label">Индекс здоровья портфеля</div>
-                                <div class="v2-cell-value">{{ dashboard_v2_snapshot.health_score|floatformat:1 }}</div>
+                                <div class="v2-cell-label">Индекс нового бизнеса</div>
+                                {% if dashboard_v2_nb_index.has_data %}
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="v2-cell-value">{{ dashboard_v2_nb_index.score|floatformat:1 }}</div>
+                                    <span class="v2-nb-badge
+                                        {% if dashboard_v2_nb_index.score >= 70 %}v2-nb-badge--up
+                                        {% elif dashboard_v2_nb_index.score >= 45 %}v2-nb-badge--mid
+                                        {% else %}v2-nb-badge--down{% endif %}">
+                                        {{ dashboard_v2_nb_index.interpretation }}
+                                    </span>
+                                </div>
+                                {% else %}
+                                <div class="v2-cell-value text-muted">—</div>
+                                {% endif %}
                             </div>
                             <div class="v2-cell">
                                 <div class="v2-cell-label">Data Quality Score</div>
@@ -924,7 +945,7 @@
                     </div>
                     <div class="v2-grid-3 mb-3">
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер среди филиалов по СС</div>
+                            <div class="v2-cell-label fw-bold">Лидер среди филиалов по СС</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_branch %}
                                 <span class="v2-entity">
@@ -941,7 +962,7 @@
                             </div>
                         </div>
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер среди страховщиков по СС</div>
+                            <div class="v2-cell-label fw-bold">Лидер среди страховщиков по СС</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_insurer %}
                                 <span class="v2-entity">
@@ -958,7 +979,7 @@
                             </div>
                         </div>
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер по видам страхования - СС</div>
+                            <div class="v2-cell-label fw-bold">Лидер по видам страхования - СС</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_type %}
                                 <span class="v2-entity">
@@ -1050,7 +1071,7 @@
                     </div>
                     <div class="v2-grid-3 mb-3">
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер среди филиалов по СП</div>
+                            <div class="v2-cell-label fw-bold">Лидер среди филиалов по СП</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_branch_premium %}
                                 <span class="v2-entity">
@@ -1067,7 +1088,7 @@
                             </div>
                         </div>
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер среди страховщиков по СП</div>
+                            <div class="v2-cell-label fw-bold">Лидер среди страховщиков по СП</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_insurer_premium %}
                                 <span class="v2-entity">
@@ -1084,7 +1105,7 @@
                             </div>
                         </div>
                         <div class="v2-cell">
-                            <div class="v2-cell-label">Лидер по видам страхования - СП</div>
+                            <div class="v2-cell-label fw-bold">Лидер по видам страхования - СП</div>
                             <div class="v2-cell-value">
                                 {% if dashboard_v2_structure.top_type_premium %}
                                 <span class="v2-entity">
@@ -1242,64 +1263,50 @@
                 <h5 class="v2-title">Мост факт + план · {{ dashboard_v2_bridge.calendar_year }}</h5>
                 <p class="v2-subtitle">Прогресс сбора премий за {{ dashboard_v2_bridge.calendar_year }} год и структура страхового портфеля.</p>
 
-<div class="v2-bridge-metric">
-                    <div class="v2-goal">
-                        <div class="v2-goal-header">
-                            <span class="v2-goal-title">Страховая сумма</span>
-                            <div class="text-end">
-                                <div class="v2-goal-pct">{{ dashboard_v2_bridge.ins_sum_actual_share|floatformat:1 }}%</div>
-                                <div class="v2-goal-pct-label">выполнено</div>
-                            </div>
+{% widthratio dashboard_v2_bridge.actual.insurance_sum dashboard_v2_bridge.bridge.insurance_sum 100 as ins_fact_pct %}
+                <div class="v2-bm">
+                    <div class="v2-bm-head">
+                        <span class="v2-bm-name">Страховая сумма</span>
+                        <span class="v2-bm-total">{{ dashboard_v2_bridge.bridge.insurance_sum|floatformat:0|rub }} ₽</span>
+                    </div>
+                    <div class="v2-bm-bar">
+                        <div class="v2-bm-bar-fact" style="width: {{ ins_fact_pct }}%;"></div>
+                        <div class="v2-bm-bar-plan" style="width: {% widthratio dashboard_v2_bridge.planned.insurance_sum dashboard_v2_bridge.bridge.insurance_sum 100 %}%;"></div>
+                    </div>
+                    <div class="v2-bm-rows">
+                        <div class="v2-bm-row">
+                            <span class="v2-bm-dot" style="background:#2563eb;"></span>
+                            <span class="v2-bm-row-label">Факт · {{ dashboard_v2_bridge.actual_period_label }}</span>
+                            <span class="v2-bm-row-amount">{{ dashboard_v2_bridge.actual.insurance_sum|floatformat:0|rub }} ₽</span>
                         </div>
-                        <div class="v2-goal-bar">
-                            <div class="v2-goal-bar-collected" style="width: {{ dashboard_v2_bridge.ins_sum_actual_share }}%;"></div>
-                            <div class="v2-goal-bar-remaining" style="width: {{ dashboard_v2_bridge.ins_sum_remaining_share }}%;"></div>
-                        </div>
-                        <div class="v2-goal-stats">
-                            <div class="v2-goal-stat">
-                                <span class="v2-goal-stat-value is-collected">{{ dashboard_v2_bridge.collected_ins_sum|rub }} ₽</span>
-                                <span class="v2-goal-stat-label">✓ Собрано</span>
-                            </div>
-                            <span class="v2-goal-stat-sep">+</span>
-                            <div class="v2-goal-stat">
-                                <span class="v2-goal-stat-value">{{ dashboard_v2_bridge.remaining_ins_sum|rub }} ₽</span>
-                                <span class="v2-goal-stat-label">⏳ Ожидается</span>
-                            </div>
-                        </div>
-                        <div class="v2-goal-total">
-                            <span>Сумма по портфелю на год</span>
-                            <span class="v2-goal-total-value">{{ dashboard_v2_bridge.year_plan_ins_sum|rub }} ₽</span>
+                        <div class="v2-bm-row">
+                            <span class="v2-bm-dot" style="background:#bfdbfe;"></span>
+                            <span class="v2-bm-row-label">План · {{ dashboard_v2_bridge.planned_period_label }}</span>
+                            <span class="v2-bm-row-amount">{{ dashboard_v2_bridge.planned.insurance_sum|floatformat:0|rub }} ₽</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="v2-bridge-metric">
-                    <div class="v2-goal">
-                        <div class="v2-goal-header">
-                            <span class="v2-goal-title">Страховая премия</span>
-                            <div class="text-end">
-                                <div class="v2-goal-pct">{{ dashboard_v2_bridge.premium_actual_share|floatformat:1 }}%</div>
-                                <div class="v2-goal-pct-label">выполнено</div>
-                            </div>
+                {% widthratio dashboard_v2_bridge.actual.premium dashboard_v2_bridge.bridge.premium 100 as prem_fact_pct %}
+                <div class="v2-bm">
+                    <div class="v2-bm-head">
+                        <span class="v2-bm-name">Страховая премия</span>
+                        <span class="v2-bm-total">{{ dashboard_v2_bridge.bridge.premium|floatformat:0|rub }} ₽</span>
+                    </div>
+                    <div class="v2-bm-bar">
+                        <div class="v2-bm-bar-fact" style="width: {{ prem_fact_pct }}%;"></div>
+                        <div class="v2-bm-bar-plan" style="width: {% widthratio dashboard_v2_bridge.planned.premium dashboard_v2_bridge.bridge.premium 100 %}%;"></div>
+                    </div>
+                    <div class="v2-bm-rows">
+                        <div class="v2-bm-row">
+                            <span class="v2-bm-dot" style="background:#2563eb;"></span>
+                            <span class="v2-bm-row-label">Факт · {{ dashboard_v2_bridge.actual_period_label }}</span>
+                            <span class="v2-bm-row-amount">{{ dashboard_v2_bridge.actual.premium|floatformat:0|rub }} ₽</span>
                         </div>
-                        <div class="v2-goal-bar">
-                            <div class="v2-goal-bar-collected" style="width: {{ dashboard_v2_bridge.premium_actual_share }}%;"></div>
-                            <div class="v2-goal-bar-remaining" style="width: {{ dashboard_v2_bridge.premium_remaining_share }}%;"></div>
-                        </div>
-                        <div class="v2-goal-stats">
-                            <div class="v2-goal-stat">
-                                <span class="v2-goal-stat-value is-collected">{{ dashboard_v2_bridge.collected_premium|rub }} ₽</span>
-                                <span class="v2-goal-stat-label">✓ Собрано</span>
-                            </div>
-                            <span class="v2-goal-stat-sep">+</span>
-                            <div class="v2-goal-stat">
-                                <span class="v2-goal-stat-value">{{ dashboard_v2_bridge.remaining_premium|rub }} ₽</span>
-                                <span class="v2-goal-stat-label">⏳ Ожидается</span>
-                            </div>
-                        </div>
-                        <div class="v2-goal-total">
-                            <span>Сумма по портфелю на год</span>
-                            <span class="v2-goal-total-value">{{ dashboard_v2_bridge.year_plan_premium|rub }} ₽</span>
+                        <div class="v2-bm-row">
+                            <span class="v2-bm-dot" style="background:#bfdbfe;"></span>
+                            <span class="v2-bm-row-label">План · {{ dashboard_v2_bridge.planned_period_label }}</span>
+                            <span class="v2-bm-row-amount">{{ dashboard_v2_bridge.planned.premium|floatformat:0|rub }} ₽</span>
                         </div>
                     </div>
                 </div>
@@ -1353,15 +1360,15 @@
 
                 <div class="v2-grid-3">
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ получено (30д)</div>
+                        <div class="v2-cell-label">Δ получено</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_paid_count|default:0 }}</div>
                     </div>
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ к получению (30д)</div>
+                        <div class="v2-cell-label">Δ к получению</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_pending_count|default:0 }}</div>
                     </div>
                     <div class="v2-cell">
-                        <div class="v2-cell-label">Δ пропущено (30д)</div>
+                        <div class="v2-cell-label">Δ пропущено</div>
                         <div class="v2-cell-value">{{ dashboard_v2_payment_contour.window_30.delta_overdue_count|default:0 }}</div>
                     </div>
                 </div>
@@ -1395,9 +1402,10 @@
                     </div>
                 </div>
 
-                <div class="alert {% if dashboard_v2_concentration.overall_level == 'Высокий' %}alert-danger{% elif dashboard_v2_concentration.overall_level == 'Средний' %}alert-warning{% else %}alert-success{% endif %} py-2 mb-0">
-                    Общий уровень риска: <strong>{{ dashboard_v2_concentration.overall_level }}</strong>
-                    (HHI {{ dashboard_v2_concentration.overall_hhi|floatformat:1 }}).
+                <div class="v2-risk-footer mt-3">
+                    <span class="v2-risk-label">Общий уровень риска</span>
+                    <span class="v2-risk-badge v2-risk-badge--{% if dashboard_v2_concentration.overall_level == 'Высокий' %}high{% elif dashboard_v2_concentration.overall_level == 'Средний' %}mid{% else %}low{% endif %}">{{ dashboard_v2_concentration.overall_level }}</span>
+                    <span class="v2-risk-hhi">HHI {{ dashboard_v2_concentration.overall_hhi|floatformat:1 }}</span>
                 </div>
             </section>
         </div>
@@ -1514,7 +1522,7 @@
 
     <div class="row g-3 mt-1" id="legacy-relay">
         <div class="col-12">
-            <section class="v2-card">
+            <section class="v2-card v2-card--dark">
                 <div class="v2-kicker">Операционный Фокус</div>
                 <h5 class="v2-title">Ключевые списки из основного дашборда</h5>
                 <p class="v2-subtitle">Компактная ретрансляция: предстоящие платежи, нет данных об оплате, недавно добавленные и неподгруженные полисы.</p>
@@ -1533,7 +1541,6 @@
                                 {% for row in card.rows %}
                                 <a href="{% url 'policies:detail' row.policy_id %}" class="v2-relay-row">
                                     <div class="v2-relay-dfa">{{ row.dfa_number }}</div>
-                                    <div class="v2-relay-policy">Полис: {{ row.policy_number }}</div>
                                     <div class="v2-relay-client">{{ row.client_name }}</div>
 
                                     {% if card.type == "payment" %}

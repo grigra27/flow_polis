@@ -428,34 +428,14 @@ class DashboardV2Service:
             "insurance_sum": actual["insurance_sum"] + planned["insurance_sum"],
         }
 
-        # Прогресс-бар: факт = оплачено в этом году, ожидается = неоплаченное до конца года,
-        # цель = всё запланированное за год (знаменатель).
-        collected_qs = active_payments_qs.filter(
-            paid_date__gte=year_start,
-            paid_date__lte=today,
+        # Бар = два сегмента, сумма всегда 100%.
+        # Факт  — оплаченные платежи прошедших месяцев (due_date < current_month_start, paid).
+        # План  — все платежи текущего и будущих месяцев (due_date >= current_month_start).
+        # bridge = actual + planned (знаменатель).
+        premium_fact_share = _safe_percent(actual["premium"], bridge["premium"])
+        ins_sum_fact_share = _safe_percent(
+            actual["insurance_sum"], bridge["insurance_sum"]
         )
-        remaining_qs = active_payments_qs.filter(
-            due_date__gt=today,
-            due_date__lte=year_end,
-            paid_date__isnull=True,
-        )
-        year_plan_qs = active_payments_qs.filter(
-            due_date__gte=year_start,
-            due_date__lte=year_end,
-        )
-        collected_premium = _sum_amount(collected_qs, "amount")
-        remaining_premium = _sum_amount(remaining_qs, "amount")
-        year_plan_premium = _sum_amount(year_plan_qs, "amount")
-
-        collected_ins_sum = _sum_amount(collected_qs, "insurance_sum")
-        remaining_ins_sum = _sum_amount(remaining_qs, "insurance_sum")
-        year_plan_ins_sum = _sum_amount(year_plan_qs, "insurance_sum")
-
-        premium_actual_share = _safe_percent(collected_premium, year_plan_premium)
-        premium_remaining_share = _safe_percent(remaining_premium, year_plan_premium)
-        ins_sum_actual_share = _safe_percent(collected_ins_sum, year_plan_ins_sum)
-        ins_sum_remaining_share = _safe_percent(remaining_ins_sum, year_plan_ins_sum)
-        premium_plan_share = _safe_percent(planned["premium"], bridge["premium"])
 
         if current_month_start > year_start:
             actual_period_label = (
@@ -482,17 +462,8 @@ class DashboardV2Service:
             "actual": actual,
             "planned": planned,
             "bridge": bridge,
-            "collected_premium": collected_premium,
-            "remaining_premium": remaining_premium,
-            "year_plan_premium": year_plan_premium,
-            "collected_ins_sum": collected_ins_sum,
-            "remaining_ins_sum": remaining_ins_sum,
-            "year_plan_ins_sum": year_plan_ins_sum,
-            "premium_actual_share": premium_actual_share.quantize(Decimal("0.1")),
-            "premium_remaining_share": premium_remaining_share.quantize(Decimal("0.1")),
-            "ins_sum_actual_share": ins_sum_actual_share.quantize(Decimal("0.1")),
-            "ins_sum_remaining_share": ins_sum_remaining_share.quantize(Decimal("0.1")),
-            "premium_plan_share": premium_plan_share.quantize(Decimal("0.1")),
+            "premium_fact_share": premium_fact_share.quantize(Decimal("0.1")),
+            "ins_sum_fact_share": ins_sum_fact_share.quantize(Decimal("0.1")),
         }
 
     def _build_payment_contour(
@@ -554,7 +525,7 @@ class DashboardV2Service:
             "statuses": [
                 {
                     "key": "received",
-                    "label": "Получено (30 дн.)",
+                    "label": "Получено",
                     "count": received_count,
                     "amount": received_amount,
                     "share": _share(received_amount),
@@ -562,7 +533,7 @@ class DashboardV2Service:
                 },
                 {
                     "key": "upcoming",
-                    "label": "К получению (30 дн.)",
+                    "label": "К получению",
                     "count": upcoming_count,
                     "amount": upcoming_amount,
                     "share": _share(upcoming_amount),
@@ -570,7 +541,7 @@ class DashboardV2Service:
                 },
                 {
                     "key": "missed",
-                    "label": "Пропущено (30 дн.)",
+                    "label": "Пропущено",
                     "count": missed_count,
                     "amount": missed_amount,
                     "share": _share(missed_amount),
@@ -834,9 +805,9 @@ class DashboardV2Service:
                 },
                 {
                     "key": "upcoming_30",
-                    "label": "Предстоящие платежи (30д)",
+                    "label": "Предстоящие платежи",
                     "count": upcoming_count,
-                    "hint": "без факта оплаты",
+                    "hint": "",
                     "amount": upcoming_amount,
                     "tone": "warning",
                 },
@@ -844,7 +815,7 @@ class DashboardV2Service:
                     "key": "no_payment_data",
                     "label": "Нет данных об оплате",
                     "count": overdue_count,
-                    "hint": "просроченные платежи",
+                    "hint": "",
                     "amount": overdue_amount,
                     "tone": "danger",
                 },

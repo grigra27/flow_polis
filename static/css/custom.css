@@ -3,9 +3,9 @@
 :root {
     --app-font-family: "Segoe UI", "SF Pro Text", "Noto Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
 
-    --app-color-primary: #0d6efd;
-    --app-color-primary-strong: #0a58ca;
-    --app-color-primary-soft: #e7f1ff;
+    --app-color-primary: #1e3a5f;
+    --app-color-primary-strong: #162d4a;
+    --app-color-primary-soft: #e8f0fb;
     --app-color-surface: #ffffff;
     --app-color-surface-muted: #f8f9fa;
     --app-color-border: #dce3eb;

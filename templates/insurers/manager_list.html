@@ -2,14 +2,265 @@
 
 {% block title %}Менеджеры ЛК{% endblock %}
 
-{% block content %}
-<div class="manager-list-page">
-<div class="pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 manager-list-title">Менеджеры лизинговой компании</h1>
-</div>
+{% block extra_css %}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
 
-<div class="mb-4">
-    <div class="search-box p-3">
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .mgr-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .mgr-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .mgr-page-title {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+    }
+    .mgr-count-pill {
+        font-size: 0.82rem;
+        font-weight: 600;
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+        border-radius: 999px;
+        padding: 0.3rem 0.85rem;
+        white-space: nowrap;
+    }
+
+    /* Search */
+    .mgr-search-panel {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 2px 8px rgba(14,28,46,0.04);
+    }
+    .mgr-search-panel .form-control {
+        border-color: var(--v2-border);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: var(--v2-title);
+    }
+    .mgr-search-panel .form-control:focus {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
+    .btn-mgr-search {
+        background: #1e3a5f;
+        border: none;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.5rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 0.15s;
+        width: 100%;
+        justify-content: center;
+    }
+    .btn-mgr-search:hover { background: #16304f; color: #fff; }
+
+    /* Manager card */
+    .mgr-card {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        padding: 1rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+        border-top: 3px solid #1e3a5f;
+        text-decoration: none;
+        color: inherit;
+    }
+    .mgr-card:hover {
+        border-color: #2a4f7c;
+        box-shadow: 0 4px 18px rgba(14,28,46,0.11);
+        transform: translateY(-2px);
+        color: inherit;
+        text-decoration: none;
+    }
+    .mgr-card-kicker {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--v2-muted);
+        margin-bottom: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .mgr-card-name {
+        font-size: 1.0rem;
+        font-weight: 700;
+        color: var(--v2-title);
+        margin-bottom: 0.15rem;
+        line-height: 1.3;
+    }
+    .mgr-card-fullname {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        margin-bottom: 0.55rem;
+    }
+    .mgr-card-contacts {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-bottom: 0.75rem;
+        flex: 1;
+    }
+    .mgr-contact-row {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .mgr-contact-row i {
+        flex-shrink: 0;
+        color: #4a7aad;
+        font-size: 0.78rem;
+    }
+    .mgr-card-footer {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-top: auto;
+        padding-top: 0.65rem;
+        border-top: 1px solid #edf3fb;
+    }
+    .mgr-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.18rem 0.6rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .mgr-badge--total {
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+    }
+    .mgr-badge--active {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    /* Empty state */
+    .mgr-empty {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--v2-muted);
+    }
+    .mgr-empty i {
+        font-size: 2.5rem;
+        color: #c4d8f0;
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+    .mgr-empty-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--v2-title);
+        margin-bottom: 0.3rem;
+    }
+
+    /* Pagination */
+    .mgr-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 0.3rem;
+        margin-top: 1.5rem;
+    }
+    .mgr-page-btn {
+        border: 1px solid var(--v2-border);
+        background: var(--v2-card-bg);
+        color: var(--v2-title);
+        border-radius: 8px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .mgr-page-btn:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+    }
+    .mgr-page-btn--active {
+        background: #1e3a5f;
+        border-color: #1e3a5f;
+        color: #fff;
+    }
+    .mgr-page-btn--active:hover {
+        background: #1e3a5f;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mgr-root">
+
+    <!-- Page header -->
+    <div class="mgr-page-header">
+        <div>
+            <div class="mgr-page-kicker"><i class="bi bi-people"></i> Команда Альянс-лизинга</div>
+            <h1 class="mgr-page-title">Менеджеры лизинговой компании</h1>
+        </div>
+        {% if managers %}
+        <span class="mgr-count-pill"><i class="bi bi-person-badge"></i> {{ page_obj.paginator.count }} менеджеров</span>
+        {% endif %}
+    </div>
+
+    <!-- Search -->
+    <div class="mgr-search-panel">
         <form method="get" class="row g-2 align-items-center">
             <div class="col-md-10">
                 <input type="text"
@@ -19,73 +270,83 @@
                        value="{{ request.GET.search }}">
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">
+                <button type="submit" class="btn-mgr-search">
                     <i class="bi bi-search"></i> Найти
                 </button>
             </div>
         </form>
     </div>
-</div>
 
-{% if managers %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2">
-    {% for manager in managers %}
-    <div class="col">
-        <div class="client-item p-3" onclick="window.location.href='{% url 'insurers:manager_detail' manager.pk %}'">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <div class="client-name">{{ manager.name }}</div>
-                <span class="badge bg-primary">{{ manager.total_policies }}</span>
-            </div>
+    <!-- Cards grid -->
+    {% if managers %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2">
+        {% for manager in managers %}
+        <div class="col">
+            <a class="mgr-card" href="{% url 'insurers:manager_detail' manager.pk %}">
+                <div class="mgr-card-kicker">
+                    <i class="bi bi-person-badge"></i> Менеджер
+                </div>
+                <div class="mgr-card-name">{{ manager.name }}</div>
+                {% if manager.full_name %}
+                <div class="mgr-card-fullname">{{ manager.full_name }}</div>
+                {% endif %}
 
-            {% if manager.full_name %}
-            <div class="text-muted small mb-1">{{ manager.full_name }}</div>
-            {% endif %}
+                <div class="mgr-card-contacts">
+                    {% if manager.phone %}
+                    <div class="mgr-contact-row">
+                        <i class="bi bi-telephone"></i>
+                        <span>{{ manager.phone }}</span>
+                    </div>
+                    {% endif %}
+                    {% if manager.email %}
+                    <div class="mgr-contact-row">
+                        <i class="bi bi-envelope"></i>
+                        <span>{{ manager.email }}</span>
+                    </div>
+                    {% endif %}
+                </div>
 
-            {% if manager.phone %}
-            <div class="text-muted small mb-1">
-                <i class="bi bi-telephone"></i> {{ manager.phone }}
-            </div>
-            {% endif %}
-
-            {% if manager.email %}
-            <div class="text-muted small mb-1">
-                <i class="bi bi-envelope"></i> {{ manager.email }}
-            </div>
-            {% endif %}
-
-            <div class="mt-2">
-                <span class="badge bg-success">Активные: {{ manager.active_policies }}</span>
-            </div>
+                <div class="mgr-card-footer">
+                    <span class="mgr-badge mgr-badge--total">
+                        <i class="bi bi-file-earmark-text"></i> {{ manager.total_policies }} полисов
+                    </span>
+                    <span class="mgr-badge mgr-badge--active">
+                        <i class="bi bi-check-circle"></i> {{ manager.active_policies }} активных
+                    </span>
+                </div>
+            </a>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="text-center text-muted py-5">
-    Менеджеры не найдены
-</div>
-{% endif %}
 
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mt-4">
-    <ul class="pagination pagination-sm justify-content-center">
+    {% else %}
+    <div class="mgr-empty">
+        <i class="bi bi-people"></i>
+        <div class="mgr-empty-title">Менеджеры не найдены</div>
+        <div>Попробуйте изменить параметры поиска</div>
+    </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="mgr-pagination">
         {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">←</a>
-        </li>
+        <a class="mgr-page-btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            <i class="bi bi-chevron-left"></i> Назад
+        </a>
         {% endif %}
 
-        <li class="page-item active">
-            <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-        </li>
+        <span class="mgr-page-btn mgr-page-btn--active">
+            {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
 
         {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">→</a>
-        </li>
+        <a class="mgr-page-btn" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            Вперёд <i class="bi bi-chevron-right"></i>
+        </a>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
+    </div>
+    {% endif %}
+
 </div>
 {% endblock %}

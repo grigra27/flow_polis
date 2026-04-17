@@ -4,199 +4,473 @@
 
 {% block title %}{{ manager.full_name|default:manager.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
+
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .mgr-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .mgr-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .mgr-page-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+    }
+    .mgr-header-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+        align-items: center;
+        margin-top: 0.25rem;
+    }
+    .btn-mgr-back {
+        background: transparent;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-muted);
+        font-size: 0.88rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-mgr-back:hover { border-color: var(--v2-accent); color: var(--v2-accent); }
+    .btn-mgr-edit {
+        background: #f59e0b;
+        border: none;
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .btn-mgr-edit:hover { background: #d97706; color: #fff; }
+
+    /* Section card */
+    .mgr-section {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+    .mgr-section-head {
+        background: #1e3a5f;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    .mgr-section-head-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #e8f3ff;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+    .mgr-section-head-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(255,255,255,0.15);
+        color: #e8f3ff;
+        border-radius: 999px;
+        padding: 0.15rem 0.55rem;
+        white-space: nowrap;
+    }
+    .mgr-section-body {
+        padding: 1rem;
+    }
+
+    /* Profile info rows */
+    .mgr-info-row {
+        display: flex;
+        flex-direction: column;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f0f5fc;
+    }
+    .mgr-info-row:last-child { border-bottom: none; }
+    .mgr-info-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .mgr-info-value {
+        font-size: 0.92rem;
+        color: var(--v2-title);
+        font-weight: 500;
+    }
+    .mgr-info-value a {
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .mgr-info-value a:hover { text-decoration: underline; }
+
+    /* Notes block */
+    .mgr-notes {
+        font-size: 0.88rem;
+        color: var(--v2-title);
+        line-height: 1.6;
+        background: #f8fbff;
+        border: 1px solid #e8f0fb;
+        border-radius: 8px;
+        padding: 0.75rem 0.9rem;
+    }
+
+    /* Stats grid */
+    .mgr-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.65rem;
+        margin-bottom: 1.25rem;
+    }
+    @media (max-width: 768px) {
+        .mgr-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .mgr-stat-cell {
+        border: 1px solid #e5edf7;
+        border-radius: 10px;
+        background: #fbfdff;
+        padding: 0.7rem 0.8rem;
+        text-align: center;
+    }
+    .mgr-stat-value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        line-height: 1.1;
+        color: var(--v2-title);
+    }
+    .mgr-stat-value--success { color: #15803d; }
+    .mgr-stat-value--danger  { color: #b91c1c; }
+    .mgr-stat-value--date    { font-size: 1.1rem; color: #1e3a5f; }
+    .mgr-stat-label {
+        font-size: 0.8rem;
+        color: var(--v2-muted);
+        margin-top: 0.2rem;
+    }
+    .mgr-stat-meta {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-top: 0.1rem;
+    }
+
+    /* Table */
+    .mgr-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+    .mgr-table thead th {
+        background: #f4f8ff;
+        color: var(--v2-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.55rem 0.75rem;
+        border-bottom: 1px solid var(--v2-border);
+        white-space: nowrap;
+    }
+    .mgr-table tbody tr {
+        border-bottom: 1px solid #f0f5fb;
+        cursor: pointer;
+        transition: background 0.12s;
+    }
+    .mgr-table tbody tr:hover { background: #f4f9ff; }
+    .mgr-table tbody tr.row--terminated { opacity: 0.65; }
+    .mgr-table tbody td {
+        padding: 0.55rem 0.75rem;
+        vertical-align: middle;
+        color: var(--v2-title);
+    }
+    .mgr-table tbody td a {
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .mgr-table tbody td a:hover { text-decoration: underline; }
+    .tbl-badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.12rem 0.5rem;
+        white-space: nowrap;
+    }
+    .tbl-badge--active  { background: #dcfce7; color: #15803d; }
+    .tbl-badge--closed  { background: #fee2e2; color: #b91c1c; }
+    .tbl-badge--term    { background: #fee2e2; color: #b91c1c; }
+    .tbl-badge--nobroker { background: #f1f5f9; color: #64748b; }
+    .tbl-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--v2-muted);
+    }
+    .tbl-empty i {
+        font-size: 2rem;
+        color: #c4d8f0;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="manager-detail-page">
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">{{ manager.full_name|default:manager.name }}</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        {% if can_edit %}
-        <a href="{% url 'admin:insurers_leasingmanager_change' manager.pk %}" class="btn btn-warning me-2">
-            <i class="bi bi-pencil"></i> Редактировать
-        </a>
-        {% endif %}
-        <a href="{% url 'insurers:managers_list' %}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Назад к списку
-        </a>
-    </div>
-</div>
+<div class="mgr-root">
 
-<div class="row">
-    <div class="col-lg-4">
-        <div class="card mb-4 manager-profile-card">
-            <div class="card-header">
-                <h5 class="mb-0">Информация о менеджере</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Фамилия:</strong><br>{{ manager.name }}</p>
-
-                {% if manager.full_name %}
-                <p><strong>ФИО:</strong><br>{{ manager.full_name }}</p>
-                {% endif %}
-
-                {% if manager.phone %}
-                <p><strong>Телефон:</strong><br>
-                    <a href="tel:{{ manager.phone }}">{{ manager.phone }}</a>
-                </p>
-                {% endif %}
-
-                {% if manager.email %}
-                <p class="mb-0"><strong>Email:</strong><br>
-                    <a href="mailto:{{ manager.email }}">{{ manager.email }}</a>
-                </p>
-                {% endif %}
-
-                {% if branches %}
-                <div class="mt-4">
-                    <p class="mb-2"><strong>Филиал:</strong></p>
-                    <div class="d-flex flex-column gap-2">
-                        {% for branch in branches %}
-                        <a href="{% url 'insurers:branch_detail' branch.pk %}"
-                           class="text-decoration-none">
-                            {% branch_logo branch size='medium' %}
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+    <!-- Page header -->
+    <div class="mgr-page-header">
+        <div>
+            <div class="mgr-page-kicker"><i class="bi bi-people"></i> Команда Альянс-лизинга</div>
+            <h1 class="mgr-page-title">{{ manager.full_name|default:manager.name }}</h1>
         </div>
-
-        {% if manager.notes %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Примечание</h5>
-            </div>
-            <div class="card-body">
-                {{ manager.notes|linebreaks }}
-            </div>
+        <div class="mgr-header-actions">
+            {% if can_edit %}
+            <a href="{% url 'admin:insurers_leasingmanager_change' manager.pk %}" class="btn-mgr-edit">
+                <i class="bi bi-pencil"></i> Редактировать
+            </a>
+            {% endif %}
+            <a href="{% url 'insurers:managers_list' %}" class="btn-mgr-back">
+                <i class="bi bi-arrow-left"></i> К списку
+            </a>
         </div>
-        {% endif %}
     </div>
 
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Сделки менеджера</h5>
-                <small class="text-muted">{{ policies_count }} {{ policies_count|ru_pluralize:"полис,полиса,полисов" }}</small>
-            </div>
-            <div class="card-body">
-                <div class="overview-grid">
-                    <div class="row g-2">
-                        <div class="col-6 col-lg-3">
-                            <div class="overview-card">
-                                <div class="overview-value text-primary">{{ manager_overview.total_policies }}</div>
-                                <div class="overview-label">Всего полисов</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-lg-3">
-                            <div class="overview-card">
-                                <div class="overview-value text-success">{{ manager_overview.active_policies }}</div>
-                                <div class="overview-label">Активные</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-lg-3">
-                            <div class="overview-card">
-                                <div class="overview-value text-danger">{{ manager_overview.terminated_policies }}</div>
-                                <div class="overview-label">Расторгнутые</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-lg-3">
-                            <div class="overview-card">
-                                <div class="overview-value {% if manager_overview.nearest_end_date %}overview-value-date{% else %}text-muted{% endif %}">
-                                    {% if manager_overview.nearest_end_date %}
-                                        {{ manager_overview.nearest_end_date|date:"d.m.Y" }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </div>
-                                <div class="overview-label">Ближайшее окончание</div>
-                                <div class="overview-meta">
-                                    {% if manager_overview.nearest_end_date %}
-                                        по активным полисам
-                                    {% else %}
-                                        нет активных полисов
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
+    <div class="row g-3">
+
+        <!-- Left: profile -->
+        <div class="col-lg-4">
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <div class="mgr-section-head-title">
+                        <i class="bi bi-person-badge"></i> Информация о менеджере
                     </div>
                 </div>
-
-                {% if policies %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Номер полиса</th>
-                                <th>Номер ДФА</th>
-                                <th>Лизингополучатель</th>
-                                <th>Страховщик</th>
-                                <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
-                                <th>Период</th>
-                                <th>СП, ₽</th>
-                                <th>Статус</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for policy in policies %}
-                            <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" data-href="{% url 'policies:detail' policy.pk %}">
-                                <td>
-                                    <strong>{{ policy.policy_number }}</strong>
-                                    {% if not policy.policy_active %}
-                                        <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
-                                    {% endif %}
-                                    {% if not policy.broker_participation %}
-                                        <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ policy.dfa_number|default:"—" }}</td>
-                                <td>
-                                    <a href="{% url 'clients:detail' policy.client.pk %}">{{ policy.client.client_name }}</a>
-                                </td>
-                                <td>{% insurer_logo policy.insurer size='small' %}</td>
-                                <td class="insurance-type-icon-cell">
-                                    {% if policy.insurance_type.icon %}
-                                        <img src="{{ policy.insurance_type.icon.url }}"
-                                             alt="{{ policy.insurance_type.name }}"
-                                             title="{{ policy.insurance_type.name }}"
-                                             class="insurance-type-icon">
-                                    {% else %}
-                                        <span title="{{ policy.insurance_type.name }}"
-                                              class="insurance-type-icon-fallback">
-                                            <i class="bi bi-shield-check"></i>
-                                        </span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
-                                </td>
-                                <td><strong>{{ policy.premium_total|rub }}</strong></td>
-                                <td>
-                                    {% if policy.policy_active %}
-                                        <span class="badge bg-success">Активен</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Закрыт</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
+                <div class="mgr-section-body">
+                    <div class="mgr-info-row">
+                        <div class="mgr-info-label">Фамилия</div>
+                        <div class="mgr-info-value">{{ manager.name }}</div>
+                    </div>
+                    {% if manager.full_name %}
+                    <div class="mgr-info-row">
+                        <div class="mgr-info-label">ФИО</div>
+                        <div class="mgr-info-value">{{ manager.full_name }}</div>
+                    </div>
+                    {% endif %}
+                    {% if manager.phone %}
+                    <div class="mgr-info-row">
+                        <div class="mgr-info-label">Телефон</div>
+                        <div class="mgr-info-value">
+                            <a href="tel:{{ manager.phone }}"><i class="bi bi-telephone me-1"></i>{{ manager.phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if manager.email %}
+                    <div class="mgr-info-row">
+                        <div class="mgr-info-label">Email</div>
+                        <div class="mgr-info-value">
+                            <a href="mailto:{{ manager.email }}"><i class="bi bi-envelope me-1"></i>{{ manager.email }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if branches %}
+                    <div class="mgr-info-row">
+                        <div class="mgr-info-label">Филиал</div>
+                        <div class="mgr-info-value d-flex flex-column gap-2 mt-1">
+                            {% for branch in branches %}
+                            <a href="{% url 'insurers:branch_detail' branch.pk %}" class="text-decoration-none">
+                                {% branch_logo branch size='medium' %}
+                            </a>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <p class="text-muted mb-0">У этого менеджера пока нет полисов</p>
-                {% endif %}
+            </div>
+
+            {% if manager.notes %}
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <div class="mgr-section-head-title">
+                        <i class="bi bi-sticky"></i> Примечание
+                    </div>
+                </div>
+                <div class="mgr-section-body">
+                    <div class="mgr-notes">{{ manager.notes|linebreaks }}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right: deals -->
+        <div class="col-lg-8">
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <div class="mgr-section-head-title">
+                        <i class="bi bi-file-earmark-text"></i> Сделки менеджера
+                    </div>
+                    <span class="mgr-section-head-badge">
+                        {{ policies_count }} {{ policies_count|ru_pluralize:"полис,полиса,полисов" }}
+                    </span>
+                </div>
+                <div class="mgr-section-body">
+
+                    <!-- Stats -->
+                    <div class="mgr-stats-grid">
+                        <div class="mgr-stat-cell">
+                            <div class="mgr-stat-value">{{ manager_overview.total_policies }}</div>
+                            <div class="mgr-stat-label">Всего полисов</div>
+                        </div>
+                        <div class="mgr-stat-cell">
+                            <div class="mgr-stat-value mgr-stat-value--success">{{ manager_overview.active_policies }}</div>
+                            <div class="mgr-stat-label">Активные</div>
+                        </div>
+                        <div class="mgr-stat-cell">
+                            <div class="mgr-stat-value mgr-stat-value--danger">{{ manager_overview.terminated_policies }}</div>
+                            <div class="mgr-stat-label">Расторгнутые</div>
+                        </div>
+                        <div class="mgr-stat-cell">
+                            <div class="mgr-stat-value {% if manager_overview.nearest_end_date %}mgr-stat-value--date{% else %}text-muted{% endif %}">
+                                {% if manager_overview.nearest_end_date %}
+                                    {{ manager_overview.nearest_end_date|date:"d.m.Y" }}
+                                {% else %}—{% endif %}
+                            </div>
+                            <div class="mgr-stat-label">Ближайшее окончание</div>
+                            <div class="mgr-stat-meta">
+                                {% if manager_overview.nearest_end_date %}по активным{% else %}нет активных{% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Policies table -->
+                    {% if policies %}
+                    <div class="table-responsive">
+                        <table class="mgr-table">
+                            <thead>
+                                <tr>
+                                    <th>Полис</th>
+                                    <th>ДФА</th>
+                                    <th>Лизингополучатель</th>
+                                    <th>Страховщик</th>
+                                    <th title="Вид страхования">Вид</th>
+                                    <th>Период</th>
+                                    <th>СП, ₽</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for policy in policies %}
+                                <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %}"
+                                    data-href="{% url 'policies:detail' policy.pk %}">
+                                    <td>
+                                        <strong>{{ policy.policy_number }}</strong>
+                                        {% if not policy.policy_active %}
+                                        <span class="tbl-badge tbl-badge--term ms-1"
+                                              title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">
+                                            Расторгнут
+                                        </span>
+                                        {% endif %}
+                                        {% if not policy.broker_participation %}
+                                        <span class="tbl-badge tbl-badge--nobroker ms-1">Без брокера</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ policy.dfa_number|default:"—" }}</td>
+                                    <td>
+                                        <a href="{% url 'clients:detail' policy.client.pk %}">{{ policy.client.client_name }}</a>
+                                    </td>
+                                    <td>{% insurer_logo policy.insurer size='small' %}</td>
+                                    <td>
+                                        {% if policy.insurance_type.icon %}
+                                            <img src="{{ policy.insurance_type.icon.url }}"
+                                                 alt="{{ policy.insurance_type.name }}"
+                                                 title="{{ policy.insurance_type.name }}"
+                                                 class="insurance-type-icon">
+                                        {% else %}
+                                            <span title="{{ policy.insurance_type.name }}"
+                                                  class="insurance-type-icon-fallback">
+                                                <i class="bi bi-shield-check"></i>
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}
+                                        </small>
+                                    </td>
+                                    <td><strong>{{ policy.premium_total|rub }}</strong></td>
+                                    <td>
+                                        {% if policy.policy_active %}
+                                            <span class="tbl-badge tbl-badge--active">Активен</span>
+                                        {% else %}
+                                            <span class="tbl-badge tbl-badge--closed">Закрыт</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="tbl-empty">
+                        <i class="bi bi-file-earmark-x"></i>
+                        У этого менеджера пока нет полисов
+                    </div>
+                    {% endif %}
+
+                </div>
             </div>
         </div>
+
     </div>
-</div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const rows = document.querySelectorAll('.clickable-row');
-    rows.forEach(row => {
-        row.addEventListener('click', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.clickable-row').forEach(row => {
+        row.addEventListener('click', function () {
             window.location.href = this.dataset.href;
         });
     });

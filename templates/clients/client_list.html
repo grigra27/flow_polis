@@ -2,88 +2,337 @@
 
 {% block title %}Лизингополучатели{% endblock %}
 
-{% block content %}
-<div class="pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 manager-list-title">Лизингополучатели</h1>
-</div>
+{% block extra_css %}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
 
-<!-- Search -->
-<div class="mb-4">
-    <div class="search-box p-3">
+    .cli-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .cli-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .cli-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .cli-page-title {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+    }
+    .cli-count-pill {
+        font-size: 0.82rem;
+        font-weight: 600;
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+        border-radius: 999px;
+        padding: 0.3rem 0.85rem;
+        white-space: nowrap;
+    }
+
+    /* Search */
+    .cli-search-panel {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 2px 8px rgba(14,28,46,0.04);
+    }
+    .cli-search-panel .form-control {
+        border-color: var(--v2-border);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: var(--v2-title);
+    }
+    .cli-search-panel .form-control:focus {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
+    .btn-cli-search {
+        background: #1e3a5f;
+        border: none;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.5rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 0.15s;
+        width: 100%;
+        justify-content: center;
+    }
+    .btn-cli-search:hover { background: #16304f; color: #fff; }
+
+    /* Client card */
+    .cli-card {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        padding: 1rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+        border-top: 3px solid #c4d0de;
+        text-decoration: none;
+        color: inherit;
+    }
+    .cli-card:hover {
+        border-color: #2a4f7c;
+        box-shadow: 0 4px 18px rgba(14,28,46,0.11);
+        transform: translateY(-2px);
+        color: inherit;
+        text-decoration: none;
+    }
+    .cli-card-kicker {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--v2-muted);
+        margin-bottom: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .cli-card-name {
+        font-size: 1.0rem;
+        font-weight: 700;
+        color: var(--v2-title);
+        margin-bottom: 0.15rem;
+        line-height: 1.3;
+        flex: 1;
+    }
+    .cli-card-altname {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        margin-bottom: 0.55rem;
+        font-style: italic;
+    }
+    .cli-card-footer {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-top: auto;
+        padding-top: 0.65rem;
+        border-top: 1px solid #edf3fb;
+    }
+    .cli-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.18rem 0.6rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .cli-badge--inn {
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+    }
+    .cli-badge--noinn {
+        background: #f8f9fa;
+        color: #8a9bb0;
+        border: 1px solid #dbe5f1;
+    }
+
+    /* Empty state */
+    .cli-empty {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--v2-muted);
+    }
+    .cli-empty i {
+        font-size: 2.5rem;
+        color: #c4d8f0;
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+    .cli-empty-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--v2-title);
+        margin-bottom: 0.3rem;
+    }
+
+    /* Pagination */
+    .cli-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 0.3rem;
+        margin-top: 1.5rem;
+    }
+    .cli-page-btn {
+        border: 1px solid var(--v2-border);
+        background: var(--v2-card-bg);
+        color: var(--v2-title);
+        border-radius: 8px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .cli-page-btn:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+    }
+    .cli-page-btn--active {
+        background: #1e3a5f;
+        border-color: #1e3a5f;
+        color: #fff;
+    }
+    .cli-page-btn--active:hover {
+        background: #1e3a5f;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cli-root">
+
+    <!-- Page header -->
+    <div class="cli-page-header">
+        <div>
+            <div class="cli-page-kicker"><i class="bi bi-building"></i> Клиентская база</div>
+            <h1 class="cli-page-title">Лизингополучатели</h1>
+        </div>
+        {% if clients %}
+        <span class="cli-count-pill"><i class="bi bi-people"></i> {{ page_obj.paginator.count }} компаний</span>
+        {% endif %}
+    </div>
+
+    <!-- Search -->
+    <div class="cli-search-panel">
         <form method="get" class="row g-2 align-items-center">
             <div class="col-md-10">
-                <input type="text" name="search" class="form-control" placeholder="Поиск по названию, альтернативному названию или ИНН" value="{{ request.GET.search }}">
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       placeholder="Поиск по названию, альтернативному названию или ИНН"
+                       value="{{ request.GET.search }}">
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">
+                <button type="submit" class="btn-cli-search">
                     <i class="bi bi-search"></i> Найти
                 </button>
             </div>
         </form>
     </div>
-</div>
 
-<!-- Pagination Top -->
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mb-3">
-    <ul class="pagination pagination-sm justify-content-center">
+    <!-- Pagination top -->
+    {% if is_paginated %}
+    <div class="cli-pagination" style="margin-top:0;margin-bottom:1rem;">
         {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">←</a>
-        </li>
+        <a class="cli-page-btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            <i class="bi bi-chevron-left"></i> Назад
+        </a>
         {% endif %}
 
-        <li class="page-item active">
-            <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-        </li>
+        <span class="cli-page-btn cli-page-btn--active">
+            {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
 
         {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">→</a>
-        </li>
+        <a class="cli-page-btn" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            Вперёд <i class="bi bi-chevron-right"></i>
+        </a>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
-
-<!-- Clients List -->
-{% if clients %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
-    {% for client in clients %}
-    <div class="col">
-        <div class="client-item p-2" onclick="window.location.href='{% url 'clients:detail' client.pk %}'">
-            <div class="client-name mb-1">{{ client.client_name }}</div>
-            <div class="client-inn text-muted small">ИНН: {{ client.client_inn|default:"—" }}</div>
-        </div>
     </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="text-center text-muted py-5">
-    Лизингополучатели не найдены
-</div>
-{% endif %}
+    {% endif %}
 
-<!-- Pagination -->
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mt-4">
-    <ul class="pagination pagination-sm justify-content-center">
+    <!-- Cards grid -->
+    {% if clients %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
+        {% for client in clients %}
+        <div class="col">
+            <a class="cli-card" href="{% url 'clients:detail' client.pk %}">
+                <div class="cli-card-name">{{ client.client_name }}</div>
+                {% if client.alternative_name %}
+                <div class="cli-card-altname">{{ client.alternative_name }}</div>
+                {% endif %}
+
+                <div class="cli-card-footer">
+                    {% if client.client_inn %}
+                    <span class="cli-badge cli-badge--inn">
+                        <i class="bi bi-hash"></i> ИНН: {{ client.client_inn }}
+                    </span>
+                    {% else %}
+                    <span class="cli-badge cli-badge--noinn">
+                        <i class="bi bi-dash"></i> ИНН не указан
+                    </span>
+                    {% endif %}
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="cli-empty">
+        <i class="bi bi-building"></i>
+        <div class="cli-empty-title">Лизингополучатели не найдены</div>
+        <div>Попробуйте изменить параметры поиска</div>
+    </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="cli-pagination">
         {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">←</a>
-        </li>
+        <a class="cli-page-btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            <i class="bi bi-chevron-left"></i> Назад
+        </a>
         {% endif %}
 
-        <li class="page-item active">
-            <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-        </li>
+        <span class="cli-page-btn cli-page-btn--active">
+            {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
 
         {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">→</a>
-        </li>
+        <a class="cli-page-btn" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            Вперёд <i class="bi bi-chevron-right"></i>
+        </a>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
+    </div>
+    {% endif %}
+
+</div>
 {% endblock %}

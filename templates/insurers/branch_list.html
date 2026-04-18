@@ -5,7 +5,7 @@
 {% block title %}Филиалы ЛК{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/> {# pragma: allowlist secret #}
+{% load static %}<link rel="stylesheet" href="{% static 'css/leaflet.css' %}">
 <style>
     :root {
         --v2-bg: #f3f7fc;
@@ -410,7 +410,7 @@
 
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/sp6E=" crossorigin=""></script> {# pragma: allowlist secret #}
+<script src="{% static 'js/leaflet.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Clickable cards

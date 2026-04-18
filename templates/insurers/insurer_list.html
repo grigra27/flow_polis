@@ -6,274 +6,456 @@
 
 {% block extra_css %}
 <style>
-    .insurer-row {
-        border-left: 3px solid #0d6efd;
-        transition: all 0.2s ease;
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
     }
-    .insurer-row:hover {
-        background-color: #f8f9fa;
-        border-left-color: #0a58ca;
+
+    .ins-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
     }
-    .insurer-name {
-        font-size: 1.1rem;
+
+    /* Page header */
+    .ins-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .ins-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .ins-page-title {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+    }
+    .ins-count-pill {
+        font-size: 0.82rem;
         font-weight: 600;
-        color: #212529;
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+        border-radius: 999px;
+        padding: 0.3rem 0.85rem;
+        white-space: nowrap;
     }
-    .insurer-name-link {
+
+    /* Search */
+    .ins-search-panel {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 2px 8px rgba(14,28,46,0.04);
+    }
+    .ins-search-panel .form-control {
+        border-color: var(--v2-border);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: var(--v2-title);
+    }
+    .ins-search-panel .form-control:focus {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
+    .btn-ins-search {
+        background: #1e3a5f;
+        border: none;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.5rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 0.15s;
+        width: 100%;
+        justify-content: center;
+    }
+    .btn-ins-search:hover { background: #16304f; color: #fff; }
+
+    /* Insurer card */
+    .ins-card {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        margin-bottom: 0.65rem;
+        display: flex;
+        align-items: stretch;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+        border-left: 4px solid #1e3a5f;
+        overflow: hidden;
         text-decoration: none;
         color: inherit;
     }
-    .insurer-name-link:hover .insurer-name span {
-        color: #0d6efd;
-        text-decoration: underline;
+    .ins-card:hover {
+        border-color: #2a4f7c;
+        border-left-color: #2a4f7c;
+        box-shadow: 0 4px 18px rgba(14,28,46,0.11);
+        transform: translateY(-1px);
+        color: inherit;
+        text-decoration: none;
     }
-    .insurer-logo {
-        border-radius: 4px;
-        border: 1px solid #dee2e6;
-    }
-    .commission-item {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        margin: 0.15rem 0.3rem 0.15rem 0;
-        background-color: #e7f1ff;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        color: #084298;
-        font-weight: 500;
-    }
-    .commission-label {
-        font-size: 0.85rem;
-        color: #6c757d;
-        font-weight: 600;
-        margin-bottom: 0.4rem;
-    }
-    .table-insurer tbody tr {
-        border-bottom: 1px solid #dee2e6;
-    }
-    .table-insurer tbody tr:last-child {
-        border-bottom: none;
-    }
-    .stats-container {
-        font-size: 0.9rem;
-    }
-    .stats-badge {
-        display: inline-block;
-        padding: 0.35rem 0.65rem;
-        border-radius: 6px;
-        font-weight: 500;
-        margin-right: 0.5rem;
-        margin-bottom: 0.3rem;
-    }
-    .stats-badge-primary {
-        background-color: #e7f1ff;
-        color: #084298;
-        border: 1px solid #b6d4fe;
-    }
-    .stats-badge-success {
-        background-color: #d1e7dd;
-        color: #0a3622;
-        border: 1px solid #a3cfbb;
-    }
-    .stats-type-item {
-        display: inline-flex;
+    .ins-card-left {
+        flex-shrink: 0;
+        width: 200px;
+        padding: 1rem 1.1rem;
+        display: flex;
         align-items: center;
-        padding: 0.25rem 0.6rem;
-        margin: 0.15rem 0.25rem 0.15rem 0;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        border-left: 3px solid;
+        border-right: 1px solid #edf3fb;
+        background: #f8fbff;
     }
-    .stats-type-count {
-        font-weight: 600;
-        margin-left: 0.3rem;
+    .ins-card-right {
+        flex: 1;
+        display: flex;
+        align-items: stretch;
     }
-    .stats-type-percent {
-        font-size: 0.75rem;
-        color: #6c757d;
-        margin-left: 0.3rem;
+    .ins-card-stats {
+        flex: 1;
+        padding: 0.85rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.55rem;
+        border-right: 1px solid #edf3fb;
     }
-    .stats-section {
-        margin-bottom: 0.6rem;
+    .ins-card-commission {
+        width: 260px;
+        flex-shrink: 0;
+        padding: 0.85rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.35rem;
     }
-    .stats-section:last-child {
-        margin-bottom: 0;
-    }
-    .stats-label {
-        font-size: 0.75rem;
-        color: #6c757d;
-        font-weight: 600;
+
+    /* Stats */
+    .ins-stats-label {
+        font-size: 0.7rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.3rem;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.25rem;
     }
-    .broker-badge {
+    .ins-stats-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .ins-badge {
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
         display: inline-flex;
         align-items: center;
-        padding: 0.3rem 0.7rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 6px;
-        font-weight: 500;
-        font-size: 0.85rem;
+        gap: 0.25rem;
     }
-    .broker-badge i {
-        margin-right: 0.3rem;
+    .ins-badge--total {
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+    }
+    .ins-badge--active {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+    .ins-badge--broker {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: #fff;
+        border: none;
+    }
+
+    /* Type chips */
+    .ins-types-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        align-items: center;
+    }
+    .ins-type-chip {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.18rem 0.6rem;
+        border-radius: 6px;
+        background: #f4f8fe;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .ins-type-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .ins-type-pct {
+        color: var(--v2-muted);
+        font-weight: 400;
+    }
+
+    /* Commission */
+    .ins-comm-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.3rem;
+    }
+    .ins-comm-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+    .ins-comm-chip {
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.2rem 0.65rem;
+        border-radius: 999px;
+        background: #e8f0fb;
+        color: #1e3a5f;
+        border: 1px solid #c4d8f0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .ins-comm-none {
+        font-size: 0.8rem;
+        color: var(--v2-muted);
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    /* Empty */
+    .ins-empty {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--v2-muted);
+    }
+    .ins-empty i {
+        font-size: 2.5rem;
+        color: #c4d8f0;
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+    .ins-empty-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--v2-title);
+        margin-bottom: 0.3rem;
+    }
+
+    /* Pagination */
+    .ins-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 0.3rem;
+        margin-top: 1.25rem;
+    }
+    .ins-page-btn {
+        border: 1px solid var(--v2-border);
+        background: var(--v2-card-bg);
+        color: var(--v2-title);
+        border-radius: 8px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .ins-page-btn:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+    }
+    .ins-page-btn--active {
+        background: #1e3a5f;
+        border-color: #1e3a5f;
+        color: #fff;
+    }
+    .ins-page-btn--active:hover {
+        background: #1e3a5f;
+        color: #fff;
+    }
+
+    @media (max-width: 992px) {
+        .ins-card { flex-direction: column; border-left: none; border-top: 4px solid #1e3a5f; }
+        .ins-card-left { width: 100%; border-right: none; border-bottom: 1px solid #edf3fb; }
+        .ins-card-right { flex-direction: column; }
+        .ins-card-stats { border-right: none; border-bottom: 1px solid #edf3fb; }
+        .ins-card-commission { width: 100%; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 manager-list-title"><!--i class="bi bi-building"></i--> Страховые компании</h1>
-</div>
+<div class="ins-root">
 
-<!-- Search -->
-<div class="card mb-4 shadow-sm">
-    <div class="card-body">
-        <form method="get" class="row g-3">
+    <!-- Page header -->
+    <div class="ins-page-header">
+        <div>
+            <div class="ins-page-kicker"><i class="bi bi-building"></i> Партнёры</div>
+            <h1 class="ins-page-title">Страховые компании</h1>
+        </div>
+        {% if insurers %}
+        <span class="ins-count-pill"><i class="bi bi-building"></i> {{ page_obj.paginator.count }} компаний</span>
+        {% endif %}
+    </div>
+
+    <!-- Search -->
+    <div class="ins-search-panel">
+        <form method="get" class="row g-2 align-items-center">
             <div class="col-md-10">
-                <input type="text" name="search" class="form-control" placeholder="Поиск по названию страховой компании" value="{{ request.GET.search }}">
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       placeholder="Поиск по названию страховой компании"
+                       value="{{ request.GET.search }}">
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">
+                <button type="submit" class="btn-ins-search">
                     <i class="bi bi-search"></i> Найти
                 </button>
             </div>
         </form>
     </div>
-</div>
 
-<!-- Insurers List -->
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-insurer mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th class="ps-4" style="width: 19%;">Страховая компания</th>
-                    <th style="width: 43%;">Статистика</th>
-                    <th style="width: 38%;">Базовые ставки комиссии</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for insurer in insurers %}
-                <tr class="insurer-row clickable-row" data-href="{% url 'insurers:detail' insurer.pk %}">
-                    <td class="ps-4 py-3">
-                        <a href="{% url 'insurers:detail' insurer.pk %}" class="insurer-name-link">
-                            <div class="insurer-name">
-                                {% insurer_logo insurer size='medium' %}
-                            </div>
-                        </a>
-                    </td>
-                    <td class="py-3">
-                        <div class="stats-container">
-                            <!-- Policies count and Broker participation -->
-                            <div class="stats-section">
-                                <div class="stats-label">
-                                    <i class="bi bi-file-text"></i> Полисы
-                                </div>
-                                <div>
-                                    <span class="stats-badge stats-badge-primary">
-                                        <i class="bi bi-files"></i> Всего: <strong>{{ insurer.stats.total_policies }}</strong>
-                                    </span>
-                                    <span class="stats-badge stats-badge-success">
-                                        <i class="bi bi-check-circle"></i> Действующих: <strong>{{ insurer.stats.active_policies }}</strong>
-                                    </span>
-                                    {% if insurer.stats.active_policies > 0 %}
-                                    <span class="broker-badge">
-                                        <i class="bi bi-briefcase"></i>
-                                        Участие Брокера: {{ insurer.stats.broker_participation }}/{{ insurer.stats.active_policies }}
-                                        ({{ insurer.stats.broker_percentage }}%)
-                                    </span>
-                                    {% endif %}
-                                </div>
-                            </div>
+    <!-- Insurer list -->
+    {% if insurers %}
+    <div>
+        {% for insurer in insurers %}
+        <a class="ins-card" href="{% url 'insurers:detail' insurer.pk %}">
+            <div class="ins-card-left">
+                {% insurer_logo insurer size='medium' %}
+            </div>
+            <div class="ins-card-right">
 
-                            <!-- Insurance types distribution -->
-                            {% if insurer.stats.type_distribution %}
-                            <div class="stats-section">
-                                <div class="stats-label">
-                                    <i class="bi bi-pie-chart"></i> По видам страхования (только действующие полисы)
-                                </div>
-                                <div>
-                                    {% for type_stat in insurer.stats.type_distribution %}
-                                    <span class="stats-type-item" style="border-left-color: {{ type_stat.color }};">
-                                        {{ type_stat.name }}
-                                        <span class="stats-type-count">{{ type_stat.count }}</span>
-                                        <span class="stats-type-percent">({{ type_stat.percentage }}%)</span>
-                                    </span>
-                                    {% endfor %}
-                                </div>
-                            </div>
+                <!-- Stats + type distribution -->
+                <div class="ins-card-stats">
+                    <div>
+                        <div class="ins-stats-label"><i class="bi bi-file-earmark-text"></i> Полисы</div>
+                        <div class="ins-stats-row">
+                            <span class="ins-badge ins-badge--total">
+                                <i class="bi bi-files"></i> Всего: {{ insurer.stats.total_policies }}
+                            </span>
+                            <span class="ins-badge ins-badge--active">
+                                <i class="bi bi-check-circle"></i> Действующих: {{ insurer.stats.active_policies }}
+                            </span>
+                            {% if insurer.stats.active_policies > 0 %}
+                            <span class="ins-badge ins-badge--broker">
+                                <i class="bi bi-briefcase"></i>
+                                Участие Брокера: {{ insurer.stats.broker_participation }}/{{ insurer.stats.active_policies }} ({{ insurer.stats.broker_percentage }}%)
+                            </span>
                             {% endif %}
                         </div>
-                    </td>
-                    <td class="py-3">
-                        {% if insurer.commission_rates.all %}
-                            <div class="commission-label">
-                                <i class="bi bi-percent"></i> КВ по видам страхования:
-                            </div>
-                            <div>
-                                {% for rate in insurer.commission_rates.all %}
-                                <span class="commission-item">
-                                    {{ rate.insurance_type.name }}: <strong>{{ rate.kv_percent|percent }}%</strong>
-                                </span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <small class="text-muted">
-                                <i class="bi bi-dash-circle"></i> Ставки не указаны
-                            </small>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="text-center text-muted py-4">
-                        <i class="bi bi-info-circle"></i> Страховые компании не найдены
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </div>
+
+                    {% if insurer.stats.type_distribution %}
+                    <div>
+                        <div class="ins-stats-label"><i class="bi bi-pie-chart"></i> По видам страхования (только действующие полисы)</div>
+                        <div class="ins-types-row">
+                            {% for type_stat in insurer.stats.type_distribution %}
+                            <span class="ins-type-chip">
+                                <span class="ins-type-dot" style="background: {{ type_stat.color }};"></span>
+                                {{ type_stat.name }}
+                                <strong>{{ type_stat.count }}</strong>
+                                <span class="ins-type-pct">({{ type_stat.percentage }}%)</span>
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Commission rates -->
+                <div class="ins-card-commission">
+                    {% if insurer.commission_rates.all %}
+                    <div class="ins-comm-label"><i class="bi bi-percent"></i> КВ по видам страхования</div>
+                    <div class="ins-comm-row">
+                        {% for rate in insurer.commission_rates.all %}
+                        <span class="ins-comm-chip">
+                            {{ rate.insurance_type.name }}: <strong>{{ rate.kv_percent|percent }}%</strong>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="ins-comm-none">
+                        <i class="bi bi-dash-circle"></i> Ставки не указаны
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </a>
+        {% endfor %}
     </div>
-</div>
 
-<!-- Pagination -->
-{% if is_paginated %}
-<nav aria-label="Page navigation" class="mt-4">
-    <ul class="pagination justify-content-center">
+    {% else %}
+    <div class="ins-empty">
+        <i class="bi bi-building"></i>
+        <div class="ins-empty-title">Страховые компании не найдены</div>
+        <div>Попробуйте изменить параметры поиска</div>
+    </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="ins-pagination">
         {% if page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
-                    <i class="bi bi-chevron-left"></i> Предыдущая
-                </a>
-            </li>
+        <a class="ins-page-btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            <i class="bi bi-chevron-left"></i> Назад
+        </a>
         {% endif %}
-
-        <li class="page-item active">
-            <span class="page-link">
-                Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
-            </span>
-        </li>
-
+        <span class="ins-page-btn ins-page-btn--active">
+            {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
         {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
-                    Следующая <i class="bi bi-chevron-right"></i>
-                </a>
-            </li>
+        <a class="ins-page-btn" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">
+            Вперёд <i class="bi bi-chevron-right"></i>
+        </a>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
+    </div>
+    {% endif %}
+
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const rows = document.querySelectorAll('.clickable-row');
-    rows.forEach(row => {
-        row.addEventListener('click', function() {
-            window.location.href = this.dataset.href;
+    document.querySelectorAll('.ins-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            window.location.href = this.href;
         });
     });
 });

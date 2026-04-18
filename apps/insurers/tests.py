@@ -841,6 +841,17 @@ class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
             {self.policy_a1.id, self.policy_b1.id},
         )
 
+    def test_manager_detail_highlights_no_broker_policy_rows(self):
+        self.policy_a1.broker_participation = False
+        self.policy_a1.save(update_fields=["broker_participation"])
+
+        response = self.client.get(
+            reverse("insurers:manager_detail", args=[self.manager_ivan.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "row--nobroker")
+        self.assertContains(response, "Без брокера")
+
     def test_policy_detail_contains_link_to_manager_card(self):
         response = self.client.get(reverse("policies:detail", args=[self.policy_a1.id]))
         self.assertEqual(response.status_code, 200)

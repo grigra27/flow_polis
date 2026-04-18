@@ -9,35 +9,53 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
-    <!-- Custom Login CSS -->
     <style>
         :root {
-            --primary-color: #0d6efd;
-            --primary-dark: #0a58ca;
-            --bg-gradient-start: #667eea;
-            --bg-gradient-end: #764ba2;
+            --v2-bg: #f3f7fc;
+            --v2-card-bg: #ffffff;
+            --v2-border: #dbe5f1;
+            --v2-title: #17324f;
+            --v2-muted: #5d748d;
+            --v2-accent: #1565c0;
+            --v2-accent-deep: #1e3a5f;
+            --v2-danger: #cf3e4f;
+            --v2-danger-soft: #fff2f4;
+            --v2-info: #1d4ed8;
+            --v2-info-soft: #eff6ff;
         }
 
         body {
+            margin: 0;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            padding: 20px;
+            padding: clamp(14px, 2.4vw, 30px);
+            background:
+                radial-gradient(circle at 14% 16%, rgba(21, 101, 192, 0.18) 0%, rgba(21, 101, 192, 0) 42%),
+                radial-gradient(circle at 86% 82%, rgba(30, 58, 95, 0.14) 0%, rgba(30, 58, 95, 0) 48%),
+                linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+            color: var(--v2-title);
         }
 
-        .login-container {
+        .portal-shell {
             width: 100%;
-            max-width: 420px;
-            animation: fadeInUp 0.6s ease-out;
+            max-width: 960px;
+            display: grid;
+            grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.95fr);
+            border: 1px solid var(--v2-border);
+            border-radius: 20px;
+            background: var(--v2-card-bg);
+            box-shadow: 0 18px 48px rgba(14, 28, 46, 0.16);
+            overflow: hidden;
+            animation: loginSlideUp 0.55s ease-out;
         }
 
-        @keyframes fadeInUp {
+        @keyframes loginSlideUp {
             from {
                 opacity: 0;
-                transform: translateY(30px);
+                transform: translateY(24px);
             }
             to {
                 opacity: 1;
@@ -45,115 +63,242 @@
             }
         }
 
-        .login-card {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        .portal-brand {
+            position: relative;
             overflow: hidden;
+            background: linear-gradient(158deg, #1e3a5f 0%, #285382 54%, #3d6b9c 100%);
+            color: #e8f3ff;
+            padding: clamp(24px, 3.2vw, 40px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.1rem;
         }
 
-        .login-header {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: white;
-            padding: 40px 30px 30px;
-            text-align: center;
+        .portal-brand::before {
+            content: "";
+            position: absolute;
+            width: 360px;
+            height: 360px;
+            border-radius: 50%;
+            right: -190px;
+            top: -170px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0) 67%);
+            pointer-events: none;
         }
 
-        .login-header .logo-icon {
-            font-size: 3.5rem;
-            margin-bottom: 15px;
-            display: inline-block;
-            animation: pulse 2s ease-in-out infinite;
+        .portal-brand::after {
+            content: "";
+            position: absolute;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            left: -150px;
+            bottom: -140px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+            pointer-events: none;
         }
 
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-        }
-
-        .login-header h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-            letter-spacing: -0.5px;
-        }
-
-        .login-header p {
+        .brand-kicker,
+        .auth-kicker {
+            position: relative;
+            z-index: 1;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.86;
             margin: 0;
-            opacity: 0.95;
-            font-size: 0.95rem;
+            font-weight: 700;
         }
 
-        .login-body {
-            padding: 35px 30px 40px;
+        .brand-title {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            letter-spacing: -0.02em;
+            font-weight: 800;
+            line-height: 1.15;
+        }
+
+        .brand-title mark {
+            background: rgba(232, 243, 255, 0.18);
+            color: #f4f8ff;
+            padding: 0.08rem 0.35rem;
+            border-radius: 8px;
+        }
+
+        .brand-subtitle {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            font-size: 0.98rem;
+            line-height: 1.45;
+            max-width: 32ch;
+            color: rgba(232, 243, 255, 0.9);
+        }
+
+        .brand-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.6rem;
+            margin-top: 0.2rem;
+        }
+
+        .brand-cell {
+            border: 1px solid rgba(232, 243, 255, 0.22);
+            border-radius: 10px;
+            background: rgba(8, 29, 56, 0.24);
+            padding: 0.55rem 0.65rem;
+            backdrop-filter: blur(2px);
+        }
+
+        .brand-cell-label {
+            display: block;
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(232, 243, 255, 0.78);
+            margin-bottom: 0.1rem;
+        }
+
+        .brand-cell-value {
+            display: block;
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.1;
+        }
+
+        .brand-points {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .brand-points li {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.9rem;
+            color: rgba(240, 248, 255, 0.92);
+        }
+
+        .brand-points i {
+            width: 20px;
+            text-align: center;
+            color: #cfe2ff;
+        }
+
+        .portal-auth {
+            background: var(--v2-card-bg);
+            padding: clamp(20px, 2.9vw, 36px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .auth-top {
+            margin-bottom: 1.1rem;
+        }
+
+        .auth-kicker {
+            color: var(--v2-muted);
+            opacity: 1;
+            margin-bottom: 0.2rem;
+        }
+
+        .auth-title {
+            margin: 0;
+            color: var(--v2-title);
+            font-size: clamp(1.35rem, 2.2vw, 1.72rem);
+            font-weight: 800;
+            letter-spacing: -0.01em;
+        }
+
+        .auth-subtitle {
+            margin: 0.42rem 0 0;
+            color: var(--v2-muted);
+            font-size: 0.95rem;
         }
 
         .form-label {
             font-weight: 600;
-            color: #344054;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
+            color: var(--v2-title);
+            margin-bottom: 0.38rem;
+            font-size: 0.85rem;
+            letter-spacing: 0.01em;
         }
 
         .form-control {
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px 16px;
+            border: 1px solid var(--v2-border);
+            border-radius: 10px;
+            padding: 0.72rem 0.9rem;
             font-size: 0.95rem;
-            transition: all 0.3s ease;
-            background-color: #f9fafb;
+            line-height: 1.4;
+            color: var(--v2-title);
+            background-color: #f7fbff;
+            transition: border-color 0.16s, box-shadow 0.16s, background-color 0.16s;
         }
 
         .form-control:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1);
-            background-color: white;
+            border-color: var(--v2-accent);
+            box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.14);
+            background-color: #ffffff;
         }
 
         .form-control::placeholder {
-            color: #9ca3af;
+            color: #8ba0b8;
         }
 
-        .input-group-icon {
+        .field-wrap {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .input-with-icon {
             position: relative;
         }
 
-        .input-group-icon .form-control {
-            padding-left: 45px;
+        .input-with-icon .form-control {
+            padding-left: 2.55rem;
         }
 
-        .input-group-icon i {
+        .input-with-icon i {
             position: absolute;
-            left: 16px;
+            left: 0.9rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #6b7280;
-            font-size: 1.1rem;
+            color: #7f93aa;
+            font-size: 1rem;
             z-index: 10;
         }
 
         .btn-login {
             width: 100%;
-            padding: 14px;
-            font-size: 1rem;
+            border: 1px solid #194f8d;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--v2-accent) 0%, var(--v2-accent-deep) 100%);
+            color: #ffffff;
+            padding: 0.78rem 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            border-radius: 8px;
-            border: none;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: white;
-            transition: all 0.3s ease;
-            margin-top: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.03em;
+            transition: transform 0.14s, box-shadow 0.14s, filter 0.14s;
+            margin-top: 0.45rem;
         }
 
         .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(13, 110, 253, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 9px 22px rgba(21, 101, 192, 0.28);
+            filter: saturate(1.05);
+            color: #ffffff;
         }
 
         .btn-login:active {
@@ -161,208 +306,224 @@
         }
 
         .alert {
-            border-radius: 8px;
-            border: none;
-            padding: 14px 16px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            padding: 0.65rem 0.8rem;
+            margin-bottom: 0.95rem;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
         }
 
         .alert-danger {
-            background-color: #fef2f2;
-            color: #991b1b;
-            border-left: 4px solid #dc2626;
+            background-color: var(--v2-danger-soft);
+            color: #9f2335;
+            border-color: #f2c8cd;
         }
 
         .alert-info {
-            background-color: #eff6ff;
-            color: #1e40af;
-            border-left: 4px solid #3b82f6;
-        }
-
-        .alert i {
-            margin-right: 8px;
+            background-color: var(--v2-info-soft);
+            color: var(--v2-info);
+            border-color: #bfdbfe;
         }
 
         .errorlist {
             list-style: none;
             padding: 0;
-            margin: 8px 0 0 0;
+            margin: 0.42rem 0 0;
         }
 
         .errorlist li {
-            color: #dc2626;
-            font-size: 0.85rem;
-            padding: 6px 12px;
-            background-color: #fef2f2;
-            border-radius: 6px;
-            margin-top: 6px;
-            border-left: 3px solid #dc2626;
+            color: #9f2335;
+            font-size: 0.82rem;
+            padding: 0.4rem 0.55rem;
+            background: var(--v2-danger-soft);
+            border: 1px solid #f2c8cd;
+            border-radius: 8px;
+            margin-top: 0.36rem;
         }
 
-        .form-text {
-            font-size: 0.85rem;
-            color: #6b7280;
-            margin-top: 6px;
+        .auth-footer {
+            margin-top: 1.1rem;
+            padding-top: 0.85rem;
+            border-top: 1px solid #ebf1f8;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            font-size: 0.8rem;
+            color: var(--v2-muted);
         }
 
-        .login-footer {
-            text-align: center;
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 0.85rem;
+        .auth-chip {
+            border: 1px solid #d8e4f2;
+            background: #f4f8ff;
+            color: #2a527c;
+            border-radius: 999px;
+            padding: 0.18rem 0.56rem;
+            font-size: 0.76rem;
+            white-space: nowrap;
         }
 
-        /* Mobile responsiveness */
-        @media (max-width: 576px) {
-            body {
-                padding: 15px;
-            }
-
-            .login-container {
-                max-width: 100%;
-            }
-
-            .login-header {
-                padding: 30px 20px 25px;
-            }
-
-            .login-header .logo-icon {
-                font-size: 3rem;
-            }
-
-            .login-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .login-body {
-                padding: 25px 20px 30px;
-            }
-
-            .form-control {
-                padding: 11px 14px;
-                font-size: 0.9rem;
-            }
-
-            .btn-login {
-                padding: 12px;
-                font-size: 0.95rem;
-            }
-        }
-
-        /* Tablet responsiveness */
-        @media (min-width: 577px) and (max-width: 768px) {
-            .login-container {
-                max-width: 450px;
-            }
-        }
-
-        /* Loading state */
         .btn-login:disabled {
-            opacity: 0.7;
+            opacity: 0.75;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        /* Focus visible for accessibility */
         .form-control:focus-visible,
         .btn-login:focus-visible {
-            outline: 2px solid var(--primary-color);
+            outline: 2px solid var(--v2-accent);
             outline-offset: 2px;
+        }
+
+        @media (max-width: 900px) {
+            .portal-shell {
+                grid-template-columns: 1fr;
+                max-width: 620px;
+            }
+
+            .portal-brand {
+                padding: 1.2rem 1.2rem 1.1rem;
+                gap: 0.8rem;
+            }
+
+            .portal-brand::after {
+                display: none;
+            }
+
+            .brand-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .brand-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .auth-footer {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .brand-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-card">
-            <!-- Header -->
-            <div class="login-header">
-                <div class="logo-icon">
-                    <i class="bi bi-shield-check"></i>
+    <section class="portal-shell">
+        <aside class="portal-brand">
+            <p class="brand-kicker">insflow</p>
+            <h1 class="brand-title">флоу // <mark>полисы</mark></h1>
+            <p class="brand-subtitle">
+                Единая рабочая среда для дашборда, портфеля полисов, платежей и экосистемы поддержки страхования.
+            </p>
+
+            <div class="brand-grid">
+                <div class="brand-cell">
+                    <span class="brand-cell-label">Версия</span>
+                    <span class="brand-cell-value">2.0</span>
                 </div>
-                <h1>флоу // полисы</h1>
-                <p>Система управления страховыми полисами</p>
+                <div class="brand-cell">
+                    <span class="brand-cell-label">Мониторинг</span>
+                    <span class="brand-cell-value">24/7</span>
+                </div>
+                <div class="brand-cell">
+                    <span class="brand-cell-label">Доступ</span>
+                    <span class="brand-cell-value">polis.insflow</span>
+                </div>
             </div>
 
-            <!-- Body -->
-            <div class="login-body">
-                <!-- Session expired message -->
+            <ul class="brand-points">
+                <li><i class="bi bi-shield-lock"></i> Защищённый вход и контроль доступа</li>
+                <li><i class="bi bi-speedometer2"></i> Метрики и динамика портфеля в одном окне</li>
+                <li><i class="bi bi-diagram-3"></i> Сквозная связка: филиалы, менеджеры, ЛП</li>
+            </ul>
+        </aside>
+
+        <main class="portal-auth">
+            <div class="auth-top">
+                <p class="auth-kicker">Авторизация</p>
+                <h2 class="auth-title">Вход в систему</h2>
+                <p class="auth-subtitle">Используйте корпоративные учетные данные для доступа к рабочему контуру.</p>
+            </div>
+
+            <div class="auth-messages">
                 {% if 'next' in request.GET %}
                     <div class="alert alert-info" role="alert">
                         <i class="bi bi-info-circle-fill"></i>
-                        Ваша сессия истекла. Пожалуйста, войдите снова.
+                        <span>Сессия истекла. Пожалуйста, войдите повторно.</span>
                     </div>
                 {% endif %}
 
-                <!-- Non-field errors (invalid credentials) -->
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger" role="alert">
                         <i class="bi bi-exclamation-triangle-fill"></i>
-                        {{ form.non_field_errors.0 }}
+                        <span>{{ form.non_field_errors.0 }}</span>
                     </div>
                 {% endif %}
-
-                <!-- Login Form -->
-                <form method="post" action="{% url 'accounts:login' %}" novalidate>
-                    {% csrf_token %}
-
-                    <!-- Username Field -->
-                    <div class="mb-3">
-                        <label for="{{ form.username.id_for_label }}" class="form-label">
-                            {{ form.username.label }}
-                        </label>
-                        <div class="input-group-icon">
-                            <i class="bi bi-person-fill"></i>
-                            {{ form.username }}
-                        </div>
-                        {% if form.username.errors %}
-                            <ul class="errorlist">
-                                {% for error in form.username.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </div>
-
-                    <!-- Password Field -->
-                    <div class="mb-3">
-                        <label for="{{ form.password.id_for_label }}" class="form-label">
-                            {{ form.password.label }}
-                        </label>
-                        <div class="input-group-icon">
-                            <i class="bi bi-lock-fill"></i>
-                            {{ form.password }}
-                        </div>
-                        {% if form.password.errors %}
-                            <ul class="errorlist">
-                                {% for error in form.password.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </div>
-
-                    <!-- Hidden next field -->
-                    {% if request.GET.next %}
-                        <input type="hidden" name="next" value="{{ request.GET.next }}">
-                    {% endif %}
-
-                    <!-- Submit Button -->
-                    <button type="submit" class="btn btn-login">
-                        <i class="bi bi-box-arrow-in-right"></i> Войти в систему
-                    </button>
-                </form>
-
-                <!-- Footer -->
-                <div class="login-footer">
-                    <i class="bi bi-shield-lock"></i> Защищенное соединение
-                </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Bootstrap 5 JS -->
+            <form method="post" action="{% url 'accounts:login' %}" novalidate>
+                {% csrf_token %}
+
+                <div class="field-wrap">
+                    <label for="{{ form.username.id_for_label }}" class="form-label">
+                        {{ form.username.label }}
+                    </label>
+                    <div class="input-with-icon">
+                        <i class="bi bi-person-fill"></i>
+                        {{ form.username }}
+                    </div>
+                    {% if form.username.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.username.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <div class="field-wrap">
+                    <label for="{{ form.password.id_for_label }}" class="form-label">
+                        {{ form.password.label }}
+                    </label>
+                    <div class="input-with-icon">
+                        <i class="bi bi-lock-fill"></i>
+                        {{ form.password }}
+                    </div>
+                    {% if form.password.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.password.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                {% if request.GET.next or request.POST.next %}
+                    <input type="hidden" name="next" value="{{ request.GET.next|default:request.POST.next }}">
+                {% endif %}
+
+                <button type="submit" class="btn btn-login">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Войти
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                <span><i class="bi bi-shield-check me-1"></i> Защищенное соединение</span>
+                <span class="auth-chip">Дашборд v2</span>
+            </div>
+        </main>
+    </section>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

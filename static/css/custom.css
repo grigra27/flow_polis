@@ -225,12 +225,12 @@ body {
 }
 
 .ecosystem-strip-link:hover {
-    background: #bbd7f3;
+    background: #e2e9f2;
     color: #1a3a62;
 }
 
 .ecosystem-strip-link.active {
-    background: #cde3f8;
+    background: #d4dee9;
     color: #16324f;
     text-shadow: none;
     box-shadow:

@@ -72,7 +72,7 @@
     .btn-mgr-edit {
         background: #f59e0b;
         border: none;
-        color: #fff;
+        color: #111111;
         font-size: 0.88rem;
         font-weight: 600;
         border-radius: 8px;
@@ -83,7 +83,7 @@
         text-decoration: none;
         transition: background 0.15s;
     }
-    .btn-mgr-edit:hover { background: #d97706; color: #fff; }
+    .btn-mgr-edit:hover { background: #d97706; color: #111111; }
 
     /* Section card */
     .mgr-section {
@@ -221,7 +221,9 @@
         cursor: pointer;
         transition: background 0.12s;
     }
+    .mgr-table tbody tr.row--nobroker { background: #f5f7fa; }
     .mgr-table tbody tr:hover { background: #f4f9ff; }
+    .mgr-table tbody tr.row--nobroker:hover { background: #edf1f5; }
     .mgr-table tbody tr.row--terminated { opacity: 0.65; }
     .mgr-table tbody td {
         padding: 0.55rem 0.75rem;
@@ -403,7 +405,7 @@
                             </thead>
                             <tbody>
                                 {% for policy in policies %}
-                                <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %}"
+                                <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %} {% if not policy.broker_participation %}row--nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td>
                                         <strong>{{ policy.policy_number }}</strong>

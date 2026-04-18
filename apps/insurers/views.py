@@ -301,6 +301,24 @@ class BranchListView(LoginRequiredMixin, ListView):
 
             branches_with_stats.append(branch)
         context["branches"] = branches_with_stats
+
+        import json
+        from django.urls import reverse
+
+        map_markers = []
+        for branch in branches_with_stats:
+            if branch.latitude and branch.longitude:
+                map_markers.append(
+                    {
+                        "name": branch.branch_name,
+                        "lat": float(branch.latitude),
+                        "lng": float(branch.longitude),
+                        "total": branch.stats["total_policies"],
+                        "active": branch.stats["active_policies"],
+                        "url": reverse("insurers:branch_detail", args=[branch.pk]),
+                    }
+                )
+        context["map_markers_json"] = json.dumps(map_markers, ensure_ascii=False)
         return context
 
     def _build_type_distribution_map(self, branch_ids):

@@ -65,8 +65,8 @@ class BranchAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if obj and obj.logo:
-            return ["branch_name", "logo", "logo_preview"]
-        return ["branch_name", "logo"]
+            return ["branch_name", "logo", "logo_preview", "latitude", "longitude"]
+        return ["branch_name", "logo", "latitude", "longitude"]
 
 
 @admin.register(InsuranceType)

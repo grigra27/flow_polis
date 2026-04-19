@@ -155,6 +155,16 @@
     .exp-card--slate .exp-faq-icon:hover { background: #e2e8f0; border-color: #64748b; }
     .exp-card--slate .btn-exp-primary { background: #475569; }
     .exp-card--slate .btn-exp-primary:hover { background: #334155; }
+
+    .exp-card--teal {
+        border-left: 4px solid #6b1f2f;
+    }
+    .exp-card--teal .exp-card-kicker { color: #6b1f2f; }
+    .exp-card--teal .exp-feat { color: #6b1f2f; background: #f8eef1; border-color: #e3c2cb; }
+    .exp-card--teal .exp-faq-icon { border-color: #e3c2cb; color: #6b1f2f; background: #f8eef1; }
+    .exp-card--teal .exp-faq-icon:hover { background: #eedbe1; border-color: #6b1f2f; }
+    .exp-card--teal .btn-exp-primary { background: #6b1f2f; }
+    .exp-card--teal .btn-exp-primary:hover { background: #561323; }
     .exp-card-head {
         display: flex;
         align-items: flex-start;
@@ -232,6 +242,7 @@
     }
     .exp-feat--brown { color: #5D4037; background: #fdf5f3; border-color: #e0cec9; }
     .exp-feat--slate { color: #475569; background: #f4f6f9; border-color: #d1d9e6; }
+    .exp-feat--teal  { color: #6b1f2f; background: #f8eef1; border-color: #e3c2cb; }
     .exp-feat--dark  { color: #17324f; background: #f0f4f9; border-color: #c5d2e6; }
 
     /* Sections list (четверговый) */
@@ -344,6 +355,8 @@
     }
     .btn-exp-primary:hover { background: #1251a3; color: #fff; }
     .btn-exp-primary:disabled { background: #94b3d8; }
+    .btn-exp-primary.exp-backup-btn { background: #1a1a1a; }
+    .btn-exp-primary.exp-backup-btn:hover { background: #000000; }
 
 
     /* Recent templates list */
@@ -801,46 +814,26 @@
                 </div>
             </div>
 
-            <!-- Экспорт CSV -->
+            <!-- Отчет по 3% -->
             <div class="col-md-6">
-                <div class="exp-card exp-card--slate">
-                    <div class="exp-card-kicker"><i class="bi bi-filetype-csv"></i> Экспорт CSV</div>
-                    <div class="exp-card-title">Экспорт CSV</div>
-                    <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Выгрузка платежей по периоду</strong></p>
-                    <p class="exp-card-desc">Экспорт всех платежей за указанный период в формате CSV для анализа данных</p>
+                <div class="exp-card exp-card--teal">
+                    <div class="exp-card-kicker"><i class="bi bi-percent"></i> Отчет по 3%</div>
+                    <div class="exp-card-title">Отчет по 3%</div>
+                    <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Новый отчет для отдельного экспортного сценария</strong></p>
+                    <p class="exp-card-desc">Заглушка под будущий экспорт отчета 3%.</p>
 
                     <div class="exp-features">
-                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Формат CSV</span>
-                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Фильтр по периоду</span>
-                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Данные по платежам</span>
-                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> UTF-8 кодировка</span>
+                        <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> Заготовка интерфейса</span>
+                        <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> Блок под будущую логику</span>
+                        <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> Отдельная цветовая зона</span>
                     </div>
 
-                    <form method="get" action="{% url 'reports:export_policies_csv' %}" class="needs-validation" novalidate>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="start_date" class="form-label fw-semibold">
-                                    <i class="bi bi-calendar3"></i> Дата начала
-                                </label>
-                                <input type="date" class="form-control form-control-sm"
-                                       id="start_date" name="start_date"
-                                       value="{{ request.GET.start_date }}" required>
-                                <div class="form-text">Начало периода для выгрузки</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="end_date" class="form-label fw-semibold">
-                                    <i class="bi bi-calendar3"></i> Дата окончания
-                                </label>
-                                <input type="date" class="form-control form-control-sm"
-                                       id="end_date" name="end_date"
-                                       value="{{ request.GET.end_date }}" required>
-                                <div class="form-text">Окончание периода для выгрузки</div>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-exp-primary">
-                            <i class="bi bi-filetype-csv"></i> Экспортировать платежи в CSV
-                        </button>
-                    </form>
+                    <div class="exp-card-hint">
+                        <i class="bi bi-tools"></i> Этот блок пока не выполняет экспорт.
+                    </div>
+                    <button type="button" class="btn-exp-primary" disabled>
+                        <i class="bi bi-hourglass-split"></i> Скоро
+                    </button>
                 </div>
             </div>
 
@@ -904,6 +897,49 @@
                             {% endif %}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Экспорт CSV -->
+            <div class="col-md-6">
+                <div class="exp-card exp-card--slate">
+                    <div class="exp-card-kicker"><i class="bi bi-filetype-csv"></i> Экспорт CSV</div>
+                    <div class="exp-card-title">Экспорт CSV</div>
+                    <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Выгрузка платежей по периоду</strong></p>
+                    <p class="exp-card-desc">Экспорт всех платежей за указанный период в формате CSV для анализа данных</p>
+
+                    <div class="exp-features">
+                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Формат CSV</span>
+                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Фильтр по периоду</span>
+                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Данные по платежам</span>
+                        <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> UTF-8 кодировка</span>
+                    </div>
+
+                    <form method="get" action="{% url 'reports:export_policies_csv' %}" class="needs-validation" novalidate>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="start_date" class="form-label fw-semibold">
+                                    <i class="bi bi-calendar3"></i> Дата начала
+                                </label>
+                                <input type="date" class="form-control form-control-sm"
+                                       id="start_date" name="start_date"
+                                       value="{{ request.GET.start_date }}" required>
+                                <div class="form-text">Начало периода для выгрузки</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="end_date" class="form-label fw-semibold">
+                                    <i class="bi bi-calendar3"></i> Дата окончания
+                                </label>
+                                <input type="date" class="form-control form-control-sm"
+                                       id="end_date" name="end_date"
+                                       value="{{ request.GET.end_date }}" required>
+                                <div class="form-text">Окончание периода для выгрузки</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-exp-primary">
+                            <i class="bi bi-filetype-csv"></i> Экспортировать платежи в CSV
+                        </button>
+                    </form>
                 </div>
             </div>
 

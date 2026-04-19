@@ -373,6 +373,13 @@
     }
     .br-insurer-pill:hover { border-color: var(--v2-accent); background: #eff5ff; color: var(--v2-accent); text-decoration: none; }
     .br-insurer-pill.active { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+    .br-insurer-pill .insurer-with-logo {
+        min-width: 0;
+    }
+    .br-insurer-pill .insurer-with-logo > span:last-child {
+        color: inherit;
+        white-space: nowrap;
+    }
 
     /* Overview grid 4 cols */
     .br-overview-grid {
@@ -744,7 +751,7 @@
                         {% for insurer in insurers %}
                         <a class="br-insurer-pill {% if selected_insurer_id == insurer.id %}active{% endif %}"
                            href="?{% update_query insurer=insurer.id stats_scope='current' %}">
-                            <i class="bi bi-building"></i> {{ insurer.insurer_name }}
+                            {% insurer_logo insurer size='small' %}
                         </a>
                         {% endfor %}
                     </div>
@@ -757,9 +764,9 @@
                             <thead>
                                 <tr>
                                     <th>Номер полиса</th>
+                                    <th>Номер ДФА</th>
                                     <th>ЛП</th>
                                     <th>Страховщик</th>
-                                    <th>Менеджер ЛК</th>
                                     <th>Вид</th>
                                     <th>Объект</th>
                                     <th>Период</th>
@@ -779,13 +786,9 @@
                                         <span class="tbl-badge tbl-badge--nobroker">Без брокера</span>
                                         {% endif %}
                                     </td>
+                                    <td style="font-size:0.82rem;">{{ policy.dfa_number|default:"—" }}</td>
                                     <td style="font-size:0.82rem;">{{ policy.client.client_name }}</td>
                                     <td>{% insurer_logo policy.insurer size='small' %}</td>
-                                    <td style="font-size:0.82rem;">
-                                        {% if policy.leasing_manager %}
-                                        <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" style="color:var(--v2-accent);text-decoration:none;">{{ policy.leasing_manager.name }}</a>
-                                        {% else %}—{% endif %}
-                                    </td>
                                     <td>{% insurance_type_icon policy.insurance_type size='small' %}</td>
                                     <td style="max-width:120px;"><small>{{ policy.property_description|truncatewords:8 }}</small></td>
                                     <td style="white-space:nowrap;"><small>{{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}</small></td>

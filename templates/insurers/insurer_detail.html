@@ -257,6 +257,11 @@
     }
     .br-insurer-pill:hover { border-color: var(--v2-accent); background: #eff5ff; color: var(--v2-accent); text-decoration: none; }
     .br-insurer-pill.active { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+    .br-insurer-pill .branch-with-logo { min-width: 0; }
+    .br-insurer-pill .branch-with-logo > span:last-child {
+        color: inherit;
+        white-space: nowrap;
+    }
 
     .mgr-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .mgr-table thead tr { border-bottom: 2px solid var(--v2-border); }
@@ -568,7 +573,7 @@
                         {% for branch in branches %}
                         <a class="br-insurer-pill {% if selected_branch_id == branch.id %}active{% endif %}"
                            href="?{% update_query branch=branch.id %}">
-                            <i class="bi bi-geo-alt"></i> {{ branch.branch_name }}
+                            {% branch_logo branch size='small' %}
                         </a>
                         {% endfor %}
                     </div>

@@ -508,8 +508,8 @@
                     {% endif %}
                 </div>
 
-                {% if request.GET.next or request.POST.next %}
-                    <input type="hidden" name="next" value="{{ request.GET.next|default:request.POST.next }}">
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
                 {% endif %}
 
                 <button type="submit" class="btn btn-login">

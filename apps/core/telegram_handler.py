@@ -1,6 +1,6 @@
 """
 Telegram Logging Handler for Django
-Отправляет критические ошибки в Telegram канал
+Отправляет критические ошибки в Telegram канал и VK
 """
 import logging
 import json
@@ -12,6 +12,7 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 from django.conf import settings
 from decouple import config
+from apps.core.vk_handler import send_vk_message
 
 
 def get_moscow_time():
@@ -198,7 +199,7 @@ class TelegramHandler(logging.Handler):
 
     def _send_message_async(self, message):
         """
-        Асинхронно отправляет сообщение в Telegram
+        Асинхронно отправляет сообщение в Telegram и VK
         """
         try:
             data = {
@@ -237,6 +238,9 @@ class TelegramHandler(logging.Handler):
             print(f"TelegramHandler: Network error: {e}")
         except Exception as e:
             print(f"TelegramHandler: Unexpected error: {e}")
+
+        # Дублируем в VK
+        send_vk_message(message)
 
 
 class TelegramErrorNotifier:
@@ -277,7 +281,7 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Отправляем асинхронно
+        # Отправляем асинхронно (Telegram + VK внутри _send_message_async)
         thread = Thread(target=handler._send_message_async, args=(formatted_message,))
         thread.daemon = True
         thread.start()
@@ -315,7 +319,7 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Отправляем асинхронно
+        # Отправляем асинхронно (Telegram + VK внутри _send_message_async)
         thread = Thread(target=handler._send_message_async, args=(formatted_message,))
         thread.daemon = True
         thread.start()

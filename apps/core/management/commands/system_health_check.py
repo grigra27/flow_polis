@@ -24,6 +24,11 @@ class Command(BaseCommand):
             help="Отправить результат проверки в Telegram",
         )
         parser.add_argument(
+            "--notify-vk",
+            action="store_true",
+            help="Отправить результат проверки в VK",
+        )
+        parser.add_argument(
             "--check-all",
             action="store_true",
             help="Выполнить все проверки",
@@ -87,9 +92,12 @@ class Command(BaseCommand):
         # Выводим результаты
         self._display_results(results, overall_status)
 
-        # Отправляем в Telegram если нужно
+        # Отправляем уведомления если нужно
         if options["notify_telegram"]:
             self._send_telegram_notification(results, overall_status)
+
+        if options["notify_vk"]:
+            self._send_vk_notification(results, overall_status)
 
         # Логируем критические проблемы
         if overall_status == "critical":
@@ -243,4 +251,43 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.WARNING("⚠️ Не удалось отправить уведомление в Telegram")
+            )
+
+    def _send_vk_notification(self, results, overall_status):
+        """Отправляет уведомление о состоянии системы в VK"""
+        from apps.core.vk_handler import send_vk_message
+        from datetime import datetime, timezone, timedelta
+
+        self.stdout.write("📤 Отправка уведомления в VK...")
+
+        status_emoji = (
+            "✅"
+            if overall_status == "healthy"
+            else "⚠️"
+            if overall_status == "warning"
+            else "❌"
+        )
+        moscow_tz = timezone(timedelta(hours=3))
+        timestamp = datetime.now(moscow_tz).strftime("%Y-%m-%d %H:%M:%S MSK")
+
+        message_parts = [
+            f"{status_emoji} System Health Check",
+            "",
+            f"🕐 Time: {timestamp}",
+            f"📊 Status: {overall_status.upper()}",
+            "",
+            "📈 Metrics:",
+        ]
+        for check_name, result in results.items():
+            message_parts.append(
+                f"• {check_name.title()}: {result['status']} — {result['message']}"
+            )
+
+        success = send_vk_message("\n".join(message_parts))
+
+        if success:
+            self.stdout.write(self.style.SUCCESS("✅ Уведомление отправлено в VK"))
+        else:
+            self.stdout.write(
+                self.style.WARNING("⚠️ Не удалось отправить уведомление в VK")
             )

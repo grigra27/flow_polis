@@ -3,267 +3,596 @@
 
 {% block title %}Полисы{% endblock %}
 
+{% block extra_css %}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
+
+    /* Root wrapper */
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .mgr-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .mgr-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .mgr-page-title {
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+        line-height: 1.25;
+    }
+    .mgr-header-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+    .btn-mgr-primary {
+        background: var(--v2-accent);
+        border: none;
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .btn-mgr-primary:hover {
+        background: #0d47a1;
+        color: #fff;
+        text-decoration: none;
+    }
+
+    /* Branch tabs */
+    .pl-branch-tabs {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+    }
+    .pl-branch-tab {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        padding: 0.4rem 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--v2-muted);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .pl-branch-tab:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .pl-branch-tab.active {
+        background: var(--v2-accent);
+        border-color: var(--v2-accent);
+        color: #fff;
+    }
+    .pl-branch-tab.active:hover {
+        background: #0d47a1;
+        border-color: #0d47a1;
+        color: #fff;
+    }
+
+    /* Section card */
+    .mgr-section {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .mgr-section-head {
+        background: #1e3a5f;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    .mgr-section-head-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #e8f3ff;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .mgr-section-head-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(255,255,255,0.15);
+        color: #e8f3ff;
+        border-radius: 999px;
+        padding: 0.15rem 0.6rem;
+    }
+    .mgr-section-body {
+        padding: 0.9rem 1rem;
+    }
+
+    /* Filter form */
+    .pl-filter-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.3rem;
+        display: block;
+    }
+    .pl-filter-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        padding-top: 0.25rem;
+    }
+    .btn-pl-apply {
+        background: var(--v2-accent);
+        border: none;
+        color: #fff;
+        font-size: 0.84rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-pl-apply:hover { background: #0d47a1; color: #fff; }
+    .btn-pl-reset {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.84rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-pl-reset:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+
+    /* Table */
+    .mgr-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .mgr-table thead tr {
+        border-bottom: 2px solid var(--v2-border);
+    }
+    .mgr-table th {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        padding: 0.5rem 0.6rem;
+        white-space: nowrap;
+    }
+    .mgr-table td {
+        padding: 0.55rem 0.6rem;
+        border-bottom: 1px solid #f0f5fc;
+        vertical-align: middle;
+        color: var(--v2-title);
+    }
+    .mgr-table tbody tr:last-child td { border-bottom: none; }
+    .mgr-table tbody tr.tbl-row-clickable {
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+    .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
+    .mgr-table tbody tr.tbl-row-nobroker { background: #f5f7fa; }
+    .mgr-table tbody tr.tbl-row-clickable.tbl-row-nobroker:hover { background: #edf1f5; }
+    .mgr-table tbody tr.tbl-row-terminated { opacity: 0.65; }
+
+    .tbl-badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 0.15rem 0.55rem;
+        white-space: nowrap;
+    }
+    .tbl-badge--closed   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .tbl-badge--nobroker { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+    .tbl-badge--info     { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+
+    /* Edit button in table */
+    .btn-tbl-edit {
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 7px;
+        padding: 0.25rem 0.55rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .btn-tbl-edit:hover {
+        background: #fde68a;
+        color: #78350f;
+        text-decoration: none;
+    }
+
+    /* Pagination */
+    .pl-pagination {
+        display: flex;
+        justify-content: center;
+        gap: 0.3rem;
+        padding-top: 1rem;
+        flex-wrap: wrap;
+    }
+    .pl-page-btn {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        border-radius: 8px;
+        padding: 0.35rem 0.65rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        transition: border-color 0.15s, background 0.15s;
+        min-width: 2rem;
+        justify-content: center;
+    }
+    .pl-page-btn:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .pl-page-btn.active {
+        background: var(--v2-accent);
+        border-color: var(--v2-accent);
+        color: #fff;
+        cursor: default;
+    }
+    .pl-page-btn.disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+    .pl-page-ellipsis {
+        padding: 0.35rem 0.4rem;
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* Empty state */
+    .pl-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--v2-muted);
+        font-size: 0.9rem;
+    }
+    .pl-empty i {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 0.5rem;
+        opacity: 0.4;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Журнал полисов</h1>
-    {% if can_edit %}
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <a href="{% url 'admin:policies_policy_add' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Добавить полис
+<div class="mgr-root">
+
+    <!-- Page header -->
+    <div class="mgr-page-header">
+        <div>
+            <div class="mgr-page-kicker"><i class="bi bi-file-earmark-text"></i> Страхование</div>
+            <h1 class="mgr-page-title">Журнал полисов</h1>
+        </div>
+        {% if can_edit %}
+        <div class="mgr-header-actions">
+            <a href="{% url 'admin:policies_policy_add' %}" class="btn-mgr-primary">
+                <i class="bi bi-plus-circle"></i> Добавить полис
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Branch Tabs -->
+    {% if branches %}
+    <div class="pl-branch-tabs">
+        <a class="pl-branch-tab {% if not selected_branch %}active{% endif %}"
+           href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+            <i class="bi bi-grid-3x3-gap"></i> Все филиалы
         </a>
+        {% for branch in branches %}
+        <a class="pl-branch-tab {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
+           href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+            {% branch_logo branch size='small' %}
+        </a>
+        {% endfor %}
     </div>
     {% endif %}
-</div>
 
-<!-- Branch Tabs -->
-{% if branches %}
-<div class="mb-4">
-    <ul class="nav nav-pills nav-fill app-nav-pills" role="tablist">
-        <li class="nav-item" role="presentation">
-            <a class="nav-link {% if not selected_branch %}active{% endif %}"
-               href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
-                <i class="bi bi-grid-3x3-gap"></i> Все филиалы
-            </a>
-        </li>
-        {% for branch in branches %}
-        <li class="nav-item" role="presentation">
-            <a class="nav-link {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
-               href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                {% branch_logo branch size='small' %}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-</div>
-{% endif %}
-
-<!-- Filters -->
-<div class="card mb-4">
-    <div class="card-header">
-        <i class="bi bi-funnel"></i> Фильтры
-    </div>
-    <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Номер полиса</label>
-                {{ filter.form.policy_number }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Номер ДФА</label>
-                {{ filter.form.dfa_number }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Клиент</label>
-                {{ filter.form.client__client_name }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Страховщик</label>
-                {{ filter.form.insurer }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Филиал</label>
-                {{ filter.form.branch }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Вид страхования</label>
-                {{ filter.form.insurance_type }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Дата начала страхования от</label>
-                {{ filter.form.start_date_from }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Дата начала страхования до</label>
-                {{ filter.form.start_date_to }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Полис активен</label>
-                {{ filter.form.policy_active }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">ДФА активен</label>
-                {{ filter.form.dfa_active }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Полис подгружен</label>
-                {{ filter.form.policy_uploaded }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Участие брокера</label>
-                {{ filter.form.broker_participation }}
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Инфо 1</label>
-                {{ filter.form.info1_tag }}
-            </div>
-            <div class="col-md-12">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Применить
-                </button>
-                <a href="{% url 'policies:list' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Сбросить
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Policies Table -->
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Номер полиса</th>
-                        <th>Номер ДФА</th>
-                        <th>Лизингополучатель</th>
-                        <th>Страховщик</th>
-                        <th>Объект страхования</th>
-                        <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
-                        <th>Период</th>
-                        <th>Инфо 1</th>
-                        <th>Инфо 3</th>
-                        <th>Ред.</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for policy in policies %}
-                    <tr class="clickable-row {% if not policy.policy_active %}table-terminated{% elif not policy.broker_participation %}table-secondary{% endif %}" data-href="{% url 'policies:detail' policy.pk %}">
-                        <td>
-                            <strong>{{ policy.policy_number }}</strong>
-                            {% if not policy.policy_active %}
-                                <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
-                            {% endif %}
-                            {% if not policy.broker_participation %}
-                                <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ policy.dfa_number }}</td>
-                        <td>{{ policy.client.client_name }}</td>
-                        <td>{% insurer_logo policy.insurer size='small' %}</td>
-                        <td>
-                            <small>{{ policy.property_description|truncatewords:10 }}</small>
-                        </td>
-                        <td class="insurance-type-icon-cell">
-                            {% if policy.insurance_type.icon %}
-                                <img src="{{ policy.insurance_type.icon.url }}"
-                                     alt="{{ policy.insurance_type.name }}"
-                                     title="{{ policy.insurance_type.name }}"
-                                     class="insurance-type-icon">
-                            {% else %}
-                                <span title="{{ policy.insurance_type.name }}"
-                                      class="insurance-type-icon-fallback">
-                                    <i class="bi bi-shield-check"></i>
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <small>{{ policy.start_date|date:"d.m.Y" }} - {{ policy.end_date|date:"d.m.Y" }}</small>
-                        </td>
-                        <td>
-                            {% for info in policy.info_tags.all %}
-                                {% if info.info_field == 1 %}
-                                    <span class="badge bg-info">{{ info.tag.name }}</span>
-                                {% endif %}
-                            {% endfor %}
-                        </td>
-                        <td>
-                            <small>{{ policy.info3|truncatewords:10 }}</small>
-                        </td>
-                        <td onclick="event.stopPropagation();">
-                            {% if can_edit %}
-                            <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-sm btn-warning">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="10" class="text-center text-muted">Полисы не найдены</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Filters -->
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
         </div>
+        <div class="mgr-section-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Номер полиса</label>
+                    {{ filter.form.policy_number }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Номер ДФА</label>
+                    {{ filter.form.dfa_number }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Клиент</label>
+                    {{ filter.form.client__client_name }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Страховщик</label>
+                    {{ filter.form.insurer }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Филиал</label>
+                    {{ filter.form.branch }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Вид страхования</label>
+                    {{ filter.form.insurance_type }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Дата начала страхования от</label>
+                    {{ filter.form.start_date_from }}
+                </div>
+                <div class="col-md-3">
+                    <label class="pl-filter-label">Дата начала страхования до</label>
+                    {{ filter.form.start_date_to }}
+                </div>
+                <div class="col-md-2">
+                    <label class="pl-filter-label">Полис активен</label>
+                    {{ filter.form.policy_active }}
+                </div>
+                <div class="col-md-2">
+                    <label class="pl-filter-label">ДФА активен</label>
+                    {{ filter.form.dfa_active }}
+                </div>
+                <div class="col-md-2">
+                    <label class="pl-filter-label">Полис подгружен</label>
+                    {{ filter.form.policy_uploaded }}
+                </div>
+                <div class="col-md-2">
+                    <label class="pl-filter-label">Участие брокера</label>
+                    {{ filter.form.broker_participation }}
+                </div>
+                <div class="col-md-2">
+                    <label class="pl-filter-label">Инфо 1</label>
+                    {{ filter.form.info1_tag }}
+                </div>
+                <div class="col-md-12">
+                    <div class="pl-filter-actions">
+                        <button type="submit" class="btn-pl-apply">
+                            <i class="bi bi-search"></i> Применить
+                        </button>
+                        <a href="{% url 'policies:list' %}" class="btn-pl-reset">
+                            <i class="bi bi-x-circle"></i> Сбросить
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        <!-- Pagination -->
-        {% if is_paginated %}
-        <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center">
-                <!-- First Page -->
+    <!-- Policies Table -->
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-file-earmark-text"></i> Полисы</span>
+            {% if page_obj %}
+            <span class="mgr-section-head-badge">{{ page_obj.paginator.count }}</span>
+            {% endif %}
+        </div>
+        <div class="mgr-section-body" style="padding: 0 0 0.9rem;">
+            <div class="table-responsive">
+                <table class="mgr-table">
+                    <thead>
+                        <tr>
+                            <th style="width:2rem;text-align:center;" title="Полис подгружен"></th>
+                            <th style="padding-left:1rem;">Номер полиса</th>
+                            <th>Номер ДФА</th>
+                            <th>Лизингополучатель</th>
+                            <th>Страховщик</th>
+                            <th>Объект страхования</th>
+                            <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
+                            <th>Период</th>
+                            <th>Инфо 1</th>
+                            <th>Инфо 3</th>
+                            {% if can_edit %}<th>Ред.</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for policy in policies %}
+                        <tr class="tbl-row-clickable {% if not policy.policy_active %}tbl-row-terminated{% elif not policy.broker_participation %}tbl-row-nobroker{% endif %}"
+                            data-href="{% url 'policies:detail' policy.pk %}">
+                            <td style="width:2rem;text-align:center;">
+                                {% if policy.policy_uploaded %}
+                                    <i class="bi bi-check-circle-fill" style="color:#15803d;" title="Полис подгружен"></i>
+                                {% else %}
+                                    <i class="bi bi-x-circle-fill" style="color:#b91c1c;" title="Полис не подгружен"></i>
+                                {% endif %}
+                            </td>
+                            <td style="padding-left:1rem;">
+                                <strong>{{ policy.policy_number }}</strong>
+                                {% if not policy.policy_active %}
+                                    <span class="tbl-badge tbl-badge--closed" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
+                                {% endif %}
+                                {% if not policy.broker_participation %}
+                                    <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
+                                {% endif %}
+                            </td>
+                            <td style="color:var(--v2-muted);">{{ policy.dfa_number }}</td>
+                            <td>{{ policy.client.client_name }}</td>
+                            <td>{% insurer_logo policy.insurer size='small' %}</td>
+                            <td style="max-width:160px;">
+                                <small>{{ policy.property_description|truncatewords:10 }}</small>
+                            </td>
+                            <td class="insurance-type-icon-cell">
+                                {% if policy.insurance_type.icon %}
+                                    <img src="{{ policy.insurance_type.icon.url }}"
+                                         alt="{{ policy.insurance_type.name }}"
+                                         title="{{ policy.insurance_type.name }}"
+                                         class="insurance-type-icon">
+                                {% else %}
+                                    <span title="{{ policy.insurance_type.name }}"
+                                          class="insurance-type-icon-fallback">
+                                        <i class="bi bi-shield-check"></i>
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td style="white-space:nowrap;">
+                                <small>{{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}</small>
+                            </td>
+                            <td>
+                                {% for info in policy.info_tags.all %}
+                                    {% if info.info_field == 1 %}
+                                        <span class="tbl-badge tbl-badge--info">{{ info.tag.name }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <small>{{ policy.info3|truncatewords:10 }}</small>
+                            </td>
+                            {% if can_edit %}
+                            <td onclick="event.stopPropagation();">
+                                <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn-tbl-edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10">
+                                <div class="pl-empty">
+                                    <i class="bi bi-file-earmark-x"></i>
+                                    Полисы не найдены
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="pl-pagination">
+                <!-- First / Prev -->
                 {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Первая страница">
-                            <i class="bi bi-chevron-double-left"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Предыдущая">
-                            <i class="bi bi-chevron-left"></i>
-                        </a>
-                    </li>
+                    <a class="pl-page-btn" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Первая страница">
+                        <i class="bi bi-chevron-double-left"></i>
+                    </a>
+                    <a class="pl-page-btn" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Предыдущая">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
                 {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link"><i class="bi bi-chevron-double-left"></i></span>
-                    </li>
-                    <li class="page-item disabled">
-                        <span class="page-link"><i class="bi bi-chevron-left"></i></span>
-                    </li>
+                    <span class="pl-page-btn disabled"><i class="bi bi-chevron-double-left"></i></span>
+                    <span class="pl-page-btn disabled"><i class="bi bi-chevron-left"></i></span>
                 {% endif %}
 
-                <!-- Page Numbers -->
+                <!-- Page numbers -->
                 {% for num in page_obj.paginator.page_range %}
                     {% if page_obj.number == num %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ num }}</span>
-                        </li>
+                        <span class="pl-page-btn active">{{ num }}</span>
                     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
-                        </li>
+                        <a class="pl-page-btn" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
                     {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
-                        </li>
+                        <a class="pl-page-btn" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
                     {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
-                        <li class="page-item disabled">
-                            <span class="page-link">...</span>
-                        </li>
+                        <span class="pl-page-ellipsis">…</span>
                     {% endif %}
                 {% endfor %}
 
-                <!-- Next Page -->
+                <!-- Next / Last -->
                 {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Следующая">
-                            <i class="bi bi-chevron-right"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Последняя страница">
-                            <i class="bi bi-chevron-double-right"></i>
-                        </a>
-                    </li>
+                    <a class="pl-page-btn" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Следующая">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <a class="pl-page-btn" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Последняя страница">
+                        <i class="bi bi-chevron-double-right"></i>
+                    </a>
                 {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link"><i class="bi bi-chevron-right"></i></span>
-                    </li>
-                    <li class="page-item disabled">
-                        <span class="page-link"><i class="bi bi-chevron-double-right"></i></span>
-                    </li>
+                    <span class="pl-page-btn disabled"><i class="bi bi-chevron-right"></i></span>
+                    <span class="pl-page-btn disabled"><i class="bi bi-chevron-double-right"></i></span>
                 {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
+            </div>
+            {% endif %}
+
+        </div>
     </div>
+
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const rows = document.querySelectorAll('.clickable-row');
-    rows.forEach(row => {
+    document.querySelectorAll('.tbl-row-clickable').forEach(function(row) {
         row.addEventListener('click', function() {
             window.location.href = this.dataset.href;
         });

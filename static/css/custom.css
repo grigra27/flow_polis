@@ -638,6 +638,17 @@ tr.table-secondary:hover > td {
     font-weight: 700;
 }
 
+/* ─── No-broker row highlight (centralized) ─────────────────────────────── */
+.mgr-table tbody tr.tbl-row-nobroker,
+.mgr-table tbody tr.row--nobroker {
+    background: #e5e9f0;
+}
+.mgr-table tbody tr.tbl-row-clickable.tbl-row-nobroker:hover,
+.mgr-table tbody tr.tbl-row-clickable.row--nobroker:hover,
+.mgr-table tbody tr.clickable-row.row--nobroker:hover {
+    background: #dae0e9;
+}
+
 .insurance-type-icon-cell {
     width: 40px !important;
     min-width: 40px;

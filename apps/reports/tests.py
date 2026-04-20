@@ -832,6 +832,153 @@ class PaymentExporterTest(TestCase):
         self.assertIn("payments_", response["Content-Disposition"])
 
 
+class MonthlyKVExportViewTest(TestCase):
+    """Тесты экспорта «КВ за месяц»."""
+
+    def setUp(self):
+        from datetime import date
+        from decimal import Decimal
+        from apps.clients.models import Client
+        from apps.insurers.models import Insurer, Branch, InsuranceType
+        from apps.policies.models import Policy, PaymentSchedule
+
+        self.user = User.objects.create_user(
+            username="monthly_kv_user", password="testpass123"
+        )
+        self.admin = User.objects.create_user(
+            username="monthly_kv_admin", password="testpass123", is_staff=True
+        )
+
+        self.client_obj = Client.objects.create(
+            client_name="Лизингополучатель", client_inn="7700000001"
+        )
+        self.policyholder = Client.objects.create(
+            client_name="Страхователь", client_inn="7700000002"
+        )
+        self.insurer = Insurer.objects.create(insurer_name="СК Тест")
+        self.branch = Branch.objects.create(branch_name="Москва")
+        self.insurance_type = InsuranceType.objects.create(name="КАСКО")
+
+        self.policy = Policy.objects.create(
+            policy_number="POL-KV-001",
+            dfa_number="DFA-KV-001",
+            client=self.client_obj,
+            policyholder=self.policyholder,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Автомобиль",
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            policy_active=True,
+        )
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2025, 2, 10),
+            amount=Decimal("10000.00"),
+            insurance_sum=Decimal("500000.00"),
+            kv_rub=Decimal("1500.00"),
+            paid_date=date(2025, 2, 15),
+        )
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=2,
+            due_date=date(2025, 3, 10),
+            amount=Decimal("12000.00"),
+            insurance_sum=Decimal("500000.00"),
+            kv_rub=Decimal("1800.00"),
+            paid_date=date(2025, 3, 15),
+        )
+
+    def test_non_admin_cannot_export_monthly_kv(self):
+        """Тест: обычный пользователь не может выгрузить КВ за месяц."""
+        self.client.login(username="monthly_kv_user", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_monthly_kv_report"),
+            {"kv_month": 2, "kv_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("reports:index"))
+
+    def test_admin_can_export_monthly_kv(self):
+        """Тест: админ получает Excel с нужными колонками и данными."""
+        from datetime import date
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        self.client.login(username="monthly_kv_admin", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_monthly_kv_report"),
+            {"kv_month": 2, "kv_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn("kv_for_month_2025_02_", response["Content-Disposition"])
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+        sheet = workbook.active
+
+        self.assertEqual(sheet["A1"].value, "КВ ЗА МЕСЯЦ - 02.2025")
+        self.assertEqual(
+            [cell.value for cell in sheet[3]],
+            [
+                "Страховщик",
+                "Номер полиса",
+                "Номер ДФА",
+                "Страхователь",
+                "КВ в %",
+                "Страховая премия",
+                "Дата фактической оплаты",
+                "КВ (в руб)",
+                "Филиал",
+            ],
+        )
+
+        data_rows = [
+            row
+            for row in sheet.iter_rows(min_row=5, max_col=9, values_only=True)
+            if any(value is not None and value != "" for value in row)
+        ]
+
+        self.assertEqual(len(data_rows), 1)
+        row = data_rows[0]
+
+        self.assertEqual(row[0], "СК Тест")
+        self.assertEqual(row[1], "POL-KV-001")
+        self.assertEqual(row[2], "DFA-KV-001")
+        self.assertEqual(row[3], "Страхователь")
+        self.assertAlmostEqual(float(row[4]), 15.0)
+        self.assertAlmostEqual(float(row[5]), 10000.0)
+        exported_paid_date = row[6].date() if hasattr(row[6], "date") else row[6]
+        self.assertEqual(exported_paid_date, date(2025, 2, 15))
+        self.assertAlmostEqual(float(row[7]), 1500.0)
+        self.assertEqual(row[8], "Москва")
+
+    def test_admin_gets_redirect_when_no_data(self):
+        """Тест: при отсутствии данных админ возвращается на страницу экспортов."""
+        self.client.login(username="monthly_kv_admin", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_monthly_kv_report"),
+            {"kv_month": 1, "kv_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("reports:index"))
+
+
 class BackupExportViewTest(TestCase):
     """Тесты скачивания backup-файлов на странице экспортов."""
 

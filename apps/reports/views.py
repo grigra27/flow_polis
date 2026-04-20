@@ -690,6 +690,84 @@ def export_commission_report(request):
 
 
 @login_required
+def export_monthly_kv_report(request):
+    """Export monthly KV report by paid date month/year (admin only)."""
+    if not _is_admin_user(request.user):
+        messages.error(request, "У вас нет прав для выполнения этого действия")
+        return redirect("reports:index")
+
+    try:
+        month_param = request.GET.get("kv_month")
+        year_param = request.GET.get("kv_year")
+
+        if not month_param or not year_param:
+            messages.error(request, "Необходимо выбрать месяц и год")
+            return redirect("reports:index")
+
+        try:
+            month = int(month_param)
+            year = int(year_param)
+        except (TypeError, ValueError):
+            messages.error(request, "Некорректные значения месяца или года")
+            return redirect("reports:index")
+
+        if month < 1 or month > 12:
+            messages.error(request, "Месяц должен быть в диапазоне от 1 до 12")
+            return redirect("reports:index")
+
+        current_year = timezone.now().year
+        if year < 2000 or year > current_year + 5:
+            messages.error(request, "Некорректное значение года")
+            return redirect("reports:index")
+
+        payments = (
+            PaymentSchedule.objects.select_related(
+                "policy",
+                "policy__insurer",
+                "policy__policyholder",
+                "policy__branch",
+            )
+            .filter(
+                paid_date__isnull=False,
+                paid_date__year=year,
+                paid_date__month=month,
+                kv_rub__gt=0,
+            )
+            .order_by(
+                "paid_date",
+                "policy__insurer__insurer_name",
+                "policy__policy_number",
+            )
+        )
+
+        if not payments.exists():
+            messages.warning(
+                request,
+                f"Нет данных по КВ за {month:02d}.{year}",
+            )
+            return redirect("reports:index")
+
+        from .exporters import MonthlyKVReportExporter
+
+        exporter = MonthlyKVReportExporter(payments, [], month=month, year=year)
+
+        logger.info(
+            "User %s exported monthly KV report (period: %02d.%s, count: %s)",
+            request.user.username,
+            month,
+            year,
+            payments.count(),
+        )
+
+        return exporter.export()
+
+    except Exception as e:
+        logger.error(f"Error exporting monthly KV report: {e}")
+        messages.error(request, "Ошибка при создании отчета КВ за месяц")
+        return redirect("reports:index")
+
+
+@login_required
 def export_database_backup(request):
     """Скачивание актуального backup-файла базы данных."""
     return _download_backup_file(request, "database")
@@ -724,6 +802,54 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
             .order_by("-year")
         )
         context["years"] = [year for year in years if year]
+
+        kv_years = (
+            PaymentSchedule.objects.filter(paid_date__isnull=False)
+            .annotate(year=ExtractYear("paid_date"))
+            .values_list("year", flat=True)
+            .distinct()
+            .order_by("-year")
+        )
+        kv_year_choices = [year for year in kv_years if year]
+        current_date = timezone.now().date()
+
+        if not kv_year_choices:
+            kv_year_choices = [current_date.year]
+
+        context["kv_month_choices"] = [
+            (1, "Январь"),
+            (2, "Февраль"),
+            (3, "Март"),
+            (4, "Апрель"),
+            (5, "Май"),
+            (6, "Июнь"),
+            (7, "Июль"),
+            (8, "Август"),
+            (9, "Сентябрь"),
+            (10, "Октябрь"),
+            (11, "Ноябрь"),
+            (12, "Декабрь"),
+        ]
+        context["kv_year_choices"] = kv_year_choices
+
+        try:
+            selected_kv_month = int(
+                self.request.GET.get("kv_month", current_date.month)
+            )
+        except (TypeError, ValueError):
+            selected_kv_month = current_date.month
+        if selected_kv_month < 1 or selected_kv_month > 12:
+            selected_kv_month = current_date.month
+
+        try:
+            selected_kv_year = int(self.request.GET.get("kv_year", kv_year_choices[0]))
+        except (TypeError, ValueError):
+            selected_kv_year = kv_year_choices[0]
+        if selected_kv_year not in kv_year_choices:
+            selected_kv_year = kv_year_choices[0]
+
+        context["selected_kv_month"] = selected_kv_month
+        context["selected_kv_year"] = selected_kv_year
 
         if _is_admin_user(self.request.user):
             context["database_backup_info"] = _get_backup_file_info("database")

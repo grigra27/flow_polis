@@ -2168,3 +2168,132 @@ class CommissionReportExporter(BaseExporter):
         # 6. Высота строк данных (пропускаем заголовки)
         for row in range(5, ws.max_row + 1):
             ws.row_dimensions[row].height = 20
+
+
+class MonthlyKVReportExporter(BaseExporter):
+    """Экспортер для отчета КВ за месяц по оплаченным платежам."""
+
+    def __init__(self, queryset, fields, month, year):
+        super().__init__(queryset, fields)
+        self.month = month
+        self.year = year
+
+    def get_filename(self):
+        """Возвращает базовое имя файла"""
+        return f"kv_for_month_{self.year}_{self.month:02d}"
+
+    def get_headers(self):
+        """Возвращает список заголовков"""
+        return [
+            "Страховщик",
+            "Номер полиса",
+            "Номер ДФА",
+            "Страхователь",
+            "КВ в %",
+            "Страховая премия",
+            "Дата фактической оплаты",
+            "КВ (в руб)",
+            "Филиал",
+        ]
+
+    def export(self):
+        """Генерирует Excel файл с форматированием в стиле отчета по КВ"""
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        wb = Workbook()
+        ws = wb.active
+
+        report_title = f"КВ ЗА МЕСЯЦ - {self.month:02d}.{self.year}"
+        ws.append([report_title])
+
+        title_cell = ws.cell(row=1, column=1)
+        title_cell.font = Font(bold=True, size=14, color="000000")
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 30
+
+        ws.merge_cells(
+            start_row=1, start_column=1, end_row=1, end_column=len(self.get_headers())
+        )
+        ws.append([""])
+
+        headers = self.get_headers()
+        ws.append(headers)
+
+        header_fill = PatternFill(
+            start_color="5D4037", end_color="5D4037", fill_type="solid"
+        )
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        for cell in ws[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[3].height = 30
+
+        ws.append([""] * len(headers))
+
+        for payment in self.queryset:
+            ws.append(self.get_row_data(payment))
+
+        self.apply_formatting(ws)
+        return self.create_response(wb)
+
+    def get_row_data(self, payment):
+        """Возвращает данные строки для платежа"""
+        policy = payment.policy
+        kv_percent = round(float(payment.kv_percent_actual), 2)
+
+        return [
+            policy.insurer.insurer_name if policy.insurer else "",
+            policy.policy_number,
+            policy.dfa_number,
+            policy.policyholder.client_name if policy.policyholder else "",
+            kv_percent,
+            self.format_value(payment.amount),
+            self.format_value(payment.paid_date),
+            self.format_value(payment.kv_rub),
+            policy.branch.branch_name if policy.branch else "",
+        ]
+
+    def apply_formatting(self, ws):
+        """Применяет форматирование листа"""
+        from datetime import date
+        from openpyxl.styles import Alignment
+
+        column_widths = {
+            "A": 24,  # Страховщик
+            "B": 16,  # Номер полиса
+            "C": 16,  # Номер ДФА
+            "D": 26,  # Страхователь
+            "E": 10,  # КВ в %
+            "F": 18,  # Страховая премия
+            "G": 20,  # Дата фактической оплаты
+            "H": 16,  # КВ (в руб)
+            "I": 20,  # Филиал
+        }
+
+        for column_letter, width in column_widths.items():
+            ws.column_dimensions[column_letter].width = width
+
+        for row in ws.iter_rows(min_row=5):
+            for idx, cell in enumerate(row, start=1):
+                if idx in [6, 8]:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    cell.number_format = "#,##0.00"
+                elif idx == 5:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.number_format = "0.00"
+                elif idx == 7:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        ws.freeze_panes = "A5"
+        if ws.max_row > 3:
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
+
+        for row in range(5, ws.max_row + 1):
+            ws.row_dimensions[row].height = 20

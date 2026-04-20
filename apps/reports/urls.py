@@ -30,6 +30,11 @@ urlpatterns = [
         name="export_commission_report",
     ),
     path(
+        "export/monthly-kv-report/",
+        views.export_monthly_kv_report,
+        name="export_monthly_kv_report",
+    ),
+    path(
         "export/policies-csv/",
         views.export_policies_csv,
         name="export_policies_csv",

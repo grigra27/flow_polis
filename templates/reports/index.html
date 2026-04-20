@@ -82,6 +82,14 @@
     }
     .exp-section-badge--admin { background: #fef9c3; color: #854d0e; }
     .exp-section-badge--tool  { background: #dbeafe; color: #1d4ed8; }
+    .exp-section-badge--backup { background: #1f2937; color: #f9fafb; border: 1px solid #374151; }
+
+    .exp-section-head--backup {
+        background: #111827;
+        border-color: #111827;
+    }
+    .exp-section-head--backup .exp-section-head-title { color: #f9fafb; }
+    .exp-section-head--backup .exp-section-head-sub { color: #cbd5e1; }
 
     .exp-section-body {
         border: 1px solid var(--v2-border);
@@ -781,10 +789,19 @@
             <!-- Отчет по КВ -->
             <div class="col-md-6">
                 <div class="exp-card exp-card--brown">
-                    <div class="exp-card-kicker"><i class="bi bi-cash-stack"></i> Отчет по КВ</div>
-                    <div class="exp-card-title">Отчет по КВ</div>
-                    <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Комиссионное вознаграждение</strong></p>
-                    <p class="exp-card-desc">Оплаченные платежи, ожидающие согласования страховой компанией</p>
+                    <div class="exp-card-head">
+                        <div>
+                            <div class="exp-card-kicker"><i class="bi bi-cash-stack"></i> Отчет по КВ</div>
+                            <div class="exp-card-title">Отчет по КВ по конкретной компании</div>
+                            <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Комиссионное вознаграждение</strong></p>
+                            <p class="exp-card-desc">Оплаченные платежи, ожидающие согласования страховой компанией</p>
+                        </div>
+                        <button type="button" class="exp-faq-icon"
+                                data-bs-toggle="modal" data-bs-target="#commissionReportFaqModal"
+                                title="FAQ">
+                            <i class="bi bi-question-lg"></i>
+                        </button>
+                    </div>
 
                     <div class="exp-features">
                         <span class="exp-feat exp-feat--brown"><i class="bi bi-check2"></i> КВ % и КВ руб</span>
@@ -837,76 +854,80 @@
                 </div>
             </div>
 
-            <!-- Backup -->
+            <!-- КВ за месяц -->
             <div class="col-md-6">
-                <div class="exp-card exp-card--navy">
+                <div class="exp-card exp-card--brown">
                     <div class="exp-card-head">
                         <div>
-                            <div class="exp-card-kicker"><i class="bi bi-hdd-stack"></i> Backup</div>
-                            <div class="exp-card-title">Скачать backup</div>
-                            <div class="exp-card-desc">Актуальные серверные файлы базы данных и media</div>
+                            <div class="exp-card-kicker"><i class="bi bi-calendar2-check"></i> КВ за месяц</div>
+                            <div class="exp-card-title">КВ за месяц по всему портфелю</div>
+                            <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Выгрузка оплаченных платежей по КВ</strong></p>
+                            <p class="exp-card-desc">Отбор по месяцу и году фактической даты оплаты</p>
                         </div>
+                        <button type="button" class="exp-faq-icon"
+                                data-bs-toggle="modal" data-bs-target="#monthlyKvFaqModal"
+                                title="FAQ">
+                            <i class="bi bi-question-lg"></i>
+                        </button>
                     </div>
 
-                    <div class="exp-backup-row">
-                        <div class="exp-backup-item {% if database_backup_info.available %}exp-backup-item--ok{% else %}exp-backup-item--na{% endif %}">
-                            <div class="exp-backup-item-head">
-                                <span class="exp-backup-item-icon"><i class="bi bi-database"></i></span>
-                                <span class="exp-backup-item-name">База данных</span>
-                                {% if database_backup_info.available %}
-                                <span class="exp-backup-status exp-backup-status--ok">доступен</span>
-                                {% else %}
-                                <span class="exp-backup-status exp-backup-status--na">недоступен</span>
-                                {% endif %}
-                            </div>
-                            {% if database_backup_info.available %}
-                            <div class="exp-backup-meta">
-                                <span>{{ database_backup_info.size }}</span>
-                                <span>·</span>
-                                <span>{{ database_backup_info.modified_at|date:"d.m.Y H:i" }}</span>
-                            </div>
-                            <a href="{% url 'reports:export_database_backup' %}" class="btn-exp-primary exp-backup-btn" style="text-decoration:none;">
-                                <i class="bi bi-download"></i> Скачать БД
-                            </a>
-                            {% else %}
-                            <div class="exp-backup-meta">Файл не найден. Проверьте настройки директории backup.</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="exp-backup-item {% if media_backup_info.available %}exp-backup-item--ok{% else %}exp-backup-item--na{% endif %}">
-                            <div class="exp-backup-item-head">
-                                <span class="exp-backup-item-icon"><i class="bi bi-images"></i></span>
-                                <span class="exp-backup-item-name">Media</span>
-                                {% if media_backup_info.available %}
-                                <span class="exp-backup-status exp-backup-status--ok">доступен</span>
-                                {% else %}
-                                <span class="exp-backup-status exp-backup-status--na">недоступен</span>
-                                {% endif %}
-                            </div>
-                            {% if media_backup_info.available %}
-                            <div class="exp-backup-meta">
-                                <span>{{ media_backup_info.size }}</span>
-                                <span>·</span>
-                                <span>{{ media_backup_info.modified_at|date:"d.m.Y H:i" }}</span>
-                            </div>
-                            <a href="{% url 'reports:export_media_backup' %}" class="btn-exp-primary exp-backup-btn" style="text-decoration:none;">
-                                <i class="bi bi-download"></i> Скачать media
-                            </a>
-                            {% else %}
-                            <div class="exp-backup-meta">Файл не найден. Проверьте настройки директории backup.</div>
-                            {% endif %}
-                        </div>
+                    <div class="exp-features">
+                        <span class="exp-feat exp-feat--brown"><i class="bi bi-check2"></i> Страховщик и полис</span>
+                        <span class="exp-feat exp-feat--brown"><i class="bi bi-check2"></i> КВ % и КВ руб</span>
+                        <span class="exp-feat exp-feat--brown"><i class="bi bi-check2"></i> Страховая премия</span>
+                        <span class="exp-feat exp-feat--brown"><i class="bi bi-check2"></i> 9 столбцов</span>
                     </div>
+
+                    <form method="get" action="{% url 'reports:export_monthly_kv_report' %}" class="needs-validation" novalidate>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label for="kv_month" class="form-label fw-semibold">
+                                    <i class="bi bi-calendar-month"></i> Месяц
+                                </label>
+                                <select class="form-select form-select-sm" id="kv_month" name="kv_month" required>
+                                    {% for month_value, month_label in kv_month_choices %}
+                                    <option value="{{ month_value }}" {% if selected_kv_month == month_value %}selected{% endif %}>
+                                        {{ month_label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label for="kv_year" class="form-label fw-semibold">
+                                    <i class="bi bi-calendar2-week"></i> Год
+                                </label>
+                                <select class="form-select form-select-sm" id="kv_year" name="kv_year" required>
+                                    {% for year in kv_year_choices %}
+                                    <option value="{{ year }}" {% if selected_kv_year == year %}selected{% endif %}>
+                                        {{ year }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-exp-primary">
+                            <i class="bi bi-file-earmark-excel"></i> Экспортировать в Excel
+                        </button>
+                    </form>
                 </div>
             </div>
 
             <!-- Экспорт CSV -->
             <div class="col-md-6">
                 <div class="exp-card exp-card--slate">
-                    <div class="exp-card-kicker"><i class="bi bi-filetype-csv"></i> Экспорт CSV</div>
-                    <div class="exp-card-title">Экспорт CSV</div>
-                    <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Выгрузка платежей по периоду</strong></p>
-                    <p class="exp-card-desc">Экспорт всех платежей за указанный период в формате CSV для анализа данных</p>
+                    <div class="exp-card-head">
+                        <div>
+                            <div class="exp-card-kicker"><i class="bi bi-filetype-csv"></i> Экспорт CSV</div>
+                            <div class="exp-card-title">Экспорт CSV</div>
+                            <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Выгрузка платежей по периоду</strong></p>
+                            <p class="exp-card-desc">Экспорт всех платежей за указанный период в формате CSV для анализа данных</p>
+                        </div>
+                        <button type="button" class="exp-faq-icon"
+                                data-bs-toggle="modal" data-bs-target="#csvExportFaqModal"
+                                title="FAQ">
+                            <i class="bi bi-question-lg"></i>
+                        </button>
+                    </div>
 
                     <div class="exp-features">
                         <span class="exp-feat exp-feat--slate"><i class="bi bi-check2"></i> Формат CSV</span>
@@ -945,6 +966,91 @@
 
         </div>
     </div><!-- /section-body -->
+
+    <!-- FAQ: Отчет по КВ -->
+    <div class="modal fade" id="commissionReportFaqModal" tabindex="-1" aria-labelledby="commissionReportFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header exp-modal-header">
+                    <h5 class="modal-title" id="commissionReportFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: Отчет по КВ
+                    </h5>
+                    <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Что попадает в отчет:</strong> платежи только выбранной страховой компании, где есть фактическая дата оплаты (<code>paid_date</code> заполнена), но еще нет даты согласования со страховой (<code>insurer_date</code> пусто), и КВ в рублях больше нуля.</p>
+                    <p><strong>Как формируется:</strong> выгрузка создается в Excel, данные сортируются по дате оплаты и номеру полиса. В отчете 12 столбцов: полис, страхователь, даты страхования, страховая сумма, премия, КВ %, КВ руб и филиал.</p>
+                    <p class="mb-2"><strong>Почему запись может не попасть:</strong></p>
+                    <ul>
+                        <li>платеж еще не оплачен;</li>
+                        <li>акт уже согласован со страховой компанией;</li>
+                        <li>КВ в рублях равно нулю;</li>
+                        <li>платеж относится к другой страховой компании.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ: КВ за месяц -->
+    <div class="modal fade" id="monthlyKvFaqModal" tabindex="-1" aria-labelledby="monthlyKvFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header exp-modal-header">
+                    <h5 class="modal-title" id="monthlyKvFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: КВ за месяц
+                    </h5>
+                    <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Что попадает в отчет:</strong> все оплаченные платежи портфеля за выбранные месяц и год по фактической дате оплаты (<code>paid_date</code>), где КВ в рублях больше нуля.</p>
+                    <p><strong>Что формируется в выгрузке:</strong> Excel на 9 столбцов — Страховщик, Номер полиса, Номер ДФА, Страхователь, КВ в %, Страховая премия, Дата фактической оплаты, КВ (в руб), Филиал.</p>
+                    <p><strong>Как считается КВ в %:</strong> фактический процент рассчитывается из соотношения <code>КВ (в руб) / Страховая премия * 100</code>.</p>
+                    <p class="mb-2"><strong>Почему запись может не попасть:</strong></p>
+                    <ul>
+                        <li>дата оплаты вне выбранного месяца/года;</li>
+                        <li>дата оплаты не заполнена;</li>
+                        <li>КВ в рублях равно нулю;</li>
+                        <li>по выбранному периоду нет оплаченных платежей.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ: Экспорт CSV -->
+    <div class="modal fade" id="csvExportFaqModal" tabindex="-1" aria-labelledby="csvExportFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header exp-modal-header">
+                    <h5 class="modal-title" id="csvExportFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: Экспорт CSV
+                    </h5>
+                    <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Что попадает в экспорт:</strong> платежи за выбранный период по договорной дате платежа (<code>due_date</code> между датой начала и датой окончания включительно).</p>
+                    <p><strong>Что генерируется:</strong> CSV-файл в кодировке UTF-8 (с BOM) с разделителем <code>;</code>. В выгрузке поля по ДФА, клиенту, страховщику, страхователю, суммам, КВ, виду страхования, филиалу, месяцу и участию брокера.</p>
+                    <p class="mb-2"><strong>Почему запись может не попасть:</strong></p>
+                    <ul>
+                        <li>договорная дата платежа вне указанного диапазона;</li>
+                        <li>ошибка в периоде (дата начала позже даты окончания);</li>
+                        <li>не заполнены обязательные даты периода;</li>
+                        <li>по выбранному диапазону нет платежей.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <hr class="exp-divider">
 
@@ -1022,6 +1128,77 @@
                         <span style="font-size:0.84rem;">После создания отчёта вы сможете сохранить его как шаблон.</span>
                     </div>
                 {% endif %}
+            </div>
+        </div>
+    </div><!-- /section-body -->
+
+    <hr class="exp-divider">
+
+    <div class="exp-section-head exp-section-head--backup">
+        <div class="exp-section-head-text">
+            <div class="exp-section-head-title">
+                <i class="bi bi-hdd-stack"></i> Скачать бэкап
+            </div>
+            <div class="exp-section-head-sub">Актуальные серверные файлы базы данных и медиа</div>
+        </div>
+        <span class="exp-section-badge exp-section-badge--backup">
+            <i class="bi bi-shield-check"></i> Только для админов
+        </span>
+    </div>
+    <div class="exp-section-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="exp-card exp-card--navy">
+                    <div class="exp-backup-row">
+                        <div class="exp-backup-item {% if database_backup_info.available %}exp-backup-item--ok{% else %}exp-backup-item--na{% endif %}">
+                            <div class="exp-backup-item-head">
+                                <span class="exp-backup-item-icon"><i class="bi bi-database"></i></span>
+                                <span class="exp-backup-item-name">База данных</span>
+                                {% if database_backup_info.available %}
+                                <span class="exp-backup-status exp-backup-status--ok">доступен</span>
+                                {% else %}
+                                <span class="exp-backup-status exp-backup-status--na">недоступен</span>
+                                {% endif %}
+                            </div>
+                            {% if database_backup_info.available %}
+                            <div class="exp-backup-meta">
+                                <span>{{ database_backup_info.size }}</span>
+                                <span>·</span>
+                                <span>{{ database_backup_info.modified_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                            <a href="{% url 'reports:export_database_backup' %}" class="btn-exp-primary exp-backup-btn" style="text-decoration:none;">
+                                <i class="bi bi-download"></i> Скачать БД
+                            </a>
+                            {% else %}
+                            <div class="exp-backup-meta">Файл не найден. Проверьте настройки директории backup.</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="exp-backup-item {% if media_backup_info.available %}exp-backup-item--ok{% else %}exp-backup-item--na{% endif %}">
+                            <div class="exp-backup-item-head">
+                                <span class="exp-backup-item-icon"><i class="bi bi-images"></i></span>
+                                <span class="exp-backup-item-name">Media</span>
+                                {% if media_backup_info.available %}
+                                <span class="exp-backup-status exp-backup-status--ok">доступен</span>
+                                {% else %}
+                                <span class="exp-backup-status exp-backup-status--na">недоступен</span>
+                                {% endif %}
+                            </div>
+                            {% if media_backup_info.available %}
+                            <div class="exp-backup-meta">
+                                <span>{{ media_backup_info.size }}</span>
+                                <span>·</span>
+                                <span>{{ media_backup_info.modified_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                            <a href="{% url 'reports:export_media_backup' %}" class="btn-exp-primary exp-backup-btn" style="text-decoration:none;">
+                                <i class="bi bi-download"></i> Скачать media
+                            </a>
+                            {% else %}
+                            <div class="exp-backup-meta">Файл не найден. Проверьте настройки директории backup.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div><!-- /section-body -->

@@ -153,30 +153,179 @@
     }
 
     /* Filter form */
+    .pl-filter-form {
+        display: grid;
+        gap: 0.4rem;
+    }
+    .pl-filter-cluster {
+        border: 1px solid #dfe8f4;
+        border-radius: 10px;
+        background: #fbfdff;
+        padding: 0.45rem 0.55rem 0.5rem;
+    }
+    .pl-filter-cluster .row {
+        --bs-gutter-x: 0.55rem;
+        --bs-gutter-y: 0.35rem;
+    }
     .pl-filter-label {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--v2-muted);
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.2rem;
         display: block;
     }
+    .pl-filter-subtitle {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #3d5f7d;
+        margin: 0 0 0.3rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .pl-filter-form input[type="text"],
+    .pl-filter-form input[type="search"],
+    .pl-filter-form input[type="date"],
+    .pl-filter-form select {
+        width: 100%;
+        min-width: 0;
+        height: 29px;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        padding: 0.2rem 0.45rem;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.8rem;
+        line-height: 1.2;
+    }
+    .pl-filter-form input:focus,
+    .pl-filter-form select:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.12);
+    }
+    .pl-date-range-box {
+        border: 1px solid var(--v2-border);
+        border-radius: 10px;
+        background: #f8fbff;
+        padding: 0.35rem 0.4rem;
+        height: 100%;
+    }
+    .pl-date-range-grid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0.5rem;
+        align-items: end;
+    }
+    .pl-date-range-sep {
+        color: var(--v2-muted);
+        font-size: 0.74rem;
+        padding-bottom: 0.34rem;
+    }
+    .pl-filter-mini-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.15rem;
+        display: block;
+    }
+    .pl-active-filters {
+        border: 1px dashed #c7dbf8;
+        background: #f7fbff;
+        border-radius: 10px;
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 0.8rem;
+    }
+    .pl-active-filters-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.45rem;
+    }
+    .pl-active-filters-title {
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #1d4ed8;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .pl-clear-all {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .pl-clear-all:hover { color: #0d47a1; text-decoration: underline; }
+    .pl-active-filters-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .pl-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: #e8f1ff;
+        color: #17324f;
+        border: 1px solid #c7dbf8;
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.8rem;
+        line-height: 1.2;
+    }
+    .pl-filter-chip-label { font-weight: 700; }
+    .pl-filter-chip-remove {
+        color: #4b5563;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.86rem;
+        line-height: 1;
+        margin-left: 0.1rem;
+    }
+    .pl-filter-chip-remove:hover { color: #b91c1c; text-decoration: none; }
     .pl-filter-actions {
         display: flex;
+        justify-content: space-between;
         gap: 0.5rem;
-        align-items: flex-end;
+        align-items: center;
         flex-wrap: wrap;
-        padding-top: 0.25rem;
+        padding-top: 0.1rem;
+    }
+    .pl-filter-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .pl-filter-result {
+        font-size: 0.82rem;
+        color: #3d5f7d;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .pl-filter-result strong {
+        color: var(--v2-title);
+        font-weight: 700;
     }
     .btn-pl-apply {
         background: var(--v2-accent);
         border: none;
         color: #fff;
-        font-size: 0.84rem;
+        font-size: 0.8rem;
         font-weight: 600;
         border-radius: 8px;
-        padding: 0.45rem 1rem;
+        padding: 0.34rem 0.8rem;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -188,10 +337,10 @@
         background: var(--v2-card-bg);
         border: 1px solid var(--v2-border);
         color: var(--v2-title);
-        font-size: 0.84rem;
+        font-size: 0.8rem;
         font-weight: 600;
         border-radius: 8px;
-        padding: 0.45rem 1rem;
+        padding: 0.34rem 0.8rem;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -330,6 +479,36 @@
         margin-bottom: 0.5rem;
         opacity: 0.4;
     }
+    @media (max-width: 768px) {
+        .pl-filter-cluster {
+            padding: 0.42rem 0.5rem 0.5rem;
+        }
+        .pl-filter-actions {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.55rem;
+        }
+        .pl-filter-buttons {
+            width: 100%;
+            justify-content: flex-end;
+        }
+        .pl-date-range-grid {
+            grid-template-columns: 1fr;
+        }
+        .pl-date-range-sep {
+            display: none;
+        }
+    }
+    @media (max-width: 576px) {
+        .pl-filter-buttons {
+            justify-content: stretch;
+        }
+        .btn-pl-apply,
+        .btn-pl-reset {
+            width: 100%;
+            justify-content: center;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -373,61 +552,117 @@
             <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
         </div>
         <div class="mgr-section-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Номер полиса</label>
-                    {{ filter.form.policy_number }}
+            {% if active_filters or request.GET.start_date_from or request.GET.start_date_to %}
+            <div class="pl-active-filters">
+                <div class="pl-active-filters-head">
+                    <div class="pl-active-filters-title">
+                        <i class="bi bi-funnel-fill"></i> Активные фильтры
+                    </div>
+                    <a href="{% url 'policies:list' %}" class="pl-clear-all">Очистить все</a>
                 </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Номер ДФА</label>
-                    {{ filter.form.dfa_number }}
+                <div class="pl-active-filters-list">
+                    {% for item in active_filters %}
+                    <span class="pl-filter-chip">
+                        <span class="pl-filter-chip-label">{{ item.label }}:</span>
+                        <span>{{ item.value }}</span>
+                        <a class="pl-filter-chip-remove" href="?{% remove_query_param item.param %}" title="Убрать фильтр">×</a>
+                    </span>
+                    {% endfor %}
+                    {% if request.GET.start_date_from or request.GET.start_date_to %}
+                    <span class="pl-filter-chip">
+                        <span class="pl-filter-chip-label">Дата начала страхования:</span>
+                        <span>
+                            {% if request.GET.start_date_from %}от {{ request.GET.start_date_from }}{% endif %}
+                            {% if request.GET.start_date_from and request.GET.start_date_to %} — {% endif %}
+                            {% if request.GET.start_date_to %}до {{ request.GET.start_date_to }}{% endif %}
+                        </span>
+                        <a class="pl-filter-chip-remove" href="?{% remove_query_params 'start_date_from' 'start_date_to' %}" title="Убрать фильтр">×</a>
+                    </span>
+                    {% endif %}
                 </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Клиент</label>
-                    {{ filter.form.client__client_name }}
+            </div>
+            {% endif %}
+            <form method="get" class="pl-filter-form">
+                <div class="pl-filter-cluster">
+                    <div class="pl-filter-subtitle"><i class="bi bi-search"></i> Основные параметры</div>
+                    <div class="row g-2">
+                        <div class="col-xl-2 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">Номер полиса</label>
+                            {{ filter.form.policy_number }}
+                        </div>
+                        <div class="col-xl-2 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">Номер ДФА</label>
+                            {{ filter.form.dfa_number }}
+                        </div>
+                        <div class="col-xl-4 col-lg-6 col-md-6">
+                            <label class="pl-filter-label">Клиент</label>
+                            {{ filter.form.client__client_name }}
+                        </div>
+                        <div class="col-xl-4 col-lg-6 col-md-6">
+                            <label class="pl-filter-label">Страховщик</label>
+                            {{ filter.form.insurer }}
+                        </div>
+                        <div class="col-xl-3 col-lg-4 col-md-6">
+                            <label class="pl-filter-label">Филиал</label>
+                            {{ filter.form.branch }}
+                        </div>
+                        <div class="col-xl-3 col-lg-4 col-md-6">
+                            <label class="pl-filter-label">Вид страхования</label>
+                            {{ filter.form.insurance_type }}
+                        </div>
+                        <div class="col-xl-2 col-lg-4 col-md-6">
+                            <label class="pl-filter-label">Инфо 1</label>
+                            {{ filter.form.info1_tag }}
+                        </div>
+                        <div class="col-xl-4 col-lg-12 col-md-12">
+                            <label class="pl-filter-label">Дата начала страхования</label>
+                            <div class="pl-date-range-box">
+                                <div class="pl-date-range-grid">
+                                    <div>
+                                        <label class="pl-filter-mini-label">От</label>
+                                        {{ filter.form.start_date_from }}
+                                    </div>
+                                    <div class="pl-date-range-sep">
+                                        <i class="bi bi-arrow-left-right"></i>
+                                    </div>
+                                    <div>
+                                        <label class="pl-filter-mini-label">До</label>
+                                        {{ filter.form.start_date_to }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Страховщик</label>
-                    {{ filter.form.insurer }}
+
+                <div class="pl-filter-cluster">
+                    <div class="pl-filter-subtitle"><i class="bi bi-ui-checks-grid"></i> Статусы</div>
+                    <div class="row g-2">
+                        <div class="col-xl-3 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">Полис активен</label>
+                            {{ filter.form.policy_active }}
+                        </div>
+                        <div class="col-xl-3 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">ДФА активен</label>
+                            {{ filter.form.dfa_active }}
+                        </div>
+                        <div class="col-xl-3 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">Полис подгружен</label>
+                            {{ filter.form.policy_uploaded }}
+                        </div>
+                        <div class="col-xl-3 col-lg-3 col-md-6">
+                            <label class="pl-filter-label">Участие брокера</label>
+                            {{ filter.form.broker_participation }}
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Филиал</label>
-                    {{ filter.form.branch }}
-                </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Вид страхования</label>
-                    {{ filter.form.insurance_type }}
-                </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Дата начала страхования от</label>
-                    {{ filter.form.start_date_from }}
-                </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Дата начала страхования до</label>
-                    {{ filter.form.start_date_to }}
-                </div>
-                <div class="col-md-2">
-                    <label class="pl-filter-label">Полис активен</label>
-                    {{ filter.form.policy_active }}
-                </div>
-                <div class="col-md-2">
-                    <label class="pl-filter-label">ДФА активен</label>
-                    {{ filter.form.dfa_active }}
-                </div>
-                <div class="col-md-2">
-                    <label class="pl-filter-label">Полис подгружен</label>
-                    {{ filter.form.policy_uploaded }}
-                </div>
-                <div class="col-md-2">
-                    <label class="pl-filter-label">Участие брокера</label>
-                    {{ filter.form.broker_participation }}
-                </div>
-                <div class="col-md-2">
-                    <label class="pl-filter-label">Инфо 1</label>
-                    {{ filter.form.info1_tag }}
-                </div>
-                <div class="col-md-12">
-                    <div class="pl-filter-actions">
+
+                <div class="pl-filter-actions">
+                    <div class="pl-filter-result">
+                        <i class="bi bi-list-check"></i>
+                        Найдено: <strong>{{ policies_count }}</strong>
+                    </div>
+                    <div class="pl-filter-buttons">
                         <button type="submit" class="btn-pl-apply">
                             <i class="bi bi-search"></i> Применить
                         </button>

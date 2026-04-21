@@ -27,12 +27,95 @@ class PolicyListView(LoginRequiredMixin, FilterView):
 
         return queryset
 
+    def _build_active_filters(self):
+        from apps.insurers.models import Branch, Insurer, InsuranceType, InfoTag
+
+        active_filters = []
+        query_params = self.request.GET
+
+        def add_filter(param, label, value):
+            if value not in (None, ""):
+                active_filters.append({"param": param, "label": label, "value": value})
+
+        # Текстовые фильтры
+        add_filter("policy_number", "Номер полиса", query_params.get("policy_number"))
+        add_filter("dfa_number", "Номер ДФА", query_params.get("dfa_number"))
+        add_filter(
+            "client__client_name", "Клиент", query_params.get("client__client_name")
+        )
+
+        # Справочники
+        insurer_id = query_params.get("insurer")
+        if insurer_id:
+            insurer_name = (
+                Insurer.objects.filter(pk=insurer_id)
+                .values_list("insurer_name", flat=True)
+                .first()
+            )
+            add_filter("insurer", "Страховщик", insurer_name or insurer_id)
+
+        branch_id = query_params.get("branch")
+        if branch_id:
+            branch_name = (
+                Branch.objects.filter(pk=branch_id)
+                .values_list("branch_name", flat=True)
+                .first()
+            )
+            add_filter("branch", "Филиал", branch_name or branch_id)
+
+        insurance_type_id = query_params.get("insurance_type")
+        if insurance_type_id:
+            insurance_type_name = (
+                InsuranceType.objects.filter(pk=insurance_type_id)
+                .values_list("name", flat=True)
+                .first()
+            )
+            add_filter(
+                "insurance_type",
+                "Вид страхования",
+                insurance_type_name or insurance_type_id,
+            )
+
+        info1_tag_id = query_params.get("info1_tag")
+        if info1_tag_id:
+            info1_tag_name = (
+                InfoTag.objects.filter(pk=info1_tag_id)
+                .values_list("name", flat=True)
+                .first()
+            )
+            add_filter("info1_tag", "Инфо 1", info1_tag_name or info1_tag_id)
+
+        # Булевые фильтры
+        bool_mapping = {
+            "true": "Да",
+            "false": "Нет",
+            "1": "Да",
+            "0": "Нет",
+        }
+        bool_filters = [
+            ("policy_active", "Полис активен"),
+            ("dfa_active", "ДФА активен"),
+            ("policy_uploaded", "Полис подгружен"),
+            ("broker_participation", "Участие брокера"),
+        ]
+        for param, label in bool_filters:
+            raw_value = query_params.get(param)
+            if raw_value is None:
+                continue
+            bool_value = bool_mapping.get(str(raw_value).lower())
+            if bool_value is not None:
+                add_filter(param, label, bool_value)
+
+        return active_filters
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from apps.insurers.models import Branch
 
         context["branches"] = Branch.objects.all()
         context["selected_branch"] = self.request.GET.get("branch")
+        context["active_filters"] = self._build_active_filters()
+        context["policies_count"] = self.object_list.count()
         return context
 
 

@@ -120,3 +120,41 @@ def update_query(context, **kwargs):
         else:
             query[key] = value
     return query.urlencode()
+
+
+@register.simple_tag(takes_context=True)
+def remove_query_param(context, param_name):
+    """
+    Удаляет один query-параметр из текущего URL.
+
+    Использование:
+    href="?{% remove_query_param 'insurer' %}"
+    """
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    query = request.GET.copy()
+    query.pop(param_name, None)
+    # При изменении фильтра сбрасываем пагинацию.
+    query.pop("page", None)
+    return query.urlencode()
+
+
+@register.simple_tag(takes_context=True)
+def remove_query_params(context, *param_names):
+    """
+    Удаляет несколько query-параметров из текущего URL.
+
+    Использование:
+    href="?{% remove_query_params 'start_date_from' 'start_date_to' %}"
+    """
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    query = request.GET.copy()
+    for param_name in param_names:
+        query.pop(param_name, None)
+    query.pop("page", None)
+    return query.urlencode()

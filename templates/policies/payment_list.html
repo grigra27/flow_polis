@@ -392,14 +392,6 @@
     .tbl-badge--pending   { background: #fef3c7; color: #92400e;  border: 1px solid #fde68a; }
     .tbl-badge--nobroker  { background: #f3f4f6; color: #6b7280;  border: 1px solid #d1d5db; }
 
-    /* Policy link in table */
-    .tbl-policy-link {
-        color: var(--v2-accent);
-        font-weight: 600;
-        text-decoration: none;
-    }
-    .tbl-policy-link:hover { text-decoration: underline; color: #0d47a1; }
-
     /* Edit button in table */
     .btn-tbl-edit {
         background: #fef3c7;
@@ -646,14 +638,12 @@
                         <tr class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
                             data-href="{% url 'policies:detail' payment.policy.pk %}">
                             <td style="padding-left:1rem;">
-                                <a href="{% url 'policies:detail' payment.policy.pk %}" class="tbl-policy-link" onclick="event.stopPropagation();">
-                                    {{ payment.policy.policy_number }}
-                                </a>
+                                {{ payment.policy.policy_number }}
                                 {% if not payment.policy.broker_participation %}
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
                             </td>
-                            <td style="color:var(--v2-muted);">{{ payment.policy.dfa_number }}</td>
+                            <td><strong>{{ payment.policy.dfa_number|default:"—" }}</strong></td>
                             <td>{{ payment.policy.client.client_name }}</td>
                             <td style="max-width:160px;">
                                 <small>{{ payment.policy.property_description|truncatewords:10 }}</small>

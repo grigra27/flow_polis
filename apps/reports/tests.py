@@ -882,6 +882,7 @@ class MonthlyKVExportViewTest(TestCase):
             insurance_sum=Decimal("500000.00"),
             kv_rub=Decimal("1500.00"),
             paid_date=date(2025, 2, 15),
+            insurer_date=date(2025, 2, 20),
         )
 
         PaymentSchedule.objects.create(
@@ -893,6 +894,7 @@ class MonthlyKVExportViewTest(TestCase):
             insurance_sum=Decimal("500000.00"),
             kv_rub=Decimal("1800.00"),
             paid_date=date(2025, 3, 15),
+            insurer_date=date(2025, 3, 20),
         )
 
     def test_non_admin_cannot_export_monthly_kv(self):

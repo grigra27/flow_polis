@@ -478,7 +478,7 @@
                                 {% endif %}
                             </td>
                             <td style="padding-left:1rem;">
-                                <strong>{{ policy.policy_number }}</strong>
+                                {{ policy.policy_number }}
                                 {% if not policy.policy_active %}
                                     <span class="tbl-badge tbl-badge--closed" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
                                 {% endif %}
@@ -486,7 +486,7 @@
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
                             </td>
-                            <td style="color:var(--v2-muted);">{{ policy.dfa_number }}</td>
+                            <td><strong>{{ policy.dfa_number|default:"—" }}</strong></td>
                             <td>{{ policy.client.client_name }}</td>
                             <td>{% insurer_logo policy.insurer size='small' %}</td>
                             <td style="max-width:160px;">

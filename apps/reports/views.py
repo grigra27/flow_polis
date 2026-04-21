@@ -691,7 +691,7 @@ def export_commission_report(request):
 
 @login_required
 def export_monthly_kv_report(request):
-    """Export monthly KV report by paid date month/year (admin only)."""
+    """Export monthly KV report by insurer approval date month/year (admin only)."""
     if not _is_admin_user(request.user):
         messages.error(request, "У вас нет прав для выполнения этого действия")
         return redirect("reports:index")
@@ -728,13 +728,13 @@ def export_monthly_kv_report(request):
                 "policy__branch",
             )
             .filter(
-                paid_date__isnull=False,
-                paid_date__year=year,
-                paid_date__month=month,
+                insurer_date__isnull=False,
+                insurer_date__year=year,
+                insurer_date__month=month,
                 kv_rub__gt=0,
             )
             .order_by(
-                "paid_date",
+                "insurer_date",
                 "policy__insurer__insurer_name",
                 "policy__policy_number",
             )
@@ -804,8 +804,8 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
         context["years"] = [year for year in years if year]
 
         kv_years = (
-            PaymentSchedule.objects.filter(paid_date__isnull=False)
-            .annotate(year=ExtractYear("paid_date"))
+            PaymentSchedule.objects.filter(insurer_date__isnull=False)
+            .annotate(year=ExtractYear("insurer_date"))
             .values_list("year", flat=True)
             .distinct()
             .order_by("-year")

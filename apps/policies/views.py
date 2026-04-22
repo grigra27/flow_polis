@@ -216,13 +216,11 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
             # Согласованные со СК: платежи с указанной датой согласования СК
             queryset = queryset.filter(insurer_date__isnull=False)
         elif status == "paid":
-            # Оплаченные: платежи с указанной датой оплаты (дата платежа <= сегодня)
+            # Оплаченные: платежи с указанной датой оплаты
             # но БЕЗ даты согласования СК (иначе они попадают в "Акт согласован СК")
-            from django.utils import timezone
-
+            # Включаем и предоплаты (когда due_date в будущем).
             queryset = queryset.filter(
                 paid_date__isnull=False,
-                due_date__lte=timezone.now().date(),
                 insurer_date__isnull=True,
             )
         elif status == "cancelled":

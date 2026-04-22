@@ -308,3 +308,54 @@ class TestPaymentScheduleListView:
         result_ids = {payment.id for payment in response.context["payments"]}
         assert result_ids == {upcoming_payment.id, paid_payment.id}
         assert response.context["selected_status"] == "all"
+
+    def test_payment_list_paid_status_includes_prepayments(
+        self,
+        client,
+        regular_user,
+        policy_factory,
+        payment_schedule_factory,
+    ):
+        """
+        Test that paid status includes prepayments:
+        paid_date is set, insurer_date is empty, even when due_date is in the future.
+        """
+        today = timezone.now().date()
+        policy = policy_factory(
+            policy_number="PAY-FILTER-PAID-PREPAY", policy_active=True
+        )
+
+        prepayment = payment_schedule_factory(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=today + timedelta(days=1),
+            paid_date=today,
+            insurer_date=None,
+        )
+        # Exclude: approved payment
+        payment_schedule_factory(
+            policy=policy,
+            year_number=1,
+            installment_number=2,
+            due_date=today + timedelta(days=2),
+            paid_date=today + timedelta(days=1),
+            insurer_date=today + timedelta(days=1),
+        )
+        # Exclude: unpaid payment
+        payment_schedule_factory(
+            policy=policy,
+            year_number=1,
+            installment_number=3,
+            due_date=today + timedelta(days=3),
+            paid_date=None,
+            insurer_date=None,
+        )
+
+        client.force_login(regular_user)
+        url = reverse("policies:payments")
+        response = client.get(url, {"status": "paid"})
+
+        assert response.status_code == 200
+        result_ids = {payment.id for payment in response.context["payments"]}
+        assert prepayment.id in result_ids

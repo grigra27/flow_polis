@@ -1,6 +1,7 @@
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_filters.views import FilterView
+from django.db.models import Q
 from .models import Policy, PaymentSchedule
 from .filters import PolicyFilter
 
@@ -25,10 +26,19 @@ class PolicyListView(LoginRequiredMixin, FilterView):
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
 
+        # Universal text search across policy number / DFA number / client.
+        search_query = (self.request.GET.get("search") or "").strip()
+        if search_query:
+            queryset = queryset.filter(
+                Q(policy_number__icontains=search_query)
+                | Q(dfa_number__icontains=search_query)
+                | Q(client__client_name__icontains=search_query)
+            )
+
         return queryset
 
     def _build_active_filters(self):
-        from apps.insurers.models import Branch, Insurer, InsuranceType, InfoTag
+        from apps.insurers.models import Branch, Insurer, InsuranceType
 
         active_filters = []
         query_params = self.request.GET
@@ -37,12 +47,18 @@ class PolicyListView(LoginRequiredMixin, FilterView):
             if value not in (None, ""):
                 active_filters.append({"param": param, "label": label, "value": value})
 
-        # Текстовые фильтры
-        add_filter("policy_number", "Номер полиса", query_params.get("policy_number"))
-        add_filter("dfa_number", "Номер ДФА", query_params.get("dfa_number"))
-        add_filter(
-            "client__client_name", "Клиент", query_params.get("client__client_name")
-        )
+        # Универсальный поиск или legacy-текстовые фильтры
+        search_query = query_params.get("search")
+        if search_query:
+            add_filter("search", "Поиск", search_query)
+        else:
+            add_filter(
+                "policy_number", "Номер полиса", query_params.get("policy_number")
+            )
+            add_filter("dfa_number", "Номер ДФА", query_params.get("dfa_number"))
+            add_filter(
+                "client__client_name", "Клиент", query_params.get("client__client_name")
+            )
 
         # Справочники
         insurer_id = query_params.get("insurer")
@@ -75,15 +91,6 @@ class PolicyListView(LoginRequiredMixin, FilterView):
                 "Вид страхования",
                 insurance_type_name or insurance_type_id,
             )
-
-        info1_tag_id = query_params.get("info1_tag")
-        if info1_tag_id:
-            info1_tag_name = (
-                InfoTag.objects.filter(pk=info1_tag_id)
-                .values_list("name", flat=True)
-                .first()
-            )
-            add_filter("info1_tag", "Инфо 1", info1_tag_name or info1_tag_id)
 
         # Булевые фильтры
         bool_mapping = {
@@ -204,6 +211,20 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         if date_to:
             queryset = queryset.filter(due_date__lte=date_to)
 
+        # Filter by year/installment pair if specified
+        year_number = self.request.GET.get("year_number")
+        installment_number = self.request.GET.get("installment_number")
+        if year_number:
+            try:
+                queryset = queryset.filter(year_number=int(year_number))
+            except (TypeError, ValueError):
+                pass
+        if installment_number:
+            try:
+                queryset = queryset.filter(installment_number=int(installment_number))
+            except (TypeError, ValueError):
+                pass
+
         # Filter by status (applies together with branch/insurer/date filters)
         # If date filter is set without explicit status, show all statuses in this date range.
         status = self.request.GET.get("status")
@@ -290,6 +311,20 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         context["insurers"] = Insurer.objects.all()
         context["selected_branch"] = self.request.GET.get("branch")
         context["selected_insurer"] = self.request.GET.get("insurer")
+        context["selected_year_number"] = self.request.GET.get("year_number", "")
+        context["selected_installment_number"] = self.request.GET.get(
+            "installment_number", ""
+        )
+        context["year_numbers"] = (
+            PaymentSchedule.objects.order_by("year_number")
+            .values_list("year_number", flat=True)
+            .distinct()
+        )
+        context["installment_numbers"] = (
+            PaymentSchedule.objects.order_by("installment_number")
+            .values_list("installment_number", flat=True)
+            .distinct()
+        )
         selected_status = self.request.GET.get("status")
         if not selected_status:
             selected_status = (

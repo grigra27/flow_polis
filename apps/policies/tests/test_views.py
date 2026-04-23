@@ -144,7 +144,7 @@ class TestPaymentScheduleListView:
     ):
         """
         Test that all payment filters are applied together:
-        status + date range + branch + insurer.
+        status + date range + branch + insurer + year/installment.
         """
         today = timezone.now().date()
         branch_match = branch_factory(branch_name="Филиал 1")
@@ -178,6 +178,15 @@ class TestPaymentScheduleListView:
         matching_payment = payment_schedule_factory(
             policy=matching_policy,
             year_number=1,
+            installment_number=1,
+            due_date=today + timedelta(days=5),
+            paid_date=None,
+            insurer_date=None,
+        )
+        # Must be excluded by year/installment filter
+        payment_schedule_factory(
+            policy=matching_policy,
+            year_number=2,
             installment_number=1,
             due_date=today + timedelta(days=5),
             paid_date=None,
@@ -226,6 +235,8 @@ class TestPaymentScheduleListView:
                 "date_to": (today + timedelta(days=10)).isoformat(),
                 "branch": branch_match.id,
                 "insurer": insurer_match.id,
+                "year_number": 1,
+                "installment_number": 1,
             },
         )
 
@@ -243,6 +254,8 @@ class TestPaymentScheduleListView:
         client.force_login(regular_user)
         date_from = "2026-01-01"
         date_to = "2026-12-31"
+        year_number = "2"
+        installment_number = "3"
 
         url = reverse("policies:payments")
         response = client.get(
@@ -251,6 +264,8 @@ class TestPaymentScheduleListView:
                 "status": "upcoming",
                 "date_from": date_from,
                 "date_to": date_to,
+                "year_number": year_number,
+                "installment_number": installment_number,
             },
         )
 
@@ -258,7 +273,10 @@ class TestPaymentScheduleListView:
         content = response.content.decode("utf-8")
 
         assert "Акт согласован СК" in content
-        assert f"status=paid&date_from={date_from}&date_to={date_to}" in content
+        assert (
+            f"status=paid&date_from={date_from}&date_to={date_to}"
+            f"&year_number={year_number}&installment_number={installment_number}"
+        ) in content
         assert 'name="status" value="upcoming"' in content
 
     def test_payment_list_date_filter_without_explicit_status_uses_all(

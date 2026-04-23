@@ -122,26 +122,145 @@
         padding: 0.9rem 1rem;
     }
 
-    /* Filter labels */
+    /* Filter block (same compact pattern as policy list) */
+    .pl-filter-form {
+        display: grid;
+        gap: 0.4rem;
+    }
+    .pl-filter-top-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 2.25fr) minmax(0, 1.25fr);
+        gap: 0.45rem;
+        align-items: stretch;
+    }
+    .pl-filter-cluster {
+        border: 1px solid #dfe8f4;
+        border-radius: 10px;
+        background: #fbfdff;
+        padding: 0.45rem 0.55rem 0.5rem;
+    }
+    .pl-filter-cluster .row {
+        --bs-gutter-x: 0.55rem;
+        --bs-gutter-y: 0.35rem;
+    }
     .pl-filter-label {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--v2-muted);
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.2rem;
         display: block;
     }
-
-    /* Filter action buttons */
+    .pl-filter-subtitle {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #3d5f7d;
+        margin: 0 0 0.3rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .pl-filter-fields-inline {
+        display: flex;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 0.35rem 0.5rem;
+    }
+    .pl-filter-field {
+        flex: 0 1 220px;
+        min-width: 170px;
+    }
+    .pl-filter-cluster--date {
+        display: flex;
+        flex-direction: column;
+    }
+    .pl-filter-cluster--date .pl-date-range-box {
+        width: 100%;
+    }
+    .pl-filter-form input[type="text"],
+    .pl-filter-form input[type="search"],
+    .pl-filter-form input[type="date"],
+    .pl-filter-form select {
+        width: 100%;
+        min-width: 0;
+        height: 29px;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        padding: 0.2rem 0.45rem;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.8rem;
+        line-height: 1.2;
+    }
+    .pl-filter-form input:focus,
+    .pl-filter-form select:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.12);
+    }
+    .pl-date-range-box {
+        border: 1px solid var(--v2-border);
+        border-radius: 10px;
+        background: #f8fbff;
+        padding: 0.35rem 0.4rem;
+        height: 100%;
+    }
+    .pl-date-range-grid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0.5rem;
+        align-items: end;
+    }
+    .pl-date-range-sep {
+        color: var(--v2-muted);
+        font-size: 0.74rem;
+        padding-bottom: 0.34rem;
+    }
+    .pl-filter-mini-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.15rem;
+        display: block;
+    }
+    .pl-filter-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        padding-top: 0.1rem;
+    }
+    .pl-filter-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+    }
+    .pl-filter-result {
+        font-size: 0.82rem;
+        color: #3d5f7d;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .pl-filter-result strong {
+        color: var(--v2-title);
+        font-weight: 700;
+    }
     .btn-pl-apply {
         background: var(--v2-accent);
         border: none;
         color: #fff;
-        font-size: 0.84rem;
+        font-size: 0.8rem;
         font-weight: 600;
         border-radius: 8px;
-        padding: 0.45rem 1rem;
+        padding: 0.34rem 0.8rem;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -154,10 +273,10 @@
         background: var(--v2-card-bg);
         border: 1px solid var(--v2-border);
         color: var(--v2-title);
-        font-size: 0.84rem;
+        font-size: 0.8rem;
         font-weight: 600;
         border-radius: 8px;
-        padding: 0.45rem 1rem;
+        padding: 0.34rem 0.8rem;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -170,6 +289,43 @@
         background: #eff5ff;
         color: var(--v2-accent);
         text-decoration: none;
+    }
+    @media (max-width: 768px) {
+        .pl-filter-top-grid {
+            grid-template-columns: 1fr;
+        }
+        .pl-filter-cluster {
+            padding: 0.42rem 0.5rem 0.5rem;
+        }
+        .pl-filter-field {
+            flex: 1 1 100%;
+            min-width: 0;
+        }
+        .pl-filter-actions {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.55rem;
+        }
+        .pl-filter-buttons {
+            width: 100%;
+            justify-content: flex-end;
+        }
+        .pl-date-range-grid {
+            grid-template-columns: 1fr;
+        }
+        .pl-date-range-sep {
+            display: none;
+        }
+    }
+    @media (max-width: 576px) {
+        .pl-filter-buttons {
+            justify-content: stretch;
+        }
+        .btn-pl-apply,
+        .btn-pl-reset {
+            width: 100%;
+            justify-content: center;
+        }
     }
 
     /* Status filter strip */
@@ -507,39 +663,86 @@
             <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
         </div>
         <div class="mgr-section-body">
-            <form method="get" class="row g-3 align-items-end" id="filterForm">
+            <form method="get" class="pl-filter-form" id="filterForm">
                 {% if selected_branch %}
                 <input type="hidden" name="branch" value="{{ selected_branch }}">
                 {% endif %}
                 {% if request.GET.status %}
                 <input type="hidden" name="status" value="{{ request.GET.status }}">
                 {% endif %}
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Дата платежа от</label>
-                    <input type="date" name="date_from" class="form-control" value="{{ request.GET.date_from }}">
+                <div class="pl-filter-top-grid">
+                    <div class="pl-filter-cluster">
+                        <div class="pl-filter-subtitle"><i class="bi bi-search"></i> Основные параметры</div>
+                        <div class="pl-filter-fields-inline">
+                            <div class="pl-filter-field">
+                                <label class="pl-filter-label">Страховщик</label>
+                                <select name="insurer" id="insurerSelect">
+                                    <option value="">Все страховщики</option>
+                                    {% for insurer in insurers %}
+                                    <option value="{{ insurer.id }}" {% if selected_insurer == insurer.id|stringformat:'s' %}selected{% endif %}>
+                                        {{ insurer.insurer_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="pl-filter-field">
+                                <label class="pl-filter-label">Год платежа</label>
+                                <select name="year_number">
+                                    <option value="">Все годы</option>
+                                    {% for year in year_numbers %}
+                                    <option value="{{ year }}" {% if selected_year_number == year|stringformat:'s' %}selected{% endif %}>
+                                        {{ year }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="pl-filter-field">
+                                <label class="pl-filter-label">Номер платежа</label>
+                                <select name="installment_number">
+                                    <option value="">Все номера</option>
+                                    {% for installment in installment_numbers %}
+                                    <option value="{{ installment }}" {% if selected_installment_number == installment|stringformat:'s' %}selected{% endif %}>
+                                        {{ installment }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pl-filter-cluster pl-filter-cluster--date">
+                        <div class="pl-filter-subtitle"><i class="bi bi-calendar3"></i> Дата платежа по полису</div>
+                        <div class="pl-date-range-box">
+                            <div class="pl-date-range-grid">
+                                <div>
+                                    <label class="pl-filter-mini-label">От</label>
+                                    <input type="date" name="date_from" value="{{ request.GET.date_from }}">
+                                </div>
+                                <div class="pl-date-range-sep">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                </div>
+                                <div>
+                                    <label class="pl-filter-mini-label">До</label>
+                                    <input type="date" name="date_to" value="{{ request.GET.date_to }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Дата платежа до</label>
-                    <input type="date" name="date_to" class="form-control" value="{{ request.GET.date_to }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="pl-filter-label">Страховщик</label>
-                    <select name="insurer" class="form-select" id="insurerSelect">
-                        <option value="">Все страховщики</option>
-                        {% for insurer in insurers %}
-                        <option value="{{ insurer.id }}" {% if selected_insurer == insurer.id|stringformat:'s' %}selected{% endif %}>
-                            {{ insurer.insurer_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
-                    <button type="submit" class="btn-pl-apply">
-                        <i class="bi bi-funnel"></i> Применить
-                    </button>
-                    <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn-pl-reset">
-                        <i class="bi bi-x-circle"></i> Сбросить
-                    </a>
+
+                <div class="pl-filter-actions">
+                    <div class="pl-filter-result">
+                        <i class="bi bi-list-check"></i>
+                        Найдено: <strong>{% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ payments|length }}{% endif %}</strong>
+                    </div>
+                    <div class="pl-filter-buttons">
+                        <button type="submit" class="btn-pl-apply">
+                            <i class="bi bi-funnel"></i> Применить
+                        </button>
+                        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}" class="btn-pl-reset">
+                            <i class="bi bi-x-circle"></i> Сбросить
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
@@ -548,15 +751,15 @@
     <!-- Status Filter Strip -->
     <div class="pl-status-strip">
         <!-- Past payments group -->
-        <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--approved {% if selected_status == 'approved' %}active{% endif %}">
             <i class="bi bi-check2-circle"></i> Акт согласован СК
         </a>
-        <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--paid {% if selected_status == 'paid' %}active{% endif %}">
             <i class="bi bi-check-circle"></i> Оплаченные
         </a>
-        <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--overdue {% if selected_status == 'overdue' %}active{% endif %}">
             <i class="bi bi-exclamation-triangle"></i> Не оплаченные
         </a>
@@ -564,11 +767,11 @@
         <div class="pl-status-divider"></div>
 
         <!-- Future payments group -->
-        <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--upcoming {% if selected_status == 'upcoming' %}active{% endif %}">
             <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
         </a>
-        <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--future {% if selected_status == 'future' %}active{% endif %}">
             <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
         </a>
@@ -576,7 +779,7 @@
         <div class="pl-status-divider"></div>
 
         <!-- All -->
-        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}"
+        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--all {% if selected_status == 'all' %}active{% endif %}">
             <i class="bi bi-list-ul"></i> Все платежи
         </a>

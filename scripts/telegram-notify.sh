@@ -210,6 +210,12 @@ send_vk_file() {
     owner_id=$(printf '%s' "$save_response" | json_extract_field "response.0.owner_id" 2>/dev/null || true)
     doc_id=$(printf '%s' "$save_response" | json_extract_field "response.0.id" 2>/dev/null || true)
 
+    # VK API may return docs.save result in object form: response.doc.{owner_id,id}
+    if [ -z "$owner_id" ] || [ -z "$doc_id" ]; then
+        owner_id=$(printf '%s' "$save_response" | json_extract_field "response.doc.owner_id" 2>/dev/null || true)
+        doc_id=$(printf '%s' "$save_response" | json_extract_field "response.doc.id" 2>/dev/null || true)
+    fi
+
     if [ -z "$owner_id" ] || [ -z "$doc_id" ]; then
         log_error "VK document identifiers not found in response: $save_response"
         return 1

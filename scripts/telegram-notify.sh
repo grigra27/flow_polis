@@ -66,24 +66,24 @@ json_extract_field() {
         return 1
     fi
 
-    python3 - "$path" <<'PY'
+    python3 -c '
 import json
 import sys
 
 path = sys.argv[1].split(".")
 raw = sys.stdin.read()
+if not raw:
+    sys.exit(1)
 
 try:
-    data = json.loads(raw)
+    obj = json.loads(raw)
 except Exception:
     sys.exit(1)
 
-obj = data
 for segment in path:
     if isinstance(obj, list):
         try:
-            idx = int(segment)
-            obj = obj[idx]
+            obj = obj[int(segment)]
         except Exception:
             sys.exit(1)
     elif isinstance(obj, dict):
@@ -100,7 +100,7 @@ if isinstance(obj, (dict, list)):
     print(json.dumps(obj, ensure_ascii=False))
 else:
     print(obj)
-PY
+' "$path"
 }
 
 # Send mirrored text message to VK (same text as Telegram)

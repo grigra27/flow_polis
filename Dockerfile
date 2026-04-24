@@ -11,6 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     netcat-traditional \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Создаем рабочую директорию

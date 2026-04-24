@@ -126,7 +126,7 @@ $error_message
 
 📋 Rate Limit: $last_error_count/$MAX_ERRORS_PER_HOUR per hour"
 
-    send_telegram_message "$message"
+    send_telegram_message "$message" || true
 }
 
 # Monitor a single log file for new errors
@@ -210,7 +210,7 @@ run_daemon() {
 
 Monitoring logs for ERROR and CRITICAL messages..."
 
-        send_telegram_message "$message"
+        send_telegram_message "$message" || true
     fi
 
     # Main monitoring loop

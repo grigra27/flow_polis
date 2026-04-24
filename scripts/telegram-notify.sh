@@ -44,13 +44,19 @@ check_telegram_enabled() {
 
 # Check if VK mirroring is enabled/configured
 check_vk_enabled() {
+    local silent="${1:-false}"
+
     if [ "${VK_ENABLED:-false}" != "true" ]; then
-        log_error "VK mirroring is disabled (VK_ENABLED=false)"
+        if [ "$silent" != "true" ]; then
+            log_error "VK mirroring is disabled (VK_ENABLED=false)"
+        fi
         return 1
     fi
 
     if [ -z "${VK_COMMUNITY_TOKEN:-}" ] || [ -z "${VK_USER_ID:-}" ]; then
-        log_error "VK mirroring is not configured (VK_COMMUNITY_TOKEN or VK_USER_ID missing)"
+        if [ "$silent" != "true" ]; then
+            log_error "VK mirroring is not configured (VK_COMMUNITY_TOKEN or VK_USER_ID missing)"
+        fi
         return 1
     fi
 
@@ -231,18 +237,19 @@ send_vk_file() {
     return 1
 }
 
-# Send text message to Telegram
-send_telegram_message() {
+# Send text message only to Telegram
+send_telegram_message_only() {
     local message="$1"
     local parse_mode="${2:-}"
 
     if ! check_telegram_enabled; then
-        return 0
+        return 1
     fi
 
     # Use simple text format to avoid HTML parsing issues
     local response
-    response=$(curl -sS --connect-timeout 15 --max-time 60 -X POST "$TELEGRAM_API_URL/sendMessage" \
+    # Force IPv4 to avoid intermittent IPv6 routing issues in some Docker hosts.
+    response=$(curl -4 -sS --connect-timeout 15 --max-time 60 --retry 2 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendMessage" \
         -d "chat_id=$TELEGRAM_CHAT_ID" \
         -d "text=$message" \
         -d "disable_web_page_preview=true" 2>&1)
@@ -255,10 +262,6 @@ send_telegram_message() {
 
     if echo "$response" | grep -q '"ok":true'; then
         log_info "Message sent successfully"
-        if ! send_vk_mirror_message "$message"; then
-            log_error "Telegram message sent, but VK mirror failed"
-            return 1
-        fi
         return 0
     else
         log_error "Failed to send message: $response"
@@ -266,19 +269,19 @@ send_telegram_message() {
     fi
 }
 
-# Send file to Telegram
-send_telegram_file() {
+# Send file only to Telegram
+send_telegram_file_only() {
     local file_path="$1"
     local caption="$2"
     local max_size_mb="$TELEGRAM_MAX_FILE_SIZE"
 
     if ! check_telegram_enabled; then
-        return 0
+        return 1
     fi
 
     if [ "$TELEGRAM_UPLOAD_FILES" != "true" ]; then
-        log_info "File upload disabled in configuration"
-        return 0
+        log_warn "Telegram file upload disabled in configuration"
+        return 1
     fi
 
     if [ ! -f "$file_path" ]; then
@@ -322,7 +325,8 @@ send_telegram_file() {
     log_info "Uploading file: $(basename "$file_path") ($file_size_mb MB)"
 
     local response
-    response=$(curl -sS --connect-timeout 20 --max-time 300 --retry 2 --retry-delay 2 -X POST "$TELEGRAM_API_URL/sendDocument" \
+    # Force IPv4 to avoid intermittent IPv6 routing issues in some Docker hosts.
+    response=$(curl -4 -sS --connect-timeout 20 --max-time 300 --retry 3 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendDocument" \
         -F "chat_id=$TELEGRAM_CHAT_ID" \
         -F "document=@$file_path" \
         --form-string "caption=$caption" 2>&1)
@@ -342,16 +346,6 @@ send_telegram_file() {
     if echo "$response" | grep -q '"ok":true'; then
         log_info "File uploaded successfully"
 
-        # Mirror uploaded file to VK with same caption
-        if ! send_vk_file "$file_path" "$caption"; then
-            log_error "Telegram file uploaded, but VK file mirror failed"
-            # Clean up temporary compressed file before returning
-            if [[ "$file_path" == *.gz ]] && [[ "$caption" == *"compressed"* ]]; then
-                rm -f "$file_path"
-            fi
-            return 1
-        fi
-
         # Clean up temporary compressed file
         if [[ "$file_path" == *.gz ]] && [[ "$caption" == *"compressed"* ]]; then
             rm -f "$file_path"
@@ -370,6 +364,107 @@ send_telegram_file() {
     fi
 }
 
+# Send text message to all configured channels in parallel.
+# Return 0 if at least one channel succeeded.
+send_telegram_message() {
+    local message="$1"
+    local tg_pid=""
+    local vk_pid=""
+    local tg_status=1
+    local vk_status=1
+    local tg_enabled=0
+    local vk_enabled=0
+
+    if check_telegram_enabled; then
+        tg_enabled=1
+        send_telegram_message_only "$message" &
+        tg_pid=$!
+    fi
+
+    if check_vk_enabled true; then
+        vk_enabled=1
+        send_vk_mirror_message "$message" &
+        vk_pid=$!
+    fi
+
+    if [ "$tg_enabled" -eq 0 ] && [ "$vk_enabled" -eq 0 ]; then
+        log_warn "No enabled notification channels for message send"
+        return 0
+    fi
+
+    if [ -n "$tg_pid" ]; then
+        wait "$tg_pid"
+        tg_status=$?
+    fi
+
+    if [ -n "$vk_pid" ]; then
+        wait "$vk_pid"
+        vk_status=$?
+    fi
+
+    if [ "$tg_enabled" -eq 1 ] && [ "$tg_status" -eq 0 ]; then
+        return 0
+    fi
+
+    if [ "$vk_enabled" -eq 1 ] && [ "$vk_status" -eq 0 ]; then
+        return 0
+    fi
+
+    log_warn "Message delivery failed on all enabled channels"
+    return 1
+}
+
+# Send file to all configured channels in parallel.
+# Return 0 if at least one channel succeeded.
+send_telegram_file() {
+    local file_path="$1"
+    local caption="$2"
+    local tg_pid=""
+    local vk_pid=""
+    local tg_status=1
+    local vk_status=1
+    local tg_enabled=0
+    local vk_enabled=0
+
+    if check_telegram_enabled && [ "$TELEGRAM_UPLOAD_FILES" = "true" ]; then
+        tg_enabled=1
+        send_telegram_file_only "$file_path" "$caption" &
+        tg_pid=$!
+    fi
+
+    if check_vk_enabled true; then
+        vk_enabled=1
+        send_vk_file "$file_path" "$caption" &
+        vk_pid=$!
+    fi
+
+    if [ "$tg_enabled" -eq 0 ] && [ "$vk_enabled" -eq 0 ]; then
+        log_warn "No enabled notification channels for file upload"
+        return 0
+    fi
+
+    if [ -n "$tg_pid" ]; then
+        wait "$tg_pid"
+        tg_status=$?
+    fi
+
+    if [ -n "$vk_pid" ]; then
+        wait "$vk_pid"
+        vk_status=$?
+    fi
+
+    if [ "$tg_enabled" -eq 1 ] && [ "$tg_status" -eq 0 ]; then
+        return 0
+    fi
+
+    if [ "$vk_enabled" -eq 1 ] && [ "$vk_status" -eq 0 ]; then
+        return 0
+    fi
+
+    log_warn "File delivery failed on all enabled channels"
+    return 1
+}
+
 # Send backup start notification
 notify_backup_start() {
     local backup_type="$1"
@@ -383,7 +478,7 @@ notify_backup_start() {
 
 Starting backup process..."
 
-    send_telegram_message "$message"
+    send_telegram_message "$message" || true
 }
 
 # Send backup success notification
@@ -403,12 +498,12 @@ notify_backup_success() {
 ⏱ Duration: $duration
 🖥 Server: $(hostname)"
 
-    send_telegram_message "$message"
+    send_telegram_message "$message" || true
 
     # Upload file if enabled
     if [ -n "$file_path" ] && [ -f "$file_path" ]; then
         local caption="$backup_type backup - $(basename "$file_path") - $file_size"
-        send_telegram_file "$file_path" "$caption"
+        send_telegram_file "$file_path" "$caption" || true
     fi
 }
 
@@ -427,7 +522,7 @@ notify_backup_error() {
 
 Please check the logs for more details."
 
-    send_telegram_message "$message"
+    send_telegram_message "$message" || true
 }
 
 # Send cleanup notification
@@ -445,7 +540,7 @@ notify_cleanup_result() {
 📅 Retention: $retention_days days
 🖥 Server: $(hostname)"
 
-    send_telegram_message "$message"
+    send_telegram_message "$message" || true
 }
 
 # Test Telegram connection
@@ -466,11 +561,38 @@ This is a test message from Insurance Broker backup system.
 
 If you receive this message, Telegram notifications are working correctly! ✅"
 
-    if send_telegram_message "$test_message"; then
+    if send_telegram_message_only "$test_message"; then
         log_info "Telegram connection test successful!"
         return 0
     else
         log_error "Telegram connection test failed!"
+        return 1
+    fi
+}
+
+# Test VK connection
+test_vk_connection() {
+    log_info "Testing VK connection..."
+
+    if ! check_vk_enabled; then
+        log_error "VK is not enabled or not configured properly"
+        return 1
+    fi
+
+    local test_message="🧪 Test Message
+
+This is a test message from Insurance Broker backup system.
+
+🕐 Time: $(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+🖥 Server: $(hostname)
+
+If you receive this message, VK notifications are working correctly! ✅"
+
+    if send_vk_mirror_message "$test_message"; then
+        log_info "VK connection test successful!"
+        return 0
+    else
+        log_error "VK connection test failed!"
         return 1
     fi
 }
@@ -482,14 +604,20 @@ usage() {
     echo "Telegram notification functions for backup scripts"
     echo ""
     echo "Commands:"
-    echo "  test                    Test Telegram connection"
-    echo "  send MESSAGE            Send a test message"
-    echo "  upload FILE [CAPTION]   Upload a test file"
+    echo "  test                    Test Telegram-only connection"
+    echo "  vk-test                 Test VK-only connection"
+    echo "  send MESSAGE            Send message in parallel (Telegram + VK)"
+    echo "  upload FILE [CAPTION]   Upload file in parallel (Telegram + VK)"
+    echo "  vk-send MESSAGE         Send message only to VK"
+    echo "  vk-upload FILE [CAPTION] Upload file only to VK"
     echo ""
     echo "Examples:"
     echo "  $0 test"
+    echo "  $0 vk-test"
     echo "  $0 send \"Hello from backup system\""
     echo "  $0 upload /path/to/file.txt \"Test file upload\""
+    echo "  $0 vk-send \"VK only test\""
+    echo "  $0 vk-upload /path/to/file.txt \"VK only upload\""
     echo ""
 }
 
@@ -509,6 +637,19 @@ main() {
             send_telegram_message "$2"
             exit $?
             ;;
+        vk-test)
+            test_vk_connection
+            exit $?
+            ;;
+        vk-send)
+            if [ -z "${2:-}" ]; then
+                echo "Error: Message text required"
+                usage
+                exit 1
+            fi
+            send_vk_mirror_message "$2"
+            exit $?
+            ;;
         upload)
             if [ -z "${2:-}" ]; then
                 echo "Error: File path required"
@@ -516,6 +657,15 @@ main() {
                 exit 1
             fi
             send_telegram_file "$2" "${3:-Test file upload}"
+            exit $?
+            ;;
+        vk-upload)
+            if [ -z "${2:-}" ]; then
+                echo "Error: File path required"
+                usage
+                exit 1
+            fi
+            send_vk_file "$2" "${3:-Test VK file upload}"
             exit $?
             ;;
         -h|--help|"")

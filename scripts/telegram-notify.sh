@@ -42,6 +42,195 @@ check_telegram_enabled() {
     return 0
 }
 
+# Check if VK mirroring is enabled/configured
+check_vk_enabled() {
+    if [ "${VK_ENABLED:-false}" != "true" ]; then
+        log_error "VK mirroring is disabled (VK_ENABLED=false)"
+        return 1
+    fi
+
+    if [ -z "${VK_COMMUNITY_TOKEN:-}" ] || [ -z "${VK_USER_ID:-}" ]; then
+        log_error "VK mirroring is not configured (VK_COMMUNITY_TOKEN or VK_USER_ID missing)"
+        return 1
+    fi
+
+    return 0
+}
+
+# Extract JSON field by dot path using python3 (supports dicts/lists).
+# Example paths: response.upload_url, response.0.id
+json_extract_field() {
+    local path="$1"
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        return 1
+    fi
+
+    python3 - "$path" <<'PY'
+import json
+import sys
+
+path = sys.argv[1].split(".")
+raw = sys.stdin.read()
+
+try:
+    data = json.loads(raw)
+except Exception:
+    sys.exit(1)
+
+obj = data
+for segment in path:
+    if isinstance(obj, list):
+        try:
+            idx = int(segment)
+            obj = obj[idx]
+        except Exception:
+            sys.exit(1)
+    elif isinstance(obj, dict):
+        if segment not in obj:
+            sys.exit(1)
+        obj = obj[segment]
+    else:
+        sys.exit(1)
+
+if obj is None:
+    sys.exit(1)
+
+if isinstance(obj, (dict, list)):
+    print(json.dumps(obj, ensure_ascii=False))
+else:
+    print(obj)
+PY
+}
+
+# Send mirrored text message to VK (same text as Telegram)
+send_vk_mirror_message() {
+    local message="$1"
+
+    if ! check_vk_enabled; then
+        return 1
+    fi
+
+    # random_id is required by VK API to deduplicate messages
+    local random_id="${RANDOM}$(date +%s)"
+    local response=$(curl -s -X POST "https://api.vk.com/method/messages.send" \
+        --data-urlencode "user_id=$VK_USER_ID" \
+        --data-urlencode "message=$message" \
+        --data-urlencode "random_id=$random_id" \
+        --data-urlencode "access_token=$VK_COMMUNITY_TOKEN" \
+        --data-urlencode "v=5.199")
+
+    if echo "$response" | grep -q '"response"'; then
+        log_info "Message mirrored to VK successfully"
+        return 0
+    else
+        log_error "Failed to mirror message to VK: $response"
+        return 1
+    fi
+}
+
+# Upload file to VK docs and send it to configured user with caption.
+send_vk_file() {
+    local file_path="$1"
+    local caption="${2:-Backup file}"
+
+    if ! check_vk_enabled; then
+        return 1
+    fi
+
+    if [ ! -f "$file_path" ]; then
+        log_error "VK file mirror failed: file not found: $file_path"
+        return 1
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_error "VK file mirror requires python3 for JSON parsing"
+        return 1
+    fi
+
+    local file_name
+    file_name="$(basename "$file_path")"
+
+    # 1) Get VK upload URL for message docs
+    local upload_server_response
+    upload_server_response=$(curl -s -X POST "https://api.vk.com/method/docs.getMessagesUploadServer" \
+        --data-urlencode "peer_id=$VK_USER_ID" \
+        --data-urlencode "type=doc" \
+        --data-urlencode "access_token=$VK_COMMUNITY_TOKEN" \
+        --data-urlencode "v=5.199")
+
+    if echo "$upload_server_response" | grep -q '"error"'; then
+        log_error "VK docs.getMessagesUploadServer error: $upload_server_response"
+        return 1
+    fi
+
+    local upload_url
+    upload_url=$(printf '%s' "$upload_server_response" | json_extract_field "response.upload_url" 2>/dev/null || true)
+    if [ -z "$upload_url" ]; then
+        log_error "VK upload URL not found in response: $upload_server_response"
+        return 1
+    fi
+
+    # 2) Upload file bytes
+    local upload_response
+    upload_response=$(curl -s -X POST "$upload_url" -F "file=@$file_path")
+    if echo "$upload_response" | grep -q '"error"'; then
+        log_error "VK upload file error: $upload_response"
+        return 1
+    fi
+
+    local file_token
+    file_token=$(printf '%s' "$upload_response" | json_extract_field "file" 2>/dev/null || true)
+    if [ -z "$file_token" ]; then
+        log_error "VK upload token not found in response: $upload_response"
+        return 1
+    fi
+
+    # 3) Save uploaded file as VK document
+    local save_response
+    save_response=$(curl -s -X POST "https://api.vk.com/method/docs.save" \
+        --data-urlencode "file=$file_token" \
+        --data-urlencode "title=$file_name" \
+        --data-urlencode "access_token=$VK_COMMUNITY_TOKEN" \
+        --data-urlencode "v=5.199")
+
+    if echo "$save_response" | grep -q '"error"'; then
+        log_error "VK docs.save error: $save_response"
+        return 1
+    fi
+
+    local owner_id
+    local doc_id
+    owner_id=$(printf '%s' "$save_response" | json_extract_field "response.0.owner_id" 2>/dev/null || true)
+    doc_id=$(printf '%s' "$save_response" | json_extract_field "response.0.id" 2>/dev/null || true)
+
+    if [ -z "$owner_id" ] || [ -z "$doc_id" ]; then
+        log_error "VK document identifiers not found in response: $save_response"
+        return 1
+    fi
+
+    local attachment="doc${owner_id}_${doc_id}"
+    local random_id="${RANDOM}$(date +%s)"
+
+    # 4) Send saved document to target user
+    local send_response
+    send_response=$(curl -s -X POST "https://api.vk.com/method/messages.send" \
+        --data-urlencode "user_id=$VK_USER_ID" \
+        --data-urlencode "message=$caption" \
+        --data-urlencode "attachment=$attachment" \
+        --data-urlencode "random_id=$random_id" \
+        --data-urlencode "access_token=$VK_COMMUNITY_TOKEN" \
+        --data-urlencode "v=5.199")
+
+    if echo "$send_response" | grep -q '"response"'; then
+        log_info "File mirrored to VK successfully"
+        return 0
+    fi
+
+    log_error "VK messages.send (with attachment) failed: $send_response"
+    return 1
+}
+
 # Send text message to Telegram
 send_telegram_message() {
     local message="$1"
@@ -59,6 +248,10 @@ send_telegram_message() {
 
     if echo "$response" | grep -q '"ok":true'; then
         log_info "Message sent successfully"
+        if ! send_vk_mirror_message "$message"; then
+            log_error "Telegram message sent, but VK mirror failed"
+            return 1
+        fi
         return 0
     else
         log_error "Failed to send message: $response"
@@ -128,6 +321,16 @@ send_telegram_file() {
 
     if echo "$response" | grep -q '"ok":true'; then
         log_info "File uploaded successfully"
+
+        # Mirror uploaded file to VK with same caption
+        if ! send_vk_file "$file_path" "$caption"; then
+            log_error "Telegram file uploaded, but VK file mirror failed"
+            # Clean up temporary compressed file before returning
+            if [[ "$file_path" == *.gz ]] && [[ "$caption" == *"compressed"* ]]; then
+                rm -f "$file_path"
+            fi
+            return 1
+        fi
 
         # Clean up temporary compressed file
         if [[ "$file_path" == *.gz ]] && [[ "$caption" == *"compressed"* ]]; then

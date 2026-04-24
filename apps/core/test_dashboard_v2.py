@@ -2,6 +2,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.db.models import Q, Sum
+from django.db.models.functions import Coalesce
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -203,6 +205,7 @@ class DashboardV2ServiceTests(TestCase):
             "dashboard_v2_legacy_relay",
         }
         self.assertTrue(expected_keys.issubset(context.keys()))
+        self.assertEqual(context["dashboard_v2_structure_scope"], "all")
 
         health = context["dashboard_v2_health"]
         self.assertGreaterEqual(health["score"], Decimal("0"))
@@ -257,6 +260,40 @@ class DashboardV2ServiceTests(TestCase):
         self.assertEqual(legacy_relay["cards"][0]["title"], "Предстоящие платежи")
         self.assertIn("link_url", legacy_relay["cards"][0])
 
+    def test_structure_scope_broker_filters_non_broker_policies(self):
+        context_all = DashboardV2Service().get_dashboard_context(structure_scope="all")
+        context_broker = DashboardV2Service().get_dashboard_context(
+            structure_scope="broker"
+        )
+
+        self.assertEqual(context_all["dashboard_v2_structure_scope"], "all")
+        self.assertEqual(context_broker["dashboard_v2_structure_scope"], "broker")
+
+        all_structure = context_all["dashboard_v2_structure"]
+        broker_structure = context_broker["dashboard_v2_structure"]
+
+        all_sum = all_structure["by_branch"][0]["bridge_insurance_sum"]
+        broker_sum = broker_structure["by_branch"][0]["bridge_insurance_sum"]
+
+        current_month_start = timezone.localdate().replace(day=1)
+        non_broker_qs = PaymentSchedule.objects.filter(
+            policy__policy_active=True,
+            policy__broker_participation=False,
+        )
+        expected_non_broker_sum = non_broker_qs.filter(
+            Q(due_date__lt=current_month_start, paid_date__isnull=False)
+            | Q(due_date__gte=current_month_start)
+        ).aggregate(total=Coalesce(Sum("insurance_sum"), Decimal("0")))["total"]
+        self.assertEqual(all_sum - broker_sum, expected_non_broker_sum)
+
+        all_premium = all_structure["top_branch_premium"]["bridge_insurance_sum"]
+        broker_premium = broker_structure["top_branch_premium"]["bridge_insurance_sum"]
+        expected_non_broker_premium = non_broker_qs.filter(
+            Q(due_date__lt=current_month_start, paid_date__isnull=False)
+            | Q(due_date__gte=current_month_start)
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"]
+        self.assertEqual(all_premium - broker_premium, expected_non_broker_premium)
+
 
 class DashboardV2ViewTests(TestCase):
     def setUp(self):
@@ -267,26 +304,38 @@ class DashboardV2ViewTests(TestCase):
         )
 
     def test_dashboard_v2_requires_login(self):
-        response = self.client.get(reverse("core:dashboard_v2"))
+        response = self.client.get(reverse("core:dashboard"))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("accounts:login"), response.url)
 
     def test_dashboard_v2_renders_for_authenticated_user(self):
         self.client.force_login(self.user)
 
-        response = self.client.get(reverse("core:dashboard_v2"))
+        response = self.client.get(reverse("core:dashboard"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Дашборд версия 2.0")
         self.assertContains(response, "Ключевые списки из основного дашборда")
+        self.assertContains(response, "Все сделки")
+        self.assertContains(response, "Только с участием брокера")
         self.assertIn("dashboard_v2_health", response.context)
         self.assertIn("dashboard_v2_insights", response.context)
+        self.assertEqual(response.context["dashboard_v2_structure_scope"], "all")
 
-    def test_exports_page_contains_dashboard_v2_link(self):
+    def test_dashboard_v2_accepts_structure_scope_query_param(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("core:dashboard"), {"structure_scope": "broker"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_v2_structure_scope"], "broker")
+
+    def test_exports_page_does_not_contain_dashboard_v2_link(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("reports:index"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Дашборд версия 2.0")
-        self.assertContains(response, reverse("core:dashboard_v2"))
+        self.assertNotContains(response, "Дашборд версия 2.0")

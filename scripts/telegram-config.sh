@@ -41,6 +41,11 @@ else
     TELEGRAM_API_URL=""
 fi
 
+# VK mirror configuration (optional, for Telegram -> VK mirroring)
+VK_ENABLED="${VK_ENABLED:-false}"
+VK_COMMUNITY_TOKEN="${VK_COMMUNITY_TOKEN:-}"
+VK_USER_ID="${VK_USER_ID:-}"
+
 # Export variables for use in other scripts
 export TELEGRAM_BOT_TOKEN
 export TELEGRAM_CHAT_ID
@@ -48,3 +53,6 @@ export TELEGRAM_ENABLED
 export TELEGRAM_UPLOAD_FILES
 export TELEGRAM_MAX_FILE_SIZE
 export TELEGRAM_API_URL
+export VK_ENABLED
+export VK_COMMUNITY_TOKEN
+export VK_USER_ID

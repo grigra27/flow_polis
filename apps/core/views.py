@@ -8,16 +8,59 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+STRUCTURE_SCOPE_OPTIONS = (
+    {
+        "key": "all",
+        "label": "Все сделки",
+        "hint": "С участием брокера и без",
+    },
+    {
+        "key": "broker",
+        "label": "Только с участием брокера",
+        "hint": "Только broker_participation = Да",
+    },
+)
+
+
+def _normalize_structure_scope(scope):
+    normalized = (scope or "").strip().lower()
+    if normalized in {"broker", "with_broker", "broker_only"}:
+        return "broker"
+    return "all"
+
+
+def _build_structure_scope_context(request, selected_scope):
+    normalized_scope = _normalize_structure_scope(selected_scope)
+    switch_options = []
+    for option in STRUCTURE_SCOPE_OPTIONS:
+        params = request.GET.copy()
+        params["structure_scope"] = option["key"]
+        switch_options.append(
+            {
+                **option,
+                "active": option["key"] == normalized_scope,
+                "url": f"{request.path}?{params.urlencode()}#portfolio-structure",
+            }
+        )
+
+    return {
+        "dashboard_v2_structure_scope": normalized_scope,
+        "dashboard_v2_structure_scope_options": switch_options,
+    }
+
 
 @login_required
 def dashboard(request):
     """
     Dashboard 2.0
     """
+    requested_structure_scope = request.GET.get("structure_scope")
     try:
         from apps.core.services.dashboard_v2_service import DashboardV2Service
 
-        context = DashboardV2Service().get_dashboard_context()
+        context = DashboardV2Service().get_dashboard_context(
+            structure_scope=requested_structure_scope or "all"
+        )
     except Exception as exc:
         logger.error("Error building Dashboard 2.0 context: %s", exc, exc_info=True)
         context = {
@@ -175,7 +218,19 @@ def dashboard(request):
                     },
                 ]
             },
+            "dashboard_v2_structure_scope": _normalize_structure_scope(
+                requested_structure_scope
+            ),
         }
+
+    context.update(
+        _build_structure_scope_context(
+            request,
+            selected_scope=context.get(
+                "dashboard_v2_structure_scope", requested_structure_scope or "all"
+            ),
+        )
+    )
 
     return render(request, "core/dashboard.html", context)
 

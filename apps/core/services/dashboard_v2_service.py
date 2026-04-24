@@ -168,12 +168,13 @@ class DashboardV2Service:
     level totals (no policy numbers or client-level sensitive data).
     """
 
-    def get_dashboard_context(self) -> Dict[str, Any]:
+    def get_dashboard_context(self, *, structure_scope: str = "all") -> Dict[str, Any]:
         from apps.policies.models import Policy, PaymentSchedule
 
         today = timezone.localdate()
         prev_date = today - timedelta(days=30)
         current_month_start = today.replace(day=1)
+        normalized_structure_scope = self._normalize_structure_scope(structure_scope)
 
         policies_qs = Policy.objects.all()
         active_policies_qs = policies_qs.filter(policy_active=True)
@@ -224,6 +225,7 @@ class DashboardV2Service:
         structure = self._build_portfolio_structure(
             active_payments_qs=active_payments_qs,
             current_month_start=current_month_start,
+            broker_only=normalized_structure_scope == "broker",
         )
 
         concentration = self._build_concentration_risk(structure=structure)
@@ -267,12 +269,20 @@ class DashboardV2Service:
             "dashboard_v2_renewal": renewal,
             "dashboard_v2_data_quality": data_quality,
             "dashboard_v2_structure": structure,
+            "dashboard_v2_structure_scope": normalized_structure_scope,
             "dashboard_v2_concentration": concentration,
             "dashboard_v2_dynamics": dynamics,
             "dashboard_v2_insights": insights,
             "dashboard_v2_legacy_relay": legacy_relay,
             "dashboard_v2_nb_index": nb_index,
         }
+
+    @staticmethod
+    def _normalize_structure_scope(structure_scope: str | None) -> str:
+        scope = (structure_scope or "").strip().lower()
+        if scope in {"broker", "with_broker", "broker_only"}:
+            return "broker"
+        return "all"
 
     def _build_health_index(
         self,
@@ -827,9 +837,14 @@ class DashboardV2Service:
         *,
         active_payments_qs,
         current_month_start: date,
+        broker_only: bool = False,
     ) -> Dict[str, Any]:
         # Safety filter: block 7 must always be based only on active policies.
         scoped_payments_qs = active_payments_qs.filter(policy__policy_active=True)
+        if broker_only:
+            scoped_payments_qs = scoped_payments_qs.filter(
+                policy__broker_participation=True
+            )
 
         actual_qs = scoped_payments_qs.filter(
             due_date__lt=current_month_start, paid_date__isnull=False
@@ -1251,7 +1266,7 @@ class DashboardV2Service:
                         "Портфель зависит от ограниченного числа сегментов."
                     ),
                     "action_label": "Посмотреть структуру",
-                    "action_url": reverse("core:dashboard_v2") + "#portfolio-structure",
+                    "action_url": reverse("core:dashboard") + "#portfolio-structure",
                 }
             )
 

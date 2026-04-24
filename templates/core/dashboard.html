@@ -54,6 +54,72 @@
         margin-bottom: 0.9rem;
     }
 
+    .v2-structure-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.9rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .v2-structure-switch {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.45rem;
+        width: auto;
+    }
+
+    .v2-structure-switch-item {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #a4bad4;
+        border-radius: 999px;
+        background: #f7fbff;
+        color: #1f3f63;
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        padding: 0.44rem 0.82rem;
+        min-height: 34px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        box-shadow: 0 1px 2px rgba(14, 38, 70, 0.1);
+    }
+
+    .v2-structure-switch-item:hover {
+        border-color: #6f8fb3;
+        background: #edf4fc;
+        color: #1d3d5f;
+        transform: translateY(-0.5px);
+        box-shadow: 0 3px 8px rgba(15, 36, 62, 0.14);
+    }
+
+    .v2-structure-switch-item.is-active {
+        border-color: #1d4ed8;
+        background: #1d4ed8;
+        color: #ffffff;
+        box-shadow: 0 3px 10px rgba(29, 78, 216, 0.25);
+    }
+
+    .v2-structure-switch-title {
+        display: block;
+        color: inherit;
+        text-align: center;
+    }
+
+    #portfolio-structure.is-loading {
+        opacity: 0.72;
+        transition: opacity 0.14s ease;
+    }
+
+    #portfolio-structure.is-loading .v2-structure-switch-item {
+        pointer-events: none;
+        cursor: wait;
+    }
+
     .v2-main-value {
         font-size: 2rem;
         font-weight: 800;
@@ -787,6 +853,15 @@
         .v2-grid-3 {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
+        .v2-structure-head {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .v2-structure-switch {
+            justify-content: flex-start;
+        }
     }
 
     @media (max-width: 576px) {
@@ -934,8 +1009,26 @@
     <div class="row g-3 mb-1" id="portfolio-structure">
         <div class="col-12">
             <section class="v2-card">
-                <h5 class="v2-title">Структура портфеля</h5>
-                <p class="v2-subtitle">Ключевые сегменты по филиалам, страховщикам и видам страхования (только активные полисы).</p>
+                <div class="v2-structure-head">
+                    <div>
+                        <h5 class="v2-title mb-1">Структура портфеля</h5>
+                        {% if dashboard_v2_structure_scope == "broker" %}
+                        <p class="v2-subtitle mb-0">Режим: только активные полисы с участием брокера.</p>
+                        {% else %}
+                        <p class="v2-subtitle mb-0">Режим: все активные полисы (с участием брокера и без участия брокера).</p>
+                        {% endif %}
+                    </div>
+                    <div class="v2-structure-switch" role="tablist" aria-label="Режим структуры портфеля">
+                        {% for option in dashboard_v2_structure_scope_options %}
+                        <a href="{{ option.url }}"
+                           data-structure-switch="1"
+                           class="v2-structure-switch-item{% if option.active %} is-active{% endif %}"
+                           aria-selected="{% if option.active %}true{% else %}false{% endif %}">
+                            <span class="v2-structure-switch-title">{{ option.label }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
 
                 {# ── Подраздел: Страховая сумма ── #}
                 <div class="v2-sub-section v2-sub-section--light">
@@ -1591,6 +1684,74 @@ document.addEventListener('DOMContentLoaded', function () {
                 bootstrap.Popover.getInstance(el)?.hide();
             }
         });
+    });
+
+    async function updatePortfolioStructure(nextUrl) {
+        const block = document.getElementById('portfolio-structure');
+        if (!block) {
+            window.location.href = nextUrl;
+            return;
+        }
+        if (block.dataset.loading === '1') {
+            return;
+        }
+
+        block.dataset.loading = '1';
+        block.classList.add('is-loading');
+
+        try {
+            const requestUrl = new URL(nextUrl, window.location.origin);
+            requestUrl.hash = '';
+
+            const response = await fetch(requestUrl.toString(), {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load portfolio structure');
+            }
+
+            const html = await response.text();
+            const parsed = new DOMParser().parseFromString(html, 'text/html');
+            const nextBlock = parsed.getElementById('portfolio-structure');
+
+            if (!nextBlock) {
+                throw new Error('Portfolio structure block not found');
+            }
+
+            block.replaceWith(nextBlock);
+            window.history.replaceState({}, '', nextUrl);
+        } catch (error) {
+            window.location.href = nextUrl;
+        } finally {
+            const current = document.getElementById('portfolio-structure');
+            if (current) {
+                current.classList.remove('is-loading');
+                delete current.dataset.loading;
+            }
+        }
+    }
+
+    document.addEventListener('click', function (event) {
+        const trigger = event.target.closest('a[data-structure-switch="1"]');
+        if (!trigger) {
+            return;
+        }
+        if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        updatePortfolioStructure(trigger.href);
     });
 });
 </script>

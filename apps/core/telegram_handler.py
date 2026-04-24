@@ -38,6 +38,19 @@ class TelegramHandler(logging.Handler):
         self.max_messages_per_hour = config(
             "TELEGRAM_ERROR_RATE_LIMIT", default=10, cast=int
         )
+        self.error_message_limit = config(
+            "TELEGRAM_ERROR_MESSAGE_LIMIT", default=500, cast=int
+        )
+        self.exception_message_limit = config(
+            "TELEGRAM_EXCEPTION_MESSAGE_LIMIT", default=700, cast=int
+        )
+        self.traceback_limit = config(
+            "TELEGRAM_TRACEBACK_LIMIT", default=2500, cast=int
+        )
+        # Telegram sendMessage hard limit is 4096 chars.
+        self.telegram_message_limit = config(
+            "TELEGRAM_MESSAGE_LIMIT", default=3900, cast=int
+        )
         self.message_cache = {}  # Кэш для группировки одинаковых ошибок
         self.sent_messages = []  # История отправленных сообщений для rate limiting
 
@@ -150,8 +163,12 @@ class TelegramHandler(logging.Handler):
 
         # Добавляем сообщение об ошибке
         error_message = record.getMessage()
-        if len(error_message) > 500:
-            error_message = error_message[:500] + "..."
+        error_message = self._trim_with_middle_ellipsis(
+            error_message,
+            self.error_message_limit,
+            marker=" ... (truncated) ... ",
+            tail_ratio=0.5,
+        )
 
         message_parts.extend(
             [
@@ -161,14 +178,39 @@ class TelegramHandler(logging.Handler):
             ]
         )
 
+        # Добавляем тип и текст исключения отдельно, чтобы было видно "что именно упало",
+        # даже если traceback пришлось сократить.
+        if record.exc_info and record.exc_info[0]:
+            exc_type = record.exc_info[0].__name__
+            exc_value = str(record.exc_info[1]) if record.exc_info[1] else ""
+            exc_line = f"{exc_type}: {exc_value}".strip()
+            exc_line = self._trim_with_middle_ellipsis(
+                exc_line,
+                self.exception_message_limit,
+                marker=" ... (truncated) ... ",
+                tail_ratio=0.7,
+            )
+            message_parts.extend(
+                [
+                    "",
+                    "💥 Exception:",
+                    exc_line,
+                ]
+            )
+
         # Добавляем traceback если есть
         if record.exc_info:
             tb_lines = traceback.format_exception(*record.exc_info)
             tb_text = "".join(tb_lines)
 
-            # Ограничиваем размер traceback
-            if len(tb_text) > 1000:
-                tb_text = tb_text[:1000] + "\n... (truncated)"
+            # Ограничиваем размер traceback, сохраняя и начало, и конец.
+            # Конец traceback особенно важен, там обычно тип и текст исключения.
+            tb_text = self._trim_with_middle_ellipsis(
+                tb_text,
+                self.traceback_limit,
+                marker="\n... (middle truncated) ...\n",
+                tail_ratio=0.8,
+            )
 
             message_parts.extend(
                 [
@@ -178,7 +220,50 @@ class TelegramHandler(logging.Handler):
                 ]
             )
 
-        return "\n".join(message_parts)
+        message = "\n".join(message_parts)
+        if len(message) > self.telegram_message_limit:
+            message = self._trim_with_middle_ellipsis(
+                message,
+                self.telegram_message_limit,
+                marker="\n... (message truncated) ...\n",
+                tail_ratio=0.8,
+            )
+
+        return message
+
+    def _trim_with_middle_ellipsis(
+        self, text, max_length, marker=" ... ", tail_ratio=0.7
+    ):
+        """
+        Обрезает длинный текст, сохраняя начало и конец.
+        Полезно для traceback, где конец содержит тип/сообщение исключения.
+        """
+        if text is None:
+            return ""
+
+        text = str(text)
+        if max_length is None or max_length <= 0 or len(text) <= max_length:
+            return text
+
+        marker = str(marker)
+
+        # Если лимит слишком мал, отдаем хвост (обычно там самая ценная часть traceback).
+        if max_length <= len(marker) + 10:
+            return text[-max_length:]
+
+        available = max_length - len(marker)
+        tail_len = int(available * tail_ratio)
+        head_len = available - tail_len
+
+        # Защита от некорректных ratio/округления
+        if head_len < 1:
+            head_len = 1
+            tail_len = available - head_len
+        if tail_len < 1:
+            tail_len = 1
+            head_len = available - tail_len
+
+        return text[:head_len] + marker + text[-tail_len:]
 
     def _escape_html(self, text):
         """

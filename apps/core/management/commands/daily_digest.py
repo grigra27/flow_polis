@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Отправляет ежедневный дайджест в Telegram"
+    help = "Отправляет ежедневный дайджест в Telegram с зеркалированием в VK"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -37,7 +37,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--no-vk",
             action="store_true",
-            help="Не отправлять дайджест в VK",
+            help="Не зеркалировать дайджест в VK",
         )
 
     def handle(self, *args, **options):
@@ -89,24 +89,40 @@ class Command(BaseCommand):
 
             full_message = f"📊 Дайджест за {period_name}\n\n{message}"
 
-            # Разделяем на части для Telegram (лимит 3900 символов)
-            telegram_parts = self._split_message_into_parts(
+            # Разделяем на части ЕДИНОЖДЫ:
+            # эти же части отправляем и в Telegram, и в VK, чтобы тексты совпадали.
+            message_parts = self._split_message_into_parts(
                 full_message, max_length=3900
             )
-            # Разделяем на части для VK (лимит 4096 символов)
-            vk_parts = self._split_message_into_parts(full_message, max_length=4096)
 
             print(
-                f"DEBUG: Telegram parts: {len(telegram_parts)}, VK parts: {len(vk_parts)}"
+                f"DEBUG: Message parts for Telegram/VK mirroring: {len(message_parts)}"
             )
 
-            # --- Telegram ---
-            if not options.get("no_telegram"):
-                tg_success = self._send_telegram_messages(telegram_parts)
+            send_telegram = not options.get("no_telegram")
+            send_vk = not options.get("no_vk")
+
+            tg_success = False
+            vk_success = False
+
+            if send_telegram:
+                # Если включен VK, отправляем зеркально в том же цикле и тем же текстом.
+                delivery_results = self._send_telegram_messages(
+                    message_parts, mirror_to_vk=send_vk
+                )
+                tg_success = delivery_results["telegram"] > 0
+                if send_vk:
+                    vk_success = delivery_results["vk"] > 0
+            elif send_vk:
+                # Telegram отключен флагом --no-telegram: отправляем только в VK.
+                vk_success = self._send_vk_messages(message_parts)
+
+            # --- Telegram status ---
+            if send_telegram:
                 if tg_success:
                     suffix = (
-                        f" ({len(telegram_parts)} частей)"
-                        if len(telegram_parts) > 1
+                        f" ({len(message_parts)} частей)"
+                        if len(message_parts) > 1
                         else ""
                     )
                     self.stdout.write(
@@ -121,11 +137,14 @@ class Command(BaseCommand):
             else:
                 self.stdout.write("⏭️ Telegram: пропущено (--no-telegram)")
 
-            # --- VK ---
-            if not options.get("no_vk"):
-                vk_success = self._send_vk_messages(vk_parts)
+            # --- VK status ---
+            if send_vk:
                 if vk_success:
-                    suffix = f" ({len(vk_parts)} частей)" if len(vk_parts) > 1 else ""
+                    suffix = (
+                        f" ({len(message_parts)} частей)"
+                        if len(message_parts) > 1
+                        else ""
+                    )
                     self.stdout.write(
                         self.style.SUCCESS(f"✅ Дайджест отправлен в VK{suffix}")
                     )
@@ -1141,42 +1160,66 @@ class Command(BaseCommand):
 
         return parts
 
-    def _send_telegram_messages(self, messages):
-        """Отправляет несколько сообщений в Telegram с задержкой между ними"""
+    def _format_part_message(self, message, part_index, total_parts):
+        """Форматирует часть сообщения одинаково для Telegram и VK."""
+        if total_parts > 1:
+            if part_index == 0:
+                return f"{message}\n\n📄 Часть 1/{total_parts}"
+            return f"📄 Часть {part_index+1}/{total_parts}\n\n{message}"
+        return message
+
+    def _send_telegram_messages(self, messages, mirror_to_vk=False):
+        """
+        Отправляет несколько сообщений в Telegram.
+        При mirror_to_vk=True зеркалит КАЖДУЮ часть в VK тем же текстом.
+        """
         import time
 
-        success_count = 0
+        from apps.core.vk_handler import send_vk_message
+
+        telegram_success_count = 0
+        vk_success_count = 0
         total_messages = len(messages)
 
-        for i, message in enumerate(messages):
+        for i, base_message in enumerate(messages):
+            message = self._format_part_message(base_message, i, total_messages)
+
             print(
                 f"DEBUG: Sending message {i+1}/{total_messages} (length: {len(message)})"
             )
 
-            # Добавляем номер части если сообщений больше одного
-            if total_messages > 1:
-                if i == 0:
-                    message = f"{message}\n\n📄 Часть 1/{total_messages}"
-                else:
-                    message = f"📄 Часть {i+1}/{total_messages}\n\n{message}"
-
             success = self._send_single_telegram_message(message)
 
             if success:
-                success_count += 1
+                telegram_success_count += 1
                 print(f"DEBUG: Message {i+1}/{total_messages} sent successfully")
 
-                # Задержка между сообщениями (кроме последнего)
-                if i < total_messages - 1:
-                    time.sleep(1)  # 1 секунда между сообщениями
+                if mirror_to_vk:
+                    vk_ok = send_vk_message(message)
+                    if vk_ok:
+                        vk_success_count += 1
+                        print(
+                            f"DEBUG: VK mirror message {i+1}/{total_messages} sent successfully"
+                        )
+                    else:
+                        print(
+                            f"ERROR: Failed to mirror VK message {i+1}/{total_messages}"
+                        )
             else:
                 print(f"ERROR: Failed to send message {i+1}/{total_messages}")
-                # Продолжаем отправку остальных сообщений
 
-        print(f"DEBUG: Successfully sent {success_count}/{total_messages} messages")
-        return (
-            success_count > 0
-        )  # Возвращаем True если хотя бы одно сообщение отправлено
+            # Задержка между сообщениями (кроме последнего)
+            if i < total_messages - 1:
+                time.sleep(1)  # 1 секунда между сообщениями
+
+        print(
+            f"DEBUG: Telegram sent {telegram_success_count}/{total_messages}, "
+            f"VK mirror sent {vk_success_count}/{total_messages}"
+        )
+        return {
+            "telegram": telegram_success_count,
+            "vk": vk_success_count,
+        }
 
     def _send_single_telegram_message(self, message):
         """Отправляет сообщение в Telegram через Python с детальной отладкой"""
@@ -1298,20 +1341,15 @@ class Command(BaseCommand):
     def _send_vk_messages(self, messages):
         """Отправляет несколько сообщений в VK с задержкой между ними"""
         import time
-        from apps.core.vk_handler import send_vk_message
 
         success_count = 0
         total = len(messages)
 
-        for i, message in enumerate(messages):
-            if total > 1:
-                if i == 0:
-                    message = f"{message}\n\n📄 Часть 1/{total}"
-                else:
-                    message = f"📄 Часть {i + 1}/{total}\n\n{message}"
+        for i, base_message in enumerate(messages):
+            message = self._format_part_message(base_message, i, total)
 
             print(f"DEBUG: Sending VK message {i + 1}/{total} (length: {len(message)})")
-            ok = send_vk_message(message)
+            ok = self._send_single_vk_message(message)
 
             if ok:
                 success_count += 1
@@ -1323,3 +1361,9 @@ class Command(BaseCommand):
 
         print(f"DEBUG: VK sent {success_count}/{total} messages")
         return success_count > 0
+
+    def _send_single_vk_message(self, message):
+        """Отправляет одно сообщение в VK."""
+        from apps.core.vk_handler import send_vk_message
+
+        return send_vk_message(message)

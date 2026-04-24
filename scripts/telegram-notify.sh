@@ -241,10 +241,17 @@ send_telegram_message() {
     fi
 
     # Use simple text format to avoid HTML parsing issues
-    local response=$(curl -s -X POST "$TELEGRAM_API_URL/sendMessage" \
+    local response
+    response=$(curl -sS --connect-timeout 15 --max-time 60 -X POST "$TELEGRAM_API_URL/sendMessage" \
         -d "chat_id=$TELEGRAM_CHAT_ID" \
         -d "text=$message" \
-        -d "disable_web_page_preview=true")
+        -d "disable_web_page_preview=true" 2>&1)
+    local curl_exit=$?
+
+    if [ $curl_exit -ne 0 ]; then
+        log_error "curl sendMessage failed (exit: $curl_exit): $response"
+        return 1
+    fi
 
     if echo "$response" | grep -q '"ok":true'; then
         log_info "Message sent successfully"
@@ -314,10 +321,23 @@ send_telegram_file() {
 
     log_info "Uploading file: $(basename "$file_path") ($file_size_mb MB)"
 
-    local response=$(curl -s -X POST "$TELEGRAM_API_URL/sendDocument" \
+    local response
+    response=$(curl -sS --connect-timeout 20 --max-time 300 --retry 2 --retry-delay 2 -X POST "$TELEGRAM_API_URL/sendDocument" \
         -F "chat_id=$TELEGRAM_CHAT_ID" \
         -F "document=@$file_path" \
-        -F "caption=$caption")
+        --form-string "caption=$caption" 2>&1)
+    local curl_exit=$?
+
+    if [ $curl_exit -ne 0 ]; then
+        log_error "curl sendDocument failed (exit: $curl_exit): $response"
+
+        # Clean up temporary compressed file on failure
+        if [[ "$file_path" == *.gz ]] && [[ "$caption" == *"compressed"* ]]; then
+            rm -f "$file_path"
+        fi
+
+        return 1
+    fi
 
     if echo "$response" | grep -q '"ok":true'; then
         log_info "File uploaded successfully"

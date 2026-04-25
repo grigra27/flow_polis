@@ -183,6 +183,22 @@ class PolicyAdmin(admin.ModelAdmin):
         js = ("policies/js/auto_copy_policyholder.js",)
         css = {"all": ("policies/css/auto_copy_policyholder.css",)}
 
+    def get_queryset(self, request):
+        # list_display обращается к client и insurer по каждой строке.
+        # Без select_related это N+1: 1 + 2 × len(page).
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "client",
+                "policyholder",
+                "insurer",
+                "insurance_type",
+                "branch",
+                "leasing_manager",
+            )
+        )
+
     def policy_status(self, obj):
         if obj.policy_active:
             return format_html('<span style="color: green;">✓ Активен</span>')
@@ -314,6 +330,15 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
     date_hierarchy = "due_date"
     actions = ["copy_payments"]
     exclude = ["commission_rate"]
+
+    def get_queryset(self, request):
+        # list_display обращается к str(policy), который тянет client.
+        # Без select_related это N+1: 1 + 2 × len(page).
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("policy", "policy__client", "policy__insurer")
+        )
 
     @admin.action(description="Копировать выбранные платежи")
     def copy_payments(self, request, queryset):

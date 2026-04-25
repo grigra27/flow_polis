@@ -258,11 +258,21 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Use WhiteNoise only in development, nginx serves static files in production
+# Use WhiteNoise only in development, nginx serves static files in production.
+# Django 5.1 заменил STATICFILES_STORAGE на STORAGES dict.
 if DEBUG:
-    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    _staticfiles_backend = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 else:
-    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    _staticfiles_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": _staticfiles_backend,
+    },
+}
 
 # Media files
 MEDIA_URL = "media/"

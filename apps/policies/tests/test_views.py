@@ -64,17 +64,23 @@ class TestPolicyDetailView:
 
         Validates: Requirements 1.2
         """
-        # Create payments with different insurance sums
+        # Create payments with different insurance sums.
+        # Явные due_date по возрастанию — фабрика ставит рандом, и валидатор
+        # PaymentSchedule.clean() требует строгого возрастания дат между installment'ами.
+        from datetime import date, timedelta
+
         payment1 = payment_schedule_factory(
             policy=sample_policy,
             year_number=1,
             installment_number=1,
+            due_date=date.today() + timedelta(days=10),
             insurance_sum=Decimal("1000000.00"),
         )
         payment2 = payment_schedule_factory(
             policy=sample_policy,
             year_number=1,
             installment_number=2,
+            due_date=date.today() + timedelta(days=20),
             insurance_sum=Decimal("950000.00"),
         )
 

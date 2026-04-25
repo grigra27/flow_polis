@@ -112,9 +112,15 @@
                             {% endif %}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
-                                <i class="bi bi-box-arrow-right"></i> Выход
-                            </a></li>
+                            <li>
+                                {# Django 5 требует POST на LogoutView, GET-запросы не принимаются #}
+                                <form method="post" action="{% url 'accounts:logout' %}" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-box-arrow-right"></i> Выход
+                                    </button>
+                                </form>
+                            </li>
                         </ul>
                     </li>
                 </ul>

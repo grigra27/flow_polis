@@ -27,3 +27,16 @@ MIGRATION_MODULES = DisableMigrations()
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+# Используем простой staticfiles storage без manifest/сжатия:
+# WhiteNoise CompressedManifestStaticFilesStorage в проде требует, чтобы
+# collectstatic был выполнен заранее. В тестах он не запускается, и любой
+# {% static %} в шаблонах падает с "Missing staticfiles manifest entry".
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}

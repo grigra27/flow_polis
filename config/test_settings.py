@@ -21,7 +21,7 @@ class DisableMigrations:
         return None
 
 
-# MIGRATION_MODULES = DisableMigrations()
+MIGRATION_MODULES = DisableMigrations()
 
 # Speed up password hashing for tests
 PASSWORD_HASHERS = [

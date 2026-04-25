@@ -65,6 +65,11 @@ venv/
 *.swo
 *~
 
+# Claude Code
+CLAUDE.md
+.claude/
+PLAN.md
+
 # OS
 .DS_Store
 Thumbs.db

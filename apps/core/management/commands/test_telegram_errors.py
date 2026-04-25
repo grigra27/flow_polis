@@ -33,6 +33,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Отправить кастомное уведомление",
         )
+        parser.add_argument(
+            "--test-security",
+            action="store_true",
+            help=(
+                "Имитировать CRITICAL событие security-логгера (как brute-force). "
+                "Используется для проверки что Python TelegramHandler шлёт алерт "
+                "вместо bash monitor-logs-telegram.sh — см. PLAN.md, пункт 11.1."
+            ),
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(
@@ -48,6 +57,8 @@ class Command(BaseCommand):
             self._test_exception()
         elif options["test_custom"]:
             self._test_custom()
+        elif options["test_security"]:
+            self._test_security()
         else:
             self._show_usage()
 
@@ -106,6 +117,36 @@ class Command(BaseCommand):
             )
         )
 
+    def _test_security(self):
+        """
+        Имитирует CRITICAL событие security-логгера — то же самое что брутфорс
+        логина. Если Python TelegramHandler работает, придёт сообщение
+        с заголовком "🚨 Critical Error Detected" в течение нескольких секунд.
+
+        Если параллельно запущен bash monitor-logs-telegram.sh (см. PLAN 11.1),
+        придёт ещё одно сообщение «🚨 Log Error Detected» через ~60 сек —
+        это и есть дублирование, которое мы хотим устранить.
+        """
+        self.stdout.write(
+            "📤 Имитация CRITICAL события security-логгера (как brute-force)..."
+        )
+        security_logger = logging.getLogger("security")
+        security_logger.critical(
+            "TEST: Brute force attack detected - IP: 0.0.0.0, "
+            "Username: test, Attempts: 5 (PLAN.md item 11.1 sanity check)"
+        )
+        self.stdout.write("")
+        self.stdout.write(
+            self.style.SUCCESS(
+                "✅ Событие отправлено в security-logger.\n"
+                "   Жди в Telegram сообщение «🚨 Critical Error Detected» "
+                "от Python — должно прийти за ~5 сек.\n"
+                "   Если параллельно запущен bash monitor-logs-telegram.sh, "
+                "придёт также «🚨 Log Error Detected» через ~60 сек.\n"
+                "   Если первое (Python) пришло — bash-канал можно отключать."
+            )
+        )
+
     def _show_usage(self):
         """Показывает примеры использования"""
         self.stdout.write(self.style.WARNING("Укажите тип теста:"))
@@ -114,7 +155,11 @@ class Command(BaseCommand):
         self.stdout.write("  --test-critical    Тестовая критическая ошибка")
         self.stdout.write("  --test-exception   Тестовое исключение с traceback")
         self.stdout.write("  --test-custom      Кастомное уведомление")
+        self.stdout.write(
+            "  --test-security    Имитация security-CRITICAL (sanity check для 11.1)"
+        )
         self.stdout.write("")
         self.stdout.write("Примеры:")
         self.stdout.write("  python manage.py test_telegram_errors --test-error")
         self.stdout.write("  python manage.py test_telegram_errors --test-exception")
+        self.stdout.write("  python manage.py test_telegram_errors --test-security")

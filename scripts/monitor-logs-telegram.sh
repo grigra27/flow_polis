@@ -1,5 +1,32 @@
 #!/bin/bash
 
+# ============================================================
+# ⚠️  DEPRECATED — см. PLAN.md, пункт 11.1
+# ============================================================
+# Этот скрипт дублирует функциональность Python TelegramHandler
+# (apps/core/telegram_handler.py), который уже подключён в LOGGING
+# config Django (config/settings.py). Любой logger.error()/critical()
+# из Django-кода — включая security CRITICAL события (брутфорс) —
+# уже отправляется в Telegram через Python.
+#
+# Этот bash-скрипт раньше был fallback'ом на случай если Django упадёт.
+# В результате на проде получаются ДВА сообщения за каждую ошибку:
+#   • «🚨 Critical Error Detected» от Python (через несколько секунд)
+#   • «🚨 Log Error Detected»     от bash    (через ~60 секунд)
+#
+# Перед окончательным удалением:
+# 1) Убедись, что Python-канал работает:
+#    docker compose -f docker-compose.prod.yml exec web \
+#      python manage.py test_telegram_errors --test-security
+#    Должно прийти «🚨 Critical Error Detected» за ~5 секунд.
+# 2) Отключи cron/daemon на сервере:
+#    crontab -l | grep monitor-logs-telegram     # найди запись
+#    crontab -e                                  # закомментируй её
+#    pgrep -af monitor-logs-telegram             # проверь нет ли daemon
+# 3) После недели наблюдения этот файл и setup-error-monitoring.sh
+#    можно удалить из репо.
+# ============================================================
+#
 # monitor-logs-telegram.sh
 # Мониторинг логов Django на предмет критических ошибок с уведомлениями в Telegram
 # Может работать как демон или как разовая проверка

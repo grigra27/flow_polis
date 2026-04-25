@@ -21,12 +21,28 @@ class Command(BaseCommand):
         parser.add_argument(
             "--notify-telegram",
             action="store_true",
-            help="Отправить результат проверки в Telegram",
+            help=(
+                "Отправить результат в Telegram. По умолчанию шлёт ТОЛЬКО "
+                "при warning/critical статусе — чтобы не спамить «всё ок» "
+                "каждые 30 минут. Используй --notify-always чтобы слать "
+                "и при healthy."
+            ),
         )
         parser.add_argument(
             "--notify-vk",
             action="store_true",
-            help="Отправить результат проверки в VK",
+            help=(
+                "Отправить результат в VK. По умолчанию шлёт только "
+                "при warning/critical (см. --notify-telegram)."
+            ),
+        )
+        parser.add_argument(
+            "--notify-always",
+            action="store_true",
+            help=(
+                "Слать уведомление в TG/VK даже когда всё healthy. "
+                "По умолчанию healthy-статус молчит."
+            ),
         )
         parser.add_argument(
             "--check-all",
@@ -92,12 +108,27 @@ class Command(BaseCommand):
         # Выводим результаты
         self._display_results(results, overall_status)
 
-        # Отправляем уведомления если нужно
-        if options["notify_telegram"]:
-            self._send_telegram_notification(results, overall_status)
+        # Отправляем уведомления только если статус НЕ healthy,
+        # либо явно запрошено --notify-always.
+        # Раньше команда слала «✅ System Health Check» каждые 30 минут
+        # из cron — спам в TG/VK. Теперь по умолчанию тихо когда всё ок.
+        should_notify = options["notify_always"] or overall_status != "healthy"
 
-        if options["notify_vk"]:
+        if options["notify_telegram"] and should_notify:
+            self._send_telegram_notification(results, overall_status)
+        elif options["notify_telegram"]:
+            self.stdout.write(
+                "ℹ️  Status=healthy, Telegram-уведомление пропущено "
+                "(используй --notify-always чтобы слать всегда)"
+            )
+
+        if options["notify_vk"] and should_notify:
             self._send_vk_notification(results, overall_status)
+        elif options["notify_vk"]:
+            self.stdout.write(
+                "ℹ️  Status=healthy, VK-уведомление пропущено "
+                "(используй --notify-always чтобы слать всегда)"
+            )
 
         # Логируем критические проблемы
         if overall_status == "critical":

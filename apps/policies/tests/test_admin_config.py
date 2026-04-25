@@ -27,11 +27,10 @@ class TestPaymentScheduleInlineConfig:
             "insurance_sum" in inline.fields
         ), "insurance_sum should be present in PaymentScheduleInline fields"
 
-    def test_insurance_sum_position_after_amount(self):
+    def test_insurance_sum_position_before_amount(self):
         """
-        Test that insurance_sum appears after amount in inline fields.
-
-        **Validates: Requirements 4.1**
+        Test that insurance_sum appears immediately before amount in inline fields.
+        UX-решение: страховая сумма слева от суммы платежа для удобства ввода.
         """
         inline = PaymentScheduleInline(Policy, admin.site)
         fields_list = list(inline.fields)
@@ -43,8 +42,8 @@ class TestPaymentScheduleInlineConfig:
         insurance_sum_index = fields_list.index("insurance_sum")
 
         assert (
-            insurance_sum_index == amount_index + 1
-        ), "insurance_sum should appear immediately after amount"
+            insurance_sum_index == amount_index - 1
+        ), "insurance_sum should appear immediately before amount"
 
 
 @pytest.mark.django_db
@@ -62,11 +61,10 @@ class TestPaymentScheduleAdminConfig:
             "insurance_sum" in payment_admin.list_display
         ), "insurance_sum should be present in list_display"
 
-    def test_insurance_sum_position_after_amount_in_list_display(self):
+    def test_insurance_sum_position_before_amount_in_list_display(self):
         """
-        Test that insurance_sum appears after amount in list_display.
-
-        **Validates: Requirements 4.2**
+        Test that insurance_sum appears immediately before amount in list_display.
+        UX-решение: страховая сумма слева от суммы платежа.
         """
         payment_admin = PaymentScheduleAdmin(PaymentSchedule, admin.site)
         list_display = list(payment_admin.list_display)
@@ -80,8 +78,8 @@ class TestPaymentScheduleAdminConfig:
         insurance_sum_index = list_display.index("insurance_sum")
 
         assert (
-            insurance_sum_index == amount_index + 1
-        ), "insurance_sum should appear immediately after amount in list_display"
+            insurance_sum_index == amount_index - 1
+        ), "insurance_sum should appear immediately before amount in list_display"
 
     def test_insurance_sum_filter_exists(self):
         """

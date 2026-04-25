@@ -65,12 +65,15 @@ class TestCopyPaymentsAction:
 
         **Validates: Requirements 2.1, 2.5**
         """
-        # Create a policy with multiple payments
+        # Create a policy with multiple payments.
+        # Явно задаём due_date по возрастанию — модель валидирует, что дата
+        # каждого следующего платежа строго позже предыдущего.
         policy = policy_factory()
         payment1 = payment_schedule_factory(
             policy=policy,
             year_number=1,
             installment_number=1,
+            due_date=date.today() + timedelta(days=10),
             amount=Decimal("10000.00"),
             insurance_sum=Decimal("1000000.00"),
         )
@@ -78,6 +81,7 @@ class TestCopyPaymentsAction:
             policy=policy,
             year_number=1,
             installment_number=2,
+            due_date=date.today() + timedelta(days=20),
             amount=Decimal("12000.00"),
             insurance_sum=Decimal("1200000.00"),
         )
@@ -85,6 +89,7 @@ class TestCopyPaymentsAction:
             policy=policy,
             year_number=2,
             installment_number=1,
+            due_date=date.today() + timedelta(days=400),
             amount=Decimal("15000.00"),
             insurance_sum=Decimal("1500000.00"),
         )
@@ -212,14 +217,16 @@ class TestCopyPaymentsAction:
         # Execute copy action
         response = admin.copy_payments(request, queryset)
 
-        # Verify all fields are in the redirect URL
+        # Verify all fields are in the redirect URL.
+        # Note: commission_rate намеренно исключён из URL — поле скрыто в админке
+        # (admin.exclude = ["commission_rate"]) и подставляется JS-скриптом
+        # auto_commission_rate.js на основе insurer + insurance_type.
         assert f"policy={original.policy.id}" in response.url
         assert f"year_number={original.year_number}" in response.url
         assert f"installment_number={original.installment_number}" in response.url
         assert f"due_date={original.due_date}" in response.url
         assert f"amount={original.amount}" in response.url
         assert f"insurance_sum={original.insurance_sum}" in response.url
-        assert f"commission_rate={original.commission_rate.id}" in response.url
         # kv_rub might have different decimal precision in URL, so just check it's present
         assert "kv_rub=" in response.url
         assert f"paid_date={original.paid_date}" in response.url

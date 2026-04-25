@@ -102,9 +102,11 @@ class TestPaymentScheduleListView:
         # Login user
         client.force_login(regular_user)
 
-        # Get payment list page
+        # Get payment list page.
+        # ?status=all чтобы не зависеть от due_date фабрики (дефолтный фильтр
+        # "upcoming" показывает только платежи в окне сегодня…+30 дней).
         url = reverse("policies:payments")
-        response = client.get(url)
+        response = client.get(f"{url}?status=all")
 
         # Check response is successful
         assert response.status_code == 200
@@ -129,7 +131,8 @@ class TestPaymentScheduleListView:
 
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        assert "table-secondary" in content
+        # Шаблон использует кастомный tbl-row-nobroker (не bootstrap'овский table-secondary)
+        assert "tbl-row-nobroker" in content
         assert "Без брокера" in content
 
     def test_payment_list_combines_status_date_branch_and_insurer_filters(
@@ -183,12 +186,14 @@ class TestPaymentScheduleListView:
             paid_date=None,
             insurer_date=None,
         )
-        # Must be excluded by year/installment filter
+        # Must be excluded by year/installment filter.
+        # Дата отличается от первого платежа — модель валидирует строгое возрастание
+        # дат между installment'ами одного полиса (apps/policies/models.py:288 .clean()).
         payment_schedule_factory(
             policy=matching_policy,
             year_number=2,
             installment_number=1,
-            due_date=today + timedelta(days=5),
+            due_date=today + timedelta(days=8),
             paid_date=None,
             insurer_date=None,
         )

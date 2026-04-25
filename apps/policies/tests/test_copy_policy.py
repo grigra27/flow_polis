@@ -242,12 +242,16 @@ class TestCopyPolicyAction:
         actions = admin.get_actions(request)
         assert "copy_policy" in actions
 
-    def test_copy_preserves_all_fields(self, policy_factory, client_factory):
+    def test_copy_preserves_all_fields(
+        self, policy_factory, client_factory, leasing_manager_factory
+    ):
         """
         Test that all fields are preserved in the copy.
         """
-        # Create policyholder
+        # Create policyholder and leasing manager.
+        # leasing_manager — это FK на LeasingManager, не строка.
         policyholder = client_factory()
+        leasing_manager = leasing_manager_factory(name="John Doe")
 
         # Create original policy with all fields populated
         original = policy_factory(
@@ -258,7 +262,7 @@ class TestCopyPolicyAction:
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
             franchise=Decimal("10000.00"),
-            leasing_manager="John Doe",
+            leasing_manager=leasing_manager,
             info3="Important info 3",
             info4="Important info 4",
             policy_active=True,
@@ -309,11 +313,14 @@ class TestCopyPolicyAction:
         # Create original policy
         original = policy_factory(policy_number="TEST-2024-008")
 
-        # Create payment schedule for original policy
+        # Create payment schedule for original policy.
+        # Явные due_date по возрастанию — модель валидирует, что дата следующего
+        # платежа строго позже предыдущего (apps/policies/models.py:288 .clean()).
         payment1 = payment_schedule_factory(
             policy=original,
             year_number=1,
             installment_number=1,
+            due_date=date.today() + timedelta(days=10),
             amount=Decimal("10000.00"),
             insurance_sum=Decimal("1000000.00"),
             kv_rub=Decimal("1000.00"),
@@ -322,6 +329,7 @@ class TestCopyPolicyAction:
             policy=original,
             year_number=1,
             installment_number=2,
+            due_date=date.today() + timedelta(days=20),
             amount=Decimal("12000.00"),
             insurance_sum=Decimal("1200000.00"),
             kv_rub=Decimal("1200.00"),

@@ -13,7 +13,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
-RUNNING_TESTS = "test" in sys.argv
+# True для `manage.py test` ("test" в argv) и для любого запуска через pytest
+# (модуль pytest всегда находится в sys.modules к моменту импорта settings).
+# В тестах все DB_*/секретные значения читаются только из os.environ, минуя .env,
+# чтобы локальный .env разработчика не влиял на результаты.
+RUNNING_TESTS = "test" in sys.argv or "pytest" in sys.modules
 
 # Security
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-this-key")

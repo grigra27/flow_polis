@@ -40,3 +40,21 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+# В тестах не пишем логи в файлы и не отправляем в Telegram.
+# RotatingFileHandler в settings.py требует существующую директорию logs/,
+# которой нет на чистом CI runner'е, и Django 5/Python 3.12 строже к dictConfig:
+# handler создаётся даже если не используется ни в одном logger → ValueError.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+}

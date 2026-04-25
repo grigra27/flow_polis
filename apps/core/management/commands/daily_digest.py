@@ -1170,15 +1170,19 @@ class Command(BaseCommand):
 
     def _send_telegram_messages(self, messages, mirror_to_vk=False):
         """
-        Отправляет несколько сообщений в Telegram + (опционально) VK.
+        Отправляет несколько частей дайджеста в Telegram + (опционально) VK.
 
         VK — резервный канал: должен пройти ВСЕГДА, независимо от того,
         прошёл Telegram или нет. Сервер в РФ, Telegram периодически
         блокируется — без независимого VK сообщения теряются.
+
+        Низкоуровневая отправка делегируется в apps.core.notifications,
+        здесь только формирование частей и delay между ними (защита от
+        Telegram rate-limit ~30 msg/sec).
         """
         import time
 
-        from apps.core.vk_handler import send_vk_message
+        from apps.core.notifications import send_telegram, send_vk
 
         telegram_success_count = 0
         vk_success_count = 0
@@ -1186,31 +1190,24 @@ class Command(BaseCommand):
 
         for i, base_message in enumerate(messages):
             message = self._format_part_message(base_message, i, total_messages)
+            print(f"DEBUG: Part {i + 1}/{total_messages}, len={len(message)}")
 
-            print(
-                f"DEBUG: Sending message {i+1}/{total_messages} (length: {len(message)})"
-            )
-
-            # 1) Telegram (может не пройти — РФ)
-            tg_success = self._send_single_telegram_message(message)
-            if tg_success:
+            # Telegram (может не пройти — РФ блокировка, это ОК)
+            if send_telegram(message):
                 telegram_success_count += 1
-                print(f"DEBUG: TG {i+1}/{total_messages} sent")
             else:
-                print(f"ERROR: TG {i+1}/{total_messages} failed")
+                print(f"ERROR: TG part {i + 1}/{total_messages} failed")
 
-            # 2) VK — независимо от результата TG. Резервный канал.
+            # VK — независимо от результата TG. Резервный канал.
             if mirror_to_vk:
-                vk_ok = send_vk_message(message)
-                if vk_ok:
+                if send_vk(message):
                     vk_success_count += 1
-                    print(f"DEBUG: VK {i+1}/{total_messages} sent")
                 else:
-                    print(f"ERROR: VK {i+1}/{total_messages} failed")
+                    print(f"ERROR: VK part {i + 1}/{total_messages} failed")
 
             # Задержка между сообщениями (кроме последнего)
             if i < total_messages - 1:
-                time.sleep(1)  # 1 секунда между сообщениями
+                time.sleep(1)
 
         print(
             f"DEBUG: Telegram sent {telegram_success_count}/{total_messages}, "
@@ -1220,123 +1217,6 @@ class Command(BaseCommand):
             "telegram": telegram_success_count,
             "vk": vk_success_count,
         }
-
-    def _send_single_telegram_message(self, message):
-        """Отправляет сообщение в Telegram через Python с детальной отладкой"""
-        try:
-            from urllib.parse import urlencode
-            from urllib.request import urlopen, Request, HTTPError
-            from decouple import config
-            import json
-
-            # Получаем настройки Telegram
-            bot_token = config("TELEGRAM_BOT_TOKEN", default="")
-            chat_id = config("TELEGRAM_CHAT_ID", default="")
-            enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
-
-            print(
-                f"DEBUG: Telegram config - enabled: {enabled}, has_token: {bool(bot_token)}, has_chat_id: {bool(chat_id)}"
-            )
-
-            if not enabled or not bot_token or not chat_id:
-                logger.error("Telegram not configured")
-                return False
-
-            # Детальная отладка сообщения
-            print(f"DEBUG: Message length: {len(message)}")
-            print(f"DEBUG: Message preview (first 200 chars): {repr(message[:200])}")
-
-            # Проверяем на проблемные символы
-            problematic_chars = []
-            for i, char in enumerate(message):
-                if ord(char) > 127:  # Non-ASCII символы
-                    problematic_chars.append((i, char, ord(char)))
-
-            if problematic_chars:
-                print(f"DEBUG: Found {len(problematic_chars)} non-ASCII characters")
-                for pos, char, code in problematic_chars[:10]:  # Показываем первые 10
-                    print(f"  Position {pos}: '{char}' (code: {code})")
-
-            # Проверяем длину сообщения и сокращаем если нужно
-            MAX_MESSAGE_LENGTH = (
-                3900  # Консервативный лимит с запасом для заголовка и кодировки
-            )
-
-            if len(message) > MAX_MESSAGE_LENGTH:
-                print(
-                    f"DEBUG: Message too long ({len(message)} chars), truncating to {MAX_MESSAGE_LENGTH}..."
-                )
-                message = self._truncate_message(message, MAX_MESSAGE_LENGTH)
-                print(f"DEBUG: Truncated message length: {len(message)}")
-                print(
-                    f"DEBUG: Truncated message preview: {repr(message[-200:])}"
-                )  # Показываем конец
-
-            # Подготавливаем данные БЕЗ parse_mode (как в остальном проекте)
-            data = {
-                "chat_id": chat_id,
-                "text": message,
-                "disable_web_page_preview": True,
-            }
-
-            print(f"DEBUG: Request data keys: {list(data.keys())}")
-            if "parse_mode" in data:
-                print(f"DEBUG: Parse mode: {data['parse_mode']}")
-            else:
-                print(
-                    f"DEBUG: No parse mode (plain text) - совместимо с остальным проектом"
-                )
-
-            # Кодируем данные
-            encoded_data = urlencode(data).encode("utf-8")
-            print(f"DEBUG: Encoded data length: {len(encoded_data)}")
-
-            # Создаем запрос
-            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            request = Request(
-                api_url,
-                data=encoded_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-
-            print(f"DEBUG: API URL: {api_url[:50]}...")
-            print(f"DEBUG: Request headers: {request.headers}")
-
-            # Отправляем запрос
-            try:
-                with urlopen(request, timeout=10) as response:
-                    response_data = response.read().decode("utf-8")
-                    print(f"DEBUG: Response status: {response.status}")
-                    print(f"DEBUG: Response data: {response_data}")
-
-                    result = json.loads(response_data)
-
-                    if result.get("ok"):
-                        print("DEBUG: Message sent successfully!")
-                        return True
-                    else:
-                        print(f"DEBUG: Telegram API returned error: {result}")
-                        logger.error(f"Telegram API error: {result}")
-                        return False
-
-            except HTTPError as e:
-                print(f"DEBUG: HTTP Error {e.code}: {e.reason}")
-                if hasattr(e, "read"):
-                    error_body = e.read().decode("utf-8")
-                    print(f"DEBUG: Error response body: {error_body}")
-                    try:
-                        error_json = json.loads(error_body)
-                        print(f"DEBUG: Parsed error JSON: {error_json}")
-                    except:
-                        pass
-                raise e
-
-        except Exception as e:
-            print(
-                f"DEBUG: Exception in _send_telegram_message: {type(e).__name__}: {e}"
-            )
-            logger.error(f"Error sending telegram message: {e}")
-            return False
 
     def _send_vk_messages(self, messages):
         """Отправляет несколько сообщений в VK с задержкой между ними"""
@@ -1364,6 +1244,6 @@ class Command(BaseCommand):
 
     def _send_single_vk_message(self, message):
         """Отправляет одно сообщение в VK."""
-        from apps.core.vk_handler import send_vk_message
+        from apps.core.notifications import send_vk
 
-        return send_vk_message(message)
+        return send_vk(message)

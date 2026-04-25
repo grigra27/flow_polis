@@ -1,24 +1,19 @@
 """
-Telegram Logging Handler for Django
-Отправляет критические ошибки в Telegram канал и VK.
+Telegram Logging Handler for Django.
 
-VK — резервный 100%-канал: сервер в РФ, Telegram блокируется, поэтому
-любое сообщение должно дойти как минимум до VK. Принципы:
-  • VK отправляется ВСЕГДА, независимо от результата Telegram.
-  • VK отправляется ПЕРВЫМ, чтобы не задерживаться на TG-таймаутах.
-  • Отправка СИНХРОННАЯ (не в Thread'е) — daemon thread в management
-    command'ах убивался до завершения, и сообщения терялись.
+Этот модуль реализует только специфику logging-handler'а:
+  • Rate-limit (10 сообщений в час, in-memory)
+  • Группировка одинаковых ошибок (раз в 10 мин)
+  • Форматирование с emoji, timestamp, traceback, request info
+
+Сама отправка делегируется в apps.core.notifications.send_to_all,
+которая знает про VK-first, обрезку, retry — см. notifications.py.
 """
 import logging
-import json
 import traceback
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urlencode
-from urllib.request import urlopen, Request
-from urllib.error import URLError
-from django.conf import settings
 from decouple import config
-from apps.core.vk_handler import send_vk_message
+from apps.core.notifications import send_to_all
 
 
 def get_moscow_time():
@@ -292,46 +287,17 @@ class TelegramHandler(logging.Handler):
 
     def _send_message_async(self, message):
         """
-        Отправляет сообщение в Telegram и VK.
+        Отправляет сообщение в Telegram + VK через единую утилиту.
 
-        Несмотря на исторический суффикс _async — теперь СИНХРОННАЯ
-        отправка. Имя оставлено для совместимости (вызывается из
-        TelegramErrorNotifier.notify_*).
+        Имя _async — историческое (раньше тут был Thread). Сейчас
+        синхронно, делегируем в notifications.send_to_all которая
+        отправляет VK первым (см. notifications.py docstring).
 
-        Порядок: VK ПЕРВЫМ. Сервер в РФ, Telegram блокируется и может
-        дать timeout до 10 секунд. Ставим VK раньше, чтобы он не ждал
-        Telegram — резервный канал должен быть быстрым и надёжным.
+        После успешной TG-отправки обновляет sent_messages для rate-limit.
         """
-        # 1) VK — резервный 100%-канал, отправляется первым
-        try:
-            send_vk_message(message)
-        except Exception as e:
-            print(f"TelegramHandler: VK send failed: {e}")
-
-        # 2) Telegram (может не пройти из-за блокировки в РФ — это ОК)
-        try:
-            data = {
-                "chat_id": self.chat_id,
-                "text": message,
-                "disable_web_page_preview": True,
-            }
-            encoded_data = urlencode(data).encode("utf-8")
-            request = Request(
-                f"{self.api_url}/sendMessage",
-                data=encoded_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            with urlopen(request, timeout=10) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                if result.get("ok"):
-                    self.sent_messages.append(datetime.now())
-                    print("TelegramHandler: Message sent successfully")
-                else:
-                    print(f"TelegramHandler: Telegram API error: {result}")
-        except URLError as e:
-            print(f"TelegramHandler: Network error: {e}")
-        except Exception as e:
-            print(f"TelegramHandler: Unexpected error: {e}")
+        result = send_to_all(message)
+        if result.get("telegram"):
+            self.sent_messages.append(datetime.now())
 
 
 class TelegramErrorNotifier:

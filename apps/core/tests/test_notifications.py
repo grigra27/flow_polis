@@ -1,0 +1,128 @@
+"""
+Тесты единой утилиты apps.core.notifications.
+
+Главное что проверяем:
+  • VK отправляется ПЕРВЫМ — резервный 100%-канал не должен ждать TG.
+  • Если Telegram падает (что нормально для сервера в РФ), VK всё равно идёт.
+  • Если VK падает, Telegram всё равно пытается.
+  • TELEGRAM_ENABLED=false корректно отключает только TG, не VK.
+"""
+from unittest.mock import patch
+
+import apps.core.notifications as notifications
+
+
+def test_send_to_all_calls_vk_before_telegram(monkeypatch):
+    """VK = 100% backup — должен отправляться ПЕРВЫМ, до TG."""
+    call_order = []
+
+    def fake_vk(text):
+        call_order.append("vk")
+        return True
+
+    def fake_tg(text):
+        call_order.append("tg")
+        return True
+
+    monkeypatch.setattr(notifications, "send_vk", fake_vk)
+    monkeypatch.setattr(notifications, "send_telegram", fake_tg)
+
+    result = notifications.send_to_all("hi")
+
+    assert call_order == ["vk", "tg"], f"VK must be first; got {call_order}"
+    assert result == {"vk": True, "telegram": True}
+
+
+def test_send_to_all_vk_independent_of_telegram(monkeypatch):
+    """Если TG упал — VK всё равно отправляется (резервный канал)."""
+    monkeypatch.setattr(notifications, "send_vk", lambda text: True)
+    monkeypatch.setattr(notifications, "send_telegram", lambda text: False)
+
+    result = notifications.send_to_all("hi")
+
+    assert result == {"vk": True, "telegram": False}
+
+
+def test_send_to_all_telegram_independent_of_vk(monkeypatch):
+    """Если VK упал — TG всё равно пробуется."""
+    monkeypatch.setattr(notifications, "send_vk", lambda text: False)
+    monkeypatch.setattr(notifications, "send_telegram", lambda text: True)
+
+    result = notifications.send_to_all("hi")
+
+    assert result == {"vk": False, "telegram": True}
+
+
+def test_send_telegram_returns_false_when_disabled(monkeypatch):
+    """TELEGRAM_ENABLED=false → не пытаемся отправить, возвращаем False."""
+
+    # Мокаем decouple.config так чтобы вернуть TELEGRAM_ENABLED=False
+    def fake_config(key, default=None, cast=None):
+        if key == "TELEGRAM_ENABLED":
+            return False
+        return default
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+
+    # Никаких реальных HTTP-запросов — если бы они были, urlopen упал бы
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_returns_false_when_no_token(monkeypatch):
+    """Нет TELEGRAM_BOT_TOKEN → не пытаемся отправить."""
+
+    def fake_config(key, default=None, cast=None):
+        if key == "TELEGRAM_ENABLED":
+            return True
+        return default  # пустые токен/чат
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_handles_network_error(monkeypatch):
+    """URLError от Telegram (типичная ошибка из-за блокировки в РФ) → False, без падения."""
+    from urllib.error import URLError
+
+    def fake_config(key, default=None, cast=None):
+        return {
+            "TELEGRAM_ENABLED": True,
+            "TELEGRAM_BOT_TOKEN": "x",
+            "TELEGRAM_CHAT_ID": "y",
+        }.get(key, default)
+
+    def fake_urlopen(*args, **kwargs):
+        raise URLError("Connection blocked (simulated)")
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+    monkeypatch.setattr(notifications, "urlopen", fake_urlopen)
+
+    # Не должно бросать исключение — caller'у достаточно False
+    assert notifications.send_telegram("hi") is False
+
+
+def test_trim_with_middle_ellipsis_keeps_tail():
+    """Обрезание длинного текста сохраняет конец (важно для traceback)."""
+    long = "START-" + ("X" * 500) + "-FINAL"
+    out = notifications.trim_with_middle_ellipsis(
+        long, max_length=80, marker="|...|", tail_ratio=0.8
+    )
+    assert len(out) <= 80
+    assert out.startswith("START-")
+    assert out.endswith("-FINAL")
+    assert "|...|" in out
+
+
+def test_send_vk_delegates_to_send_vk_message(monkeypatch):
+    """notifications.send_vk — тонкая обёртка над vk_handler.send_vk_message."""
+    call_args = []
+
+    def fake_send(text):
+        call_args.append(text)
+        return True
+
+    monkeypatch.setattr(notifications, "send_vk_message", fake_send)
+
+    assert notifications.send_vk("hello") is True
+    assert call_args == ["hello"]

@@ -2,18 +2,19 @@
 Telegram Logging Handler for Django.
 
 Этот модуль реализует только специфику logging-handler'а:
-  • Rate-limit (10 сообщений в час, in-memory)
-  • Группировка одинаковых ошибок (раз в 10 мин)
+  • Rate-limit через Redis (общий для всех Gunicorn-воркеров)
+  • Группировка одинаковых ошибок (раз в 10 мин, in-memory)
   • Форматирование с emoji, timestamp, traceback, request info
 
-Сама отправка делегируется в apps.core.notifications.send_to_all,
-которая знает про VK-first, обрезку, retry — см. notifications.py.
+Отправка делегируется в Celery task apps.core.tasks.send_to_all_task —
+не блокирует request handler. При недоступности Celery/Redis fallback
+на синхронный apps.core.notifications.send_to_all.
 """
 import logging
 import traceback
 from datetime import datetime, timezone, timedelta
 from decouple import config
-from apps.core.notifications import send_to_all
+from apps.core.notifications import check_rate_limit, send_to_all
 
 
 def get_moscow_time():
@@ -85,7 +86,14 @@ class TelegramHandler(logging.Handler):
 
     def _should_send_message(self, record):
         """
-        Проверяет нужно ли отправлять сообщение
+        Проверяет нужно ли отправлять сообщение.
+
+        Rate-limit теперь через Redis (общий для всех воркеров) — раньше
+        был in-memory list, и при N Gunicorn-воркерах реальный потолок
+        был N × max_messages_per_hour, а не N. См. notifications.check_rate_limit.
+
+        Группировка одинаковых ошибок осталась in-memory (per-worker) —
+        это менее критично и не требует Redis.
         """
         # Проверяем базовые настройки
         if not self.enabled or not self.bot_token or not self.chat_id:
@@ -95,24 +103,18 @@ class TelegramHandler(logging.Handler):
         if record.levelno < logging.ERROR:
             return False
 
-        # Rate limiting - не более N сообщений в час
+        # Группировка одинаковых ошибок (per-worker, in-memory)
         now = datetime.now()
-        self.sent_messages = [
-            msg_time
-            for msg_time in self.sent_messages
-            if (now - msg_time).seconds < 3600
-        ]
-
-        if len(self.sent_messages) >= self.max_messages_per_hour:
-            return False
-
-        # Группировка одинаковых ошибок
         error_key = self._get_error_key(record)
         if error_key in self.message_cache:
             last_sent = self.message_cache[error_key]
-            # Не отправляем одинаковые ошибки чаще чем раз в 10 минут
             if (now - last_sent).seconds < 600:
                 return False
+        self.message_cache[error_key] = now
+
+        # Глобальный rate-limit через Redis
+        if not check_rate_limit("telegram_handler", self.max_messages_per_hour):
+            return False
 
         return True
 
@@ -287,17 +289,24 @@ class TelegramHandler(logging.Handler):
 
     def _send_message_async(self, message):
         """
-        Отправляет сообщение в Telegram + VK через единую утилиту.
+        Ставит отправку в Celery очередь (apps.core.tasks.send_to_all_task).
+        Не блокирует caller — возвращается мгновенно.
 
-        Имя _async — историческое (раньше тут был Thread). Сейчас
-        синхронно, делегируем в notifications.send_to_all которая
-        отправляет VK первым (см. notifications.py docstring).
-
-        После успешной TG-отправки обновляет sent_messages для rate-limit.
+        Если Celery/Redis недоступны (broker down, импорт упал),
+        делает fallback на синхронную отправку. Лучше задержать запрос
+        на 10-20 секунд чем потерять алерт.
         """
-        result = send_to_all(message)
-        if result.get("telegram"):
-            self.sent_messages.append(datetime.now())
+        try:
+            from apps.core.tasks import send_to_all_task
+
+            send_to_all_task.delay(message)
+        except Exception as e:
+            # Fail-open: синхронная отправка, чтобы алерт точно дошёл
+            print(f"TelegramHandler: Celery dispatch failed, sync fallback: {e}")
+            try:
+                send_to_all(message)
+            except Exception as e2:
+                print(f"TelegramHandler: Sync fallback also failed: {e2}")
 
 
 class TelegramErrorNotifier:

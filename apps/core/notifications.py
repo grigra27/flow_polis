@@ -12,6 +12,7 @@
 """
 import json
 import logging
+from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -23,6 +24,61 @@ from decouple import config
 from apps.core.vk_handler import send_vk_message
 
 logger = logging.getLogger(__name__)
+
+# Lazy-init redis-клиент. Создаётся при первом обращении.
+# Если Redis недоступен — rate-limit fail-open (пропускаем),
+# лучше дубль чем потеря алерта.
+_redis_client = None
+
+
+def _get_redis():
+    """Возвращает redis-клиент или None если подключиться нельзя."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        import redis
+
+        url = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+        _redis_client = redis.Redis.from_url(url, socket_timeout=2)
+        # Lazy ping — проверим что redis отвечает. Если нет — None.
+        _redis_client.ping()
+        return _redis_client
+    except Exception as e:
+        logger.warning("Redis недоступен для rate-limit, fail-open: %s", e)
+        _redis_client = None
+        return None
+
+
+def check_rate_limit(scope: str, max_per_hour: int = 10) -> bool:
+    """
+    Атомарный sliding-hour rate limit через Redis INCR.
+
+    scope — логический неймспейс ("telegram_handler", "system_health", ...)
+    max_per_hour — лимит для этого scope в текущем часе.
+
+    Возвращает True если можно отправить, False если упёрлись в лимит.
+    Common для всех Gunicorn-воркеров: один счётчик, не N×limit.
+
+    Если Redis недоступен — возвращает True (fail-open). Лучше дубль
+    в Telegram чем потерять алерт из-за инфраструктурной проблемы.
+    """
+    r = _get_redis()
+    if r is None:
+        return True
+    try:
+        hour = datetime.now().strftime("%Y%m%d%H")
+        key = f"rate_limit:{scope}:{hour}"
+        count = r.incr(key)
+        if count == 1:
+            # Первый incr в этом часе — ставим TTL чуть больше часа на случай
+            # если кто-то проверит сразу после смены часа.
+            r.expire(key, 3700)
+        return count <= max_per_hour
+    except Exception as e:
+        logger.warning("Redis rate-limit INCR failed, fail-open: %s", e)
+        return True
+
 
 # Hard limit Telegram sendMessage — 4096 символов. Берём с запасом.
 TELEGRAM_MESSAGE_LIMIT = 3900

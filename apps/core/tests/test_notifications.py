@@ -126,3 +126,47 @@ def test_send_vk_delegates_to_send_vk_message(monkeypatch):
 
     assert notifications.send_vk("hello") is True
     assert call_args == ["hello"]
+
+
+def test_check_rate_limit_fail_open_when_redis_unavailable(monkeypatch):
+    """Если Redis недоступен — fail-open (возвращаем True). Лучше дубль чем тишина."""
+    monkeypatch.setattr(notifications, "_get_redis", lambda: None)
+    # Также сбрасываем кеш клиента
+    notifications._redis_client = None
+
+    assert notifications.check_rate_limit("any_scope", max_per_hour=10) is True
+
+
+def test_check_rate_limit_blocks_after_max(monkeypatch):
+    """После max_per_hour подряд возвращает False."""
+    # Имитируем INCR через простой counter
+    counter = {"value": 0}
+
+    class FakeRedis:
+        def incr(self, key):
+            counter["value"] += 1
+            return counter["value"]
+
+        def expire(self, key, ttl):
+            pass
+
+    monkeypatch.setattr(notifications, "_get_redis", lambda: FakeRedis())
+
+    # Первые 5 вызовов проходят
+    for i in range(5):
+        assert notifications.check_rate_limit("test", max_per_hour=5) is True
+    # 6-й — упёрлись в лимит
+    assert notifications.check_rate_limit("test", max_per_hour=5) is False
+
+
+def test_check_rate_limit_fail_open_when_redis_raises(monkeypatch):
+    """Если INCR упал (например, redis-broker во flux) — fail-open."""
+
+    class BrokenRedis:
+        def incr(self, key):
+            raise ConnectionError("redis is down")
+
+    monkeypatch.setattr(notifications, "_get_redis", lambda: BrokenRedis())
+
+    # Не падает, возвращает True
+    assert notifications.check_rate_limit("test", max_per_hour=10) is True

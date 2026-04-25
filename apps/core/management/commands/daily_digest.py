@@ -1170,8 +1170,11 @@ class Command(BaseCommand):
 
     def _send_telegram_messages(self, messages, mirror_to_vk=False):
         """
-        Отправляет несколько сообщений в Telegram.
-        При mirror_to_vk=True зеркалит КАЖДУЮ часть в VK тем же текстом.
+        Отправляет несколько сообщений в Telegram + (опционально) VK.
+
+        VK — резервный канал: должен пройти ВСЕГДА, независимо от того,
+        прошёл Telegram или нет. Сервер в РФ, Telegram периодически
+        блокируется — без независимого VK сообщения теряются.
         """
         import time
 
@@ -1188,25 +1191,22 @@ class Command(BaseCommand):
                 f"DEBUG: Sending message {i+1}/{total_messages} (length: {len(message)})"
             )
 
-            success = self._send_single_telegram_message(message)
-
-            if success:
+            # 1) Telegram (может не пройти — РФ)
+            tg_success = self._send_single_telegram_message(message)
+            if tg_success:
                 telegram_success_count += 1
-                print(f"DEBUG: Message {i+1}/{total_messages} sent successfully")
-
-                if mirror_to_vk:
-                    vk_ok = send_vk_message(message)
-                    if vk_ok:
-                        vk_success_count += 1
-                        print(
-                            f"DEBUG: VK mirror message {i+1}/{total_messages} sent successfully"
-                        )
-                    else:
-                        print(
-                            f"ERROR: Failed to mirror VK message {i+1}/{total_messages}"
-                        )
+                print(f"DEBUG: TG {i+1}/{total_messages} sent")
             else:
-                print(f"ERROR: Failed to send message {i+1}/{total_messages}")
+                print(f"ERROR: TG {i+1}/{total_messages} failed")
+
+            # 2) VK — независимо от результата TG. Резервный канал.
+            if mirror_to_vk:
+                vk_ok = send_vk_message(message)
+                if vk_ok:
+                    vk_success_count += 1
+                    print(f"DEBUG: VK {i+1}/{total_messages} sent")
+                else:
+                    print(f"ERROR: VK {i+1}/{total_messages} failed")
 
             # Задержка между сообщениями (кроме последнего)
             if i < total_messages - 1:

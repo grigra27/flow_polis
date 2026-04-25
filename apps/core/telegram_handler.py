@@ -1,12 +1,18 @@
 """
 Telegram Logging Handler for Django
-Отправляет критические ошибки в Telegram канал и VK
+Отправляет критические ошибки в Telegram канал и VK.
+
+VK — резервный 100%-канал: сервер в РФ, Telegram блокируется, поэтому
+любое сообщение должно дойти как минимум до VK. Принципы:
+  • VK отправляется ВСЕГДА, независимо от результата Telegram.
+  • VK отправляется ПЕРВЫМ, чтобы не задерживаться на TG-таймаутах.
+  • Отправка СИНХРОННАЯ (не в Thread'е) — daemon thread в management
+    command'ах убивался до завершения, и сообщения терялись.
 """
 import logging
 import json
 import traceback
 from datetime import datetime, timezone, timedelta
-from threading import Thread
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -62,20 +68,22 @@ class TelegramHandler(logging.Handler):
 
     def emit(self, record):
         """
-        Отправляет лог запись в Telegram
+        Отправляет лог-запись в Telegram + VK.
+
+        Раньше отправка шла в Thread(daemon=True) — но в management
+        command'ах daemon thread убивался при выходе процесса до того,
+        как успевала уйти HTTP-запись. Сообщения терялись.
+
+        Теперь синхронно: блокирует логгер до 10s × (TG + VK).
+        Это приемлемо: rate-limit не даст спамить, а критичные ошибки
+        важнее доли секунды задержки в request handler'е.
         """
         if not self._should_send_message(record):
             return
 
         try:
-            # Форматируем сообщение
             message = self._format_message(record)
-
-            # Отправляем асинхронно чтобы не блокировать основной поток
-            thread = Thread(target=self._send_message_async, args=(message,))
-            thread.daemon = True
-            thread.start()
-
+            self._send_message_async(message)
         except Exception as e:
             # Не должны падать если не можем отправить в Telegram
             print(f"TelegramHandler error: {e}")
@@ -284,48 +292,46 @@ class TelegramHandler(logging.Handler):
 
     def _send_message_async(self, message):
         """
-        Асинхронно отправляет сообщение в Telegram и VK
+        Отправляет сообщение в Telegram и VK.
+
+        Несмотря на исторический суффикс _async — теперь СИНХРОННАЯ
+        отправка. Имя оставлено для совместимости (вызывается из
+        TelegramErrorNotifier.notify_*).
+
+        Порядок: VK ПЕРВЫМ. Сервер в РФ, Telegram блокируется и может
+        дать timeout до 10 секунд. Ставим VK раньше, чтобы он не ждал
+        Telegram — резервный канал должен быть быстрым и надёжным.
         """
+        # 1) VK — резервный 100%-канал, отправляется первым
+        try:
+            send_vk_message(message)
+        except Exception as e:
+            print(f"TelegramHandler: VK send failed: {e}")
+
+        # 2) Telegram (может не пройти из-за блокировки в РФ — это ОК)
         try:
             data = {
                 "chat_id": self.chat_id,
                 "text": message,
                 "disable_web_page_preview": True,
             }
-
-            # Кодируем данные
             encoded_data = urlencode(data).encode("utf-8")
-
-            # Создаем запрос
             request = Request(
                 f"{self.api_url}/sendMessage",
                 data=encoded_data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-
-            # Отправляем запрос
             with urlopen(request, timeout=10) as response:
                 result = json.loads(response.read().decode("utf-8"))
-
                 if result.get("ok"):
-                    # Обновляем кэш и историю
-                    now = datetime.now()
-                    self.sent_messages.append(now)
-
-                    # Обновляем кэш группировки ошибок
-                    # (здесь нужно было бы передать record, но для простоты пропускаем)
-
-                    print(f"TelegramHandler: Message sent successfully")
+                    self.sent_messages.append(datetime.now())
+                    print("TelegramHandler: Message sent successfully")
                 else:
                     print(f"TelegramHandler: Telegram API error: {result}")
-
         except URLError as e:
             print(f"TelegramHandler: Network error: {e}")
         except Exception as e:
             print(f"TelegramHandler: Unexpected error: {e}")
-
-        # Дублируем в VK
-        send_vk_message(message)
 
 
 class TelegramErrorNotifier:
@@ -366,11 +372,10 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Отправляем асинхронно (Telegram + VK внутри _send_message_async)
-        thread = Thread(target=handler._send_message_async, args=(formatted_message,))
-        thread.daemon = True
-        thread.start()
-
+        # Синхронная отправка (внутри: VK сначала, потом Telegram).
+        # Раньше был Thread(daemon=True), но при вызове из management
+        # command'ов он убивался до отправки — см. emit() docstring.
+        handler._send_message_async(formatted_message)
         return True
 
     @staticmethod
@@ -404,9 +409,8 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Отправляем асинхронно (Telegram + VK внутри _send_message_async)
-        thread = Thread(target=handler._send_message_async, args=(formatted_message,))
-        thread.daemon = True
-        thread.start()
-
+        # Синхронная отправка (внутри: VK сначала, потом Telegram).
+        # Раньше был Thread(daemon=True), но при вызове из management
+        # command'ов он убивался до отправки — см. emit() docstring.
+        handler._send_message_async(formatted_message)
         return True

@@ -1,7 +1,7 @@
 import logging
-from django.db.models.signals import post_save, post_delete, pre_save
+from django.db.models.signals import pre_save
 from django.dispatch import receiver
-from .models import PaymentSchedule, Policy
+from .models import PaymentSchedule
 
 logger = logging.getLogger(__name__)
 
@@ -117,35 +117,5 @@ def calculate_commission(sender, instance, **kwargs):
         # Don't re-raise - let the save continue
 
 
-@receiver([post_save, post_delete], sender=PaymentSchedule)
-def update_policy_premium_total(sender, instance, **kwargs):
-    """
-    Update policy premium_total when payment schedule changes
-    """
-    try:
-        policy = instance.policy
-
-        # Calculate new total
-        old_total = policy.premium_total
-        new_total = policy.calculate_premium_total()
-
-        # Only update if total actually changed to avoid unnecessary saves
-        if old_total != new_total:
-            policy.premium_total = new_total
-            # Use update_fields to avoid triggering other signals/validations
-            policy.save(update_fields=["premium_total", "updated_at"])
-
-            logger.debug(
-                f"Updated policy {policy.id} premium_total: {old_total} -> {new_total}"
-            )
-        else:
-            logger.debug(f"Policy {policy.id} premium_total unchanged: {old_total}")
-
-    except Exception as e:
-        # Log error but don't break the payment save
-        logger.error(
-            f"Error updating policy premium_total for payment "
-            f"(policy_id={getattr(instance, 'policy_id', 'unknown')}): {e}",
-            exc_info=True,
-        )
-        # Don't re-raise - this is a secondary operation
+# Сигнал update_policy_premium_total удалён: premium_total теперь
+# вычисляемый @property на модели Policy, его не нужно поддерживать в БД.

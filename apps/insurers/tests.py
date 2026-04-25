@@ -97,7 +97,6 @@ class InsurerStatisticsTestDataMixin:
             property_description="Тестовое имущество",
             start_date=start_date,
             end_date=end_date,
-            premium_total=premium,
             insurance_type=insurance_type,
             branch=branch,
             policy_active=policy_active,

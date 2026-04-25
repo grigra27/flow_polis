@@ -152,7 +152,6 @@ class NbIndexBuildTests(TestCase):
             property_description="Тест",
             start_date=self.today - timedelta(days=start_offset_days),
             end_date=self.today + timedelta(days=365),
-            premium_total=premium,
             franchise=Decimal("0"),
         )
         PaymentSchedule.objects.create(

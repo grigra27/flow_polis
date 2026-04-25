@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Sum
 from django.utils.html import format_html
 from django.contrib.admin import SimpleListFilter
 from django.shortcuts import redirect
@@ -97,7 +98,7 @@ class PolicyAdmin(admin.ModelAdmin):
         "insurer",
         "start_date",
         "end_date",
-        "premium_total",
+        "premium_total_display",
         "policy_status",
         "dfa_status",
     ]
@@ -126,7 +127,7 @@ class PolicyAdmin(admin.ModelAdmin):
         "branch",
         "leasing_manager",
     ]
-    readonly_fields = ["premium_total", "created_at", "updated_at"]
+    readonly_fields = ["created_at", "updated_at"]
     actions = ["copy_policy"]
 
     fieldsets = (
@@ -186,6 +187,9 @@ class PolicyAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         # list_display обращается к client и insurer по каждой строке.
         # Без select_related это N+1: 1 + 2 × len(page).
+        # premium_total_db — annotate'нутая сумма платежей; используется
+        # вместо @property Policy.premium_total чтобы избежать +50 SQL'ей
+        # на страницу listing'а.
         return (
             super()
             .get_queryset(request)
@@ -197,7 +201,22 @@ class PolicyAdmin(admin.ModelAdmin):
                 "branch",
                 "leasing_manager",
             )
+            .annotate(premium_total_db=Sum("payment_schedule__amount"))
         )
+
+    @admin.display(
+        description="Общая сумма страховой премии",
+        ordering="premium_total_db",
+    )
+    def premium_total_display(self, obj):
+        # premium_total_db приходит из annotate в get_queryset.
+        # Fallback на @property только если атрибута нет (объект пришёл
+        # из other queryset без annotate — например, change_form preview).
+        # is None — а не truthy — чтобы не обращаться к @property для нулевой суммы.
+        value = getattr(obj, "premium_total_db", None)
+        if value is None:
+            value = obj.premium_total
+        return value if value is not None else Decimal("0")
 
     def policy_status(self, obj):
         if obj.policy_active:

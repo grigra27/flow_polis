@@ -52,7 +52,11 @@ class FullCycleCustomExportTest(TestCase):
 
         self.insurance_type = InsuranceType.objects.create(name="КАСКО")
 
-        # Создаем несколько полисов
+        # Создаем несколько полисов с платежами.
+        # premium_total теперь @property (Sum платежей), поэтому для воспроизведения
+        # старого поведения создаём PaymentSchedule с amount = (i+1) * 100_000.
+        from apps.policies.models import PaymentSchedule
+
         self.policies = []
         for i in range(5):
             policy = Policy.objects.create(
@@ -65,8 +69,15 @@ class FullCycleCustomExportTest(TestCase):
                 property_description=f"Имущество {i}",
                 start_date=date(2024, 1, 1) + timedelta(days=i * 30),
                 end_date=date(2024, 12, 31),
-                premium_total=Decimal("100000.00") * (i + 1),
                 policy_active=(i % 2 == 0),
+            )
+            PaymentSchedule.objects.create(
+                policy=policy,
+                year_number=1,
+                installment_number=1,
+                due_date=date(2024, 3, 1) + timedelta(days=i * 30),
+                amount=Decimal("100000.00") * (i + 1),
+                insurance_sum=Decimal("1000000.00"),
             )
             self.policies.append(policy)
 
@@ -337,7 +348,6 @@ class ReadyExportsTest(TestCase):
             property_description="Имущество для экспорта",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
             franchise=Decimal("5000.00"),
             policy_active=True,
         )
@@ -488,7 +498,6 @@ class ReadyExportsTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
             policy_uploaded=True,  # Этот полис подгружен
         )
 
@@ -685,7 +694,6 @@ class ReadyExportsTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 6, 15),  # В диапазоне
-            premium_total=Decimal("75000.00"),
             info4="Тестовое значение Info4",
         )
 
@@ -698,7 +706,6 @@ class ReadyExportsTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),  # Вне диапазона
-            premium_total=Decimal("85000.00"),
         )
 
         self.test_client.login(username="testuser", password="testpass123")

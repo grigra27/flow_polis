@@ -39,7 +39,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("100000.00"),
             property_description="Тестовое имущество",
             policy_active=True,  # Активный полис
         )
@@ -53,7 +52,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
             property_description="Неактивное имущество",
             policy_active=False,  # Неактивный полис
         )
@@ -428,7 +426,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
             property_description="Имущество второго филиала",
             policy_active=True,
         )
@@ -550,7 +547,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("80000.00"),
             property_description="Имущество с рассрочкой",
             policy_active=True,
         )
@@ -575,7 +571,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
             property_description="Имущество с годовым платежом",
             policy_active=True,
         )
@@ -756,7 +751,6 @@ class PaymentExportDateRangeTest(TestCase):
             insurance_type=self.insurance_type,
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("60000.00"),
             property_description="Имущество для проверки статусов",
             policy_active=True,
         )

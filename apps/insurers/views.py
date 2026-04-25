@@ -6,9 +6,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, DecimalField, Q, Subquery
 from apps.clients.models import Client as LeasingClient
-from apps.policies.models import Policy
+from apps.policies.models import Policy, policy_premium_subquery
 from .models import (
     Insurer,
     CommissionRate,
@@ -172,7 +172,9 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
             total_policies=Count("id"),
             active_policies=Count("id", filter=Q(policy_active=True)),
             terminated_policies=Count("id", filter=Q(policy_active=False)),
-            avg_premium=Avg("premium_total"),
+            avg_premium=Avg(
+                Subquery(policy_premium_subquery(), output_field=DecimalField()),
+            ),
         )
         context["insurer_overview"] = {
             "total_policies": overview_data["total_policies"],
@@ -386,7 +388,9 @@ class BranchDetailView(LoginRequiredMixin, DetailView):
             total_policies=Count("id"),
             active_policies=Count("id", filter=Q(policy_active=True)),
             terminated_policies=Count("id", filter=Q(policy_active=False)),
-            avg_premium=Avg("premium_total"),
+            avg_premium=Avg(
+                Subquery(policy_premium_subquery(), output_field=DecimalField()),
+            ),
         )
         context["branch_overview"] = {
             "total_policies": overview_data["total_policies"],

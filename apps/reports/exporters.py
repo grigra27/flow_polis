@@ -1,3 +1,5 @@
+from django.db.models import DecimalField, Subquery
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl import Workbook
@@ -7,6 +9,23 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from datetime import date
 from decimal import Decimal
 import logging
+
+from apps.policies.models import policy_premium_subquery
+
+
+def _annotate_premium_db(policies_qs):
+    """
+    Annotate'ает queryset полисов полем premium_total_db.
+    Заменяет старое БД-поле premium_total (см. миграцию 0017).
+    Используется в exporters чтобы избежать N+1 при чтении premium_total.
+    """
+    return policies_qs.annotate(
+        premium_total_db=Coalesce(
+            Subquery(policy_premium_subquery(), output_field=DecimalField()),
+            Decimal("0"),
+        )
+    )
+
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +300,13 @@ class BaseExporter:
 class CustomExporter(BaseExporter):
     """Экспортер для кастомного экспорта с динамическими полями"""
 
+    # Маппинг "виртуальных" полей (которых нет в БД) на источник данных:
+    # ключ = имя поля в FIELD_LABELS, значение = (атрибут на объекте, имя для annotate).
+    # premium_total — @property; для экспорта читаем из аннотированного premium_total_db.
+    POLICY_VIRTUAL_FIELDS = {
+        "premium_total": "premium_total_db",
+    }
+
     FIELD_LABELS = {
         "policies": {
             "policy_number": "Номер полиса",
@@ -320,6 +346,8 @@ class CustomExporter(BaseExporter):
     }
 
     def __init__(self, queryset, fields, data_source):
+        if data_source == "policies" and "premium_total" in fields:
+            queryset = _annotate_premium_db(queryset)
         super().__init__(queryset, fields)
         self.data_source = data_source
 
@@ -337,6 +365,10 @@ class CustomExporter(BaseExporter):
 
     def get_field_value(self, obj, field):
         """Получает значение поля, поддерживая вложенные поля (через __)"""
+        # Виртуальные поля (premium_total) читаем из annotate'нутого источника
+        if self.data_source == "policies" and field in self.POLICY_VIRTUAL_FIELDS:
+            value = getattr(obj, self.POLICY_VIRTUAL_FIELDS[field], None)
+            return self.format_value(value)
         parts = field.split("__")
         value = obj
         for part in parts:
@@ -397,6 +429,14 @@ class CustomExporter(BaseExporter):
 class PolicyExporter(BaseExporter):
     """Экспортер для готового экспорта по полисам"""
 
+    def __init__(self, queryset, fields=None):
+        # premium_total теперь @property; для экспорта annotate'аем
+        # premium_total_db, чтобы не делать +1 SQL на каждую строку.
+        # hasattr-проверка нужна т.к. в части тестов передают list вместо QuerySet.
+        if hasattr(queryset, "annotate"):
+            queryset = _annotate_premium_db(queryset)
+        super().__init__(queryset, fields)
+
     def get_filename(self):
         """Возвращает базовое имя файла"""
         return "policies"
@@ -431,7 +471,12 @@ class PolicyExporter(BaseExporter):
             policy.branch.branch_name,
             self.format_value(policy.start_date),
             self.format_value(policy.end_date),
-            self.format_value(policy.premium_total),
+            # Decimal("0") falsy, поэтому проверяем is None, а не truthy.
+            self.format_value(
+                policy.premium_total_db
+                if getattr(policy, "premium_total_db", None) is not None
+                else policy.premium_total
+            ),
             self.format_value(policy.franchise),
             "Активен" if policy.policy_active else "Расторгнут",
             self.format_value(policy.termination_date),

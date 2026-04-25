@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Dict, List, Any
 
 from django.conf import settings
-from django.db.models import Max, Q, Sum
+from django.db.models import DecimalField, Max, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
@@ -1457,10 +1457,27 @@ class DashboardV2Service:
         cnt60 = _to_decimal(p60_qs.count())
         cnt90 = _to_decimal(p90_qs.count())
 
-        # Premium — sum policy.premium_total to avoid double-counting payments
+        # Premium — сумма amount всех платежей по полисам в окне.
+        # Subquery, а не Sum("payment_schedule__amount"): прямой JOIN дал
+        # бы double-counting, если у policies_qs есть фильтры по другим
+        # relations (info_tags и т.п.) — каждая строка JOIN'а тогда
+        # умножается на количество тегов.
+        per_policy_premium = (
+            PaymentSchedule.objects.filter(policy=OuterRef("pk"))
+            .values("policy")
+            .annotate(total=Sum("amount"))
+            .values("total")
+        )
+
         def _sum_premium(qs) -> Decimal:
+            annotated = qs.annotate(
+                _premium_calc=Coalesce(
+                    Subquery(per_policy_premium, output_field=DecimalField()),
+                    DECIMAL_ZERO,
+                )
+            )
             return _to_decimal(
-                qs.aggregate(t=Coalesce(Sum("premium_total"), DECIMAL_ZERO))["t"]
+                annotated.aggregate(t=Coalesce(Sum("_premium_calc"), DECIMAL_ZERO))["t"]
             )
 
         pr30 = _sum_premium(p30_qs)

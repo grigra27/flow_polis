@@ -57,7 +57,6 @@ class TestPaymentScheduleProperties(TestCase):
             property_description="Test property",
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
-            premium_total=Decimal("50000.00"),
         )
 
         # Create payment with the generated insurance_sum
@@ -145,7 +144,6 @@ class TestPaymentScheduleProperties(TestCase):
             property_description="Test property",
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
-            premium_total=Decimal("50000.00"),
         )
 
         # Create payments with the generated insurance sums
@@ -249,7 +247,6 @@ class TestPaymentScheduleProperties(TestCase):
             property_description="Test property",
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
-            premium_total=Decimal("50000.00"),
         )
 
         # Create original payment with generated values
@@ -349,7 +346,6 @@ class TestPaymentScheduleProperties(TestCase):
             property_description="Test property",
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
-            premium_total=Decimal("50000.00"),
         )
 
         # Create payment with generated values
@@ -420,7 +416,6 @@ class TestPaymentScheduleProperties(TestCase):
             property_description="Test property",
             start_date=date.today(),
             end_date=date.today() + timedelta(days=365),
-            premium_total=Decimal("50000.00"),
         )
 
         # Test with minimal amount (0.01) and zero kv_rub

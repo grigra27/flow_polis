@@ -8,8 +8,39 @@ from datetime import date, datetime, timedelta
 import calendar
 from collections import defaultdict
 from typing import Optional, Dict, Any
-from django.db.models import QuerySet, Sum, Count, Avg, Q
+from django.db.models import (
+    Avg,
+    Count,
+    DecimalField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Sum,
+)
 from django.db.models.functions import Coalesce
+
+
+def _policy_premium_subquery():
+    """
+    Subquery для получения суммы платежей одного полиса.
+
+    Используется в .annotate(premium=Subquery(_policy_premium_subquery()))
+    или внутри Sum(Subquery(...)) для агрегации по группам полисов.
+
+    Subquery вместо Sum("payment_schedule__amount") нужен чтобы избежать
+    double-counting при наличии других JOIN'ов (info_tags и т.п.).
+    """
+    from apps.policies.models import PaymentSchedule
+
+    return (
+        PaymentSchedule.objects.filter(policy=OuterRef("pk"))
+        .values("policy")
+        .annotate(total=Sum("amount"))
+        .values("total")
+    )
+
+
 from .chart_providers import ChartDataProvider
 
 
@@ -699,7 +730,14 @@ class AnalyticsService:
                 .annotate(
                     active_policies=Count("id"),
                     active_clients=Count("client_id", distinct=True),
-                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                    premium_total=Coalesce(
+                        Sum(
+                            Subquery(
+                                _policy_premium_subquery(), output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0"),
+                    ),
                     renewals_30=Count(
                         "id",
                         filter=Q(
@@ -819,7 +857,14 @@ class AnalyticsService:
                 policies_qs.values("branch_id", "client__client_name")
                 .annotate(
                     policy_count=Count("id"),
-                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                    premium_total=Coalesce(
+                        Sum(
+                            Subquery(
+                                _policy_premium_subquery(), output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0"),
+                    ),
                 )
                 .order_by("branch_id", "-premium_total", "client__client_name")
             )
@@ -841,7 +886,14 @@ class AnalyticsService:
                 policies_qs.values("branch_id", "insurer__insurer_name")
                 .annotate(
                     policy_count=Count("id"),
-                    premium_total=Coalesce(Sum("premium_total"), Decimal("0")),
+                    premium_total=Coalesce(
+                        Sum(
+                            Subquery(
+                                _policy_premium_subquery(), output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0"),
+                    ),
                 )
                 .order_by("branch_id", "-premium_total", "insurer__insurer_name")
             )
@@ -858,12 +910,22 @@ class AnalyticsService:
                     }
                 )
 
-            # Drill-down: upcoming renewals (nearest)
+            # Drill-down: upcoming renewals (nearest).
+            # annotate premium_db чтобы избежать N+1 — иначе @property
+            # Policy.premium_total делал бы Sum-запрос на каждый полис.
             upcoming_rows = (
                 policies_qs.filter(
                     end_date__gte=as_of_date, end_date__lte=renewal_90_end
                 )
                 .select_related("branch", "client", "insurer")
+                .annotate(
+                    premium_db=Coalesce(
+                        Subquery(
+                            _policy_premium_subquery(), output_field=DecimalField()
+                        ),
+                        Decimal("0"),
+                    )
+                )
                 .order_by("end_date", "policy_number")
             )
             upcoming_by_branch: Dict[int, list] = defaultdict(list)
@@ -877,7 +939,7 @@ class AnalyticsService:
                         "client_name": policy.client.client_name,
                         "insurer_name": policy.insurer.insurer_name,
                         "end_date": policy.end_date,
-                        "premium_total": policy.premium_total or Decimal("0"),
+                        "premium_total": policy.premium_db or Decimal("0"),
                     }
                 )
 

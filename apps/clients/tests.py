@@ -36,7 +36,6 @@ class ClientDetailViewTest(TestCase):
             property_description="Тестовое имущество",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 12, 31),
-            premium_total=Decimal("1000.00"),
             insurance_type=self.insurance_type,
             branch=self.branch,
             policy_active=True,

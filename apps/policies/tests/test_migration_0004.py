@@ -56,7 +56,6 @@ class TestMigration0004Functions:
             property_description="Test property",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("50000.00"),
         )
 
         # Simulate the old property_value by storing it separately
@@ -129,7 +128,6 @@ class TestMigration0004Functions:
             property_description="Test property 2",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("60000.00"),
         )
 
         # Create payments with insurance_sum
@@ -196,7 +194,6 @@ class TestMigration0004Functions:
             property_description="Test property 3",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("0.00"),
         )
 
         # Simulate forward migration on policy without payments
@@ -244,7 +241,6 @@ class TestMigration0004Functions:
             property_description="Test property 4",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("0.00"),
         )
 
         # Simulate reverse migration: get first payment
@@ -294,7 +290,6 @@ class TestMigration0004Functions:
             property_description="Test property 5",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("90000.00"),
         )
 
         # Create payments with DIFFERENT insurance sums

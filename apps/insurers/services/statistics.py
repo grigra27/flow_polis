@@ -7,9 +7,11 @@ from hashlib import md5
 from typing import Any, Dict, List, Optional
 
 from django.core.cache import cache
-from django.db.models import Count, Max, QuerySet, Sum
+from django.db.models import Count, DecimalField, Max, QuerySet, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils.dateparse import parse_date
+
+from apps.policies.models import policy_premium_subquery
 
 
 BRANCH_COLORS = [
@@ -107,7 +109,10 @@ class InsurerStatisticsService:
 
         scoped_policies = scoped_queryset.count()
         total_premium = scoped_queryset.aggregate(
-            total=Coalesce(Sum("premium_total"), Decimal("0"))
+            total=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            )
         )["total"] or Decimal("0")
         avg_premium = (
             total_premium / scoped_policies if scoped_policies > 0 else Decimal("0")
@@ -183,7 +188,10 @@ class InsurerStatisticsService:
             "branch_id", "branch__branch_name"
         ).annotate(
             count=Count("id"),
-            total_premium=Coalesce(Sum("premium_total"), Decimal("0")),
+            total_premium=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            ),
         )
         if filters.metric == "premium":
             branch_stats = branch_stats.order_by("-total_premium", "-count")
@@ -229,7 +237,10 @@ class InsurerStatisticsService:
             "insurance_type_id", "insurance_type__name"
         ).annotate(
             count=Count("id"),
-            total_premium=Coalesce(Sum("premium_total"), Decimal("0")),
+            total_premium=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            ),
         )
         if filters.metric == "premium":
             type_stats = type_stats.order_by("-total_premium", "-count")
@@ -386,7 +397,10 @@ class BranchStatisticsService:
 
         scoped_policies = scoped_queryset.count()
         total_premium = scoped_queryset.aggregate(
-            total=Coalesce(Sum("premium_total"), Decimal("0"))
+            total=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            )
         )["total"] or Decimal("0")
         avg_premium = (
             total_premium / scoped_policies if scoped_policies > 0 else Decimal("0")
@@ -464,7 +478,10 @@ class BranchStatisticsService:
             "insurer_id", "insurer__insurer_name"
         ).annotate(
             count=Count("id"),
-            total_premium=Coalesce(Sum("premium_total"), Decimal("0")),
+            total_premium=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            ),
         )
         if filters.metric == "premium":
             insurer_stats = insurer_stats.order_by("-total_premium", "-count")
@@ -510,7 +527,10 @@ class BranchStatisticsService:
             "insurance_type_id", "insurance_type__name"
         ).annotate(
             count=Count("id"),
-            total_premium=Coalesce(Sum("premium_total"), Decimal("0")),
+            total_premium=Coalesce(
+                Sum(Subquery(policy_premium_subquery(), output_field=DecimalField())),
+                Decimal("0"),
+            ),
         )
         if filters.metric == "premium":
             type_stats = type_stats.order_by("-total_premium", "-count")

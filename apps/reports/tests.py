@@ -303,7 +303,6 @@ class CustomExporterTest(TestCase):
             property_description="Тестовое имущество",
             start_date=date(2024, 1, 15),
             end_date=date(2024, 12, 31),
-            premium_total=Decimal("100000.00"),
             policy_active=True,
         )
 

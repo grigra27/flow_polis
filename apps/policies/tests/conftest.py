@@ -168,7 +168,6 @@ def policy_factory(
             "property_description": "Test property description",
             "start_date": date.today(),
             "end_date": date.today() + timedelta(days=365),
-            "premium_total": Decimal("50000.00"),
             "leasing_manager": None,
             "franchise": Decimal("5000.00"),
             "info3": "Test info 3",

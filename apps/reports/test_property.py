@@ -370,7 +370,11 @@ class PropertyTest5_DecimalFormatting(TestCase):
     )
     def test_decimal_converted_to_float(self, premium):
         """Decimal значения должны быть преобразованы в float"""
-        # Создаем полис со случайной премией
+        from apps.policies.models import PaymentSchedule
+
+        # Создаем полис и платёж со случайной премией.
+        # premium_total теперь @property = Sum(PaymentSchedule.amount),
+        # поэтому нужно создавать платёж, а не присваивать поле напрямую.
         policy = Policy.objects.create(
             policy_number="TEST-DECIMAL",
             dfa_number="DFA-DECIMAL",
@@ -381,17 +385,25 @@ class PropertyTest5_DecimalFormatting(TestCase):
             property_description="Test property",
             start_date=date(2024, 1, 1),
             end_date=date(2024, 12, 31),
-            premium_total=premium,
             policy_active=True,
         )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2024, 3, 1),
+            amount=premium,
+            insurance_sum=Decimal("1000000.00"),
+        )
 
-        # Создаем экспортер
+        # Создаем экспортер — он сам сделает annotate(premium_total_db=...)
         exporter = CustomExporter(
             Policy.objects.filter(id=policy.id), ["premium_total"], "policies"
         )
 
-        # Получаем данные строки
-        row = exporter.get_row_data(policy)
+        # Получаем данные строки из аннотированного queryset'а
+        annotated_policy = exporter.queryset.first()
+        row = exporter.get_row_data(annotated_policy)
         premium_value = row[0]
 
         # Проверяем что это float

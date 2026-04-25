@@ -73,7 +73,6 @@ class LargeDatasetTest(TestCase):
                 property_description=f"Имущество {i}",
                 start_date=date(2024, 1, 1) + timedelta(days=i % 365),
                 end_date=date(2024, 12, 31),
-                premium_total=Decimal("100000.00") + Decimal(i * 100),
                 policy_active=(i % 3 != 0),
             )
             cls.policies.append(policy)
@@ -256,15 +255,17 @@ class QueryOptimizationTest(TestCase):
         with CaptureQueriesContext(connection) as context:
             exporter = PolicyExporter(queryset, [])
 
-            # Получаем данные для всех полисов
-            for policy in queryset:
+            # Итерируем по аннотированному queryset из exporter,
+            # а не по оригинальному — иначе premium_total_db не будет
+            # доступен и @property сделает +1 SQL на каждую строку.
+            for policy in exporter.queryset:
                 row = exporter.get_row_data(policy)
 
         query_count = len(context.captured_queries)
 
         print(f"Готовый экспорт: {query_count} запросов для {queryset.count()} полисов")
 
-        # Должен быть только 1 запрос благодаря select_related
+        # Должен быть только 1 запрос благодаря select_related + annotate
         self.assertLessEqual(
             query_count, 2, f"Expected <= 2 queries, got {query_count}"
         )
@@ -416,7 +417,6 @@ class MemoryUsageTest(TestCase):
                 property_description=f"Имущество {i}" * 10,  # Длинное описание
                 start_date=date(2024, 1, 1),
                 end_date=date(2024, 12, 31),
-                premium_total=Decimal("100000.00"),
                 policy_active=True,
             )
 

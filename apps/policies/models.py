@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import OuterRef, Subquery, Sum
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from decimal import Decimal
 from apps.core.models import TimeStampedModel
@@ -66,14 +67,6 @@ class Policy(TimeStampedModel):
     start_date = models.DateField("Дата начала страхования")
     end_date = models.DateField("Дата окончания страхования")
 
-    premium_total = models.DecimalField(
-        "Общая сумма страховой премии",
-        max_digits=15,
-        decimal_places=2,
-        default=0,
-        help_text="Рассчитывается автоматически из графика платежей",
-    )
-
     insurance_type = models.ForeignKey(
         InsuranceType,
         on_delete=models.PROTECT,
@@ -129,12 +122,18 @@ class Policy(TimeStampedModel):
     def __str__(self):
         return f"{self.policy_number} - {self.client}"
 
-    def calculate_premium_total(self):
-        """Calculate total premium from payment schedule"""
-        total = self.payment_schedule.aggregate(total=models.Sum("amount"))[
-            "total"
-        ] or Decimal("0")
-        return total
+    @property
+    def premium_total(self):
+        """
+        Общая сумма страховой премии = сумма всех платежей.
+        Считается на лету из графика платежей.
+
+        Для админки/дашборда/дайджеста, которые работают со многими полисами
+        сразу, рекомендуется делать annotate(premium_total_db=Sum(...)) на
+        queryset, чтобы избежать N+1.
+        """
+        total = self.payment_schedule.aggregate(total=models.Sum("amount"))["total"]
+        return total or Decimal("0")
 
     def get_rates_by_year(self):
         """
@@ -455,3 +454,36 @@ class PolicyInfo(TimeStampedModel):
 
     def __str__(self):
         return f"{self.policy.policy_number} - {self.tag.name} (Инфо {self.info_field})"
+
+
+def policy_premium_subquery():
+    """
+    Subquery: сумма amount всех платежей одного полиса.
+
+    Используется в queryset'ах вместо `Sum("premium_total")` —
+    поле premium_total больше не хранится в БД (см. миграцию 0017),
+    оно вычисляется на лету через @property Policy.premium_total.
+
+    Применение:
+        from django.db.models import DecimalField, Subquery, Sum
+        from apps.policies.models import policy_premium_subquery
+
+        # Annotate каждого полиса его premium:
+        Policy.objects.annotate(
+            premium=Subquery(policy_premium_subquery(), output_field=DecimalField())
+        )
+
+        # Агрегация по группам полисов:
+        Policy.objects.values("branch").annotate(
+            total=Sum(Subquery(policy_premium_subquery(), output_field=DecimalField()))
+        )
+
+    Subquery вместо прямого `Sum("payment_schedule__amount")` чтобы избежать
+    double-counting при JOIN'ах с другими relations (info_tags и т.п.).
+    """
+    return (
+        PaymentSchedule.objects.filter(policy=OuterRef("pk"))
+        .values("policy")
+        .annotate(total=Sum("amount"))
+        .values("total")
+    )

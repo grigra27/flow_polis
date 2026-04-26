@@ -170,3 +170,94 @@ def test_check_rate_limit_fail_open_when_redis_raises(monkeypatch):
 
     # Не падает, возвращает True
     assert notifications.check_rate_limit("test", max_per_hour=10) is True
+
+
+# ──────────────────────────────────────────────────────────────────
+# Тесты HTTP 429 retry (PLAN 11.3)
+# ──────────────────────────────────────────────────────────────────
+
+
+def _http_error_429(body_json: str = "", header_retry_after: str = None):
+    """Создаёт HTTPError с кодом 429 и заданными body+header."""
+    from io import BytesIO
+    from urllib.error import HTTPError
+
+    headers = {}
+    if header_retry_after is not None:
+        headers["Retry-After"] = header_retry_after
+    body_bytes = body_json.encode("utf-8") if body_json else b""
+    return HTTPError(
+        url="https://api.telegram.org/...",
+        code=429,
+        msg="Too Many Requests",
+        hdrs=headers,
+        fp=BytesIO(body_bytes),
+    )
+
+
+def test_send_telegram_429_raises_when_caller_asks(monkeypatch):
+    """raise_on_rate_limit=True → 429 поднимает TelegramRateLimitError."""
+
+    def fake_config(key, default=None, cast=None):
+        return {
+            "TELEGRAM_ENABLED": True,
+            "TELEGRAM_BOT_TOKEN": "x",
+            "TELEGRAM_CHAT_ID": "y",
+        }.get(key, default)
+
+    body = '{"ok":false,"error_code":429,"parameters":{"retry_after":42}}'
+
+    def fake_urlopen(*args, **kwargs):
+        raise _http_error_429(body_json=body)
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+    monkeypatch.setattr(notifications, "urlopen", fake_urlopen)
+
+    import pytest
+
+    with pytest.raises(notifications.TelegramRateLimitError) as exc_info:
+        notifications.send_telegram("hi", raise_on_rate_limit=True)
+    assert exc_info.value.retry_after == 42
+
+
+def test_send_telegram_429_returns_false_by_default(monkeypatch):
+    """raise_on_rate_limit=False (default) → 429 = False, не падает."""
+
+    def fake_config(key, default=None, cast=None):
+        return {
+            "TELEGRAM_ENABLED": True,
+            "TELEGRAM_BOT_TOKEN": "x",
+            "TELEGRAM_CHAT_ID": "y",
+        }.get(key, default)
+
+    def fake_urlopen(*args, **kwargs):
+        raise _http_error_429(body_json='{"ok":false,"parameters":{"retry_after":5}}')
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+    monkeypatch.setattr(notifications, "urlopen", fake_urlopen)
+
+    # Default raise_on_rate_limit=False — exception проглочен, возвращаем False
+    assert notifications.send_telegram("hi") is False
+
+
+def test_parse_retry_after_prefers_json_body():
+    """retry_after из JSON body имеет приоритет над Retry-After header."""
+    err = _http_error_429(
+        body_json='{"parameters":{"retry_after":99}}',
+        header_retry_after="11",
+    )
+    assert (
+        notifications._parse_retry_after(err, '{"parameters":{"retry_after":99}}') == 99
+    )
+
+
+def test_parse_retry_after_falls_back_to_header():
+    """Если в body нет retry_after — берём из Retry-After header."""
+    err = _http_error_429(body_json="", header_retry_after="33")
+    assert notifications._parse_retry_after(err, "") == 33
+
+
+def test_parse_retry_after_default_when_nothing_present():
+    """Нет ни в body ни в header — default 60."""
+    err = _http_error_429(body_json="", header_retry_after=None)
+    assert notifications._parse_retry_after(err, "") == 60

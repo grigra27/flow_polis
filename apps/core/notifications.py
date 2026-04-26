@@ -25,6 +25,50 @@ from apps.core.vk_handler import send_vk_message
 
 logger = logging.getLogger(__name__)
 
+
+class TelegramRateLimitError(Exception):
+    """
+    HTTP 429 от Telegram API. retry_after — рекомендованная задержка
+    в секундах перед следующей попыткой (из JSON body или Retry-After
+    header ответа). Используется в Celery task для self.retry(countdown=...).
+    """
+
+    def __init__(self, retry_after: int, raw: str = ""):
+        self.retry_after = retry_after
+        self.raw = raw
+        super().__init__(f"Telegram rate-limited, retry after {retry_after}s")
+
+
+def _parse_retry_after(exc, body: str) -> int:
+    """
+    Извлекает retry_after из ответа Telegram на 429.
+
+    Telegram возвращает либо в JSON body:
+      {"ok": false, "error_code": 429, "parameters": {"retry_after": 30}}
+    либо в HTTP заголовке Retry-After.
+
+    Default: 60 секунд если ничего не нашли.
+    """
+    # 1) JSON body
+    try:
+        data = json.loads(body) if body else {}
+        params = data.get("parameters") or {}
+        ra = params.get("retry_after")
+        if isinstance(ra, int) and ra > 0:
+            return ra
+    except (ValueError, TypeError):
+        pass
+    # 2) HTTP header
+    try:
+        header_val = exc.headers.get("Retry-After") if exc.headers else None
+        if header_val:
+            return max(1, int(header_val))
+    except (ValueError, AttributeError, TypeError):
+        pass
+    # 3) Default — Telegram обычно просит 1-60 сек, берём верхнюю границу
+    return 60
+
+
 # Lazy-init redis-клиент. Создаётся при первом обращении.
 # Если Redis недоступен — rate-limit fail-open (пропускаем),
 # лучше дубль чем потеря алерта.
@@ -120,7 +164,7 @@ def trim_with_middle_ellipsis(
     return text[:head_len] + marker + text[-tail_len:]
 
 
-def send_telegram(text: str) -> bool:
+def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
     """
     Отправляет одно сообщение в Telegram. Возвращает True/False.
 
@@ -131,6 +175,12 @@ def send_telegram(text: str) -> bool:
     При TELEGRAM_ENABLED=false или отсутствии токена/чата возвращает False
     без попытки отправки. При сетевой ошибке логирует и возвращает False
     (исключение НЕ пробрасывается — caller'у достаточно знать что не дошло).
+
+    raise_on_rate_limit:
+        Если True — на HTTP 429 поднимает TelegramRateLimitError(retry_after).
+        Используется Celery task'ом send_telegram_task для self.retry с точной
+        задержкой по указанию Telegram. Default False — для совместимости
+        с прямыми вызовами (daily_digest, ручные тесты), которым retry не нужен.
 
     Длина обрезается до TELEGRAM_MESSAGE_LIMIT с сохранением начала и конца
     (важно для traceback'ов).
@@ -173,11 +223,18 @@ def send_telegram(text: str) -> bool:
             logger.error("Telegram API вернул ошибку: %s", result)
             return False
     except HTTPError as e:
-        # Отдельный handling 429: уважительное retry — задача #11.3
         try:
             error_body = e.read().decode("utf-8") if hasattr(e, "read") else ""
         except Exception:
             error_body = ""
+        # 429 = Telegram rate-limit. Если caller хочет retry — поднимаем
+        # exception с точной задержкой. Иначе логируем как обычную ошибку.
+        if e.code == 429 and raise_on_rate_limit:
+            retry_after = _parse_retry_after(e, error_body)
+            logger.warning(
+                "Telegram 429, will retry after %ss: %s", retry_after, error_body
+            )
+            raise TelegramRateLimitError(retry_after, raw=error_body)
         logger.error("Telegram HTTP %s: %s | %s", e.code, e.reason, error_body)
         return False
     except URLError as e:

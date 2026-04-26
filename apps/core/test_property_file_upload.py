@@ -239,11 +239,15 @@ def test_property_13_filename_randomization(uploaded_file):
     # Safe filename should be different from original
     assert safe_filename != original_name, "Safe filename should differ from original"
 
-    # Safe filename should not contain original name (except extension)
-    # Only check if original base is longer than 1 character to avoid false positives
+    # Safe filename should not contain original name (except extension).
+    # Skip коротких original-base'ов: UUID-hex (32 символа из {0-9a-f})
+    # с большой вероятностью содержит 2-3-символьную подстроку случайно
+    # (например "be" в hex). Это flaky-падение из PLAN.md item 1.2.
+    # Реальные имена файлов почти всегда длиннее 4 символов; для коротких
+    # тестовых имён эта проверка нерелевантна.
     original_base = original_name.rsplit(".", 1)[0]
     safe_base = safe_filename.rsplit(".", 1)[0]
-    if len(original_base) > 1:
+    if len(original_base) >= 4:
         assert (
             original_base.lower() not in safe_base.lower()
         ), "Safe filename should not contain original base name"

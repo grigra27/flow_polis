@@ -5,8 +5,11 @@ services:
     container_name: insurance_broker_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Postgres-image использует POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD,
+    # они теперь в общем .env.prod (раньше был отдельный .env.prod.db
+    # — выпилен в PLAN 11.7 чтобы не дублировать DB-credentials в двух файлах).
     env_file:
-      - .env.prod.db
+      - .env.prod
     restart: unless-stopped
     networks:
       - backend
@@ -58,6 +61,17 @@ services:
       - /root/insurance_broker_backups:/app/server_backups:ro
     env_file:
       - .env.prod
+    # Django в settings.py читает DB_NAME/DB_USER/DB_PASSWORD; Postgres-image
+    # использует POSTGRES_*. Чтобы не дублировать значения в .env.prod,
+    # маппим один источник правды (POSTGRES_*) на DB_* через interpolation.
+    # Compose читает POSTGRES_* из shell environment — workflow и cron
+    # должны делать `set -a; source .env.prod; set +a` перед `up`/`run`.
+    environment:
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
     restart: unless-stopped
     networks:
       - backend
@@ -88,6 +102,12 @@ services:
       - ./logs:/app/logs
     env_file:
       - .env.prod
+    environment:
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
     restart: unless-stopped
     networks:
       - backend
@@ -121,6 +141,12 @@ services:
       - ./logs:/app/logs
     env_file:
       - .env.prod
+    environment:
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
     restart: unless-stopped
     networks:
       - backend

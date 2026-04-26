@@ -24,16 +24,18 @@ jobs:
 
       - name: Validate docker-compose syntax
         run: |
-          # Create temporary env files for validation
+          # Create temporary env file for validation.
+          # POSTGRES_* нужны для interpolation в environment блоке web/celery_*.
           cp .env.prod.example .env.prod || touch .env.prod
-          cp .env.prod.db.example .env.prod.db || touch .env.prod.db
+          set -a
+          # shellcheck disable=SC1091
+          source .env.prod
+          set +a
 
-          # Validate syntax
           docker compose -f docker-compose.prod.yml config > /dev/null
           echo "✅ docker-compose.prod.yml syntax is valid"
 
-          # Cleanup
-          rm -f .env.prod .env.prod.db
+          rm -f .env.prod
 
       - name: Check for required files
         run: |
@@ -184,7 +186,6 @@ jobs:
             --exclude='*.pyc' \
             --exclude='.env' \
             --exclude='.env.prod' \
-            --exclude='.env.prod.db' \
             --exclude='db.sqlite3' \
             --exclude='certbot/' \
             ./ "$DROPLET_USER@$DROPLET_HOST:~/insurance_broker/"
@@ -199,25 +200,27 @@ jobs:
             set -e
             cd ~/insurance_broker
 
-            # Check if .env.prod.db exists
-            if [ ! -f .env.prod.db ]; then
-              echo "❌ .env.prod.db not found!"
-              echo "Please create it manually on the server before deploying"
-              exit 1
-            else
-              echo "✅ .env.prod.db exists (preserving existing credentials)"
-            fi
-
-            # Check if .env.prod exists
             if [ ! -f .env.prod ]; then
               echo "❌ .env.prod not found!"
               echo "Please create it manually on the server before deploying"
               exit 1
-            else
-              echo "✅ .env.prod exists (preserving existing credentials)"
             fi
+            echo "✅ .env.prod exists (preserving existing credentials)"
 
-            echo "✅ Environment files verified (not modified)"
+            # PLAN 11.7: POSTGRES_* теперь живут в .env.prod (раньше — в .env.prod.db).
+            # docker-compose.prod.yml interpolation требует чтобы POSTGRES_DB / USER /
+            # PASSWORD были определены в .env.prod, иначе db не получит креды
+            # и Django получит пустые DB_NAME/DB_USER/DB_PASSWORD через environment маппинг.
+            for var in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+              if ! grep -qE "^${var}=" .env.prod; then
+                echo "❌ ${var} missing in .env.prod"
+                echo "   Run on the server BEFORE deploy:"
+                echo "   cat .env.prod.db >> .env.prod   # перенесёт 3 строки из старого файла"
+                echo "   Then re-run the workflow."
+                exit 1
+              fi
+            done
+            echo "✅ POSTGRES_* present in .env.prod"
           ENDSSH
 
       - name: Check SSL certificates
@@ -260,6 +263,15 @@ jobs:
           ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
             set -e
             cd ~/insurance_broker
+
+            # PLAN 11.7: docker-compose делает interpolation ${POSTGRES_*}
+            # в environment блоке web/celery_*. Compose читает их из shell env,
+            # не из env_file. Поэтому source перед каждой командой что создаёт
+            # контейнеры (up, run). Для exec/down/build/pull это не нужно.
+            set -a
+            # shellcheck disable=SC1091
+            source .env.prod
+            set +a
 
             echo "📦 Pulling latest images..."
             docker-compose -f docker-compose.prod.yml pull || true
@@ -313,6 +325,12 @@ jobs:
           ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
             set -e
             cd ~/insurance_broker
+
+            # PLAN 11.7: source POSTGRES_* для compose interpolation в `run` команд.
+            set -a
+            # shellcheck disable=SC1091
+            source .env.prod
+            set +a
 
             echo "⏳ Waiting for database to be ready..."
             sleep 10
@@ -421,6 +439,14 @@ jobs:
             cd ~/insurance_broker
 
             echo "⚠️  Deployment failed, attempting rollback..."
+
+            # PLAN 11.7: source POSTGRES_* для compose interpolation.
+            if [ -f .env.prod ]; then
+              set -a
+              # shellcheck disable=SC1091
+              source .env.prod
+              set +a
+            fi
 
             # Try to restart with previous images
             docker-compose -f docker-compose.prod.yml down

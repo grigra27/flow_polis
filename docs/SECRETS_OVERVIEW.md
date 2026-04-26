@@ -5,7 +5,7 @@
 Связанные документы:
 - `docs/ENVIRONMENT_VARIABLES.md` — справочник значений каждой переменной (что значит `SECRET_KEY`, какие у неё дефолты и т.д.).
 - `docs/GITHUB_SECRETS_SETUP.md` — пошаговый how-to по настройке SSH-ключей в GitHub.
-- `.env.example`, `.env.prod.example`, `.env.prod.db.example` — рабочие шаблоны.
+- `.env.example`, `.env.prod.example` — рабочие шаблоны.
 
 ---
 
@@ -15,8 +15,8 @@
 GitHub Secrets (4 ключа)         →  только SSH-доступ к серверу
                                     Никаких прикладных секретов
 
-Сервер ~/insurance_broker/       →  .env.prod        — Django + всё
-                                    .env.prod.db     — credentials Postgres
+Сервер ~/insurance_broker/       →  .env.prod        — единственный конфиг
+                                                     для Django + Postgres + bash
                                     certbot/conf/    — SSL-сертификаты (приватный ключ Let's Encrypt)
 
 Локально (рядом с manage.py)     →  .env             — dev-значения разработчика
@@ -59,7 +59,11 @@ GitHub Secrets (4 ключа)         →  только SSH-доступ к се
 - `SECRET_KEY` (если равен дефолту `django-insecure-change-this-key` — fail на старте)
 - `DEBUG=False`
 - `ALLOWED_HOSTS=polis.insflow.ru,...`
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD` (host=`db`, port=5432 — внутри docker network)
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` — единый источник
+  правды для DB-credentials. docker-compose маппит их в Django как
+  `DB_NAME=${POSTGRES_DB}` и т.д. через `environment:` блок (см.
+  PLAN 11.7 — раньше дублировались в отдельном `.env.prod.db`).
+  DB_HOST=db, DB_PORT=5432 захардкожены в compose.
 
 **Опциональные** (есть defaults):
 - Email: `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`
@@ -72,14 +76,14 @@ GitHub Secrets (4 ключа)         →  только SSH-доступ к се
 
 Полный референс — `docs/ENVIRONMENT_VARIABLES.md`.
 
-### `.env.prod.db` — только для контейнера Postgres
+### Postgres-контейнер тоже из `.env.prod`
 
-3 ключа, читаются образом `postgres:15-alpine` напрямую при инициализации БД:
-- `POSTGRES_DB` — имя БД
-- `POSTGRES_USER` — суперюзер БД
-- `POSTGRES_PASSWORD` — пароль
+`postgres:15-alpine` при инициализации читает `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`. С PLAN 11.7 они живут в общем `.env.prod` (раньше был
+отдельный `.env.prod.db`, что создавало риск рассинхрона).
 
-**Критично**: эти три значения **должны совпадать** с `DB_NAME` / `DB_USER` / `DB_PASSWORD` в `.env.prod` — иначе Django не подключится. Никакой синхронизации нет, это руками.
+Compose делает interpolation `${POSTGRES_*}` → `DB_*` для Django через
+`environment:` блок. Источник правды один, синхронизировать руками нечего.
 
 ### `certbot/conf/live/<домен>/` — SSL-материал
 
@@ -90,17 +94,17 @@ GitHub Secrets (4 ключа)         →  только SSH-доступ к се
 
 ### Как они туда попадают и что их защищает
 
-В `.github/workflows/deploy.yml` rsync явно исключает три пути:
+В `.github/workflows/deploy.yml` rsync явно исключает:
 ```bash
 --exclude='.env.prod'
---exclude='.env.prod.db'
 --exclude='certbot/'
 ```
 
 То есть:
 - Деплой **никогда не перезаписывает** эти файлы.
-- Следующий шаг workflow **проверяет** наличие `.env.prod` и `.env.prod.db` и фейлит сборку, если их нет.
-- Первичная установка — руками: `ssh user@server`, создать оба файла на основе `.env.prod*.example`, выставить `chmod 600`.
+- Следующий шаг workflow проверяет наличие `.env.prod` + что в нём есть `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` (необходимы для compose interpolation). Если чего-то нет — деплой фейлится с подсказкой.
+- Перед `docker-compose up`/`run` workflow делает `set -a; source .env.prod; set +a` — это нужно чтобы `${POSTGRES_*}` в `environment:` блоках compose-файла подставились.
+- Первичная установка — руками: `ssh user@server`, создать `.env.prod` на основе `.env.prod.example`, выставить `chmod 600`.
 - Ротация любого секрета — тоже руками: `ssh`, отредактировать, `docker compose restart`.
 
 ### Что ещё на сервере по сути является секретом
@@ -179,7 +183,6 @@ ALLOWED_HOSTS: localhost,127.0.0.1
 |------|--------------|-------|-----|
 | GitHub Secrets | 4 SSH-ключа | один раз при настройке репо | владелец репо |
 | Сервер `.env.prod` | ~25 переменных приложения | один раз при первой установке + при ротации | админ через SSH |
-| Сервер `.env.prod.db` | 3 переменные Postgres | один раз; должны совпадать с DB_* в `.env.prod` | админ через SSH |
 | Сервер `certbot/conf/` | SSL приватный ключ | автоматически certbot'ом, обновляется тоже автоматически | certbot |
 | Локально `.env` | те же ~25 переменных, но dev-значения | каждый разработчик у себя | сам разработчик |
 

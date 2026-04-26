@@ -12,16 +12,19 @@
 """
 import json
 import logging
+import os
+import random
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+import requests
 from decouple import config
 
 # Reuse существующая VK-отправка — она содержит все нюансы (random_id,
 # обработка кода ошибок VK API, проверка enabled/token/user_id).
-from apps.core.vk_handler import send_vk_message
+from apps.core.vk_handler import VK_API_VERSION, send_vk_message
 
 logger = logging.getLogger(__name__)
 
@@ -272,3 +275,128 @@ def send_to_all(text: str) -> dict:
     vk_ok = send_vk(text)
     tg_ok = send_telegram(text)
     return {"vk": vk_ok, "telegram": tg_ok}
+
+
+# Таймаут для VK file upload — 60 секунд (multipart upload медленнее обычных API-вызовов)
+VK_FILE_TIMEOUT = 60
+VK_API_BASE = "https://api.vk.com/method"
+
+
+def send_vk_file(file_path: str, caption: str = "") -> bool:
+    """
+    Отправляет файл в VK как документ конкретному пользователю.
+
+    Конфигурация (та же что и для send_vk_message):
+        VK_COMMUNITY_TOKEN, VK_USER_ID, VK_ENABLED
+
+    4-шаговый процесс по VK API (портирован из bash send_vk_file
+    в scripts/telegram-notify.sh):
+      1) docs.getMessagesUploadServer → upload_url
+      2) POST upload_url с multipart файлом → file token
+      3) docs.save с file token → owner_id, doc_id
+      4) messages.send с attachment=doc{owner_id}_{id} + caption
+
+    Возвращает True/False. На любой ошибке (network, VK API error, файл
+    не найден) — логирует и возвращает False, не падает.
+    """
+    token = config("VK_COMMUNITY_TOKEN", default="")
+    user_id = config("VK_USER_ID", default="")
+    enabled = config("VK_ENABLED", default=False, cast=bool)
+
+    if not enabled:
+        logger.debug("VK отправка отключена (VK_ENABLED=false)")
+        return False
+    if not token or not user_id:
+        logger.error("VK не настроен: отсутствует VK_COMMUNITY_TOKEN или VK_USER_ID")
+        return False
+    if not os.path.isfile(file_path):
+        logger.error("VK file upload: файл не найден: %s", file_path)
+        return False
+
+    base_params = {"access_token": token, "v": VK_API_VERSION}
+
+    try:
+        # Шаг 1: получить upload URL
+        r = requests.post(
+            f"{VK_API_BASE}/docs.getMessagesUploadServer",
+            data={**base_params, "peer_id": user_id, "type": "doc"},
+            timeout=VK_FILE_TIMEOUT,
+        )
+        data = r.json()
+        if "error" in data:
+            logger.error("VK docs.getMessagesUploadServer: %s", data["error"])
+            return False
+        upload_url = (data.get("response") or {}).get("upload_url")
+        if not upload_url:
+            logger.error("VK upload URL не получен: %s", data)
+            return False
+
+        # Шаг 2: загрузить файл
+        with open(file_path, "rb") as f:
+            r = requests.post(upload_url, files={"file": f}, timeout=VK_FILE_TIMEOUT)
+        data = r.json()
+        if "error" in data:
+            logger.error("VK upload error: %s", data["error"])
+            return False
+        file_token = data.get("file")
+        if not file_token:
+            logger.error("VK file token не получен: %s", data)
+            return False
+
+        # Шаг 3: сохранить как VK-документ
+        title = os.path.basename(file_path)
+        r = requests.post(
+            f"{VK_API_BASE}/docs.save",
+            data={**base_params, "file": file_token, "title": title},
+            timeout=VK_FILE_TIMEOUT,
+        )
+        data = r.json()
+        if "error" in data:
+            logger.error("VK docs.save: %s", data["error"])
+            return False
+
+        # docs.save возвращает либо response.doc.{owner_id, id},
+        # либо response[0].{owner_id, id} — поддерживаем оба формата
+        # (как в bash-версии send_vk_file).
+        response = data.get("response")
+        owner_id = doc_id = None
+        if isinstance(response, dict):
+            doc = response.get("doc") or {}
+            owner_id = doc.get("owner_id")
+            doc_id = doc.get("id")
+        elif isinstance(response, list) and response:
+            owner_id = response[0].get("owner_id")
+            doc_id = response[0].get("id")
+        if not owner_id or not doc_id:
+            logger.error("VK docs.save: doc identifiers не найдены: %s", data)
+            return False
+
+        attachment = f"doc{owner_id}_{doc_id}"
+
+        # Шаг 4: отправить документ как сообщение
+        random_id = random.randint(1, 2**31 - 1)
+        r = requests.post(
+            f"{VK_API_BASE}/messages.send",
+            data={
+                **base_params,
+                "user_id": user_id,
+                "message": caption or "",
+                "attachment": attachment,
+                "random_id": random_id,
+            },
+            timeout=VK_FILE_TIMEOUT,
+        )
+        data = r.json()
+        if "error" in data:
+            logger.error("VK messages.send (with attachment): %s", data["error"])
+            return False
+
+        logger.info("VK file sent: %s as %s", file_path, attachment)
+        return True
+
+    except requests.RequestException as e:
+        logger.error("VK file upload network error: %s", e)
+        return False
+    except Exception as e:
+        logger.error("VK file upload unexpected error: %s", e, exc_info=True)
+        return False

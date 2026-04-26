@@ -261,3 +261,158 @@ def test_parse_retry_after_default_when_nothing_present():
     """Нет ни в body ни в header — default 60."""
     err = _http_error_429(body_json="", header_retry_after=None)
     assert notifications._parse_retry_after(err, "") == 60
+
+
+# ──────────────────────────────────────────────────────────────────
+# Тесты VK file upload (PLAN 11.5)
+# ──────────────────────────────────────────────────────────────────
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def _vk_config_enabled():
+    """Helper: imitate decouple.config returning enabled VK + creds."""
+
+    def fake(key, default=None, cast=None):
+        return {
+            "VK_ENABLED": True,
+            "VK_COMMUNITY_TOKEN": "vk-token",
+            "VK_USER_ID": "12345",
+        }.get(key, default)
+
+    return fake
+
+
+def test_send_vk_file_full_4_step_flow(monkeypatch, tmp_path):
+    """Успешный 4-шаговый upload: getUploadServer → upload → save → send."""
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+
+    test_file = tmp_path / "report.xlsx"
+    test_file.write_bytes(b"fake-excel-content")
+
+    # Каждому из 4 POST'ов соответствует свой ответ
+    responses = iter(
+        [
+            _FakeResponse({"response": {"upload_url": "https://upload.vk/abc"}}),
+            _FakeResponse({"file": "file-token-xyz"}),
+            _FakeResponse(
+                {"response": [{"owner_id": -111, "id": 222}]}
+            ),  # docs.save list-форма
+            _FakeResponse({"response": 999}),  # messages.send: ID нового сообщения
+        ]
+    )
+    posts = []
+
+    def fake_post(url, **kwargs):
+        posts.append(url)
+        return next(responses)
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+
+    assert notifications.send_vk_file(str(test_file), caption="Test backup") is True
+    # Проверяем что все 4 шага были вызваны
+    assert len(posts) == 4
+    assert "docs.getMessagesUploadServer" in posts[0]
+    assert posts[1] == "https://upload.vk/abc"
+    assert "docs.save" in posts[2]
+    assert "messages.send" in posts[3]
+
+
+def test_send_vk_file_supports_dict_response_from_docs_save(monkeypatch, tmp_path):
+    """docs.save может вернуть response.doc.{owner_id,id} вместо list."""
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+
+    test_file = tmp_path / "doc.pdf"
+    test_file.write_bytes(b"x")
+
+    responses = iter(
+        [
+            _FakeResponse({"response": {"upload_url": "https://upload.vk/xyz"}}),
+            _FakeResponse({"file": "tok"}),
+            # ← объектная форма
+            _FakeResponse({"response": {"doc": {"owner_id": -42, "id": 7}}}),
+            _FakeResponse({"response": 1}),
+        ]
+    )
+    monkeypatch.setattr(
+        notifications.requests, "post", lambda *a, **kw: next(responses)
+    )
+
+    assert notifications.send_vk_file(str(test_file)) is True
+
+
+def test_send_vk_file_returns_false_when_disabled(monkeypatch, tmp_path):
+    """VK_ENABLED=false → не пытаемся отправить."""
+
+    def fake(key, default=None, cast=None):
+        if key == "VK_ENABLED":
+            return False
+        return default
+
+    monkeypatch.setattr(notifications, "config", fake)
+
+    test_file = tmp_path / "x.txt"
+    test_file.write_bytes(b"x")
+
+    # Мокаем requests чтобы убедиться что НЕ вызывается
+    calls = []
+    monkeypatch.setattr(
+        notifications.requests, "post", lambda *a, **kw: calls.append(a)
+    )
+
+    assert notifications.send_vk_file(str(test_file)) is False
+    assert calls == []  # ни одного HTTP-запроса
+
+
+def test_send_vk_file_returns_false_when_file_missing(monkeypatch):
+    """Файл не существует → False, без попытки отправки."""
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+
+    calls = []
+    monkeypatch.setattr(
+        notifications.requests, "post", lambda *a, **kw: calls.append(a)
+    )
+
+    assert notifications.send_vk_file("/nonexistent/path.xlsx") is False
+    assert calls == []
+
+
+def test_send_vk_file_handles_step1_api_error(monkeypatch, tmp_path):
+    """VK API возвращает {error: ...} на первом шаге → False, без падения."""
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+
+    test_file = tmp_path / "x.txt"
+    test_file.write_bytes(b"x")
+
+    # Шаг 1 возвращает error — дальше шагов быть не должно
+    posts = []
+
+    def fake_post(url, **kwargs):
+        posts.append(url)
+        return _FakeResponse({"error": {"error_code": 5, "error_msg": "Auth fail"}})
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+
+    assert notifications.send_vk_file(str(test_file)) is False
+    assert len(posts) == 1  # только первый шаг
+
+
+def test_send_vk_file_handles_network_error(monkeypatch, tmp_path):
+    """RequestException на любом шаге → False, без падения."""
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+
+    test_file = tmp_path / "x.txt"
+    test_file.write_bytes(b"x")
+
+    def fake_post(*args, **kwargs):
+        raise notifications.requests.ConnectionError("network down")
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+
+    assert notifications.send_vk_file(str(test_file)) is False

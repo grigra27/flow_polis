@@ -188,11 +188,57 @@ class FileUploadValidator:
                     f"Содержимое файла не соответствует заявленному типу. Ожидается: {', '.join(expected_mimes)}, обнаружено: {detected_mime}",
                 )
 
+            # PLAN 9 (a): для xlsx MIME==application/zip недостаточен —
+            # любой ZIP-архив пройдёт. Реально открываем через openpyxl
+            # чтобы убедиться что внутри валидный xlsx.
+            if ext.lower() == "xlsx":
+                is_xlsx, xlsx_error = cls._validate_xlsx_structure(uploaded_file)
+                if not is_xlsx:
+                    return False, xlsx_error
+
             return True, None
 
         except Exception as e:
             security_logger.error(f"Error validating MIME type: {str(e)}")
             return False, "Ошибка при проверке типа файла"
+
+    @classmethod
+    def _validate_xlsx_structure(
+        cls, uploaded_file: UploadedFile
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Проверяет что ZIP-архив реально является валидным xlsx —
+        пытается открыть через openpyxl. Если внутри не xlsx (просто ZIP
+        с произвольными файлами), openpyxl выкинет исключение.
+
+        Validates: PLAN 9 (a) — защита от загрузки произвольного ZIP под видом xlsx.
+        """
+        from openpyxl import load_workbook
+
+        current_pos = uploaded_file.tell()
+        try:
+            uploaded_file.seek(0)
+            # read_only=True не парсит ячейки сразу, только структуру
+            wb = load_workbook(uploaded_file, read_only=True, data_only=False)
+            # На всякий случай — проверим что есть хоть один лист
+            if not wb.sheetnames:
+                return False, "Excel-файл повреждён или не содержит листов"
+            wb.close()
+            return True, None
+        except Exception as e:
+            security_logger.warning(
+                "Файл прошёл MIME-проверку как ZIP, но не открывается как xlsx: %s",
+                str(e)[:200],
+            )
+            return (
+                False,
+                "Файл выглядит как ZIP, но не является валидным Excel-документом",
+            )
+        finally:
+            try:
+                uploaded_file.seek(current_pos)
+            except Exception:
+                pass
 
     @classmethod
     def get_extension(cls, filename: str) -> Optional[str]:

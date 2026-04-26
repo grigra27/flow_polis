@@ -33,14 +33,47 @@ class TestFileUploadValidator:
         content += b"\x00" * (size - len(content))
         return SimpleUploadedFile(filename, content, content_type="application/pdf")
 
-    def create_xlsx_file(self, filename="test.xlsx", size=1024):
-        """Helper to create a valid XLSX file."""
-        # XLSX is a ZIP file
-        content = b"PK\x03\x04"
-        content += b"\x00" * (size - len(content))
+    def create_xlsx_file(self, filename="test.xlsx", size=None):
+        """
+        Helper to create a real XLSX file (PLAN 9 (a)).
+
+        Раньше fake `PK\\x03\\x04` + нули прошёл бы валидатор — теперь
+        мы реально открываем файл через openpyxl, поэтому нужен валидный
+        xlsx. `size` параметр игнорируется (формат фиксированный).
+        """
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws["A1"] = "test"
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
         return SimpleUploadedFile(
             filename,
-            content,
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def create_fake_zip_with_xlsx_extension(self, filename="evil.xlsx"):
+        """
+        ZIP-архив, который НЕ является xlsx — просто валидный ZIP с произвольными
+        файлами. Раньше такой проходил валидацию (filetype определял MIME=zip,
+        который был в whitelist для xlsx). PLAN 9 (a): теперь должен быть отклонён
+        потому что openpyxl не сможет его открыть как Workbook.
+        """
+        import zipfile
+        from io import BytesIO
+
+        buf = BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("malicious.txt", "not an xlsx, just a zip")
+        buf.seek(0)
+        return SimpleUploadedFile(
+            filename,
+            buf.read(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
@@ -246,6 +279,24 @@ class TestFileUploadValidator:
         assert not is_valid, "File with MIME mismatch should be rejected"
         assert error is not None
         assert "не соответствует" in error
+        assert safe_filename is None
+
+    # PLAN 9 (a): фейковый ZIP под видом xlsx должен быть отклонён.
+    def test_xlsx_rejects_arbitrary_zip(self):
+        """
+        Раньше любой ZIP-архив с расширением .xlsx проходил валидацию
+        (filetype определял MIME=application/zip, который был в whitelist
+        для xlsx). Теперь openpyxl реально открывает файл — если внутри
+        не xlsx, отклоняем.
+        """
+        uploaded_file = self.create_fake_zip_with_xlsx_extension("evil.xlsx")
+        is_valid, error, safe_filename = FileUploadValidator.validate_file(
+            uploaded_file
+        )
+
+        assert not is_valid, "Произвольный ZIP под видом .xlsx должен быть отклонён"
+        assert error is not None
+        assert "Excel" in error or "xlsx" in error.lower()
         assert safe_filename is None
 
     # Test: Отклонение файла превышающего лимит

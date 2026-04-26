@@ -69,9 +69,20 @@ def create_pdf_content():
 
 
 def create_xlsx_content():
-    """Create minimal valid XLSX content (ZIP format)."""
-    # XLSX is a ZIP file, ZIP magic bytes: PK
-    return b"PK\x03\x04" + b"\x00" * 100
+    """
+    Create minimal real XLSX content. PLAN 9 (a): валидатор теперь
+    реально открывает xlsx через openpyxl, поэтому фейковый
+    `PK\\x03\\x04` + нули больше не пройдёт.
+    """
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active["A1"] = "test"
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 def create_invalid_content():
@@ -99,10 +110,11 @@ def valid_uploaded_file(draw):
     content_generator = content_generators[extension]
     content = content_generator()
 
-    # File size between 1KB and 5MB (well within 10MB limit)
-    size = draw(st.integers(min_value=1024, max_value=5 * 1024 * 1024))
-    # Pad content to desired size
-    content = content + b"\x00" * (size - len(content))
+    # PLAN 9 (a): для xlsx нельзя padding'ить нулями после ZIP Central Directory —
+    # openpyxl не сможет открыть. Для остальных форматов padding безопасен.
+    if extension != "xlsx":
+        size = draw(st.integers(min_value=1024, max_value=5 * 1024 * 1024))
+        content = content + b"\x00" * max(0, size - len(content))
 
     return SimpleUploadedFile(
         filename, content, content_type="application/octet-stream"

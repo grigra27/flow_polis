@@ -103,24 +103,11 @@ class LoginAttemptMiddleware:
         return response
 
     def get_client_ip(self, request):
-        """
-        Get the client's IP address from the request.
+        # PLAN 9 (b): trust X-Forwarded-For только если непосредственный
+        # peer — наш Nginx из приватной сети. См. apps/core/ip_utils.
+        from apps.core.ip_utils import get_client_ip
 
-        Handles cases where the request comes through a proxy (X-Forwarded-For).
-
-        Args:
-            request: The HTTP request object
-
-        Returns:
-            str: The client's IP address
-        """
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            # Take the first IP in the list (client IP)
-            ip = x_forwarded_for.split(",")[0].strip()
-        else:
-            ip = request.META.get("REMOTE_ADDR")
-        return ip
+        return get_client_ip(request)
 
     def check_suspicious_activity(self, username):
         """
@@ -247,18 +234,7 @@ class PermissionCheckMiddleware:
         return False
 
     def get_client_ip(self, request):
-        """
-        Get the client's IP address from the request.
+        # PLAN 9 (b): см. LoginAttemptMiddleware.get_client_ip — единая утилита.
+        from apps.core.ip_utils import get_client_ip
 
-        Args:
-            request: The HTTP request object
-
-        Returns:
-            str: The client's IP address
-        """
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0].strip()
-        else:
-            ip = request.META.get("REMOTE_ADDR", "unknown")
-        return ip
+        return get_client_ip(request)

@@ -429,17 +429,11 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-    # Validates: Requirements 9.4 - Content-Security-Policy
-    # Note: CSP is primarily set in Nginx, but we ensure Django doesn't interfere
-    CSP_DEFAULT_SRC = ("'self'",)
-    CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'")
-    CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-    CSP_IMG_SRC = ("'self'", "data:", "https:")
-    CSP_FONT_SRC = ("'self'", "data:")
-    CSP_CONNECT_SRC = ("'self'",)
-    CSP_FRAME_ANCESTORS = ("'none'",)
-    CSP_BASE_URI = ("'self'",)
-    CSP_FORM_ACTION = ("'self'",)
+    # Content-Security-Policy управляется в nginx (см. nginx/default.conf).
+    # Раньше тут были CSP_* константы — но django-csp middleware никогда не
+    # был установлен, и эти настройки ничего не делали. Удалены в PLAN 3,
+    # уровень 1, чтобы не вводить в заблуждение что CSP управляется из Django.
+    # Реальный CSP-заголовок добавляется в nginx через add_header.
 
     # Validates: Requirements 9.5 - Referrer-Policy
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

@@ -90,29 +90,10 @@ class SecurityHeadersProductionTest(unittest.TestCase):
             self.assertTrue(settings.SECURE_HSTS_INCLUDE_SUBDOMAINS)
             self.assertTrue(settings.SECURE_HSTS_PRELOAD)
 
-    def test_csp_configured(self):
-        """
-        Test that Content-Security-Policy is configured in production.
-        Validates: Requirement 9.4
-        """
-        prod_config = {
-            "DEBUG": "False",
-            "SECRET_KEY": "production-secret-key-12345",
-            "DB_NAME": "prod_db",
-            "DB_USER": "prod_user",
-            "DB_PASSWORD": "prod_password",
-            "ALLOWED_HOSTS": "onbr.site",
-        }
-
-        with patch.dict(os.environ, prod_config, clear=True):
-            self._reload_settings()
-            from config import settings
-
-            # Validates: Requirement 9.4 - Content-Security-Policy configured
-            self.assertTrue(hasattr(settings, "CSP_DEFAULT_SRC"))
-            self.assertIn("'self'", settings.CSP_DEFAULT_SRC)
-            self.assertTrue(hasattr(settings, "CSP_FRAME_ANCESTORS"))
-            self.assertIn("'none'", settings.CSP_FRAME_ANCESTORS)
+    # PLAN 3 (level 1): test_csp_configured удалён — он проверял CSP_*
+    # константы в Django settings, но они никогда не использовались
+    # (django-csp middleware не был установлен). CSP управляется
+    # nginx — реальная проверка в test_nginx_has_csp ниже.
 
     def test_referrer_policy_configured(self):
         """
@@ -327,6 +308,26 @@ class NginxSecurityHeadersTest(unittest.TestCase):
         self.assertIn("Content-Security-Policy", self.nginx_config)
         self.assertIn("default-src 'self'", self.nginx_config)
         self.assertIn("frame-ancestors 'none'", self.nginx_config)
+
+    def test_nginx_csp_does_not_allow_unsafe_eval(self):
+        """
+        PLAN 3 (level 2): 'unsafe-eval' was removed from CSP. We don't use
+        eval() anywhere, so this lower bar of XSS-protection should hold.
+        Regression guard so it doesn't sneak back in.
+        """
+        # Ищем только в строке Content-Security-Policy, не в комментариях
+        csp_lines = [
+            line
+            for line in self.nginx_config.splitlines()
+            if "Content-Security-Policy" in line and "add_header" in line
+        ]
+        assert csp_lines, "CSP header not found in nginx config"
+        for line in csp_lines:
+            self.assertNotIn(
+                "'unsafe-eval'",
+                line,
+                f"'unsafe-eval' must not be in CSP (PLAN 3): {line}",
+            )
 
     def test_nginx_has_referrer_policy(self):
         """

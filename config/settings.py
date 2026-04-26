@@ -181,7 +181,6 @@ MIDDLEWARE = [
     "auditlog.middleware.AuditlogMiddleware",
     "apps.accounts.middleware.LoginAttemptMiddleware",  # Validates: Requirements 1.1, 1.5
     "apps.accounts.middleware.PermissionCheckMiddleware",  # Validates: Requirements 3.5, 4.1
-    # 'apps.core.middleware.InputValidationMiddleware',  # Validates: Requirements 3.3, 3.4 (Optional - enable if needed)
 ]
 
 if DEBUG:

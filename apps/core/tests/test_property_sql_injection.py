@@ -27,7 +27,7 @@ def sql_injection_strings(draw):
         "' EXEC sp_executesql--",
         "'; EXEC xp_cmdshell('dir')--",
         "' INSERT INTO users VALUES('hacker', 'password')--",
-        "' UPDATE users SET password='hacked' WHERE '1'='1",
+        "' UPDATE users SET password='hacked' WHERE '1'='1",  # pragma: allowlist secret
         "/* comment */ OR 1=1",
         "-- comment\nOR 1=1",
     ]

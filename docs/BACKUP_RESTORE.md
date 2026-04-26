@@ -362,13 +362,11 @@ cd insurance_broker
 #### 3. Configure Environment
 
 ```bash
-# Copy environment files
+# Copy environment file
 cp .env.prod.example .env.prod
-cp .env.prod.db.example .env.prod.db
 
 # Edit with production values
 nano .env.prod
-nano .env.prod.db
 ```
 
 #### 4. Start Services

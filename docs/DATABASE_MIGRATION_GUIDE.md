@@ -23,7 +23,7 @@
 
 ### На новом сервере
 - Docker и Docker Compose v1 установлены
-- Файлы `.env.prod` и `.env.prod.db` созданы
+- Файл `.env.prod` создан (включает POSTGRES_* переменные)
 - Структура директорий подготовлена
 - SSH доступ настроен
 
@@ -156,7 +156,7 @@ cd ~/insurance_broker
 - ✓ Контрольная сумма backup файла (если доступна)
 - ✓ Установка Docker Compose
 - ✓ Наличие docker-compose.prod.yml
-- ✓ Наличие .env.prod и .env.prod.db
+- ✓ Наличие .env.prod (с POSTGRES_* переменными)
 - ✓ Статус контейнера базы данных
 - ✓ Количество импортированных таблиц
 - ✓ Наличие ключевых таблиц (auth_user, policies_policy, и т.д.)
@@ -319,14 +319,12 @@ scp ./backups/insurance_broker_backup_*.sql root@109.68.215.223:~/insurance_brok
 
 ### Ошибка: Environment files missing
 
-**Причина:** Файлы .env.prod и .env.prod.db не созданы
+**Причина:** Файл .env.prod не создан
 
 **Решение:**
 ```bash
-# Создайте файлы окружения на новом сервере
-# См. документацию в MIGRATION_GUIDE.md или SERVER_SETUP.md
-nano .env.prod
-nano .env.prod.db
+cp .env.prod.example .env.prod
+nano .env.prod  # заполнить SECRET_KEY, POSTGRES_*, ALLOWED_HOSTS
 ```
 
 ### Ошибка: Database import failed

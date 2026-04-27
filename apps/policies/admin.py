@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.options import IS_POPUP_VAR
 from django.db.models import Sum
 from django.utils.html import format_html
 from django.contrib.admin import SimpleListFilter
@@ -91,6 +92,9 @@ class PolicyInfoInline(admin.TabularInline):
 
 @admin.register(Policy)
 class PolicyAdmin(admin.ModelAdmin):
+    change_form_template = "admin/policies/policy/change_form.html"
+    save_and_open_front_button_name = "_save_and_open_front"
+
     list_display = [
         "policy_number",
         "dfa_number",
@@ -183,6 +187,44 @@ class PolicyAdmin(admin.ModelAdmin):
     class Media:
         js = ("policies/js/auto_copy_policyholder.js",)
         css = {"all": ("policies/css/auto_copy_policyholder.css",)}
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        context[
+            "save_and_open_front_button_name"
+        ] = self.save_and_open_front_button_name
+        return super().render_change_form(
+            request,
+            context,
+            add=add,
+            change=change,
+            form_url=form_url,
+            obj=obj,
+        )
+
+    def _should_redirect_to_front(self, request):
+        """
+        Redirect to frontend detail page only for the dedicated admin button.
+        Standard admin buttons keep their default redirect behavior.
+        """
+        return (
+            self.save_and_open_front_button_name in request.POST
+            and IS_POPUP_VAR not in request.POST
+        )
+
+    def _get_frontend_detail_url(self, obj):
+        return reverse("policies:detail", args=[obj.pk])
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if self._should_redirect_to_front(request):
+            return redirect(self._get_frontend_detail_url(obj))
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        if self._should_redirect_to_front(request):
+            return redirect(self._get_frontend_detail_url(obj))
+        return super().response_change(request, obj)
 
     def get_queryset(self, request):
         # list_display обращается к client и insurer по каждой строке.

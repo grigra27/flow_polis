@@ -8,6 +8,8 @@ insurance_sum fields and that property_value has been removed.
 """
 import pytest
 from django.contrib import admin
+from django.test import RequestFactory
+from django.urls import reverse
 from apps.policies.admin import PaymentScheduleAdmin, PaymentScheduleInline, PolicyAdmin
 from apps.policies.models import PaymentSchedule, Policy
 
@@ -119,3 +121,91 @@ class TestPolicyAdminConfig:
         assert (
             "property_value" not in all_fields
         ), "property_value should not be present in PolicyAdmin fieldsets"
+
+    def test_response_add_redirects_to_frontend_detail_on_save_and_open_front(
+        self,
+        policy_factory,
+        admin_user,
+    ):
+        """
+        Кнопка "Сохранить и открыть на фронте" после добавления ведет на фронтовый detail.
+        """
+        policy_admin = PolicyAdmin(Policy, admin.site)
+        policy = policy_factory()
+        request = RequestFactory().post(
+            "/admin/policies/policy/add/",
+            {policy_admin.save_and_open_front_button_name: "1"},
+        )
+        request.user = admin_user
+
+        response = policy_admin.response_add(request, policy)
+        expected_url = reverse("policies:detail", args=[policy.pk])
+
+        assert response.status_code == 302
+        assert response.url == expected_url
+
+    def test_response_change_redirects_to_frontend_detail_on_save_and_open_front(
+        self,
+        policy_factory,
+        admin_user,
+    ):
+        """
+        Кнопка "Сохранить и открыть на фронте" после редактирования ведет на фронтовый detail.
+        """
+        policy_admin = PolicyAdmin(Policy, admin.site)
+        policy = policy_factory()
+        request = RequestFactory().post(
+            f"/admin/policies/policy/{policy.pk}/change/",
+            {policy_admin.save_and_open_front_button_name: "1"},
+        )
+        request.user = admin_user
+
+        response = policy_admin.response_change(request, policy)
+        expected_url = reverse("policies:detail", args=[policy.pk])
+
+        assert response.status_code == 302
+        assert response.url == expected_url
+
+    def test_front_redirect_flag_only_for_custom_button(self, admin_user):
+        """
+        Обычная кнопка "Сохранить" не должна включать редирект на фронт.
+        """
+        policy_admin = PolicyAdmin(Policy, admin.site)
+
+        save_request = RequestFactory().post(
+            "/admin/policies/policy/add/", {"_save": "1"}
+        )
+        save_request.user = admin_user
+        assert not policy_admin._should_redirect_to_front(save_request)
+
+        front_request = RequestFactory().post(
+            "/admin/policies/policy/add/",
+            {policy_admin.save_and_open_front_button_name: "1"},
+        )
+        front_request.user = admin_user
+        assert policy_admin._should_redirect_to_front(front_request)
+
+    def test_change_form_shows_custom_front_button_first_and_default(
+        self,
+        client,
+        admin_user,
+        policy_factory,
+    ):
+        """
+        В форме админки новая кнопка должна идти первой среди Save-кнопок
+        и быть кнопкой по умолчанию.
+        """
+        policy = policy_factory()
+        client.force_login(admin_user)
+        url = reverse("admin:policies_policy_change", args=[policy.pk])
+
+        response = client.get(url)
+        assert response.status_code == 200
+
+        content = response.content.decode()
+        front_btn = 'name="_save_and_open_front"'
+        save_btn = 'name="_save"'
+
+        assert front_btn in content
+        assert 'class="default" name="_save_and_open_front"' in content
+        assert content.find(front_btn) < content.find(save_btn)

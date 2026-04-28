@@ -1,6 +1,36 @@
 {% extends "admin/change_form.html" %}
 {% load policies_admin %}
 
+{% block content %}
+{% if accept_import_parsed_rows %}
+<div class="module" style="margin-bottom: 20px;">
+    <h2>Данные из акцепта</h2>
+    <div style="padding: 12px;">
+        {% if accept_import_warnings %}
+        <ul class="messagelist">
+            {% for warning in accept_import_warnings %}
+            <li class="warning">{{ warning }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <table style="width: 100%;">
+            <tbody>
+            {% for label, value in accept_import_parsed_rows %}
+                {% if value %}
+                <tr>
+                    <th style="width: 220px; text-align: left; padding: 4px 8px 4px 0;">{{ label }}</th>
+                    <td style="padding: 4px 0;">{{ value }}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
 {% block submit_buttons_top %}
 {% policy_submit_row %}
 {% endblock %}

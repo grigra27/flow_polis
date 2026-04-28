@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:policies_policy_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; Загрузить акцепт
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <fieldset class="module aligned">
+            <h2>Распоряжение на страхование</h2>
+            <div class="form-row{% if form.accept_file.errors %} errors{% endif %}">
+                {{ form.accept_file.errors }}
+                <div>
+                    {{ form.accept_file.label_tag }}
+                    {{ form.accept_file }}
+                    {% if form.accept_file.help_text %}
+                    <div class="help">{{ form.accept_file.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </fieldset>
+        <div class="submit-row">
+            <input type="submit" value="Распознать акцепт" class="default">
+            <a href="{% url 'admin:policies_policy_changelist' %}" class="closelink">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

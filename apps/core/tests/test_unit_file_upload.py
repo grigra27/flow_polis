@@ -57,6 +57,24 @@ class TestFileUploadValidator:
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
+    def create_xls_file(self, filename="test.xls"):
+        """Helper to create a real old-style XLS file."""
+        from io import BytesIO
+
+        import xlwt
+
+        workbook = xlwt.Workbook()
+        sheet = workbook.add_sheet("TDSheet")
+        sheet.write(0, 0, "test")
+        buf = BytesIO()
+        workbook.save(buf)
+        buf.seek(0)
+        return SimpleUploadedFile(
+            filename,
+            buf.read(),
+            content_type="application/vnd.ms-excel",
+        )
+
     def create_fake_zip_with_xlsx_extension(self, filename="evil.xlsx"):
         """
         ZIP-архив, который НЕ является xlsx — просто валидный ZIP с произвольными
@@ -137,6 +155,20 @@ class TestFileUploadValidator:
         assert error is None
         assert safe_filename is not None
         assert safe_filename.endswith(".xlsx")
+
+    def test_allowed_file_type_xls(self):
+        """
+        Test that old-style XLS files are accepted.
+        """
+        uploaded_file = self.create_xls_file("accept.xls")
+        is_valid, error, safe_filename = FileUploadValidator.validate_file(
+            uploaded_file
+        )
+
+        assert is_valid, f"XLS file should be accepted, error: {error}"
+        assert error is None
+        assert safe_filename is not None
+        assert safe_filename.endswith(".xls")
 
     # Test: Отклонение запрещенного типа
     def test_disallowed_file_type_exe(self):

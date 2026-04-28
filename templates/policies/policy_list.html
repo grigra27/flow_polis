@@ -74,6 +74,25 @@
         color: #fff;
         text-decoration: none;
     }
+    .btn-mgr-secondary {
+        background: #fff;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-mgr-secondary:hover {
+        border-color: var(--v2-accent);
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
 
     /* Branch tabs */
     .pl-branch-tabs {
@@ -563,6 +582,9 @@
         </div>
         {% if can_edit %}
         <div class="mgr-header-actions">
+            <a href="{% url 'admin:policies_policy_import_accept' %}" class="btn-mgr-secondary">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Из акцепта
+            </a>
             <a href="{% url 'admin:policies_policy_add' %}" class="btn-mgr-primary">
                 <i class="bi bi-plus-circle"></i> Добавить полис
             </a>

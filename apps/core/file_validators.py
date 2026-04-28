@@ -26,7 +26,7 @@ class FileUploadValidator:
     """
 
     # Whitelist of allowed file extensions
-    ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "xlsx"]
+    ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "xlsx", "xls"]
 
     # Maximum file size in bytes (10MB)
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -41,6 +41,11 @@ class FileUploadValidator:
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel",
             "application/zip",  # XLSX files are ZIP archives
+        ],
+        "xls": [
+            "application/vnd.ms-excel",
+            "application/x-ole-storage",
+            "application/octet-stream",
         ],
     }
 
@@ -174,6 +179,18 @@ class FileUploadValidator:
             uploaded_file.seek(current_pos)
 
             # Detect file type using filetype library
+            if ext.lower() == "xls":
+                if not cls._has_ole_compound_signature(file_content):
+                    return (
+                        False,
+                        "Содержимое файла не соответствует старому формату Excel .xls",
+                    )
+
+                is_xls, xls_error = cls._validate_xls_structure(uploaded_file)
+                if not is_xls:
+                    return False, xls_error
+                return True, None
+
             kind = filetype.guess(file_content)
 
             if kind is None:
@@ -233,6 +250,43 @@ class FileUploadValidator:
             return (
                 False,
                 "Файл выглядит как ZIP, но не является валидным Excel-документом",
+            )
+        finally:
+            try:
+                uploaded_file.seek(current_pos)
+            except Exception:
+                pass
+
+    @classmethod
+    def _has_ole_compound_signature(cls, file_content: bytes) -> bool:
+        """
+        Старый .xls — это OLE Compound File. Проверяем сигнатуру до запуска
+        xlrd, потому что filetype не всегда уверенно определяет такие файлы.
+        """
+        return file_content.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")
+
+    @classmethod
+    def _validate_xls_structure(
+        cls, uploaded_file: UploadedFile
+    ) -> Tuple[bool, Optional[str]]:
+        """Проверяет что OLE-файл реально открывается как Excel .xls."""
+        import xlrd
+
+        current_pos = uploaded_file.tell()
+        try:
+            uploaded_file.seek(0)
+            workbook = xlrd.open_workbook(file_contents=uploaded_file.read())
+            if not workbook.sheet_names():
+                return False, "Excel-файл повреждён или не содержит листов"
+            return True, None
+        except Exception as e:
+            security_logger.warning(
+                "Файл имеет расширение .xls, но не открывается как Excel: %s",
+                str(e)[:200],
+            )
+            return (
+                False,
+                "Файл выглядит как старый Excel .xls, но не открывается как Excel-документ",
             )
         finally:
             try:

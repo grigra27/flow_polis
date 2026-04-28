@@ -1,13 +1,24 @@
 from django.contrib import admin
 from django.contrib.admin.options import IS_POPUP_VAR
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Sum
+from django.template.response import TemplateResponse
 from django.utils.html import format_html
 from django.contrib.admin import SimpleListFilter
 from django.shortcuts import redirect
-from django.urls import reverse
+from django.urls import path, reverse
 from urllib.parse import urlencode
 from decimal import Decimal
+from uuid import uuid4
+
+from .forms import AcceptUploadForm
 from .models import Policy, PaymentSchedule, PolicyInfo
+from .services.accept_parser import parse_accept_file
+from .services.accept_resolver import (
+    ACCEPT_IMPORT_SESSION_KEY,
+    resolve_accept_data,
+)
 
 
 class InsuranceSumRangeFilter(SimpleListFilter):
@@ -93,6 +104,7 @@ class PolicyInfoInline(admin.TabularInline):
 @admin.register(Policy)
 class PolicyAdmin(admin.ModelAdmin):
     change_form_template = "admin/policies/policy/change_form.html"
+    change_list_template = "admin/policies/policy/change_list.html"
     save_and_open_front_button_name = "_save_and_open_front"
 
     list_display = [
@@ -188,12 +200,77 @@ class PolicyAdmin(admin.ModelAdmin):
         js = ("policies/js/auto_copy_policyholder.js",)
         css = {"all": ("policies/css/auto_copy_policyholder.css",)}
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "import-accept/",
+                self.admin_site.admin_view(self.import_accept_view),
+                name="policies_policy_import_accept",
+            ),
+        ]
+        return custom_urls + urls
+
+    def import_accept_view(self, request):
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+
+        if request.method == "POST":
+            form = AcceptUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                try:
+                    parse_result = parse_accept_file(form.cleaned_data["accept_file"])
+                    resolved = resolve_accept_data(
+                        parse_result.data,
+                        parser_warnings=parse_result.warnings,
+                    )
+                except ValidationError as exc:
+                    form.add_error("accept_file", exc.messages[0])
+                else:
+                    payload = resolved.to_session_payload(parse_result.data)
+                    token = self._store_accept_import_payload(request, payload)
+                    context = {
+                        **self.admin_site.each_context(request),
+                        "title": "Проверка акцепта",
+                        "opts": self.model._meta,
+                        "token": token,
+                        "payload": payload,
+                        "parsed_rows": self._build_accept_parsed_rows(payload),
+                        "resolved_rows": self._build_accept_resolved_rows(payload),
+                        "add_url": f"{reverse('admin:policies_policy_add')}?accept_token={token}",
+                    }
+                    return TemplateResponse(
+                        request,
+                        "admin/policies/policy/import_accept_preview.html",
+                        context,
+                    )
+        else:
+            form = AcceptUploadForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Загрузить акцепт",
+            "opts": self.model._meta,
+            "form": form,
+        }
+        return TemplateResponse(
+            request,
+            "admin/policies/policy/import_accept.html",
+            context,
+        )
+
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
     ):
         context[
             "save_and_open_front_button_name"
         ] = self.save_and_open_front_button_name
+        payload = self._get_accept_import_payload(request) if add else None
+        if payload:
+            context["accept_import_warnings"] = payload.get("warnings", [])
+            context["accept_import_parsed_rows"] = self._build_accept_parsed_rows(
+                payload
+            )
         return super().render_change_form(
             request,
             context,
@@ -202,6 +279,26 @@ class PolicyAdmin(admin.ModelAdmin):
             form_url=form_url,
             obj=obj,
         )
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        payload = self._get_accept_import_payload(request)
+        if payload:
+            initial.update(payload.get("policy_initial", {}))
+        return initial
+
+    def get_formset_kwargs(self, request, obj, inline, prefix):
+        kwargs = super().get_formset_kwargs(request, obj, inline, prefix)
+        payload = self._get_accept_import_payload(request)
+        if (
+            request.method == "GET"
+            and obj is None
+            and inline.model is PaymentSchedule
+            and payload
+            and payload.get("payment_initial")
+        ):
+            kwargs["initial"] = [payload["payment_initial"]]
+        return kwargs
 
     def _should_redirect_to_front(self, request):
         """
@@ -216,9 +313,86 @@ class PolicyAdmin(admin.ModelAdmin):
     def _get_frontend_detail_url(self, obj):
         return reverse("policies:detail", args=[obj.pk])
 
+    def _store_accept_import_payload(self, request, payload):
+        token = uuid4().hex
+        imports = request.session.get(ACCEPT_IMPORT_SESSION_KEY, {})
+        imports[token] = payload
+
+        # Keep the session compact if several accepts are previewed in a row.
+        for old_token in list(imports.keys())[:-5]:
+            imports.pop(old_token, None)
+
+        request.session[ACCEPT_IMPORT_SESSION_KEY] = imports
+        request.session.modified = True
+        return token
+
+    def _get_accept_import_payload(self, request):
+        token = request.GET.get("accept_token")
+        if not token:
+            return None
+        imports = request.session.get(ACCEPT_IMPORT_SESSION_KEY, {})
+        return imports.get(token)
+
+    def _build_accept_parsed_rows(self, payload):
+        parsed = payload.get("parsed", {})
+        return [
+            ("Файл", parsed.get("source_filename")),
+            ("Номер ДФА", parsed.get("dfa_number")),
+            ("Дата ДФА", parsed.get("dfa_date")),
+            ("ИНН", parsed.get("client_inn")),
+            ("Клиент", parsed.get("client_full") or parsed.get("client_short")),
+            ("Страхователь", parsed.get("policyholder_text")),
+            ("Вид страхования", parsed.get("insurance_type_name")),
+            ("ОСАГО", parsed.get("osago")),
+            ("Имущество", parsed.get("property_description")),
+            ("VIN/ID", parsed.get("vin_number")),
+            ("Год выпуска", parsed.get("property_year")),
+            ("Дата начала", parsed.get("start_date")),
+            ("Дата окончания", parsed.get("end_date")),
+            ("Стоимость по ДКП", parsed.get("purchase_price")),
+            ("Банк-кредитор", parsed.get("bank")),
+        ]
+
+    def _build_accept_resolved_rows(self, payload):
+        resolved = payload.get("resolved", {})
+        rows = []
+        labels = {
+            "client": "Лизингополучатель",
+            "policyholder": "Страхователь",
+            "insurance_type": "Вид страхования",
+            "branch": "Филиал",
+            "vin_number": "VIN/ID",
+            "payment_schedule": "График платежей",
+        }
+        for key, label in labels.items():
+            item = resolved.get(key, {})
+            rows.append(
+                {
+                    "label": label,
+                    "value": item.get("label", ""),
+                    "status": self._accept_status_label(item.get("status")),
+                    "status_code": item.get("status", "manual"),
+                }
+            )
+        return rows
+
+    def _accept_status_label(self, status):
+        return {
+            "matched": "Подставится",
+            "partial": "Частично",
+            "manual": "Вручную",
+            "invalid": "Не подставится",
+        }.get(status, "Вручную")
+
     def response_add(self, request, obj, post_url_continue=None):
         if self._should_redirect_to_front(request):
             return redirect(self._get_frontend_detail_url(obj))
+        if request.GET.get("accept_token"):
+            self.message_user(
+                request,
+                "Полис создан из предзаполненной формы акцепта.",
+                messages.SUCCESS,
+            )
         return super().response_add(request, obj, post_url_continue)
 
     def response_change(self, request, obj):

@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+<li>
+    <a href="{% url 'admin:policies_policy_import_accept' %}" class="addlink">
+        Добавить из акцепта
+    </a>
+</li>
+{{ block.super }}
+{% endblock %}

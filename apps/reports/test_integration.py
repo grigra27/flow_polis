@@ -708,6 +708,18 @@ class ReadyExportsTest(TestCase):
             end_date=date(2024, 12, 31),  # Вне диапазона
         )
 
+        inactive_policy_in_range = Policy.objects.create(
+            policy_number="EXPIRING-INACTIVE",
+            dfa_number="DFA-EXPIRING-INACTIVE",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 6, 20),  # В диапазоне, но полис расторгнут
+            policy_active=False,
+        )
+
         self.test_client.login(username="testuser", password="testpass123")
 
         # Экспортируем полисы с окончанием с 01.06.2024 по 30.06.2024
@@ -791,6 +803,9 @@ class ReadyExportsTest(TestCase):
 
         # Проверяем что EXPIRING-002 НЕТ в отчете (end_date вне диапазона)
         self.assertNotIn("EXPIRING-002", policy_numbers)
+
+        # Проверяем что неактивный полис в диапазоне НЕ попал в отчет
+        self.assertNotIn(inactive_policy_in_range.policy_number, policy_numbers)
 
         # Проверяем данные в строке с EXPIRING-001
         for row in range(6, ws.max_row + 1):

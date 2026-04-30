@@ -437,8 +437,8 @@ def export_policy_expiration(request):
             messages.error(request, "Дата начала не может быть позже даты окончания")
             return redirect("reports:index")
 
-        # Получаем ВСЕ полисы с окончанием страхования в заданном диапазоне
-        # Включаем все записи независимо от статуса полиса или ДФА
+        # Получаем активные полисы с окончанием страхования в заданном диапазоне.
+        # Статус ДФА не фильтруем: такие строки нужны в отчете и подсвечиваются.
         # Сортируем по филиалу (алфавитно), затем по дате окончания
         policies = (
             Policy.objects.select_related(
@@ -449,7 +449,7 @@ def export_policy_expiration(request):
                 "policyholder",
                 "leasing_manager",
             )
-            .filter(end_date__gte=date_from, end_date__lte=date_to)
+            .filter(end_date__gte=date_from, end_date__lte=date_to, policy_active=True)
             .order_by("branch__branch_name", "end_date", "policy_number")
         )
 

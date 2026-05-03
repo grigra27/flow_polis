@@ -279,6 +279,7 @@ class PaymentSchedule(TimeStampedModel):
         indexes = [
             models.Index(fields=["due_date"]),
             models.Index(fields=["paid_date"]),
+            models.Index(fields=["paid_date", "due_date"]),
         ]
 
     def __str__(self):

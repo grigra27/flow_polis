@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+
+{% block title %}Задача очередного взноса{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .task-page {
+        color: #17324f;
+    }
+
+    .task-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(460px, 1.1fr);
+        gap: 1rem;
+    }
+
+    .task-panel {
+        border: 1px solid #dbe5f1;
+        border-radius: 8px;
+        background: #fff;
+        padding: 1rem;
+    }
+
+    .task-section-title {
+        font-size: 1rem;
+        font-weight: 800;
+        margin-bottom: 0.75rem;
+    }
+
+    .task-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .task-label {
+        color: #5d748d;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 0.15rem;
+    }
+
+    .task-value {
+        font-weight: 700;
+    }
+
+    .grid-column-full {
+        grid-column: 1 / -1;
+    }
+
+    .task-letter {
+        min-height: 620px;
+        padding: 1rem;
+        overflow: hidden;
+        resize: none;
+        color: #13283f;
+        background: #fbfdff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 1rem;
+        line-height: 1.55;
+        white-space: pre-wrap;
+    }
+
+    .task-status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.22rem 0.6rem;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .task-status--to_request {
+        color: #854d0e;
+        background: #fef9c3;
+    }
+
+    .task-status--requested {
+        color: #1d4ed8;
+        background: #dbeafe;
+    }
+
+    .task-status--sent_to_leasing {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .task-muted {
+        color: #5d748d;
+    }
+
+    @media (max-width: 991.98px) {
+        .task-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .task-meta-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% with policy=task.payment_schedule.policy %}
+<div class="task-page">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'core:dashboard' %}"><i class="bi bi-house"></i> Главная</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'policies:payments' %}"><i class="bi bi-calendar-check"></i> Платежи</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'policies:scheduled_payments' %}?period={{ task.period.code }}">Очередные взносы</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ policy.policy_number }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <div class="text-uppercase fw-bold task-muted small">Очередной взнос / {{ task.period.label }}</div>
+            <h1 class="h3 mb-1">{{ policy.dfa_number|default:"Без ДФА" }} · {{ policy.policy_number }}</h1>
+            <div class="task-muted">{{ policy.client.client_name }}</div>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ return_url }}">
+            <i class="bi bi-arrow-left"></i> Назад к списку
+        </a>
+    </div>
+
+    <div class="task-layout">
+        <div class="d-flex flex-column gap-3">
+            <div class="task-panel">
+                <div class="task-section-title">История</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Событие</th>
+                                <th>Пользователь</th>
+                                <th>Детали</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in task.events.all %}
+                            <tr>
+                                <td>{{ event.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ event.get_event_type_display }}</td>
+                                <td>
+                                    {% if event.user %}
+                                        {{ event.user.get_full_name|default:event.user.username }}
+                                    {% else %}
+                                        Система
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if event.old_status or event.new_status %}
+                                        {{ event.old_status_label|default:"-" }} → {{ event.new_status_label|default:"-" }}
+                                    {% else %}
+                                        {{ event.comment }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="task-muted">Истории пока нет.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="task-panel">
+                <div class="task-section-title">Данные платежа</div>
+                <div class="task-meta-grid">
+                    <div>
+                        <div class="task-label">Статус</div>
+                        <span class="task-status task-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                    </div>
+                    <div>
+                        <div class="task-label">Сумма</div>
+                        <div class="task-value">{{ task.payment_schedule.amount|currency }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Дата платежа по договору</div>
+                        <div class="task-value">{{ task.payment_schedule.due_date|date:"d.m.Y" }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Крайняя дата запроса счета</div>
+                        <div class="task-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Страховщик</div>
+                        <div class="task-value">{{ policy.insurer.insurer_name }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Филиал</div>
+                        <div class="task-value">{{ policy.branch.branch_name|default:"Не указан" }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Страхователь</div>
+                        <div class="task-value">{{ policy.policyholder.client_name|default:"Не указан" }}</div>
+                    </div>
+                    <div>
+                        <div class="task-label">Менеджер лизинговой компании</div>
+                        <div class="task-value">
+                            {% if policy.leasing_manager %}
+                                {{ policy.leasing_manager.full_name|default:policy.leasing_manager.name }}
+                            {% else %}
+                                Не указан
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="grid-column-full">
+                        <div class="task-label">Объект страхования</div>
+                        <div>{{ policy.property_description }}</div>
+                    </div>
+                </div>
+                {% if not task.is_actual %}
+                <div class="alert alert-warning mt-3 mb-0">
+                    Платеж больше не соответствует текущим условиям отбора: возможно, он оплачен, полис неактивен или дата платежа перенесена.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="task-panel">
+                <div class="task-section-title">Статус и комментарий</div>
+                <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <div class="mb-3">
+                        <label for="status" class="form-label fw-semibold">Статус</label>
+                        <select id="status" name="status" class="form-select">
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comment" class="form-label fw-semibold">Комментарий</label>
+                        <textarea id="comment" name="comment" class="form-control" rows="4">{{ task.comment }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Сохранить
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+            <div class="task-panel">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <div class="task-section-title mb-0">Текст письма в СК</div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="copyLetterButton">
+                        <i class="bi bi-clipboard"></i> Скопировать
+                    </button>
+                </div>
+                <textarea id="letterText" class="form-control task-letter" rows="24" readonly>{{ letter_text }}</textarea>
+            </div>
+        </div>
+    </div>
+</div>
+{% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const button = document.getElementById('copyLetterButton');
+        const letter = document.getElementById('letterText');
+        if (!button || !letter) {
+            return;
+        }
+
+        function fitLetterHeight() {
+            letter.style.height = 'auto';
+            letter.style.height = `${letter.scrollHeight + 2}px`;
+        }
+
+        fitLetterHeight();
+        window.addEventListener('resize', fitLetterHeight);
+
+        button.addEventListener('click', async function () {
+            letter.select();
+            letter.setSelectionRange(0, letter.value.length);
+
+            try {
+                await navigator.clipboard.writeText(letter.value);
+                button.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
+                setTimeout(function () {
+                    button.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать';
+                }, 1600);
+            } catch (error) {
+                document.execCommand('copy');
+            }
+        });
+    });
+</script>
+{% endblock %}

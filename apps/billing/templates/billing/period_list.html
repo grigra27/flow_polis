@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+
+{% block title %}Очередные взносы{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .billing-page {
+        color: #17324f;
+    }
+
+    .billing-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .billing-kicker {
+        color: #5d748d;
+        font-size: 0.86rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .billing-title {
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .billing-periods {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding: 0.25rem 0 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .billing-period {
+        min-width: 170px;
+        border: 1px solid #dbe5f1;
+        border-radius: 8px;
+        background: #fff;
+        color: #17324f;
+        padding: 0.65rem 0.75rem;
+        text-decoration: none;
+        box-shadow: 0 1px 5px rgba(14, 28, 46, 0.05);
+    }
+
+    .billing-period:hover {
+        border-color: #1565c0;
+        color: #0f4f97;
+    }
+
+    .billing-period.active {
+        border-color: #1565c0;
+        background: #eff5ff;
+    }
+
+    .billing-period-name {
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+    }
+
+    .billing-period-meta {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        color: #5d748d;
+    }
+
+    .billing-chip {
+        border: 1px solid #dbe5f1;
+        border-radius: 999px;
+        padding: 0.05rem 0.35rem;
+        background: #f8fbff;
+        white-space: nowrap;
+    }
+
+    .billing-panel {
+        border: 1px solid #dbe5f1;
+        border-radius: 8px;
+        background: #fff;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .billing-filters {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr 1.4fr auto;
+        gap: 0.75rem;
+        align-items: end;
+    }
+
+    .billing-table {
+        font-size: 0.92rem;
+        vertical-align: middle;
+    }
+
+    .billing-table th {
+        color: #3d5f7d;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .billing-row {
+        cursor: pointer;
+    }
+
+    .billing-row:focus {
+        outline: 2px solid #1565c0;
+        outline-offset: -2px;
+    }
+
+    .billing-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        padding: 0.18rem 0.5rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .billing-status--to_request {
+        color: #854d0e;
+        background: #fef9c3;
+    }
+
+    .billing-status--requested {
+        color: #1d4ed8;
+        background: #dbeafe;
+    }
+
+    .billing-status--sent_to_leasing {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .billing-muted {
+        color: #5d748d;
+    }
+
+    .billing-warning {
+        color: #92400e;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .billing-bulkbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .billing-header {
+            flex-direction: column;
+        }
+
+        .billing-filters {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="billing-page">
+    <div class="billing-header">
+        <div>
+            <div class="billing-kicker">MVP / запрос счетов</div>
+            <h1 class="billing-title h3">Очередные взносы</h1>
+            <div class="billing-muted">Периоды создаются автоматически из графика платежей: два месяца назад, текущий месяц и будущие месяцы с платежами.</div>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'reports:index' %}">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Старые экспорты
+        </a>
+    </div>
+
+    <div class="billing-periods" aria-label="Периоды очередных взносов">
+        {% for option in period_options %}
+        <a class="billing-period{% if option.selected %} active{% endif %}"
+           href="{% url 'policies:scheduled_payments' %}?period={{ option.period.code }}">
+            <div class="billing-period-name">{{ option.period.label }}</div>
+            <div class="billing-period-meta">
+                <span class="billing-chip">Всего {{ option.total }}</span>
+                <span class="billing-chip">Требуется запрос {{ option.to_request }}</span>
+                <span class="billing-chip">Запрошено {{ option.requested }}</span>
+                <span class="billing-chip">Передано в Альянс {{ option.sent_to_leasing }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="billing-panel">
+        <form method="get" class="billing-filters">
+            <input type="hidden" name="period" value="{{ selected_period.code }}">
+            <div>
+                <label for="status" class="form-label fw-semibold">Статус</label>
+                <select id="status" name="status" class="form-select form-select-sm">
+                    <option value="all"{% if selected_status == "all" %} selected{% endif %}>Все статусы</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="insurer" class="form-label fw-semibold">Страховщик</label>
+                <select id="insurer" name="insurer" class="form-select form-select-sm">
+                    <option value="">Все страховщики</option>
+                    {% for insurer in insurers %}
+                    <option value="{{ insurer.id }}"{% if selected_insurer == insurer.id|stringformat:"s" %} selected{% endif %}>{{ insurer.insurer_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="branch" class="form-label fw-semibold">Филиал</label>
+                <select id="branch" name="branch" class="form-select form-select-sm">
+                    <option value="">Все филиалы</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.branch_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="q" class="form-label fw-semibold">Поиск</label>
+                <input id="q" type="search" name="q" class="form-control form-control-sm"
+                       value="{{ search_query }}" placeholder="ДФА, полис, клиент, объект">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-funnel"></i> Применить
+            </button>
+        </form>
+    </div>
+
+    <form method="post" action="{% url 'policies:scheduled_payment_bulk_update' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+        <div class="billing-bulkbar">
+            <div class="fw-semibold">{{ selected_period.label }}: {{ total_filtered }} задач</div>
+            <select name="status" class="form-select form-select-sm" style="width: 260px;" required>
+                <option value="">Сменить статус выбранных...</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-check2-square"></i> Применить
+            </button>
+        </div>
+
+        <div class="table-responsive billing-panel p-0">
+            <table class="table table-hover billing-table mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 36px;"><input type="checkbox" id="selectAllTasks" class="form-check-input"></th>
+                        <th>Статус</th>
+                        <th>Крайний срок</th>
+                        <th>Дата платежа</th>
+                        <th>Страховщик</th>
+                        <th>ДФА / полис</th>
+                        <th>Клиент</th>
+                        <th class="text-end">Сумма</th>
+                        <th>Менеджер</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    {% with policy=task.payment_schedule.policy %}
+                    <tr class="billing-row"
+                        data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
+                        tabindex="0"
+                        role="link"
+                        aria-label="Открыть задачу {{ policy.policy_number }}">
+                        <td><input type="checkbox" name="task_ids" value="{{ task.id }}" class="form-check-input task-checkbox"></td>
+                        <td>
+                            <span class="billing-status billing-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                            {% if not task.is_actual %}
+                            <div class="billing-warning mt-1">Платеж изменился</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
+                        <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
+                        <td>{{ policy.insurer.insurer_name }}</td>
+                        <td>
+                            <div class="fw-semibold">{{ policy.dfa_number|default:"Без ДФА" }}</div>
+                            <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                        </td>
+                        <td>{{ policy.client.client_name }}</td>
+                        <td class="text-end fw-semibold">{{ task.payment_schedule.amount|currency }}</td>
+                        <td>
+                            {% if policy.leasing_manager %}
+                                {{ policy.leasing_manager.name }}
+                            {% else %}
+                                <span class="billing-muted">Не указан</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-outline-primary btn-sm"
+                               href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}">
+                                Открыть
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center py-5 billing-muted">
+                            Нет задач по выбранным фильтрам.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Страницы" class="mt-3">
+        <ul class="pagination pagination-sm">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">Назад</a></li>
+            {% endif %}
+            <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">Вперед</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const selectAll = document.getElementById('selectAllTasks');
+        const checkboxes = document.querySelectorAll('.task-checkbox');
+        if (!selectAll) {
+            return;
+        }
+        selectAll.addEventListener('change', function () {
+            checkboxes.forEach(function (checkbox) {
+                checkbox.checked = selectAll.checked;
+            });
+        });
+
+        const ignoredSelector = 'a, button, input, select, textarea, label';
+        document.querySelectorAll('.billing-row[data-href]').forEach(function (row) {
+            row.addEventListener('click', function (event) {
+                if (event.target.closest(ignoredSelector)) {
+                    return;
+                }
+                window.location.href = row.dataset.href;
+            });
+
+            row.addEventListener('keydown', function (event) {
+                if (event.target.closest(ignoredSelector)) {
+                    return;
+                }
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    window.location.href = row.dataset.href;
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

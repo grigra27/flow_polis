@@ -16,6 +16,9 @@ from .models import (
 )
 
 
+FIRST_YEAR_FIRST_INSTALLMENT_FILTER = Q(year_number=1, installment_number=1)
+
+
 @dataclass
 class PeriodOption:
     period: BillingPeriod
@@ -131,12 +134,19 @@ def sync_period(year, month):
             due_date__lte=period.ends_on,
             paid_date__isnull=True,
             policy__policy_active=True,
-        ).values("id", "due_date")
+        )
+        .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
+        .values("id", "due_date")
     )
+    payment_ids = [payment["id"] for payment in payments]
+
+    stale_tasks = BillingTask.objects.filter(period=period)
+    if payment_ids:
+        stale_tasks = stale_tasks.exclude(payment_schedule_id__in=payment_ids)
+    stale_tasks.delete()
+
     if not payments:
         return period
-
-    payment_ids = [payment["id"] for payment in payments]
     existing_tasks = {
         task.payment_schedule_id: task
         for task in BillingTask.objects.filter(
@@ -226,6 +236,10 @@ def build_period_options(periods, selected_period):
     period_keys = {(period.year, period.month) for period in periods}
     counts = (
         BillingTask.objects.filter(period__in=periods)
+        .exclude(
+            payment_schedule__year_number=1,
+            payment_schedule__installment_number=1,
+        )
         .values("period_id", "status")
         .annotate(total=Count("id"))
     )
@@ -244,6 +258,7 @@ def build_period_options(periods, selected_period):
                 policy__policy_active=True,
                 billing_task__isnull=True,
             )
+            .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
             .annotate(
                 period_year=ExtractYear("due_date"),
                 period_month=ExtractMonth("due_date"),
@@ -292,6 +307,10 @@ def get_tasks_queryset(period, request_get):
         "payment_schedule__policy__insurer",
         "payment_schedule__policy__branch",
         "payment_schedule__policy__leasing_manager",
+    )
+    tasks = tasks.exclude(
+        payment_schedule__year_number=1,
+        payment_schedule__installment_number=1,
     )
 
     selected_status = request_get.get("status")

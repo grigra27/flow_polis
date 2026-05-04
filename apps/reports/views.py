@@ -315,6 +315,7 @@ def export_payments_excel(request):
                 policy__policy_active=True,  # Только активные полисы, как на странице платежей
                 paid_date__isnull=True,  # Исключаем все платежи с датой фактической оплаты
             )
+            .exclude(year_number=1, installment_number=1)
             .order_by("due_date", "policy__policy_number")
         )
 

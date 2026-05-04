@@ -48,7 +48,7 @@ def billing_payment(db):
     )
     return PaymentSchedule.objects.create(
         policy=policy,
-        year_number=1,
+        year_number=2,
         installment_number=1,
         due_date=due_date,
         insurance_sum=Decimal("1000000.00"),
@@ -131,6 +131,35 @@ def test_letter_contains_installment_metadata_for_installment_plan(billing_payme
     alliance_letter = task.build_alliance_letter_text()
     assert "Тип взноса: рассрочка, платёж 1 из 2" in alliance_letter
     assert subject == "Счёт на очередной взнос --- DFA-001 --- POL-001"
+
+
+@pytest.mark.django_db
+def test_sync_period_excludes_first_payment_of_first_year_and_cleans_stale_task(
+    billing_payment,
+):
+    excluded_payment = PaymentSchedule.objects.create(
+        policy=billing_payment.policy,
+        year_number=1,
+        installment_number=1,
+        due_date=billing_payment.due_date,
+        insurance_sum=Decimal("900000.00"),
+        amount=Decimal("40000.00"),
+    )
+    period, _ = BillingPeriod.objects.get_or_create(
+        year=excluded_payment.due_date.year,
+        month=excluded_payment.due_date.month,
+    )
+    stale_task = BillingTask.objects.create(
+        period=period,
+        payment_schedule=excluded_payment,
+        invoice_request_deadline=excluded_payment.due_date - timedelta(weeks=2),
+    )
+
+    sync_period(period.year, period.month)
+
+    assert not BillingTask.objects.filter(payment_schedule=excluded_payment).exists()
+    assert not BillingTask.objects.filter(pk=stale_task.pk).exists()
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
 
 
 @pytest.mark.django_db

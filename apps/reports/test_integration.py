@@ -355,7 +355,7 @@ class ReadyExportsTest(TestCase):
         # Создаем платеж
         self.payment = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=1,
+            year_number=2,
             installment_number=1,
             due_date=date(2024, 3, 1),
             amount=Decimal("50000.00"),
@@ -455,6 +455,53 @@ class ReadyExportsTest(TestCase):
         self.assertEqual(
             payment_row[2], "Клиент для готовых экспортов"
         )  # Лизингополучатель
+
+    def test_ready_export_payments_excludes_first_year_first_installment(self):
+        """Тест, что платеж 1.1 не попадает в экспорт очередных взносов"""
+        self.test_client.login(username="testuser", password="testpass123")
+
+        excluded_policy = Policy.objects.create(
+            policy_number="READY-EXCLUDED-001",
+            dfa_number="DFA-READY-EXCLUDED-001",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Имущество для исключения 1.1",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            policy_active=True,
+        )
+        PaymentSchedule.objects.create(
+            policy=excluded_policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2024, 3, 1),
+            amount=Decimal("30000.00"),
+            insurance_sum=Decimal("700000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("6000.00"),
+            paid_date=None,
+        )
+        PaymentSchedule.objects.filter(pk=self.payment.pk).update(paid_date=None)
+
+        response = self.test_client.get(
+            "/reports/export/payments/?date_from=2024-01-01&date_to=2024-12-31"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excel_file = BytesIO(response.content)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+
+        exported_policy_numbers = []
+        for row_num in range(5, ws.max_row + 1):
+            row_data = [cell.value for cell in ws[row_num]]
+            if row_data[0] and row_data[1]:
+                exported_policy_numbers.append(row_data[0])
+
+        self.assertIn("READY-001", exported_policy_numbers)
+        self.assertNotIn("READY-EXCLUDED-001", exported_policy_numbers)
 
     def test_ready_export_date_formatting(self):
         """Тест форматирования дат в готовых экспортах"""
@@ -611,7 +658,7 @@ class ReadyExportsTest(TestCase):
 
         unpaid_payment = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=2,
+            year_number=3,
             installment_number=1,
             due_date=date(2025, 1, 1),
             amount=Decimal("25000.00"),
@@ -845,7 +892,7 @@ class ReadyExportsTest(TestCase):
         # 1. Оплачен, но не согласован СК (должен попасть в отчет)
         paid_not_approved = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=2,
+            year_number=3,
             installment_number=1,
             due_date=date(2024, 6, 1),
             amount=Decimal("25000.00"),

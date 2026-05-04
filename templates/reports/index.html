@@ -719,7 +719,7 @@
                     <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>Что попадает в экспорт:</strong> только неоплаченные платежи (<code>paid_date</code> пусто) по активным полисам в выбранном периоде по дате платежа (<code>due_date</code>).</p>
+                    <p><strong>Что попадает в экспорт:</strong> только неоплаченные платежи (<code>paid_date</code> пусто) по активным полисам в выбранном периоде по дате платежа (<code>due_date</code>), кроме первого платежа первого года (<code>1.1</code>).</p>
                     <p><strong>Что рассчитывается автоматически:</strong></p>
                     <ul>
                         <li>статус рассрочки: «годовой» или «рассрочка»;</li>
@@ -730,6 +730,7 @@
                     <ul>
                         <li>платеж уже оплачен;</li>
                         <li>полис неактивен;</li>
+                        <li>это первый платеж первого года (<code>1.1</code>);</li>
                         <li>дата платежа вне выбранного диапазона;</li>
                         <li>задан фильтр по филиалу <code>branch</code>.</li>
                     </ul>

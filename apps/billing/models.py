@@ -173,15 +173,19 @@ class BillingTask(TimeStampedModel):
             "Просим выставить счет на очередной взнос по договору страхования:",
             "",
             f"Страховщик: {policy.insurer.insurer_name}",
-            "Страхователь: "
-            f"{policy.policyholder.client_name if policy.policyholder else ''}",
-            f"Лизингополучатель: {policy.client.client_name}",
-            f"Номер ДФА: {policy.dfa_number or ''}",
-            f"Номер полиса: {policy.policy_number}",
-            f"Объект страхования: {policy.property_description}",
-            f"Дата платежа по договору: {self.due_date.strftime('%d.%m.%Y')}",
-            f"Сумма очередного взноса: {format_money(self.amount)}",
         ]
+        if policy.policyholder:
+            lines.append(f"Страхователь: {policy.policyholder.client_name}")
+        lines.extend(
+            [
+                f"Лизингополучатель: {policy.client.client_name}",
+                f"Номер ДФА: {policy.dfa_number or ''}",
+                f"Номер полиса: {policy.policy_number}",
+                f"Объект страхования: {policy.property_description}",
+                f"Дата платежа по договору: {self.due_date.strftime('%d.%m.%Y')}",
+                f"Сумма очередного взноса: {format_money(self.amount)}",
+            ]
+        )
 
         lines.extend(
             [

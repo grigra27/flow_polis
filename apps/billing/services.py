@@ -122,6 +122,9 @@ def resolve_selected_period(periods, code=None):
 def sync_period(year, month):
     period, _ = BillingPeriod.objects.get_or_create(year=year, month=month)
 
+    if period.status == BillingPeriod.STATUS_ARCHIVED:
+        return period
+
     payments = list(
         PaymentSchedule.objects.filter(
             due_date__gte=period.starts_on,

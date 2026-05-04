@@ -6,338 +6,708 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-    .task-page {
-        color: #17324f;
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
     }
 
+    /* Root wrapper */
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .mgr-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .mgr-page-kicker {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+    }
+    .mgr-page-title {
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        margin: 0;
+        line-height: 1.25;
+    }
+    .mgr-page-subtitle {
+        font-size: 0.85rem;
+        color: var(--v2-muted);
+        margin-top: 0.25rem;
+    }
+    .mgr-header-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+    .btn-mgr-back {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-mgr-back:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+
+    /* Breadcrumb */
+    .mgr-breadcrumb {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        margin-bottom: 0.85rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .mgr-breadcrumb a {
+        color: var(--v2-muted);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .mgr-breadcrumb a:hover { color: var(--v2-accent); }
+    .mgr-breadcrumb .sep { color: #c1cfde; }
+    .mgr-breadcrumb .current { color: var(--v2-title); font-weight: 600; }
+
+    /* Section card */
+    .mgr-section {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .mgr-section-head {
+        background: #1e3a5f;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    .mgr-section-head-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #e8f3ff;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .mgr-section-body { padding: 0.9rem 1rem; }
+
+    /* Layout */
     .task-layout {
         display: grid;
-        grid-template-columns: minmax(0, 0.9fr) minmax(460px, 1.1fr);
+        grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
         gap: 1rem;
     }
-
-    .task-panel {
-        border: 1px solid #dbe5f1;
-        border-radius: 8px;
-        background: #fff;
-        padding: 1rem;
+    @media (max-width: 991.98px) {
+        .task-layout { grid-template-columns: 1fr; }
     }
 
-    .task-section-title {
-        font-size: 1rem;
-        font-weight: 800;
-        margin-bottom: 0.75rem;
-    }
-
-    .task-meta-grid {
+    /* Info rows */
+    .mgr-info-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
+        gap: 0.75rem 1rem;
     }
-
-    .task-label {
-        color: #5d748d;
-        font-size: 0.78rem;
+    @media (max-width: 575.98px) {
+        .mgr-info-grid { grid-template-columns: 1fr; }
+    }
+    .mgr-info-row {
+        display: flex;
+        flex-direction: column;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #f0f5fc;
+    }
+    .mgr-info-row.full { grid-column: 1 / -1; }
+    .mgr-info-label {
+        font-size: 0.7rem;
         font-weight: 700;
-        letter-spacing: 0.04em;
         text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
         margin-bottom: 0.15rem;
     }
+    .mgr-info-value {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--v2-title);
+    }
+    .mgr-info-value a { color: var(--v2-accent); text-decoration: none; }
+    .mgr-info-value a:hover { text-decoration: underline; }
 
-    .task-value {
+    /* Status pill */
+    .bil-status {
+        display: inline-block;
+        font-size: 0.78rem;
         font-weight: 700;
+        border-radius: 999px;
+        padding: 0.25rem 0.65rem;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+    .bil-status--to_request     { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .bil-status--requested      { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+    .bil-status--sent_to_leasing{ background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+
+    /* Forms */
+    .task-form {
+        display: grid;
+        gap: 0.85rem;
+    }
+    .task-form label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
+        display: block;
+    }
+    .task-form select,
+    .task-form textarea {
+        width: 100%;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.92rem;
+        padding: 0.45rem 0.6rem;
+    }
+    .task-form select:focus,
+    .task-form textarea:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.1);
+    }
+    .btn-pl-apply {
+        background: var(--v2-accent);
+        border: none;
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-pl-apply:hover { background: #0d47a1; color: #fff; }
+    .btn-mgr-soft {
+        background: #f4f8fe;
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        text-decoration: none;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .btn-mgr-soft:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
     }
 
-    .grid-column-full {
-        grid-column: 1 / -1;
+    /* Comment */
+    .task-comment-display {
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 0.75rem 0.85rem;
+        color: var(--v2-title);
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .task-comment-display--empty {
+        color: var(--v2-muted);
+        font-style: italic;
     }
 
+    /* Letter */
     .task-letter {
-        min-height: 620px;
+        min-height: 540px;
         padding: 1rem;
         overflow: hidden;
         resize: none;
         color: #13283f;
         background: #fbfdff;
+        border: 1px solid var(--v2-border);
+        border-radius: 10px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        font-size: 1rem;
+        font-size: 0.95rem;
         line-height: 1.55;
         white-space: pre-wrap;
+        width: 100%;
     }
 
-    .task-status {
-        display: inline-flex;
+    /* History table */
+    .mgr-table-compact {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.86rem;
+    }
+    .mgr-table-compact thead tr { border-bottom: 2px solid var(--v2-border); }
+    .mgr-table-compact th {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        padding: 0.4rem 0.55rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .mgr-table-compact td {
+        padding: 0.45rem 0.55rem;
+        border-bottom: 1px solid #f0f5fc;
+        vertical-align: top;
+        color: var(--v2-title);
+    }
+    .mgr-table-compact tbody tr:last-child td { border-bottom: none; }
+
+    /* Soft note card (комментарий) */
+    .note-card {
+        background: linear-gradient(180deg, #fbfdff 0%, #f4f8fe 100%);
+        border: 1px solid var(--v2-border);
+        border-left: 3px solid #c8d5e6;
+        border-radius: 12px;
+        padding: 0.85rem 1rem 0.95rem;
+    }
+    .note-head {
+        display: flex;
+        justify-content: space-between;
         align-items: center;
-        border-radius: 999px;
-        padding: 0.22rem 0.6rem;
-        font-size: 0.82rem;
-        font-weight: 800;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
     }
-
-    .task-status--to_request {
-        color: #854d0e;
-        background: #fef9c3;
-    }
-
-    .task-status--requested {
-        color: #1d4ed8;
-        background: #dbeafe;
-    }
-
-    .task-status--sent_to_leasing {
-        color: #166534;
-        background: #dcfce7;
-    }
-
-    .task-muted {
-        color: #5d748d;
-    }
-
-    .task-policy-link {
+    .note-title {
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
-        font-weight: 700;
-        text-decoration: none;
     }
-
-    .task-status-form,
-    .task-comment-form {
-        display: grid;
-        gap: 0.85rem;
+    .note-edit-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--v2-muted);
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 7px;
+        padding: 0.2rem 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        cursor: pointer;
+        transition: color 0.15s, background 0.15s, border-color 0.15s;
     }
-
-    .task-comment-display {
-        border: 1px solid #dbe5f1;
-        border-radius: 8px;
-        background: #f8fbff;
-        padding: 0.75rem 0.85rem;
-        color: #17324f;
-        line-height: 1.5;
-        white-space: normal;
+    .note-edit-btn:hover {
+        color: var(--v2-accent);
+        background: #eff5ff;
+        border-color: var(--v2-border);
+    }
+    .note-body {
+        color: var(--v2-title);
+        line-height: 1.55;
+        font-size: 0.92rem;
+        white-space: pre-wrap;
         word-break: break-word;
     }
-
-    .task-comment-display--empty {
-        color: #5d748d;
+    .note-body--empty {
+        color: var(--v2-muted);
         font-style: italic;
+        font-size: 0.88rem;
+    }
+    .note-textarea {
+        width: 100%;
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        background: #fff;
+        padding: 0.55rem 0.7rem;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        color: var(--v2-title);
+        resize: vertical;
+        min-height: 96px;
+    }
+    .note-textarea:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.1);
+    }
+    .note-form-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.55rem;
+    }
+    .note-save-btn {
+        background: transparent;
+        border: 1px solid var(--v2-accent);
+        color: var(--v2-accent);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.38rem 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .note-save-btn:hover {
+        background: var(--v2-accent);
+        color: #fff;
     }
 
-    @media (max-width: 991.98px) {
-        .task-layout {
-            grid-template-columns: 1fr;
-        }
+    /* Status change row */
+    .task-status-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
+    .task-status-arrow {
+        color: var(--v2-muted);
+        font-size: 1.15rem;
+        flex-shrink: 0;
+    }
+    .task-status-select-wrap {
+        flex: 1 1 180px;
+        min-width: 160px;
+    }
+    .task-status-select {
+        width: 100%;
+        height: 38px;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.92rem;
+        color: var(--v2-title);
+        background: #fff;
+    }
+    .task-status-select:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.15);
+    }
+    .btn-status-save {
+        background: linear-gradient(180deg, #1e7be0 0%, #1565c0 100%);
+        border: none;
+        color: #fff;
+        font-size: 0.92rem;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 0.55rem 1.1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(21,101,192,0.28);
+        transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-status-save:hover {
+        background: linear-gradient(180deg, #2587ec 0%, #0d47a1 100%);
+        box-shadow: 0 6px 16px rgba(13,71,161,0.35);
+        transform: translateY(-1px);
+        color: #fff;
+    }
+    .btn-status-save:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(13,71,161,0.4);
+    }
 
-        .task-meta-grid {
-            grid-template-columns: 1fr;
-        }
+    .alert-warn {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 {% with policy=task.payment_schedule.policy %}
-<div class="task-page">
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'core:dashboard' %}"><i class="bi bi-house"></i> Главная</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'policies:payments' %}"><i class="bi bi-calendar-check"></i> Платежи</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'policies:scheduled_payments' %}?period={{ task.period.code }}">Очередные взносы</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ policy.policy_number }}</li>
-        </ol>
+<div class="mgr-root">
+
+    <nav aria-label="breadcrumb" class="mgr-breadcrumb">
+        <a href="{% url 'core:dashboard' %}"><i class="bi bi-house"></i> Главная</a>
+        <span class="sep">/</span>
+        <a href="{% url 'policies:payments' %}"><i class="bi bi-calendar-check"></i> Платежи</a>
+        <span class="sep">/</span>
+        <a href="{% url 'policies:scheduled_payments' %}?period={{ task.period.code }}">Очередные взносы</a>
+        <span class="sep">/</span>
+        <span class="current">{{ policy.policy_number }}</span>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <!-- Page header -->
+    <div class="mgr-page-header">
         <div>
-            <div class="text-uppercase fw-bold task-muted small">Очередной взнос / {{ task.period.label }}</div>
-            <h1 class="h3 mb-1">{{ policy.dfa_number|default:"Без ДФА" }} · {{ policy.policy_number }}</h1>
-            <div class="task-muted">{{ policy.client.client_name }}</div>
+            <div class="mgr-page-kicker"><i class="bi bi-receipt-cutoff"></i> Очередной взнос · {{ task.period.label }}</div>
+            <h1 class="mgr-page-title">{{ policy.dfa_number|default:"Без ДФА" }} · {{ policy.policy_number }}</h1>
+            <div class="mgr-page-subtitle">{{ policy.client.client_name }}</div>
         </div>
-        <a class="btn btn-outline-secondary btn-sm" href="{{ return_url }}">
-            <i class="bi bi-arrow-left"></i> Назад к списку
-        </a>
+        <div class="mgr-header-actions">
+            <a class="btn-mgr-back" href="{{ return_url }}">
+                <i class="bi bi-arrow-left"></i> Назад к списку
+            </a>
+        </div>
     </div>
 
     <div class="task-layout">
-        <div class="d-flex flex-column gap-3">
-            <div class="task-panel">
-                <div class="task-section-title">Смена статуса</div>
-                <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-status-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <input type="hidden" name="action" value="status">
-                    <div>
-                        <div class="task-label">Текущий статус</div>
-                        <span class="task-status task-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                    </div>
-                    <div>
-                        <label for="statusSelect" class="form-label fw-semibold">Новый статус</label>
-                        <select id="statusSelect" name="status" class="form-select">
-                            {% for value, label in status_choices %}
-                            <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check2-circle"></i> Сохранить статус
-                        </button>
-                    </div>
-                </form>
-            </div>
 
-            <div class="task-panel">
-                <div class="task-section-title">История</div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Дата</th>
-                                <th>Событие</th>
-                                <th>Пользователь</th>
-                                <th>Детали</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for event in task.events.all %}
-                            <tr>
-                                <td>{{ event.created_at|date:"d.m.Y H:i" }}</td>
-                                <td>{{ event.get_event_type_display }}</td>
-                                <td>
-                                    {% if event.user %}
-                                        {{ event.user.get_full_name|default:event.user.username }}
-                                    {% else %}
-                                        Система
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if event.old_status or event.new_status %}
-                                        {{ event.old_status_label|default:"-" }} → {{ event.new_status_label|default:"-" }}
-                                    {% else %}
-                                        {{ event.comment }}
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="4" class="task-muted">Истории пока нет.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <!-- Left column -->
+        <div class="d-flex flex-column gap-3">
+
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-arrow-repeat"></i> Смена статуса</span>
+                </div>
+                <div class="mgr-section-body">
+                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-status-row">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <input type="hidden" name="action" value="status">
+                        <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                        <i class="bi bi-arrow-right task-status-arrow" aria-hidden="true"></i>
+                        <div class="task-status-select-wrap">
+                            <label for="statusSelect" class="visually-hidden">Новый статус</label>
+                            <select id="statusSelect" name="status" class="task-status-select">
+                                {% for value, label in status_choices %}
+                                <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-status-save">
+                            <i class="bi bi-check2-circle"></i> Сохранить
+                        </button>
+                    </form>
                 </div>
             </div>
 
-            <div class="task-panel">
-                <div class="task-section-title">Данные платежа</div>
-                <div class="task-meta-grid">
-                    <div>
-                        <div class="task-label">Статус</div>
-                        <span class="task-status task-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                    </div>
-                    <div>
-                        <div class="task-label">Сумма</div>
-                        <div class="task-value">{{ task.payment_schedule.amount|currency }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Дата платежа по договору</div>
-                        <div class="task-value">{{ task.payment_schedule.due_date|date:"d.m.Y" }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Крайняя дата запроса счета</div>
-                        <div class="task-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Страховщик</div>
-                        <div class="task-value">{{ policy.insurer.insurer_name }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Филиал</div>
-                        <div class="task-value">{{ policy.branch.branch_name|default:"Не указан" }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Страхователь</div>
-                        <div class="task-value">{{ policy.policyholder.client_name|default:"Не указан" }}</div>
-                    </div>
-                    <div>
-                        <div class="task-label">Менеджер лизинговой компании</div>
-                        <div class="task-value">
-                            {% if policy.leasing_manager %}
-                                {{ policy.leasing_manager.full_name|default:policy.leasing_manager.name }}
-                            {% else %}
-                                Не указан
-                            {% endif %}
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-info-circle"></i> Данные платежа</span>
+                </div>
+                <div class="mgr-section-body">
+                    <div class="mgr-info-grid">
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Статус</span>
+                            <span class="mgr-info-value">
+                                <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                            </span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Сумма</span>
+                            <span class="mgr-info-value">{{ task.payment_schedule.amount|currency }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Дата платежа по договору</span>
+                            <span class="mgr-info-value">{{ task.payment_schedule.due_date|date:"d.m.Y" }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Крайняя дата запроса счета</span>
+                            <span class="mgr-info-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Страховщик</span>
+                            <span class="mgr-info-value">{{ policy.insurer.insurer_name }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Филиал</span>
+                            <span class="mgr-info-value">{{ policy.branch.branch_name|default:"Не указан" }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Страхователь</span>
+                            <span class="mgr-info-value">{{ policy.policyholder.client_name|default:"Не указан" }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Менеджер ЛК</span>
+                            <span class="mgr-info-value">
+                                {% if policy.leasing_manager %}
+                                    {{ policy.leasing_manager.full_name|default:policy.leasing_manager.name }}
+                                {% else %}
+                                    Не указан
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="mgr-info-row full">
+                            <span class="mgr-info-label">Объект страхования</span>
+                            <span class="mgr-info-value" style="font-weight: 500;">{{ policy.property_description }}</span>
+                        </div>
+                        <div class="mgr-info-row full">
+                            <span class="mgr-info-label">Карточка полиса</span>
+                            <span class="mgr-info-value">
+                                <a href="{% url 'policies:detail' policy.id %}" class="btn-mgr-soft">
+                                    <i class="bi bi-box-arrow-up-right"></i> Открыть карточку полиса
+                                </a>
+                            </span>
                         </div>
                     </div>
-                    <div class="grid-column-full">
-                        <div class="task-label">Карточка полиса</div>
-                        <a class="btn btn-outline-primary btn-sm task-policy-link"
-                           href="{% url 'policies:detail' policy.id %}">
-                            <i class="bi bi-box-arrow-up-right"></i> Открыть карточку полиса
-                        </a>
+                    {% if not task.is_actual %}
+                    <div class="alert-warn">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Платеж больше не соответствует текущим условиям отбора: возможно, он оплачен, полис неактивен или дата платежа перенесена.
                     </div>
-                    <div class="grid-column-full">
-                        <div class="task-label">Объект страхования</div>
-                        <div>{{ policy.property_description }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-clock-history"></i> История</span>
+                </div>
+                <div class="mgr-section-body" style="padding: 0;">
+                    <div class="table-responsive">
+                        <table class="mgr-table-compact">
+                            <thead>
+                                <tr>
+                                    <th style="padding-left: 1rem;">Дата</th>
+                                    <th>Событие</th>
+                                    <th>Пользователь</th>
+                                    <th>Детали</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in task.events.all %}
+                                <tr>
+                                    <td style="padding-left: 1rem;">{{ event.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ event.get_event_type_display }}</td>
+                                    <td>
+                                        {% if event.user %}
+                                            {{ event.user.get_full_name|default:event.user.username }}
+                                        {% else %}
+                                            Система
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if event.old_status or event.new_status %}
+                                            {{ event.old_status_label|default:"-" }} → {{ event.new_status_label|default:"-" }}
+                                        {% else %}
+                                            {{ event.comment }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" style="padding-left: 1rem; color: var(--v2-muted);">Истории пока нет.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                {% if not task.is_actual %}
-                <div class="alert alert-warning mt-3 mb-0">
-                    Платеж больше не соответствует текущим условиям отбора: возможно, он оплачен, полис неактивен или дата платежа перенесена.
-                </div>
-                {% endif %}
             </div>
 
         </div>
 
+        <!-- Right column -->
         <div class="d-flex flex-column gap-3">
-            <div class="task-panel">
-                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                    <div class="task-section-title mb-0">Комментарий</div>
+
+            <div class="note-card">
+                <div class="note-head">
+                    <span class="note-title"><i class="bi bi-chat-left-text"></i> Комментарий</span>
                     <button type="button"
-                            class="btn btn-outline-primary btn-sm"
+                            class="note-edit-btn"
                             id="commentToggleButton"
                             data-bs-toggle="collapse"
                             data-bs-target="#commentEditorCollapse"
                             aria-expanded="false"
                             aria-controls="commentEditorCollapse"
                             data-collapsed-label="{% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}">
-                        <i class="bi bi-pencil-square"></i> {% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}
+                        <i class="bi bi-pencil"></i>
+                        {% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}
                     </button>
                 </div>
 
-                <div class="task-label">Текущий комментарий</div>
                 {% if task.comment %}
-                <div class="task-comment-display">{{ task.comment|linebreaksbr }}</div>
+                <div class="note-body">{{ task.comment|linebreaksbr }}</div>
                 {% else %}
-                <div class="task-comment-display task-comment-display--empty">При необходимости вы можете вписать сюда комментарий.</div>
+                <div class="note-body note-body--empty">При необходимости вы можете вписать сюда комментарий.</div>
                 {% endif %}
 
-                <div class="collapse mt-3" id="commentEditorCollapse">
-                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-comment-form">
+                <div class="collapse mt-2" id="commentEditorCollapse">
+                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
                         <input type="hidden" name="action" value="comment">
-                        <div>
-                            <label for="taskComment" class="form-label fw-semibold">Редактирование комментария</label>
-                            <textarea id="taskComment" name="comment" class="form-control" rows="4">{{ task.comment }}</textarea>
-                        </div>
-                        <div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-save"></i> Сохранить комментарий
+                        <label for="taskComment" class="visually-hidden">Редактирование комментария</label>
+                        <textarea id="taskComment" name="comment" rows="4" class="note-textarea" placeholder="Заметка по этому взносу...">{{ task.comment }}</textarea>
+                        <div class="note-form-actions">
+                            <button type="submit" class="note-save-btn">
+                                <i class="bi bi-check2"></i> Сохранить
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <div class="task-panel">
-                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                    <div class="task-section-title mb-0">Текст письма в СК</div>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="copyLetterButton">
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Текст письма в СК</span>
+                    <button type="button"
+                            class="btn-mgr-soft"
+                            id="copyLetterButton"
+                            style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); color: #e8f3ff;">
                         <i class="bi bi-clipboard"></i> Скопировать
                     </button>
                 </div>
-                <textarea id="letterText" class="form-control task-letter" rows="24" readonly>{{ letter_text }}</textarea>
+                <div class="mgr-section-body">
+                    <textarea id="letterText" class="task-letter" rows="22" readonly>{{ letter_text }}</textarea>
+                </div>
             </div>
+
         </div>
     </div>
 </div>
@@ -356,14 +726,12 @@
                 letter.style.height = 'auto';
                 letter.style.height = `${letter.scrollHeight + 2}px`;
             }
-
             fitLetterHeight();
             window.addEventListener('resize', fitLetterHeight);
 
             copyButton.addEventListener('click', async function () {
                 letter.select();
                 letter.setSelectionRange(0, letter.value.length);
-
                 try {
                     await navigator.clipboard.writeText(letter.value);
                     copyButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
@@ -389,7 +757,6 @@
                     ? `<i class="bi bi-chevron-up"></i> ${expandedLabel}`
                     : `<i class="bi bi-pencil-square"></i> ${collapsedLabel}`;
             }
-
             updateCommentToggleLabel(commentEditorCollapse.classList.contains('show'));
 
             commentEditorCollapse.addEventListener('shown.bs.collapse', function () {
@@ -399,7 +766,6 @@
                     commentInput.setSelectionRange(commentInput.value.length, commentInput.value.length);
                 }
             });
-
             commentEditorCollapse.addEventListener('hidden.bs.collapse', function () {
                 updateCommentToggleLabel(false);
             });

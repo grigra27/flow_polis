@@ -9,6 +9,7 @@ class BillingConfig(AppConfig):
     def ready(self):
         from auditlog.registry import auditlog
 
+        from . import signals  # noqa: F401
         from .models import BillingPeriod, BillingTask, BillingTaskEvent
 
         auditlog.register(BillingPeriod)

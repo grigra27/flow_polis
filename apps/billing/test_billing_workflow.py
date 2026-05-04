@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.billing.models import BillingTask, BillingTaskEvent
+from apps.billing.models import BillingPeriod, BillingTask, BillingTaskEvent
 from apps.billing.services import (
     build_period_options,
     preload_periods,
@@ -305,3 +305,71 @@ def test_payments_page_shows_scheduled_payments_button_only_to_admin(
     assert "Пролонгация" in content
     assert reverse("policies:scheduled_payments") in content
     assert reverse("policies:prolongation") in content
+
+
+@pytest.mark.django_db
+def test_letter_skips_policyholder_line_when_absent(billing_payment):
+    billing_payment.policy.policyholder = None
+    billing_payment.policy.save(update_fields=["policyholder"])
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    letter = task.build_letter_text()
+
+    assert "Страхователь:" not in letter
+    assert "Лизингополучатель:" in letter
+
+
+@pytest.mark.django_db
+def test_paid_payment_removes_billing_task(billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+    billing_payment.paid_date = timezone.localdate()
+    billing_payment.save(update_fields=["paid_date"])
+
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_due_date_change_moves_task_to_new_period_and_updates_deadline(billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    original_period_id = task.period_id
+
+    new_due_date = billing_payment.due_date + timedelta(days=45)
+    billing_payment.due_date = new_due_date
+    billing_payment.save(update_fields=["due_date"])
+
+    task.refresh_from_db()
+    assert task.invoice_request_deadline == new_due_date - timedelta(weeks=2)
+    assert task.period.year == new_due_date.year
+    assert task.period.month == new_due_date.month
+    assert task.period_id != original_period_id
+    assert task.events.filter(event_type=BillingTaskEvent.EVENT_SYNCED).exists()
+
+
+@pytest.mark.django_db
+def test_inactive_policy_removes_billing_tasks(billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+    policy = billing_payment.policy
+    policy.policy_active = False
+    policy.save(update_fields=["policy_active"])
+
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_sync_period_skips_archived_period(billing_payment):
+    period, _ = BillingPeriod.objects.get_or_create(
+        year=billing_payment.due_date.year,
+        month=billing_payment.due_date.month,
+    )
+    period.status = BillingPeriod.STATUS_ARCHIVED
+    period.save(update_fields=["status"])
+
+    sync_period(period.year, period.month)
+
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()

@@ -7,408 +7,641 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-    .billing-page {
-        color: #17324f;
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
     }
 
-    .billing-header {
+    /* Root wrapper */
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Page header */
+    .mgr-page-header {
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--v2-border);
+    }
+    .mgr-page-header-row {
         display: flex;
-        justify-content: space-between;
         align-items: flex-start;
+        justify-content: space-between;
         gap: 1rem;
-        margin-bottom: 1rem;
+        flex-wrap: wrap;
     }
-
-    .billing-kicker {
-        color: #5d748d;
-        font-size: 0.86rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
+    .mgr-page-kicker {
+        font-size: 0.78rem;
         text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--v2-muted);
+        margin-bottom: 0.2rem;
     }
-
-    .billing-title {
+    .mgr-page-title {
+        font-size: 1.45rem;
         font-weight: 800;
+        color: var(--v2-title);
         margin: 0;
+        line-height: 1.25;
+    }
+    .mgr-page-subtitle {
+        font-size: 0.85rem;
+        color: var(--v2-muted);
+        margin-top: 0.35rem;
+        max-width: 720px;
+    }
+    .mgr-page-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn-mgr-back {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.45rem 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-mgr-back:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
     }
 
-    .billing-periods {
+    /* Section card */
+    .mgr-section {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: var(--v2-card-bg);
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .mgr-section-head {
+        background: #1e3a5f;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    .mgr-section-head-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #e8f3ff;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .mgr-section-head-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(255,255,255,0.15);
+        color: #e8f3ff;
+        border-radius: 999px;
+        padding: 0.15rem 0.6rem;
+    }
+    .mgr-section-body { padding: 0.9rem 1rem; }
+    .mgr-section--filters .mgr-section-head { padding: 0.55rem 0.76rem; }
+    .mgr-section--filters .mgr-section-body { padding: 0.6rem 0.76rem; }
+
+    /* Period strip */
+    .bil-periods {
         display: flex;
         gap: 0.5rem;
         overflow-x: auto;
-        padding: 0.25rem 0 0.75rem;
-        margin-bottom: 0.75rem;
-    }
-
-    .billing-period {
-        min-width: 170px;
-        border: 1px solid #dbe5f1;
-        border-radius: 8px;
-        background: #fff;
-        color: #17324f;
-        padding: 0.65rem 0.75rem;
-        text-decoration: none;
-        box-shadow: 0 1px 5px rgba(14, 28, 46, 0.05);
-    }
-
-    .billing-period:hover {
-        border-color: #1565c0;
-        color: #0f4f97;
-    }
-
-    .billing-period.active {
-        border-color: #1565c0;
-        background: #eff5ff;
-    }
-
-    .billing-period-name {
-        font-weight: 800;
-        margin-bottom: 0.25rem;
-    }
-
-    .billing-period-meta {
-        display: flex;
-        gap: 0.35rem;
-        flex-wrap: wrap;
-        font-size: 0.78rem;
-        color: #5d748d;
-    }
-
-    .billing-chip {
-        border: 1px solid #dbe5f1;
-        border-radius: 999px;
-        padding: 0.05rem 0.35rem;
-        background: #f8fbff;
-        white-space: nowrap;
-    }
-
-    .billing-panel {
-        border: 1px solid #dbe5f1;
-        border-radius: 8px;
-        background: #fff;
-        padding: 1rem;
+        padding-bottom: 0.5rem;
         margin-bottom: 1rem;
     }
-
-    .billing-filters {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr 1fr 1.4fr auto;
-        gap: 0.75rem;
-        align-items: end;
+    .bil-period {
+        min-width: 200px;
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        padding: 0.65rem 0.8rem;
+        text-decoration: none;
+        color: var(--v2-title);
+        box-shadow: 0 1px 4px rgba(14,28,46,0.04);
+        transition: border-color 0.15s, background 0.15s, color 0.15s;
     }
-
-    .billing-filter-actions {
-        display: inline-flex;
+    .bil-period:hover {
+        border-color: var(--v2-accent);
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .bil-period.active {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+    }
+    .bil-period-name {
+        font-weight: 800;
+        margin-bottom: 0.3rem;
+        font-size: 0.95rem;
+    }
+    .bil-period-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+    .bil-chip {
+        display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 0.5rem;
-        flex-wrap: nowrap;
+        font-size: 0.74rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.25rem 0.55rem;
+        border: 1px solid var(--v2-border);
+        background: #f8fbff;
+        color: var(--v2-muted);
         white-space: nowrap;
+        line-height: 1.1;
     }
-
-    .billing-table {
-        font-size: 0.92rem;
-        vertical-align: middle;
-    }
-
-    .billing-table th {
-        color: #3d5f7d;
-        font-size: 0.78rem;
+    .bil-chip-label {
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        white-space: nowrap;
     }
-
-    .billing-table th.billing-deadline-col,
-    .billing-table td.billing-deadline-col {
-        background: #fff8ee;
+    .bil-chip-num {
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--v2-title);
+        font-variant-numeric: tabular-nums;
     }
+    .bil-chip--warn { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+    .bil-chip--warn .bil-chip-num { color: #92400e; }
+    .bil-chip--info { background: #dbeafe; border-color: #bfdbfe; color: #1d4ed8; }
+    .bil-chip--info .bil-chip-num { color: #1d4ed8; }
+    .bil-chip--ok   { background: #dcfce7; border-color: #bbf7d0; color: #15803d; }
+    .bil-chip--ok .bil-chip-num { color: #15803d; }
 
-    .billing-table th.billing-deadline-col {
-        color: #7a5a1f;
-        box-shadow: inset 0 -1px 0 #ead8b9;
+    /* Filter form */
+    .pl-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.4rem 0.5rem;
     }
-
-    .billing-table td.billing-deadline-col {
-        color: #6f4f13;
+    .pl-filter-item { flex: 0 1 160px; }
+    .pl-filter-item--insurer { flex-basis: 220px; }
+    .pl-filter-item--search  { flex: 1 1 240px; min-width: 200px; }
+    .pl-filter-label {
+        font-size: 0.66rem;
         font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin-bottom: 0.1rem;
+        display: block;
     }
-
-    .billing-table tbody tr:hover td.billing-deadline-col {
-        background: #fff3df;
+    .pl-filter-form input[type="search"],
+    .pl-filter-form select {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #c8d5e6;
+        border-radius: 7px;
+        padding: 0.18rem 0.5rem;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.86rem;
+        line-height: 1.2;
     }
-
-    .billing-row {
-        cursor: pointer;
+    .pl-filter-form input:focus,
+    .pl-filter-form select:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.1);
     }
-
-    .billing-row:focus {
-        outline: 2px solid #1565c0;
-        outline-offset: -2px;
+    .pl-filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: nowrap;
+        margin-left: auto;
     }
-
-    .billing-status {
+    .pl-filter-result {
+        font-size: 0.84rem;
+        color: #3d5f7d;
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        border-radius: 999px;
-        padding: 0.18rem 0.5rem;
-        font-size: 0.78rem;
-        font-weight: 700;
+        gap: 0.3rem;
         white-space: nowrap;
     }
-
-    .billing-status--to_request {
-        color: #854d0e;
-        background: #fef9c3;
+    .pl-filter-result strong { color: var(--v2-title); font-weight: 700; }
+    .btn-pl-apply {
+        background: var(--v2-accent);
+        border: none;
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 7px;
+        padding: 0.35rem 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        white-space: nowrap;
+    }
+    .btn-pl-apply:hover { background: #0d47a1; color: #fff; }
+    .btn-pl-reset {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 7px;
+        padding: 0.32rem 0.72rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s;
+        white-space: nowrap;
+    }
+    .btn-pl-reset:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
     }
 
-    .billing-status--requested {
-        color: #1d4ed8;
-        background: #dbeafe;
-    }
-
-    .billing-status--sent_to_leasing {
-        color: #166534;
-        background: #dcfce7;
-    }
-
-    .billing-muted {
-        color: #5d748d;
-    }
-
-    .billing-warning {
-        color: #92400e;
-        font-size: 0.82rem;
-        font-weight: 700;
-    }
-
-    .billing-bulkbar {
+    /* Bulk bar */
+    .bil-bulkbar {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.55rem;
         flex-wrap: wrap;
-        margin-bottom: 0.75rem;
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid #f0f5fc;
+        background: #fafcff;
+    }
+    .bil-bulkbar select {
+        height: 32px;
+        border: 1px solid #c8d5e6;
+        border-radius: 7px;
+        padding: 0.18rem 0.5rem;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.86rem;
+        min-width: 240px;
+    }
+    .bil-bulkbar select:focus {
+        outline: none;
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.1);
     }
 
-    .billing-pagination {
+    /* Table */
+    .mgr-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+    }
+    .mgr-table thead tr { border-bottom: 2px solid var(--v2-border); }
+    .mgr-table th {
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        padding: 0.55rem 0.65rem;
+        white-space: nowrap;
+    }
+    .mgr-table td {
+        padding: 0.6rem 0.65rem;
+        border-bottom: 1px solid #f0f5fc;
+        vertical-align: middle;
+        color: var(--v2-title);
+    }
+    .mgr-table tbody tr:last-child td { border-bottom: none; }
+    .mgr-table tbody tr.tbl-row-clickable { cursor: pointer; transition: background 0.1s; }
+    .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
+
+    .bil-checkbox-col { width: 36px; }
+    .bil-deadline-col { background: #fff8ee; color: #6f4f13; font-weight: 700; }
+    th.bil-deadline-col { color: #7a5a1f; box-shadow: inset 0 -2px 0 #ead8b9; }
+    .mgr-table tbody tr.tbl-row-clickable:hover td.bil-deadline-col { background: #fff3df; }
+
+    /* Status pill in table */
+    .bil-status {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 0.18rem 0.55rem;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+    .bil-status--to_request     { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .bil-status--requested      { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+    .bil-status--sent_to_leasing{ background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+
+    .bil-warning {
+        font-size: 0.74rem;
+        color: #b45309;
+        font-weight: 700;
+        margin-top: 0.2rem;
+    }
+    .bil-policy-line { line-height: 1.25; }
+    .bil-policy-line a { color: var(--v2-accent); text-decoration: none; }
+    .bil-policy-line a:hover { text-decoration: underline; }
+
+    .pl-empty {
+        text-align: center;
+        padding: 2.5rem 1rem !important;
+        color: var(--v2-muted);
+        font-size: 0.9rem;
+    }
+    .pl-empty i { font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4; }
+
+    /* Pagination */
+    .pl-pagination {
         display: flex;
         justify-content: center;
-        margin-top: 1.25rem;
+        gap: 0.3rem;
+        padding-top: 1rem;
+        flex-wrap: wrap;
     }
-
-    .billing-pagination .pagination {
-        gap: 0.55rem;
-        margin-bottom: 0;
+    .pl-page-btn {
+        background: var(--v2-card-bg);
+        border: 1px solid var(--v2-border);
+        color: var(--v2-title);
+        border-radius: 8px;
+        padding: 0.4rem 0.85rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: border-color 0.15s, background 0.15s;
+        min-width: 2rem;
+        justify-content: center;
     }
-
-    .billing-pagination .page-link {
-        min-width: 84px;
-        padding: 0.65rem 1rem;
-        border-radius: 12px;
-        border: 1px solid #bad0ea;
-        font-size: 0.97rem;
-        font-weight: 700;
-        text-align: center;
-        color: #0f4f97;
-        background: #fff;
-        box-shadow: 0 4px 12px rgba(15, 79, 151, 0.12);
-        transition: all 0.15s ease;
-    }
-
-    .billing-pagination .page-link:hover {
-        border-color: #1565c0;
+    .pl-page-btn:hover {
+        border-color: var(--v2-accent);
         background: #eff5ff;
-        color: #0b3f79;
-        transform: translateY(-1px);
+        color: var(--v2-accent);
+        text-decoration: none;
     }
-
-    .billing-pagination .page-item.active .page-link {
-        min-width: 110px;
-        border-color: #1565c0;
-        background: #1565c0;
+    .pl-page-btn.active {
+        background: var(--v2-accent);
+        border-color: var(--v2-accent);
         color: #fff;
-        box-shadow: 0 6px 16px rgba(21, 101, 192, 0.25);
+        cursor: default;
     }
-
-    .billing-pagination .page-link:focus {
-        box-shadow: 0 0 0 0.18rem rgba(21, 101, 192, 0.2);
-    }
+    .pl-page-btn.disabled { opacity: 0.4; pointer-events: none; }
 
     @media (max-width: 991.98px) {
-        .billing-header {
-            flex-direction: column;
-        }
-
-        .billing-filters {
-            grid-template-columns: 1fr;
-        }
+        .mgr-page-header-row { flex-direction: column; align-items: stretch; }
+        .mgr-page-actions { justify-content: stretch; }
+        .pl-filter-item, .pl-filter-item--insurer, .pl-filter-item--search { flex: 1 1 100%; }
+        .pl-filter-actions { margin-left: 0; flex-wrap: wrap; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="billing-page">
-    <div class="billing-header">
-        <div>
-            <div class="billing-kicker">MVP / запрос счетов</div>
-            <h1 class="billing-title h3">Очередные взносы</h1>
-            <div class="billing-muted">Периоды создаются автоматически из графика платежей: два месяца назад, текущий месяц и будущие месяцы с платежами.</div>
+<div class="mgr-root">
+
+    <!-- Page header -->
+    <div class="mgr-page-header">
+        <div class="mgr-page-header-row">
+            <div>
+                <div class="mgr-page-kicker"><i class="bi bi-receipt-cutoff"></i> Платежи</div>
+                <h1 class="mgr-page-title">Очередные взносы</h1>
+                <div class="mgr-page-subtitle">Периоды создаются автоматически из графика платежей: два месяца назад, текущий месяц и будущие месяцы с платежами.</div>
+            </div>
+            <div class="mgr-page-actions">
+                <a class="btn-mgr-back" href="{% url 'policies:payments' %}">
+                    <i class="bi bi-arrow-left"></i> К графику платежей
+                </a>
+                <a class="btn-mgr-back" href="{% url 'reports:index' %}">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Старые экспорты
+                </a>
+            </div>
         </div>
-        <a class="btn btn-outline-primary btn-sm" href="{% url 'reports:index' %}">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Старые экспорты
-        </a>
     </div>
 
-    <div class="billing-periods" aria-label="Периоды очередных взносов">
+    <!-- Periods navigation -->
+    <div class="bil-periods" aria-label="Периоды очередных взносов">
         {% for option in period_options %}
-        <a class="billing-period{% if option.selected %} active{% endif %}"
+        <a class="bil-period{% if option.selected %} active{% endif %}"
            href="{% url 'policies:scheduled_payments' %}?period={{ option.period.code }}">
-            <div class="billing-period-name">{{ option.period.label }}</div>
-            <div class="billing-period-meta">
-                <span class="billing-chip">Всего {{ option.total }}</span>
-                <span class="billing-chip">Требуется запрос {{ option.to_request }}</span>
-                <span class="billing-chip">Запрошено {{ option.requested }}</span>
-                <span class="billing-chip">Передано в Альянс {{ option.sent_to_leasing }}</span>
+            <div class="bil-period-name">{{ option.period.label }}</div>
+            <div class="bil-period-meta">
+                <span class="bil-chip">
+                    <span class="bil-chip-label">Всего</span>
+                    <span class="bil-chip-num">{{ option.total }}</span>
+                </span>
+                <span class="bil-chip bil-chip--warn">
+                    <span class="bil-chip-label">К запросу</span>
+                    <span class="bil-chip-num">{{ option.to_request }}</span>
+                </span>
+                <span class="bil-chip bil-chip--info">
+                    <span class="bil-chip-label">Запрошено</span>
+                    <span class="bil-chip-num">{{ option.requested }}</span>
+                </span>
+                <span class="bil-chip bil-chip--ok">
+                    <span class="bil-chip-label">В Альянс</span>
+                    <span class="bil-chip-num">{{ option.sent_to_leasing }}</span>
+                </span>
             </div>
         </a>
         {% endfor %}
     </div>
 
-    <div class="billing-panel">
-        <form method="get" class="billing-filters">
-            <input type="hidden" name="period" value="{{ selected_period.code }}">
-            <div>
-                <label for="status" class="form-label fw-semibold">Статус</label>
-                <select id="status" name="status" class="form-select form-select-sm">
-                    <option value="all"{% if selected_status == "all" %} selected{% endif %}>Все статусы</option>
-                    {% for value, label in status_choices %}
-                    <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="insurer" class="form-label fw-semibold">Страховщик</label>
-                <select id="insurer" name="insurer" class="form-select form-select-sm">
-                    <option value="">Все страховщики</option>
-                    {% for insurer in insurers %}
-                    <option value="{{ insurer.id }}"{% if selected_insurer == insurer.id|stringformat:"s" %} selected{% endif %}>{{ insurer.insurer_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="branch" class="form-label fw-semibold">Филиал</label>
-                <select id="branch" name="branch" class="form-select form-select-sm">
-                    <option value="">Все филиалы</option>
-                    {% for branch in branches %}
-                    <option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.branch_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="q" class="form-label fw-semibold">Поиск</label>
-                <input id="q" type="search" name="q" class="form-control form-control-sm"
-                       value="{{ search_query }}" placeholder="ДФА, полис, клиент, объект">
-            </div>
-            <div class="billing-filter-actions">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-funnel"></i> Применить
-                </button>
-                <a class="btn btn-outline-secondary btn-sm"
-                   href="{% url 'policies:scheduled_payments' %}?period={{ selected_period.code }}">
-                    <i class="bi bi-x-circle"></i> Сбросить
-                </a>
-            </div>
-        </form>
+    <!-- Filters -->
+    <div class="mgr-section mgr-section--filters">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
+        </div>
+        <div class="mgr-section-body">
+            <form method="get" class="pl-filter-form">
+                <input type="hidden" name="period" value="{{ selected_period.code }}">
+                <div class="pl-filter-item">
+                    <label class="pl-filter-label" for="status">Статус</label>
+                    <select id="status" name="status">
+                        <option value="all"{% if selected_status == "all" %} selected{% endif %}>Все статусы</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pl-filter-item pl-filter-item--insurer">
+                    <label class="pl-filter-label" for="insurer">Страховщик</label>
+                    <select id="insurer" name="insurer">
+                        <option value="">Все страховщики</option>
+                        {% for insurer in insurers %}
+                        <option value="{{ insurer.id }}"{% if selected_insurer == insurer.id|stringformat:"s" %} selected{% endif %}>{{ insurer.insurer_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pl-filter-item">
+                    <label class="pl-filter-label" for="branch">Филиал</label>
+                    <select id="branch" name="branch">
+                        <option value="">Все филиалы</option>
+                        {% for branch in branches %}
+                        <option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.branch_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pl-filter-item pl-filter-item--search">
+                    <label class="pl-filter-label" for="q">Поиск</label>
+                    <input id="q" type="search" name="q" value="{{ search_query }}" placeholder="ДФА, полис, клиент, объект">
+                </div>
+                <div class="pl-filter-actions">
+                    <div class="pl-filter-result">
+                        <i class="bi bi-list-check"></i>
+                        Найдено: <strong>{{ total_filtered }}</strong>
+                    </div>
+                    <div class="pl-filter-buttons">
+                        <button type="submit" class="btn-pl-apply">
+                            <i class="bi bi-funnel"></i> Применить
+                        </button>
+                        <a class="btn-pl-reset"
+                           href="{% url 'policies:scheduled_payments' %}?period={{ selected_period.code }}">
+                            <i class="bi bi-x-circle"></i> Сбросить
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
+    <!-- Tasks Table -->
     <form method="post" action="{% url 'policies:scheduled_payment_bulk_update' %}">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
-        <div class="billing-bulkbar">
-            <div class="fw-semibold">{{ selected_period.label }}: {{ total_filtered }} задач</div>
-            <select name="status" class="form-select form-select-sm" style="width: 260px;" required>
-                <option value="">Сменить статус выбранных...</option>
-                {% for value, label in status_choices %}
-                <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-check2-square"></i> Применить
-            </button>
-        </div>
+        <div class="mgr-section">
+            <div class="mgr-section-head">
+                <span class="mgr-section-head-title">
+                    <i class="bi bi-calendar2-week"></i> {{ selected_period.label }}
+                </span>
+                <span class="mgr-section-head-badge">{{ total_filtered }}</span>
+            </div>
 
-        <div class="table-responsive billing-panel p-0">
-            <table class="table table-hover billing-table mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 36px;"><input type="checkbox" id="selectAllTasks" class="form-check-input"></th>
-                        <th>Статус</th>
-                        <th class="billing-deadline-col">Крайний срок</th>
-                        <th>Дата платежа</th>
-                        <th>Страховщик</th>
-                        <th>ДФА / полис</th>
-                        <th>Клиент</th>
-                        <th class="text-end">Сумма</th>
-                        <th>Менеджер</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for task in tasks %}
-                    {% with policy=task.payment_schedule.policy %}
-                    <tr class="billing-row"
-                        data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
-                        tabindex="0"
-                        role="link"
-                        aria-label="Открыть задачу {{ policy.policy_number }}">
-                        <td><input type="checkbox" name="task_ids" value="{{ task.id }}" class="form-check-input task-checkbox"></td>
-                        <td>
-                            <span class="billing-status billing-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                            {% if not task.is_actual %}
-                            <div class="billing-warning mt-1">Платеж изменился</div>
-                            {% endif %}
-                        </td>
-                        <td class="billing-deadline-col">{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
-                        <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
-                        <td>{% insurer_logo policy.insurer size='small' %}</td>
-                        <td>
-                            <div class="fw-semibold">{{ policy.dfa_number|default:"Без ДФА" }}</div>
-                            <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
-                        </td>
-                        <td>{{ policy.client.client_name }}</td>
-                        <td class="text-end fw-semibold">{{ task.payment_schedule.amount|currency }}</td>
-                        <td>
-                            {% if policy.leasing_manager %}
-                                {{ policy.leasing_manager.name }}
-                            {% else %}
-                                <span class="billing-muted">Не указан</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endwith %}
-                    {% empty %}
-                    <tr>
-                        <td colspan="9" class="text-center py-5 billing-muted">
-                            Нет задач по выбранным фильтрам.
-                        </td>
-                    </tr>
+            <div class="bil-bulkbar">
+                <select name="status" required>
+                    <option value="">Сменить статус выбранных...</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
+                </select>
+                <button type="submit" class="btn-pl-apply">
+                    <i class="bi bi-check2-square"></i> Применить к выбранным
+                </button>
+            </div>
+
+            <div class="mgr-section-body" style="padding: 0 0 0.6rem;">
+                <div class="table-responsive">
+                    <table class="mgr-table">
+                        <thead>
+                            <tr>
+                                <th class="bil-checkbox-col" style="padding-left:1rem;">
+                                    <input type="checkbox" id="selectAllTasks" class="form-check-input">
+                                </th>
+                                <th>Статус</th>
+                                <th class="bil-deadline-col">Крайний срок</th>
+                                <th>Дата платежа</th>
+                                <th>Страховщик</th>
+                                <th>ДФА / полис</th>
+                                <th>Клиент</th>
+                                <th class="text-end">Сумма</th>
+                                <th>Менеджер</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            {% with policy=task.payment_schedule.policy %}
+                            <tr class="tbl-row-clickable"
+                                data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
+                                tabindex="0"
+                                role="link"
+                                aria-label="Открыть задачу {{ policy.policy_number }}">
+                                <td class="bil-checkbox-col" style="padding-left:1rem;">
+                                    <input type="checkbox" name="task_ids" value="{{ task.id }}" class="form-check-input task-checkbox">
+                                </td>
+                                <td>
+                                    <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                                    {% if not task.is_actual %}
+                                    <div class="bil-warning">Платеж изменился</div>
+                                    {% endif %}
+                                </td>
+                                <td class="bil-deadline-col">{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
+                                <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
+                                <td>{% insurer_logo policy.insurer size='small' %}</td>
+                                <td class="bil-policy-line">
+                                    <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
+                                    <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                                </td>
+                                <td>{{ policy.client.client_name }}</td>
+                                <td class="text-end"><strong>{{ task.payment_schedule.amount|currency }}</strong></td>
+                                <td>
+                                    {% if policy.leasing_manager %}
+                                        {{ policy.leasing_manager.name }}
+                                    {% else %}
+                                        <span style="color: var(--v2-muted);">Не указан</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="pl-empty">
+                                    <i class="bi bi-inbox"></i>
+                                    Нет задач по выбранным фильтрам.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </form>
 
     {% if page_obj.has_other_pages %}
-    <nav aria-label="Страницы" class="billing-pagination">
-        <ul class="pagination">
-            {% if page_obj.has_previous %}
-            <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">Назад</a></li>
-            {% endif %}
-            <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ paginator.num_pages }}</span></li>
-            {% if page_obj.has_next %}
-            <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">Вперед</a></li>
-            {% endif %}
-        </ul>
+    <nav aria-label="Страницы" class="pl-pagination">
+        {% if page_obj.has_previous %}
+        <a class="pl-page-btn" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">
+            <i class="bi bi-chevron-left"></i> Назад
+        </a>
+        {% else %}
+        <span class="pl-page-btn disabled"><i class="bi bi-chevron-left"></i> Назад</span>
+        {% endif %}
+        <span class="pl-page-btn active">{{ page_obj.number }} / {{ paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="pl-page-btn" href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">
+            Вперед <i class="bi bi-chevron-right"></i>
+        </a>
+        {% else %}
+        <span class="pl-page-btn disabled">Вперед <i class="bi bi-chevron-right"></i></span>
+        {% endif %}
     </nav>
     {% endif %}
 </div>
@@ -420,24 +653,22 @@
     document.addEventListener('DOMContentLoaded', function () {
         const selectAll = document.getElementById('selectAllTasks');
         const checkboxes = document.querySelectorAll('.task-checkbox');
-        if (!selectAll) {
-            return;
-        }
-        selectAll.addEventListener('change', function () {
-            checkboxes.forEach(function (checkbox) {
-                checkbox.checked = selectAll.checked;
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                checkboxes.forEach(function (checkbox) {
+                    checkbox.checked = selectAll.checked;
+                });
             });
-        });
+        }
 
         const ignoredSelector = 'a, button, input, select, textarea, label';
-        document.querySelectorAll('.billing-row[data-href]').forEach(function (row) {
+        document.querySelectorAll('.tbl-row-clickable[data-href]').forEach(function (row) {
             row.addEventListener('click', function (event) {
                 if (event.target.closest(ignoredSelector)) {
                     return;
                 }
                 window.location.href = row.dataset.href;
             });
-
             row.addEventListener('keydown', function (event) {
                 if (event.target.closest(ignoredSelector)) {
                     return;

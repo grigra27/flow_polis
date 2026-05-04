@@ -35,6 +35,9 @@ class BillingPeriodListView(AdminRequiredMixin, TemplateView):
                 [*periods, selected_period],
                 key=lambda period: (period.year, period.month),
             )
+        # Фоновая синхронизация выполняется Celery-задачей sync_billing_periods.
+        # Здесь оставлен идемпотентный fallback на случай, если beat не запущен
+        # или в выбранный период попал свежесозданный платёж.
         selected_period = sync_period(selected_period.year, selected_period.month)
 
         tasks_queryset = get_tasks_queryset(selected_period, self.request.GET)

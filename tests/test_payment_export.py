@@ -59,7 +59,7 @@ class PaymentExportDateRangeTest(TestCase):
         # Создаем платежи с разными датами
         self.payment1 = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=1,
+            year_number=2,
             installment_number=1,
             due_date=date(2024, 1, 15),
             amount=Decimal("25000.00"),
@@ -68,7 +68,7 @@ class PaymentExportDateRangeTest(TestCase):
 
         self.payment2 = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=1,
+            year_number=2,
             installment_number=2,
             due_date=date(2024, 4, 15),
             amount=Decimal("25000.00"),
@@ -77,7 +77,7 @@ class PaymentExportDateRangeTest(TestCase):
 
         self.payment3 = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=1,
+            year_number=2,
             installment_number=3,
             due_date=date(2024, 7, 15),
             amount=Decimal("25000.00"),
@@ -86,7 +86,7 @@ class PaymentExportDateRangeTest(TestCase):
 
         self.payment4 = PaymentSchedule.objects.create(
             policy=self.policy,
-            year_number=1,
+            year_number=2,
             installment_number=4,
             due_date=date(2024, 10, 15),
             amount=Decimal("25000.00"),
@@ -96,7 +96,7 @@ class PaymentExportDateRangeTest(TestCase):
         # Создаем платежи для неактивного полиса (они НЕ должны попадать в экспорт)
         self.inactive_payment1 = PaymentSchedule.objects.create(
             policy=self.inactive_policy,
-            year_number=1,
+            year_number=2,
             installment_number=1,
             due_date=date(2024, 2, 15),
             amount=Decimal("12500.00"),
@@ -105,7 +105,7 @@ class PaymentExportDateRangeTest(TestCase):
 
         self.inactive_payment2 = PaymentSchedule.objects.create(
             policy=self.inactive_policy,
-            year_number=1,
+            year_number=2,
             installment_number=2,
             due_date=date(2024, 5, 15),
             amount=Decimal("12500.00"),
@@ -433,7 +433,7 @@ class PaymentExportDateRangeTest(TestCase):
         # Создаем платеж для второго филиала
         PaymentSchedule.objects.create(
             policy=policy2,
-            year_number=1,
+            year_number=2,
             installment_number=1,
             due_date=date(2024, 3, 15),
             amount=Decimal("12500.00"),
@@ -578,7 +578,7 @@ class PaymentExportDateRangeTest(TestCase):
         # Создаем 1 платеж для годового
         PaymentSchedule.objects.create(
             policy=policy_annual,
-            year_number=1,
+            year_number=2,
             installment_number=1,
             due_date=date(2024, 6, 15),
             amount=Decimal("50000.00"),

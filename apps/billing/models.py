@@ -5,6 +5,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
+from django.utils.html import escape, format_html
+from django.utils.safestring import mark_safe
 
 from apps.core.models import TimeStampedModel
 from apps.policies.models import PaymentSchedule
@@ -185,11 +187,17 @@ class BillingTask(TimeStampedModel):
             return "Просим выставить счет на годовой взнос по договору страхования:"
         return "Просим выставить счет на очередной взнос по договору страхования:"
 
+    @staticmethod
+    def _get_outgoing_lead_line(installment_status):
+        if installment_status == "годовой":
+            return "Высылаем счет на годовой взнос по договору страхования."
+        return "Высылаем счет на очередной взнос по договору страхования."
+
     def build_letter_subject(self):
         policy = self.policy
         installment_status, _, _ = self._get_installment_metadata()
         if installment_status == "годовой":
-            subject_prefix = "Годовой взнос"
+            subject_prefix = "Счёт на годовой взнос"
         else:
             subject_prefix = "Счёт на очередной взнос"
         dfa_number = policy.dfa_number or "Без ДФА"
@@ -198,51 +206,133 @@ class BillingTask(TimeStampedModel):
 
     def build_letter_text(self):
         policy = self.policy
-        payment = self.payment_schedule
+        installment_status, _, _ = self._get_installment_metadata()
 
-        # Логика согласована с экспортом очередных взносов:
-        # - статус рассрочки;
-        # - позиция платежа в формате "X из Y".
-        (
-            installment_status,
-            payments_total_in_year,
-            payment_position,
-        ) = self._get_installment_metadata()
-        request_subject_line = self._get_request_subject_line(installment_status)
+        critical_block = [
+            f"Номер полиса: {policy.policy_number}",
+            f"Дата платежа по договору: {self.due_date.strftime('%d.%m.%Y')}",
+            f"Сумма очередного взноса: {format_money(self.amount)}",
+        ]
 
-        lines = [
-            "Добрый день.",
-            "",
-            request_subject_line,
-            "",
+        context_block = [
+            f"Номер ДФА: {policy.dfa_number or ''}",
             f"Страховщик: {policy.insurer.insurer_name}",
         ]
         if policy.policyholder:
-            lines.append(f"Страхователь: {policy.policyholder.client_name}")
-        lines.extend(
+            context_block.append(f"Страхователь: {policy.policyholder.client_name}")
+        context_block.extend(
             [
                 f"Лизингополучатель: {policy.client.client_name}",
-                f"Номер ДФА: {policy.dfa_number or ''}",
-                f"Номер полиса: {policy.policy_number}",
                 f"Объект страхования: {policy.property_description}",
-                f"Дата платежа по договору: {self.due_date.strftime('%d.%m.%Y')}",
-                f"Сумма очередного взноса: {format_money(self.amount)}",
-                f"Страховая сумма: {format_money(payment.insurance_sum)}",
-                f"Статус рассрочки: {installment_status}",
-                f"Всего платежей в году: {payments_total_in_year}",
-                f"Этот платеж в году: {payment_position}",
             ]
         )
 
-        lines.extend(
+        blocks = [
+            ["Добрый день."],
+            [self._get_request_subject_line(installment_status)],
+            critical_block,
+            context_block,
+            ["Просим направить счет для дальнейшей передачи в оплату."],
+            ["Спасибо."],
+        ]
+        return "\n\n".join("\n".join(block) for block in blocks)
+
+    def build_letter_html(self):
+        return self._wrap_letter_html(self.build_letter_text())
+
+    def build_alliance_letter_subject(self):
+        # Тема пока совпадает с письмом в СК; при необходимости легко
+        # отделить здесь свой формат.
+        return self.build_letter_subject()
+
+    def build_alliance_letter_text(self):
+        policy = self.policy
+        payment = self.payment_schedule
+        (
+            installment_status,
+            _payments_total_in_year,
+            payment_position,
+        ) = self._get_installment_metadata()
+
+        # В письме в Альянс указываем дату платежа на день раньше
+        # фактической из базы — это технологический сдвиг лизинговой
+        # компании (нужно успеть провести оплату до дедлайна СК).
+        alliance_due_date = self.due_date - timedelta(days=1)
+        alliance_due_str = alliance_due_date.strftime("%d.%m.%Y")
+
+        def _fmt_date(value):
+            return value.strftime("%d.%m.%Y") if value else "—"
+
+        contract_block = [
+            "ДОГОВОР СТРАХОВАНИЯ",
+            f"Номер ДФА: {policy.dfa_number or '—'}",
+            f"Номер полиса: {policy.policy_number}",
+            "Период договора страхования: "
+            f"{_fmt_date(policy.start_date)} — {_fmt_date(policy.end_date)}",
+            f"Страховщик: {policy.insurer.insurer_name}",
+        ]
+        if policy.policyholder:
+            contract_block.append(f"Страхователь: {policy.policyholder.client_name}")
+        contract_block.extend(
             [
-                "",
-                "Просим направить счет для дальнейшей передачи в оплату.",
-                "",
-                "Спасибо.",
+                f"Лизингополучатель: {policy.client.client_name}",
+                f"Объект страхования: {policy.property_description or '—'}",
             ]
         )
-        return "\n".join(lines)
+
+        if installment_status == "годовой":
+            payment_type_line = "Тип взноса: годовой"
+        else:
+            payment_type_line = f"Тип взноса: рассрочка, платёж {payment_position}"
+
+        payment_block = [
+            "ПЛАТЁЖ",
+            f"Оплатить до: {alliance_due_str}",
+            f"Сумма к оплате: {format_money(self.amount)}",
+            f"Страховая сумма: {format_money(payment.insurance_sum)}",
+            payment_type_line,
+        ]
+
+        blocks = [
+            ["Добрый день."],
+            [self._get_outgoing_lead_line(installment_status)],
+            contract_block,
+            payment_block,
+            [f"Просим оплатить счет до {alliance_due_str} включительно."],
+            ["Спасибо."],
+        ]
+        return "\n\n".join("\n".join(block) for block in blocks)
+
+    def build_alliance_letter_html(self):
+        return self._wrap_letter_html(
+            self.build_alliance_letter_text(),
+            section_headers={"ДОГОВОР СТРАХОВАНИЯ", "ПЛАТЁЖ"},
+        )
+
+    @staticmethod
+    def _wrap_letter_html(text, section_headers=None):
+        # Превращает plain-текст письма в HTML, оборачивая значения после
+        # двоеточий и явные заголовки секций в <strong>. Используется и для
+        # СК, и для Альянса — структура та же, отличается только набор
+        # известных заголовков. Все пользовательские данные экранируются
+        # через escape/format_html — гарантия от XSS.
+        section_headers = section_headers or set()
+        parts = []
+        for line in text.split("\n"):
+            if not line:
+                parts.append("")
+                continue
+            if line in section_headers:
+                parts.append(format_html("<strong>{}</strong>", line))
+                continue
+            label, sep, value = line.partition(":")
+            if sep and value.strip():
+                parts.append(
+                    format_html("{}: <strong>{}</strong>", label, value.strip())
+                )
+                continue
+            parts.append(escape(line))
+        return mark_safe("<br>".join(parts))
 
 
 class BillingTaskEvent(TimeStampedModel):

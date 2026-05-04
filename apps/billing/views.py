@@ -1,7 +1,10 @@
+from datetime import date
+
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
@@ -17,6 +20,55 @@ from .services import (
     sync_period,
     update_task,
 )
+
+
+_WEEKDAY_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+
+
+def _plural_days(n: int) -> str:
+    n = abs(n) % 100
+    if 11 <= n <= 14:
+        return "дней"
+    last = n % 10
+    if last == 1:
+        return "день"
+    if 2 <= last <= 4:
+        return "дня"
+    return "дней"
+
+
+def _date_hint(target, today: date) -> dict:
+    if target is None:
+        return {"dow": "", "text": "", "tone": ""}
+    delta = (target - today).days
+    dow = _WEEKDAY_RU[target.weekday()]
+    if delta == 0:
+        return {"dow": dow, "text": "сегодня", "tone": "warn"}
+    if delta == 1:
+        return {"dow": dow, "text": "завтра", "tone": "warn"}
+    if delta == -1:
+        return {"dow": dow, "text": "вчера", "tone": "danger"}
+    abs_d = abs(delta)
+    word = _plural_days(abs_d)
+    if delta < 0:
+        return {"dow": dow, "text": f"просрочен на {abs_d} {word}", "tone": "danger"}
+    if delta <= 3:
+        return {"dow": dow, "text": f"через {abs_d} {word}", "tone": "warn"}
+    return {"dow": dow, "text": f"через {abs_d} {word}", "tone": ""}
+
+
+def _payment_context(task: BillingTask) -> str:
+    payment = task.payment_schedule
+    payments_in_year = task.policy.payment_schedule.filter(
+        year_number=payment.year_number
+    ).count()
+    is_yearly = payment.installment_number == 1 and payments_in_year <= 1
+    head = (
+        "Годовой платёж"
+        if is_yearly
+        else f"Рассрочка · {payment.installment_number} из {payments_in_year}"
+    )
+    return f"{head} · {payment.year_number}-й год"
 
 
 class BillingPeriodListView(AdminRequiredMixin, TemplateView):
@@ -94,15 +146,24 @@ class BillingTaskDetailView(AdminRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        task = self.object
         context.update(
             {
                 "status_choices": BillingTask.STATUS_CHOICES,
-                "letter_subject": self.object.build_letter_subject(),
-                "letter_text": self.object.build_letter_text(),
+                "letter_subject": task.build_letter_subject(),
+                "letter_text": task.build_letter_text(),
+                "letter_html": task.build_letter_html(),
+                "alliance_letter_subject": task.build_alliance_letter_subject(),
+                "alliance_letter_text": task.build_alliance_letter_text(),
+                "alliance_letter_html": task.build_alliance_letter_html(),
                 "return_url": self.request.GET.get(
                     "next",
-                    f"{reverse('policies:scheduled_payments')}?period={self.object.period.code}",
+                    f"{reverse('policies:scheduled_payments')}?period={task.period.code}",
                 ),
+                "deadline_hint": _date_hint(task.invoice_request_deadline, today),
+                "due_hint": _date_hint(task.payment_schedule.due_date, today),
+                "payment_context": _payment_context(task),
             }
         )
         return context

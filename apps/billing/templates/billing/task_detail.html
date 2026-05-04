@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load currency_filters %}
 {% load insurer_tags %}
+{% load static %}
 
 {% block title %}Задача очередного взноса{% endblock %}
 
@@ -163,6 +164,29 @@
         text-decoration: none;
         background: rgba(255,255,255,0.13);
         border-color: rgba(255,255,255,0.45);
+    }
+    .mgr-letter-target {
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        padding: 0.05rem 0.48rem 0.05rem 0.32rem;
+        margin-left: 0.15rem;
+        color: #ffffff;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .mgr-letter-target__icon {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+        background: #ffffff;
+        border-radius: 4px;
+        padding: 1px;
+        flex-shrink: 0;
     }
     .mgr-section-body { padding: 0.9rem 1rem; }
 
@@ -338,10 +362,7 @@
 
     /* Letter */
     .task-letter {
-        min-height: 540px;
         padding: 1rem;
-        overflow: hidden;
-        resize: none;
         color: #13283f;
         background: #fbfdff;
         border: 1px solid var(--v2-border);
@@ -349,8 +370,24 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         font-size: 0.95rem;
         line-height: 1.55;
-        white-space: pre-wrap;
         width: 100%;
+    }
+    .task-letter-rendered {
+        cursor: text;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .task-letter-rendered strong {
+        font-weight: 700;
+        color: #0d2742;
+    }
+    .task-letter-plain {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+        left: -9999px;
     }
     .task-letter-block + .task-letter-block {
         margin-top: 0.8rem;
@@ -585,6 +622,169 @@
         margin-top: 0.75rem;
         font-size: 0.85rem;
     }
+
+    /* Hero stat tiles inside «Данные платежа» */
+    .task-hero-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.6rem;
+        margin-bottom: 0.85rem;
+    }
+    .task-hero-tile {
+        background: #fbfdff;
+        border: 1px solid #e6eef9;
+        border-radius: 11px;
+        padding: 0.7rem 0.85rem 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-height: 96px;
+        transition: border-color 0.15s ease;
+    }
+    .task-hero-tile:hover { border-color: #cfdcf0; }
+    .task-hero-head {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+    .task-hero-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.88rem;
+        flex-shrink: 0;
+        background: #eef3fb;
+        color: #5d748d;
+    }
+    .task-hero-tile--deadline .task-hero-icon { background: #fdf3e2; color: #a06f23; }
+    .task-hero-tile--due .task-hero-icon      { background: #eaf1fb; color: #3e6ba0; }
+    .task-hero-tile--amount .task-hero-icon   { background: #eaf3ec; color: #2e7548; }
+    .task-hero-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--v2-muted);
+        line-height: 1.2;
+    }
+    .task-hero-value {
+        font-size: 1.22rem;
+        font-weight: 700;
+        color: var(--v2-title);
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+        word-break: break-word;
+    }
+    .task-hero-sub {
+        font-size: 0.78rem;
+        color: var(--v2-muted);
+        line-height: 1.3;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+    .task-hero-sub .dot {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: #c6d2e2;
+        flex-shrink: 0;
+    }
+    .task-hero-sub-text--warn   { color: #a86c1c; font-weight: 600; }
+    .task-hero-sub-text--danger { color: #b3261e; font-weight: 600; }
+
+    /* Prose blocks (object description + policy note) */
+    .task-prose-block {
+        margin-top: 0.6rem;
+        padding: 0.7rem 0.85rem;
+        background: #fbfdff;
+        border: 1px solid #e6eef9;
+        border-radius: 10px;
+    }
+    .task-prose-block--note {
+        border-left: 3px solid #cfdcf0;
+    }
+    .task-prose-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--v2-muted);
+        margin-bottom: 0.3rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .task-prose-value {
+        color: var(--v2-title);
+        line-height: 1.5;
+        font-size: 0.92rem;
+        word-break: break-word;
+        white-space: pre-wrap;
+    }
+    .task-prose-value--empty {
+        color: var(--v2-muted);
+        font-style: italic;
+        font-weight: 500;
+    }
+
+    /* Compact meta strip (status / broker / insurance sum) */
+    .task-meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.9rem;
+        align-items: center;
+        padding: 0.55rem 0.75rem;
+        background: #f8fbff;
+        border: 1px solid #e6eef9;
+        border-radius: 9px;
+        margin-bottom: 0.85rem;
+    }
+    .task-meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        color: var(--v2-title);
+    }
+    .task-meta-item .task-meta-lbl {
+        color: var(--v2-muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 700;
+    }
+    .task-meta-item .task-meta-val {
+        font-weight: 700;
+    }
+    .task-meta-divider {
+        width: 1px;
+        height: 18px;
+        background: #d6e2f0;
+        flex-shrink: 0;
+    }
+    @media (max-width: 575.98px) {
+        .task-meta-divider { display: none; }
+    }
+
+    /* Combined date range */
+    .task-daterange {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--v2-title);
+    }
+    .task-daterange .arr {
+        color: var(--v2-muted);
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
@@ -652,6 +852,44 @@
                 </div>
             </div>
 
+            <div class="note-card">
+                <div class="note-head">
+                    <span class="note-title"><i class="bi bi-chat-left-text"></i> Комментарий</span>
+                    <button type="button"
+                            class="note-edit-btn"
+                            id="commentToggleButton"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#commentEditorCollapse"
+                            aria-expanded="false"
+                            aria-controls="commentEditorCollapse"
+                            data-collapsed-label="{% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}">
+                        <i class="bi bi-pencil"></i>
+                        {% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}
+                    </button>
+                </div>
+
+                {% if task.comment %}
+                <div class="note-body">{{ task.comment|linebreaksbr }}</div>
+                {% else %}
+                <div class="note-body note-body--empty">При необходимости вы можете вписать сюда комментарий.</div>
+                {% endif %}
+
+                <div class="collapse mt-2" id="commentEditorCollapse">
+                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <input type="hidden" name="action" value="comment">
+                        <label for="taskComment" class="visually-hidden">Редактирование комментария</label>
+                        <textarea id="taskComment" name="comment" rows="4" class="note-textarea" placeholder="Заметка по этому взносу...">{{ task.comment }}</textarea>
+                        <div class="note-form-actions">
+                            <button type="submit" class="note-save-btn">
+                                <i class="bi bi-check2"></i> Сохранить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <div class="mgr-section">
                 <div class="mgr-section-head">
                     <span class="mgr-section-head-title"><i class="bi bi-info-circle"></i> Данные платежа</span>
@@ -660,55 +898,76 @@
                     </a>
                 </div>
                 <div class="mgr-section-body">
+                    <div class="task-hero-grid">
+                        <div class="task-hero-tile task-hero-tile--deadline">
+                            <div class="task-hero-head">
+                                <span class="task-hero-icon"><i class="bi bi-hourglass-split"></i></span>
+                                <span class="task-hero-label">Крайний срок запроса счёта</span>
+                            </div>
+                            <div class="task-hero-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</div>
+                            {% if deadline_hint.text %}
+                            <div class="task-hero-sub">
+                                <span>{{ deadline_hint.dow }}</span>
+                                <span class="dot"></span>
+                                <span class="task-hero-sub-text{% if deadline_hint.tone %}--{{ deadline_hint.tone }}{% endif %}">{{ deadline_hint.text }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="task-hero-tile task-hero-tile--due">
+                            <div class="task-hero-head">
+                                <span class="task-hero-icon"><i class="bi bi-calendar-event"></i></span>
+                                <span class="task-hero-label">Дата платежа</span>
+                            </div>
+                            <div class="task-hero-value">{{ task.payment_schedule.due_date|date:"d.m.Y" }}</div>
+                            {% if due_hint.text %}
+                            <div class="task-hero-sub">
+                                <span>{{ due_hint.dow }}</span>
+                                <span class="dot"></span>
+                                <span class="task-hero-sub-text{% if due_hint.tone %}--{{ due_hint.tone }}{% endif %}">{{ due_hint.text }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="task-hero-tile task-hero-tile--amount">
+                            <div class="task-hero-head">
+                                <span class="task-hero-icon"><i class="bi bi-cash-coin"></i></span>
+                                <span class="task-hero-label">Сумма платежа</span>
+                            </div>
+                            <div class="task-hero-value">{{ task.payment_schedule.amount|currency }}</div>
+                            {% if payment_context %}
+                            <div class="task-hero-sub">{{ payment_context }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="task-meta-strip">
+                        <span class="task-meta-item">
+                            <span class="task-meta-lbl">Статус</span>
+                            <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                        </span>
+                        <span class="task-meta-divider"></span>
+                        <span class="task-meta-item">
+                            {% if policy.broker_participation %}
+                            <span class="mgr-chip mgr-chip--broker">С участием брокера</span>
+                            {% else %}
+                            <span class="mgr-chip mgr-chip--nobroker">Без участия брокера</span>
+                            {% endif %}
+                        </span>
+                        <span class="task-meta-divider"></span>
+                        <span class="task-meta-item">
+                            <span class="task-meta-lbl">Страховая сумма</span>
+                            <span class="task-meta-val">{{ task.payment_schedule.insurance_sum|currency }}</span>
+                        </span>
+                    </div>
+
                     <div class="mgr-info-grid">
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Статус</span>
-                            <span class="mgr-info-value">
-                                <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                            </span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Участие брокера</span>
-                            <span class="mgr-info-value">
-                                {% if policy.broker_participation %}
-                                <span class="mgr-chip mgr-chip--broker">С участием брокера</span>
-                                {% else %}
-                                <span class="mgr-chip mgr-chip--nobroker">Без участия брокера</span>
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Сумма</span>
-                            <span class="mgr-info-value">{{ task.payment_schedule.amount|currency }}</span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Страховая сумма</span>
-                            <span class="mgr-info-value">{{ task.payment_schedule.insurance_sum|currency }}</span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Дата начала договора страхования</span>
-                            <span class="mgr-info-value">{{ policy.start_date|date:"d.m.Y" }}</span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Дата окончания договора страхования</span>
-                            <span class="mgr-info-value">{{ policy.end_date|date:"d.m.Y" }}</span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Дата платежа по договору</span>
-                            <span class="mgr-info-value">{{ task.payment_schedule.due_date|date:"d.m.Y" }}</span>
-                        </div>
-                        <div class="mgr-info-row">
-                            <span class="mgr-info-label">Крайняя дата запроса счета</span>
-                            <span class="mgr-info-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</span>
-                        </div>
                         <div class="mgr-info-row full">
-                            <span class="mgr-info-label">Примечание к платежу</span>
-                            <span class="mgr-info-value mgr-info-value--note">
-                                {% if task.payment_schedule.payment_info %}
-                                    {{ task.payment_schedule.payment_info|linebreaksbr }}
-                                {% else %}
-                                    <span class="mgr-info-value--empty">Не указано</span>
-                                {% endif %}
+                            <span class="mgr-info-label">Период договора страхования</span>
+                            <span class="mgr-info-value">
+                                <span class="task-daterange">
+                                    {{ policy.start_date|date:"d.m.Y" }}
+                                    <span class="arr"><i class="bi bi-arrow-right"></i></span>
+                                    {{ policy.end_date|date:"d.m.Y" }}
+                                </span>
                             </span>
                         </div>
                         <div class="mgr-info-row">
@@ -739,10 +998,20 @@
                                 {% endif %}
                             </span>
                         </div>
-                        <div class="mgr-info-row full">
-                            <span class="mgr-info-label">Объект страхования</span>
-                            <span class="mgr-info-value" style="font-weight: 500;">{{ policy.property_description }}</span>
-                        </div>
+                    </div>
+
+                    <div class="task-prose-block">
+                        <div class="task-prose-label"><i class="bi bi-box-seam"></i> Объект страхования</div>
+                        <div class="task-prose-value">{{ policy.property_description }}</div>
+                    </div>
+
+                    <div class="task-prose-block task-prose-block--note">
+                        <div class="task-prose-label"><i class="bi bi-chat-square-quote"></i> Примечание к платежу (из полиса)</div>
+                        {% if task.payment_schedule.payment_info %}
+                        <div class="task-prose-value">{{ task.payment_schedule.payment_info|linebreaksbr }}</div>
+                        {% else %}
+                        <div class="task-prose-value task-prose-value--empty">Не указано</div>
+                        {% endif %}
                     </div>
                     {% if not task.is_actual %}
                     <div class="alert-warn">
@@ -802,53 +1071,15 @@
         <!-- Right column -->
         <div class="d-flex flex-column gap-3">
 
-            <div class="note-card">
-                <div class="note-head">
-                    <span class="note-title"><i class="bi bi-chat-left-text"></i> Комментарий</span>
-                    <button type="button"
-                            class="note-edit-btn"
-                            id="commentToggleButton"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#commentEditorCollapse"
-                            aria-expanded="false"
-                            aria-controls="commentEditorCollapse"
-                            data-collapsed-label="{% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}">
-                        <i class="bi bi-pencil"></i>
-                        {% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}
-                    </button>
-                </div>
-
-                {% if task.comment %}
-                <div class="note-body">{{ task.comment|linebreaksbr }}</div>
-                {% else %}
-                <div class="note-body note-body--empty">При необходимости вы можете вписать сюда комментарий.</div>
-                {% endif %}
-
-                <div class="collapse mt-2" id="commentEditorCollapse">
-                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <input type="hidden" name="action" value="comment">
-                        <label for="taskComment" class="visually-hidden">Редактирование комментария</label>
-                        <textarea id="taskComment" name="comment" rows="4" class="note-textarea" placeholder="Заметка по этому взносу...">{{ task.comment }}</textarea>
-                        <div class="note-form-actions">
-                            <button type="submit" class="note-save-btn">
-                                <i class="bi bi-check2"></i> Сохранить
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
             <div class="mgr-section">
                 <div class="mgr-section-head">
-                    <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Текст письма в СК</span>
+                    <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Текст письма в <span class="mgr-letter-target">{% if policy.insurer.logo %}<img src="{{ policy.insurer.logo.url }}" alt="" class="mgr-letter-target__icon">{% endif %}{{ policy.insurer.insurer_name }}</span></span>
                 </div>
                 <div class="mgr-section-body">
                     <div class="task-letter-block">
                         <div class="task-letter-block-head">
                             <label for="letterSubject" class="task-letter-label">Тема письма</label>
-                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" id="copySubjectButton">
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" data-letter-copy="subject" data-letter-target="letterSubject">
                                 <i class="bi bi-clipboard"></i> Скопировать тему
                             </button>
                         </div>
@@ -856,12 +1087,46 @@
                     </div>
                     <div class="task-letter-block">
                         <div class="task-letter-block-head">
-                            <label for="letterText" class="task-letter-label">Текст письма</label>
-                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" id="copyLetterButton">
+                            <label class="task-letter-label">Текст письма</label>
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn"
+                                    data-letter-copy="text"
+                                    data-letter-target="letterPlain"
+                                    data-letter-rich-target="letterRendered">
                                 <i class="bi bi-clipboard"></i> Скопировать текст
                             </button>
                         </div>
-                        <textarea id="letterText" class="task-letter" rows="22" readonly>{{ letter_text }}</textarea>
+                        <div id="letterRendered" class="task-letter task-letter-rendered">{{ letter_html }}</div>
+                        <textarea id="letterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ letter_text }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Текст письма в <span class="mgr-letter-target"><img src="{% static 'images/alliance-logo.png' %}" alt="" class="mgr-letter-target__icon">Альянс-лизинг</span></span>
+                </div>
+                <div class="mgr-section-body">
+                    <div class="task-letter-block">
+                        <div class="task-letter-block-head">
+                            <label for="allianceLetterSubject" class="task-letter-label">Тема письма</label>
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" data-letter-copy="subject" data-letter-target="allianceLetterSubject">
+                                <i class="bi bi-clipboard"></i> Скопировать тему
+                            </button>
+                        </div>
+                        <input type="text" id="allianceLetterSubject" class="task-letter-subject-input" value="{{ alliance_letter_subject }}" readonly>
+                    </div>
+                    <div class="task-letter-block">
+                        <div class="task-letter-block-head">
+                            <label class="task-letter-label">Текст письма</label>
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn"
+                                    data-letter-copy="text"
+                                    data-letter-target="allianceLetterPlain"
+                                    data-letter-rich-target="allianceLetterRendered">
+                                <i class="bi bi-clipboard"></i> Скопировать текст
+                            </button>
+                        </div>
+                        <div id="allianceLetterRendered" class="task-letter task-letter-rendered">{{ alliance_letter_html }}</div>
+                        <textarea id="allianceLetterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ alliance_letter_text }}</textarea>
                     </div>
                 </div>
             </div>
@@ -876,52 +1141,58 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const copyButton = document.getElementById('copyLetterButton');
-        const copySubjectButton = document.getElementById('copySubjectButton');
-        const subject = document.getElementById('letterSubject');
-        const letter = document.getElementById('letterText');
-
-        async function copyTextFromField(field, textToCopy) {
-            field.select();
-            field.setSelectionRange(0, field.value.length);
-            try {
-                await navigator.clipboard.writeText(textToCopy);
-                return true;
-            } catch (error) {
+        async function copyToClipboard(plainText, htmlText, fallbackField) {
+            if (htmlText && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+                try {
+                    await navigator.clipboard.write([new ClipboardItem({
+                        'text/html':  new Blob([htmlText],  { type: 'text/html' }),
+                        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                    })]);
+                    return true;
+                } catch (e) { /* fall through to plain */ }
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(plainText);
+                    return true;
+                } catch (e) { /* fall through to execCommand */ }
+            }
+            if (fallbackField && typeof fallbackField.select === 'function') {
+                fallbackField.select();
+                if (typeof fallbackField.setSelectionRange === 'function') {
+                    fallbackField.setSelectionRange(0, plainText.length);
+                }
                 return document.execCommand('copy');
             }
+            return false;
         }
 
-        if (copyButton && letter) {
-            function fitLetterHeight() {
-                letter.style.height = 'auto';
-                letter.style.height = `${letter.scrollHeight + 2}px`;
-            }
-            fitLetterHeight();
-            window.addEventListener('resize', fitLetterHeight);
+        const idleLabels = {
+            subject: '<i class="bi bi-clipboard"></i> Скопировать тему',
+            text:    '<i class="bi bi-clipboard"></i> Скопировать текст',
+        };
+        const doneLabel = '<i class="bi bi-check2"></i> Скопировано';
 
-            copyButton.addEventListener('click', async function () {
-                const copied = await copyTextFromField(letter, letter.value);
+        document.querySelectorAll('[data-letter-copy]').forEach(function (button) {
+            const targetId = button.dataset.letterTarget;
+            const richTargetId = button.dataset.letterRichTarget;
+            const kind = button.dataset.letterCopy;
+            const target = targetId ? document.getElementById(targetId) : null;
+            const richTarget = richTargetId ? document.getElementById(richTargetId) : null;
+            if (!target) return;
+
+            button.addEventListener('click', async function () {
+                const plainText = (target.value !== undefined) ? target.value : target.textContent;
+                const htmlText = richTarget ? richTarget.innerHTML : null;
+                const copied = await copyToClipboard(plainText, htmlText, target);
                 if (copied) {
-                    copyButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
+                    button.innerHTML = doneLabel;
                     setTimeout(function () {
-                        copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать текст';
+                        button.innerHTML = idleLabels[kind] || idleLabels.text;
                     }, 1600);
                 }
             });
-        }
-
-        if (copySubjectButton && subject) {
-            copySubjectButton.addEventListener('click', async function () {
-                const copied = await copyTextFromField(subject, subject.value);
-                if (copied) {
-                    copySubjectButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
-                    setTimeout(function () {
-                        copySubjectButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать тему';
-                    }, 1600);
-                }
-            });
-        }
+        });
 
         const commentToggleButton = document.getElementById('commentToggleButton');
         const commentEditorCollapse = document.getElementById('commentEditorCollapse');

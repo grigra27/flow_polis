@@ -304,7 +304,7 @@ def test_scheduled_payments_mark_policy_without_broker_in_list_and_detail(
     response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
     assert response.status_code == 200
     content = response.content.decode("utf-8")
-    assert "Участие брокера" in content
+    assert "mgr-chip--nobroker" in content
     assert "Без участия брокера" in content
 
 

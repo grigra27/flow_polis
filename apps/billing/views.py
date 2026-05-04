@@ -97,6 +97,7 @@ class BillingTaskDetailView(AdminRequiredMixin, DetailView):
         context.update(
             {
                 "status_choices": BillingTask.STATUS_CHOICES,
+                "letter_subject": self.object.build_letter_subject(),
                 "letter_text": self.object.build_letter_text(),
                 "return_url": self.request.GET.get(
                     "next",

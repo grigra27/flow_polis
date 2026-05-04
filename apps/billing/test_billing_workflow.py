@@ -93,8 +93,39 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert BillingTaskEvent.objects.filter(
         task=task, event_type=BillingTaskEvent.EVENT_CREATED
     ).exists()
-    assert "Просим выставить счет" in task.build_letter_text()
-    assert "DFA-001" in task.build_letter_text()
+    letter = task.build_letter_text()
+    subject = task.build_letter_subject()
+    assert "Просим выставить счет" in letter
+    assert "Просим выставить счет на годовой взнос по договору страхования:" in letter
+    assert "DFA-001" in letter
+    assert "Страховая сумма: 1 000 000,00 руб." in letter
+    assert "Статус рассрочки: годовой" in letter
+    assert "Всего платежей в году: 1" in letter
+    assert "Этот платеж в году: 1 из 1" in letter
+    assert subject == "Годовой взнос --- DFA-001 --- POL-001"
+
+
+@pytest.mark.django_db
+def test_letter_contains_installment_metadata_for_installment_plan(billing_payment):
+    PaymentSchedule.objects.create(
+        policy=billing_payment.policy,
+        year_number=billing_payment.year_number,
+        installment_number=2,
+        due_date=billing_payment.due_date + timedelta(days=30),
+        insurance_sum=Decimal("1000000.00"),
+        amount=Decimal("25000.00"),
+    )
+
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    letter = task.build_letter_text()
+    subject = task.build_letter_subject()
+    assert "Просим выставить счет на очередной взнос по договору страхования:" in letter
+    assert "Статус рассрочки: рассрочка" in letter
+    assert "Всего платежей в году: 2" in letter
+    assert "Этот платеж в году: 1 из 2" in letter
+    assert subject == "Счёт на очередной взнос --- DFA-001 --- POL-001"
 
 
 @pytest.mark.django_db
@@ -179,6 +210,8 @@ def test_scheduled_payments_pages_require_admin_access(client, billing_payment):
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "Текст письма в СК" in content
+    assert "Тема письма" in content
+    assert "Годовой взнос --- DFA-001 --- POL-001" in content
     assert reverse("policies:detail", args=[billing_payment.policy.id]) in content
 
     response = client.get(reverse("policies:prolongation"))
@@ -206,6 +239,67 @@ def test_task_history_displays_user_full_name(client, billing_payment):
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "Иван Петров" in content
+
+
+@pytest.mark.django_db
+def test_task_detail_displays_payment_note(client, billing_payment):
+    billing_payment.payment_info = "Примечание к конкретному платежу для карточки."
+    billing_payment.save(update_fields=["payment_info"])
+
+    admin_user = User.objects.create_user(
+        username="note_admin",
+        password="testpass123",
+        is_staff=True,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    client.force_login(admin_user)
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Примечание к платежу" in content
+    assert "Примечание к конкретному платежу для карточки." in content
+    assert "Страховая сумма" in content
+    assert "1 000 000 ₽" in content
+    assert "insurer-with-logo" in content
+    assert "branch-with-logo" in content
+    assert billing_payment.policy.start_date.strftime("%d.%m.%Y") in content
+    assert billing_payment.policy.end_date.strftime("%d.%m.%Y") in content
+
+
+@pytest.mark.django_db
+def test_scheduled_payments_mark_policy_without_broker_in_list_and_detail(
+    client, billing_payment
+):
+    billing_payment.policy.broker_participation = False
+    billing_payment.policy.save(update_fields=["broker_participation"])
+
+    admin_user = User.objects.create_user(
+        username="nobroker_admin",
+        password="testpass123",
+        is_staff=True,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    client.force_login(admin_user)
+
+    response = client.get(
+        reverse("policies:scheduled_payments"),
+        {"period": task.period.code},
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Без брокера" in content
+    assert 'title="Без участия брокера"' in content
+
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Участие брокера" in content
+    assert "Без участия брокера" in content
 
 
 @pytest.mark.django_db

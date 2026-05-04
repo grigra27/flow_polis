@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load currency_filters %}
+{% load insurer_tags %}
 
 {% block title %}Задача очередного взноса{% endblock %}
 
@@ -53,6 +54,20 @@
         font-size: 0.85rem;
         color: var(--v2-muted);
         margin-top: 0.25rem;
+    }
+    .task-nobroker-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.15rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        background: #eceff3;
+        border: 1px solid #d1d5db;
+        color: #5f6b7a;
+        vertical-align: middle;
     }
     .mgr-header-actions {
         display: flex;
@@ -129,6 +144,26 @@
         align-items: center;
         gap: 0.4rem;
     }
+    .mgr-section-head-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        color: #e8f3ff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,0.28);
+        border-radius: 7px;
+        padding: 0.24rem 0.5rem;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+    }
+    .mgr-section-head-link:hover {
+        color: #fff;
+        text-decoration: none;
+        background: rgba(255,255,255,0.13);
+        border-color: rgba(255,255,255,0.45);
+    }
     .mgr-section-body { padding: 0.9rem 1rem; }
 
     /* Layout */
@@ -169,6 +204,37 @@
         font-size: 0.92rem;
         font-weight: 600;
         color: var(--v2-title);
+    }
+    .mgr-info-value--note {
+        font-weight: 500;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+    .mgr-info-value--empty {
+        color: var(--v2-muted);
+        font-style: italic;
+        font-weight: 500;
+    }
+    .mgr-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        padding: 0.16rem 0.55rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        line-height: 1.25;
+        border: 1px solid transparent;
+    }
+    .mgr-chip--broker {
+        background: #dcfce7;
+        color: #15803d;
+        border-color: #bbf7d0;
+    }
+    .mgr-chip--nobroker {
+        background: #eceff3;
+        color: #5f6b7a;
+        border-color: #d1d5db;
     }
     .mgr-info-value a { color: var(--v2-accent); text-decoration: none; }
     .mgr-info-value a:hover { text-decoration: underline; }
@@ -285,6 +351,49 @@
         line-height: 1.55;
         white-space: pre-wrap;
         width: 100%;
+    }
+    .task-letter-block + .task-letter-block {
+        margin-top: 0.8rem;
+    }
+    .task-letter-label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--v2-muted);
+        margin: 0;
+    }
+    .task-letter-block-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.3rem;
+    }
+    .task-letter-subject-input {
+        width: 100%;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        background: #fbfdff;
+        color: #13283f;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.5rem 0.65rem;
+        min-height: 38px;
+    }
+    .task-letter-copy-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    @media (max-width: 575.98px) {
+        .task-letter-block-head {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .task-letter-copy-btn {
+            justify-content: center;
+        }
     }
 
     /* History table */
@@ -498,7 +607,12 @@
         <div>
             <div class="mgr-page-kicker"><i class="bi bi-receipt-cutoff"></i> Очередной взнос · {{ task.period.label }}</div>
             <h1 class="mgr-page-title">{{ policy.dfa_number|default:"Без ДФА" }} · {{ policy.policy_number }}</h1>
-            <div class="mgr-page-subtitle">{{ policy.client.client_name }}</div>
+            <div class="mgr-page-subtitle">
+                {{ policy.client.client_name }}
+                {% if not policy.broker_participation %}
+                <span class="task-nobroker-hint">Без участия брокера</span>
+                {% endif %}
+            </div>
         </div>
         <div class="mgr-header-actions">
             <a class="btn-mgr-back" href="{{ return_url }}">
@@ -541,6 +655,9 @@
             <div class="mgr-section">
                 <div class="mgr-section-head">
                     <span class="mgr-section-head-title"><i class="bi bi-info-circle"></i> Данные платежа</span>
+                    <a href="{% url 'policies:detail' policy.id %}" class="mgr-section-head-link">
+                        <i class="bi bi-box-arrow-up-right"></i> Карточка полиса
+                    </a>
                 </div>
                 <div class="mgr-section-body">
                     <div class="mgr-info-grid">
@@ -551,8 +668,30 @@
                             </span>
                         </div>
                         <div class="mgr-info-row">
+                            <span class="mgr-info-label">Участие брокера</span>
+                            <span class="mgr-info-value">
+                                {% if policy.broker_participation %}
+                                <span class="mgr-chip mgr-chip--broker">С участием брокера</span>
+                                {% else %}
+                                <span class="mgr-chip mgr-chip--nobroker">Без участия брокера</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="mgr-info-row">
                             <span class="mgr-info-label">Сумма</span>
                             <span class="mgr-info-value">{{ task.payment_schedule.amount|currency }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Страховая сумма</span>
+                            <span class="mgr-info-value">{{ task.payment_schedule.insurance_sum|currency }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Дата начала договора страхования</span>
+                            <span class="mgr-info-value">{{ policy.start_date|date:"d.m.Y" }}</span>
+                        </div>
+                        <div class="mgr-info-row">
+                            <span class="mgr-info-label">Дата окончания договора страхования</span>
+                            <span class="mgr-info-value">{{ policy.end_date|date:"d.m.Y" }}</span>
                         </div>
                         <div class="mgr-info-row">
                             <span class="mgr-info-label">Дата платежа по договору</span>
@@ -562,13 +701,29 @@
                             <span class="mgr-info-label">Крайняя дата запроса счета</span>
                             <span class="mgr-info-value">{{ task.invoice_request_deadline|date:"d.m.Y" }}</span>
                         </div>
+                        <div class="mgr-info-row full">
+                            <span class="mgr-info-label">Примечание к платежу</span>
+                            <span class="mgr-info-value mgr-info-value--note">
+                                {% if task.payment_schedule.payment_info %}
+                                    {{ task.payment_schedule.payment_info|linebreaksbr }}
+                                {% else %}
+                                    <span class="mgr-info-value--empty">Не указано</span>
+                                {% endif %}
+                            </span>
+                        </div>
                         <div class="mgr-info-row">
                             <span class="mgr-info-label">Страховщик</span>
-                            <span class="mgr-info-value">{{ policy.insurer.insurer_name }}</span>
+                            <span class="mgr-info-value">{% insurer_logo policy.insurer size='small' %}</span>
                         </div>
                         <div class="mgr-info-row">
                             <span class="mgr-info-label">Филиал</span>
-                            <span class="mgr-info-value">{{ policy.branch.branch_name|default:"Не указан" }}</span>
+                            <span class="mgr-info-value">
+                                {% if policy.branch %}
+                                    {% branch_logo policy.branch size='small' %}
+                                {% else %}
+                                    Не указан
+                                {% endif %}
+                            </span>
                         </div>
                         <div class="mgr-info-row">
                             <span class="mgr-info-label">Страхователь</span>
@@ -587,14 +742,6 @@
                         <div class="mgr-info-row full">
                             <span class="mgr-info-label">Объект страхования</span>
                             <span class="mgr-info-value" style="font-weight: 500;">{{ policy.property_description }}</span>
-                        </div>
-                        <div class="mgr-info-row full">
-                            <span class="mgr-info-label">Карточка полиса</span>
-                            <span class="mgr-info-value">
-                                <a href="{% url 'policies:detail' policy.id %}" class="btn-mgr-soft">
-                                    <i class="bi bi-box-arrow-up-right"></i> Открыть карточку полиса
-                                </a>
-                            </span>
                         </div>
                     </div>
                     {% if not task.is_actual %}
@@ -696,15 +843,26 @@
             <div class="mgr-section">
                 <div class="mgr-section-head">
                     <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Текст письма в СК</span>
-                    <button type="button"
-                            class="btn-mgr-soft"
-                            id="copyLetterButton"
-                            style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); color: #e8f3ff;">
-                        <i class="bi bi-clipboard"></i> Скопировать
-                    </button>
                 </div>
                 <div class="mgr-section-body">
-                    <textarea id="letterText" class="task-letter" rows="22" readonly>{{ letter_text }}</textarea>
+                    <div class="task-letter-block">
+                        <div class="task-letter-block-head">
+                            <label for="letterSubject" class="task-letter-label">Тема письма</label>
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" id="copySubjectButton">
+                                <i class="bi bi-clipboard"></i> Скопировать тему
+                            </button>
+                        </div>
+                        <input type="text" id="letterSubject" class="task-letter-subject-input" value="{{ letter_subject }}" readonly>
+                    </div>
+                    <div class="task-letter-block">
+                        <div class="task-letter-block-head">
+                            <label for="letterText" class="task-letter-label">Текст письма</label>
+                            <button type="button" class="btn-mgr-soft task-letter-copy-btn" id="copyLetterButton">
+                                <i class="bi bi-clipboard"></i> Скопировать текст
+                            </button>
+                        </div>
+                        <textarea id="letterText" class="task-letter" rows="22" readonly>{{ letter_text }}</textarea>
+                    </div>
                 </div>
             </div>
 
@@ -719,7 +877,20 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const copyButton = document.getElementById('copyLetterButton');
+        const copySubjectButton = document.getElementById('copySubjectButton');
+        const subject = document.getElementById('letterSubject');
         const letter = document.getElementById('letterText');
+
+        async function copyTextFromField(field, textToCopy) {
+            field.select();
+            field.setSelectionRange(0, field.value.length);
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                return true;
+            } catch (error) {
+                return document.execCommand('copy');
+            }
+        }
 
         if (copyButton && letter) {
             function fitLetterHeight() {
@@ -730,16 +901,24 @@
             window.addEventListener('resize', fitLetterHeight);
 
             copyButton.addEventListener('click', async function () {
-                letter.select();
-                letter.setSelectionRange(0, letter.value.length);
-                try {
-                    await navigator.clipboard.writeText(letter.value);
+                const copied = await copyTextFromField(letter, letter.value);
+                if (copied) {
                     copyButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
                     setTimeout(function () {
-                        copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать';
+                        copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать текст';
                     }, 1600);
-                } catch (error) {
-                    document.execCommand('copy');
+                }
+            });
+        }
+
+        if (copySubjectButton && subject) {
+            copySubjectButton.addEventListener('click', async function () {
+                const copied = await copyTextFromField(subject, subject.value);
+                if (copied) {
+                    copySubjectButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
+                    setTimeout(function () {
+                        copySubjectButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать тему';
+                    }, 1600);
                 }
             });
         }

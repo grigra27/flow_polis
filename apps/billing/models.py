@@ -164,13 +164,56 @@ class BillingTask(TimeStampedModel):
             and self.period.starts_on <= payment.due_date <= self.period.ends_on
         )
 
+    def _get_installment_metadata(self):
+        payment = self.payment_schedule
+        payments_in_year = self.policy.payment_schedule.filter(
+            year_number=payment.year_number
+        ).count()
+        if payment.installment_number != 1 or payments_in_year > 1:
+            installment_status = "рассрочка"
+        else:
+            installment_status = "годовой"
+        payments_total_in_year = (
+            payments_in_year if payments_in_year else payment.installment_number
+        )
+        payment_position = f"{payment.installment_number} из {payments_total_in_year}"
+        return installment_status, payments_total_in_year, payment_position
+
+    @staticmethod
+    def _get_request_subject_line(installment_status):
+        if installment_status == "годовой":
+            return "Просим выставить счет на годовой взнос по договору страхования:"
+        return "Просим выставить счет на очередной взнос по договору страхования:"
+
+    def build_letter_subject(self):
+        policy = self.policy
+        installment_status, _, _ = self._get_installment_metadata()
+        if installment_status == "годовой":
+            subject_prefix = "Годовой взнос"
+        else:
+            subject_prefix = "Счёт на очередной взнос"
+        dfa_number = policy.dfa_number or "Без ДФА"
+        policy_number = policy.policy_number or "Без номера полиса"
+        return f"{subject_prefix} --- {dfa_number} --- {policy_number}"
+
     def build_letter_text(self):
         policy = self.policy
+        payment = self.payment_schedule
+
+        # Логика согласована с экспортом очередных взносов:
+        # - статус рассрочки;
+        # - позиция платежа в формате "X из Y".
+        (
+            installment_status,
+            payments_total_in_year,
+            payment_position,
+        ) = self._get_installment_metadata()
+        request_subject_line = self._get_request_subject_line(installment_status)
 
         lines = [
             "Добрый день.",
             "",
-            "Просим выставить счет на очередной взнос по договору страхования:",
+            request_subject_line,
             "",
             f"Страховщик: {policy.insurer.insurer_name}",
         ]
@@ -184,13 +227,17 @@ class BillingTask(TimeStampedModel):
                 f"Объект страхования: {policy.property_description}",
                 f"Дата платежа по договору: {self.due_date.strftime('%d.%m.%Y')}",
                 f"Сумма очередного взноса: {format_money(self.amount)}",
+                f"Страховая сумма: {format_money(payment.insurance_sum)}",
+                f"Статус рассрочки: {installment_status}",
+                f"Всего платежей в году: {payments_total_in_year}",
+                f"Этот платеж в году: {payment_position}",
             ]
         )
 
         lines.extend(
             [
                 "",
-                "Просим направить счет для дальнейшей передачи в оплату клиенту.",
+                "Просим направить счет для дальнейшей передачи в оплату.",
                 "",
                 "Спасибо.",
             ]

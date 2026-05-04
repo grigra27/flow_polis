@@ -339,11 +339,15 @@
     .mgr-table tbody tr:last-child td { border-bottom: none; }
     .mgr-table tbody tr.tbl-row-clickable { cursor: pointer; transition: background 0.1s; }
     .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
+    .mgr-table tbody tr.tbl-row-nobroker td { background: #f3f4f6; color: #4b5563; }
+    .mgr-table tbody tr.tbl-row-nobroker:hover td { background: #e5e7eb; }
 
     .bil-checkbox-col { width: 36px; }
     .bil-deadline-col { background: #fff8ee; color: #6f4f13; font-weight: 700; }
     th.bil-deadline-col { color: #7a5a1f; box-shadow: inset 0 -2px 0 #ead8b9; }
     .mgr-table tbody tr.tbl-row-clickable:hover td.bil-deadline-col { background: #fff3df; }
+    .mgr-table tbody tr.tbl-row-nobroker td.bil-deadline-col { background: #eceef1; color: #6a571d; }
+    .mgr-table tbody tr.tbl-row-nobroker:hover td.bil-deadline-col { background: #e3e5e8; }
 
     /* Status pill in table */
     .bil-status {
@@ -368,6 +372,16 @@
     .bil-policy-line { line-height: 1.25; }
     .bil-policy-line a { color: var(--v2-accent); text-decoration: none; }
     .bil-policy-line a:hover { text-decoration: underline; }
+    .tbl-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 0.12rem 0.5rem;
+        white-space: nowrap;
+        display: inline-block;
+        line-height: 1.2;
+    }
+    .tbl-badge--nobroker { background: #eceff3; color: #5f6b7a; border: 1px solid #d1d5db; }
 
     .pl-empty {
         text-align: center;
@@ -578,7 +592,7 @@
                         <tbody>
                             {% for task in tasks %}
                             {% with policy=task.payment_schedule.policy %}
-                            <tr class="tbl-row-clickable"
+                            <tr class="tbl-row-clickable{% if not policy.broker_participation %} tbl-row-nobroker{% endif %}"
                                 data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
                                 tabindex="0"
                                 role="link"
@@ -598,6 +612,9 @@
                                 <td class="bil-policy-line">
                                     <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
                                     <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                                    {% if not policy.broker_participation %}
+                                    <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
+                                    {% endif %}
                                 </td>
                                 <td>{{ policy.client.client_name }}</td>
                                 <td class="text-end"><strong>{{ task.payment_schedule.amount|currency }}</strong></td>

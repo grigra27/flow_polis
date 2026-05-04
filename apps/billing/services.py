@@ -27,7 +27,7 @@ class PeriodOption:
 
 
 VISIBLE_PAST_MONTHS = 2
-VISIBLE_FUTURE_MONTHS = 9
+VISIBLE_FUTURE_MONTHS = 6
 
 
 def add_months(value, months):

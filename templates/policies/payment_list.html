@@ -71,6 +71,13 @@
         color: #1d4ed8;
         text-decoration: none;
     }
+    .mgr-page-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
 
     /* Branch tabs */
     .pl-branch-tabs {
@@ -292,8 +299,13 @@
             flex-direction: column;
             align-items: stretch;
         }
+        .mgr-page-actions {
+            width: 100%;
+            justify-content: stretch;
+        }
         .btn-scheduled-payments {
             justify-content: center;
+            flex: 1 1 auto;
         }
         .mgr-section--filters .mgr-section-body {
             padding: 0.48rem 0.56rem 0.56rem;
@@ -637,10 +649,15 @@
                 <div class="mgr-page-kicker"><i class="bi bi-calendar2-week"></i> Страхование</div>
                 <h1 class="mgr-page-title">График платежей</h1>
             </div>
-            {% if is_superuser %}
-            <a class="btn-scheduled-payments" href="{% url 'policies:scheduled_payments' %}">
-                <i class="bi bi-receipt-cutoff"></i> Очередные взносы
-            </a>
+            {% if request.user.is_staff %}
+            <div class="mgr-page-actions">
+                <a class="btn-scheduled-payments" href="{% url 'policies:scheduled_payments' %}">
+                    <i class="bi bi-receipt-cutoff"></i> Очередные взносы
+                </a>
+                <a class="btn-scheduled-payments" href="{% url 'policies:prolongation' %}">
+                    <i class="bi bi-arrow-repeat"></i> Пролонгация
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>

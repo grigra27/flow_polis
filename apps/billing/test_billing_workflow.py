@@ -144,7 +144,7 @@ def test_comment_update_does_not_create_history_event(billing_payment):
 
 
 @pytest.mark.django_db
-def test_scheduled_payments_page_requires_superuser(client, billing_payment):
+def test_scheduled_payments_pages_require_admin_access(client, billing_payment):
     regular_user = User.objects.create_user(username="regular", password="testpass123")
     client.force_login(regular_user)
 
@@ -153,19 +153,39 @@ def test_scheduled_payments_page_requires_superuser(client, billing_payment):
     assert response.status_code == 302
     assert reverse("accounts:access_denied") in response["Location"]
 
-    superuser = User.objects.create_superuser(username="root", password="testpass123")
-    client.force_login(superuser)
+    response = client.get(reverse("policies:prolongation"))
+
+    assert response.status_code == 302
+    assert reverse("accounts:access_denied") in response["Location"]
+
+    admin_user = User.objects.create_user(
+        username="billing_admin",
+        password="testpass123",
+        is_staff=True,
+    )
+    client.force_login(admin_user)
 
     response = client.get(reverse("policies:scheduled_payments"))
 
     assert response.status_code == 200
-    assert "Очередные взносы" in response.content.decode("utf-8")
+    content = response.content.decode("utf-8")
+    assert "Очередные взносы" in content
+    assert "Сбросить" in content
+    assert "insurer-with-logo" in content
 
     task = BillingTask.objects.get(payment_schedule=billing_payment)
     response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
 
     assert response.status_code == 200
-    assert "Текст письма в СК" in response.content.decode("utf-8")
+    content = response.content.decode("utf-8")
+    assert "Текст письма в СК" in content
+    assert reverse("policies:detail", args=[billing_payment.policy.id]) in content
+
+    response = client.get(reverse("policies:prolongation"))
+
+    assert response.status_code == 200
+    assert "Пролонгация" in response.content.decode("utf-8")
+    assert "Страница находится в разработке." in response.content.decode("utf-8")
 
 
 @pytest.mark.django_db
@@ -189,7 +209,73 @@ def test_task_history_displays_user_full_name(client, billing_payment):
 
 
 @pytest.mark.django_db
-def test_payments_page_shows_scheduled_payments_button_only_to_superuser(
+def test_task_status_form_updates_status_only(client, billing_payment):
+    user = User.objects.create_superuser(
+        username="status_only_admin",
+        password="testpass123",
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    update_task(task, user, comment="Комментарий должен остаться")
+
+    client.force_login(user)
+    detail_url = reverse("policies:scheduled_payment_task", args=[task.pk])
+    response = client.post(
+        reverse("policies:scheduled_payment_task_update", args=[task.pk]),
+        {
+            "action": "status",
+            "status": BillingTask.STATUS_REQUESTED,
+            "next": detail_url,
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.url == detail_url
+
+    task.refresh_from_db()
+    assert task.status == BillingTask.STATUS_REQUESTED
+    assert task.comment == "Комментарий должен остаться"
+    assert task.events.filter(event_type=BillingTaskEvent.EVENT_STATUS_CHANGED).exists()
+
+
+@pytest.mark.django_db
+def test_task_comment_form_updates_comment_without_status_change(
+    client, billing_payment
+):
+    user = User.objects.create_superuser(
+        username="comment_only_admin",
+        password="testpass123",
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    initial_status = task.status
+    initial_event_count = task.events.count()
+
+    client.force_login(user)
+    detail_url = reverse("policies:scheduled_payment_task", args=[task.pk])
+    response = client.post(
+        reverse("policies:scheduled_payment_task_update", args=[task.pk]),
+        {
+            "action": "comment",
+            "comment": "Отдельное сохранение комментария",
+            "next": detail_url,
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    page_content = response.content.decode("utf-8")
+    assert "Отдельное сохранение комментария" in page_content
+    assert "Изменить комментарий" in page_content
+
+    task.refresh_from_db()
+    assert task.status == initial_status
+    assert task.comment == "Отдельное сохранение комментария"
+    assert task.events.count() == initial_event_count
+
+
+@pytest.mark.django_db
+def test_payments_page_shows_scheduled_payments_button_only_to_admin(
     client, billing_payment
 ):
     regular_user = User.objects.create_user(
@@ -200,16 +286,22 @@ def test_payments_page_shows_scheduled_payments_button_only_to_superuser(
     response = client.get(f"{reverse('policies:payments')}?status=all")
 
     assert response.status_code == 200
-    assert "Очередные взносы" not in response.content.decode("utf-8")
+    content = response.content.decode("utf-8")
+    assert "Очередные взносы" not in content
+    assert "Пролонгация" not in content
 
-    superuser = User.objects.create_superuser(
-        username="payments_root", password="testpass123"
+    admin_user = User.objects.create_user(
+        username="payments_admin",
+        password="testpass123",
+        is_staff=True,
     )
-    client.force_login(superuser)
+    client.force_login(admin_user)
 
     response = client.get(f"{reverse('policies:payments')}?status=all")
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "Очередные взносы" in content
+    assert "Пролонгация" in content
     assert reverse("policies:scheduled_payments") in content
+    assert reverse("policies:prolongation") in content

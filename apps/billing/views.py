@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
-from apps.accounts.mixins import SuperuserRequiredMixin
+from apps.accounts.mixins import AdminRequiredMixin
 
 from .models import BillingTask
 from .services import (
@@ -19,7 +19,7 @@ from .services import (
 )
 
 
-class BillingPeriodListView(SuperuserRequiredMixin, TemplateView):
+class BillingPeriodListView(AdminRequiredMixin, TemplateView):
     template_name = "billing/period_list.html"
     paginate_by = 50
 
@@ -62,7 +62,11 @@ class BillingPeriodListView(SuperuserRequiredMixin, TemplateView):
         return context
 
 
-class BillingTaskDetailView(SuperuserRequiredMixin, DetailView):
+class BillingProlongationPlaceholderView(AdminRequiredMixin, TemplateView):
+    template_name = "billing/prolongation_placeholder.html"
+
+
+class BillingTaskDetailView(AdminRequiredMixin, DetailView):
     model = BillingTask
     template_name = "billing/task_detail.html"
     context_object_name = "task"
@@ -100,26 +104,40 @@ class BillingTaskDetailView(SuperuserRequiredMixin, DetailView):
         return context
 
 
-class BillingTaskUpdateView(SuperuserRequiredMixin, View):
+class BillingTaskUpdateView(AdminRequiredMixin, View):
     def post(self, request, pk):
         task = get_object_or_404(BillingTask, pk=pk)
+        next_url = request.POST.get("next") or task.get_absolute_url()
+        action = request.POST.get("action")
         new_status = request.POST.get("status")
+        comment = request.POST.get("comment")
         valid_statuses = {status for status, _ in BillingTask.STATUS_CHOICES}
+
+        if action == "comment":
+            update_task(task, request.user, comment=comment)
+            messages.success(request, "Комментарий сохранен")
+            return redirect(next_url)
+
+        if action == "status":
+            if new_status not in valid_statuses:
+                messages.warning(request, "Выберите корректный статус")
+                return redirect(next_url)
+
+            update_task(task, request.user, new_status=new_status)
+            messages.success(request, "Статус обновлен")
+            return redirect(next_url)
+
+        # Fallback for legacy combined form submissions.
         if new_status not in valid_statuses:
             messages.warning(request, "Выберите корректный статус")
-            return redirect(request.POST.get("next") or task.get_absolute_url())
+            return redirect(next_url)
 
-        update_task(
-            task,
-            request.user,
-            new_status=new_status,
-            comment=request.POST.get("comment"),
-        )
+        update_task(task, request.user, new_status=new_status, comment=comment)
         messages.success(request, "Задача обновлена")
-        return redirect(request.POST.get("next") or task.get_absolute_url())
+        return redirect(next_url)
 
 
-class BillingTaskBulkUpdateView(SuperuserRequiredMixin, View):
+class BillingTaskBulkUpdateView(AdminRequiredMixin, View):
     def post(self, request):
         task_ids = request.POST.getlist("task_ids")
         new_status = request.POST.get("status")

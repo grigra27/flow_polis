@@ -14,6 +14,11 @@ urlpatterns = [
         name="scheduled_payments",
     ),
     path(
+        "payments/prolongation/",
+        billing_views.BillingProlongationPlaceholderView.as_view(),
+        name="prolongation",
+    ),
+    path(
         "payments/scheduled/tasks/<int:pk>/",
         billing_views.BillingTaskDetailView.as_view(),
         name="scheduled_payment_task",

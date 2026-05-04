@@ -93,6 +93,36 @@
         color: #5d748d;
     }
 
+    .task-policy-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .task-status-form,
+    .task-comment-form {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .task-comment-display {
+        border: 1px solid #dbe5f1;
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 0.75rem 0.85rem;
+        color: #17324f;
+        line-height: 1.5;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .task-comment-display--empty {
+        color: #5d748d;
+        font-style: italic;
+    }
+
     @media (max-width: 991.98px) {
         .task-layout {
             grid-template-columns: 1fr;
@@ -130,6 +160,32 @@
 
     <div class="task-layout">
         <div class="d-flex flex-column gap-3">
+            <div class="task-panel">
+                <div class="task-section-title">Смена статуса</div>
+                <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-status-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="action" value="status">
+                    <div>
+                        <div class="task-label">Текущий статус</div>
+                        <span class="task-status task-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                    </div>
+                    <div>
+                        <label for="statusSelect" class="form-label fw-semibold">Новый статус</label>
+                        <select id="statusSelect" name="status" class="form-select">
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2-circle"></i> Сохранить статус
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <div class="task-panel">
                 <div class="task-section-title">История</div>
                 <div class="table-responsive">
@@ -212,6 +268,13 @@
                         </div>
                     </div>
                     <div class="grid-column-full">
+                        <div class="task-label">Карточка полиса</div>
+                        <a class="btn btn-outline-primary btn-sm task-policy-link"
+                           href="{% url 'policies:detail' policy.id %}">
+                            <i class="bi bi-box-arrow-up-right"></i> Открыть карточку полиса
+                        </a>
+                    </div>
+                    <div class="grid-column-full">
                         <div class="task-label">Объект страхования</div>
                         <div>{{ policy.property_description }}</div>
                     </div>
@@ -223,31 +286,49 @@
                 {% endif %}
             </div>
 
-            <div class="task-panel">
-                <div class="task-section-title">Статус и комментарий</div>
-                <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <div class="mb-3">
-                        <label for="status" class="form-label fw-semibold">Статус</label>
-                        <select id="status" name="status" class="form-select">
-                            {% for value, label in status_choices %}
-                            <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="comment" class="form-label fw-semibold">Комментарий</label>
-                        <textarea id="comment" name="comment" class="form-control" rows="4">{{ task.comment }}</textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Сохранить
-                    </button>
-                </form>
-            </div>
         </div>
 
         <div class="d-flex flex-column gap-3">
+            <div class="task-panel">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <div class="task-section-title mb-0">Комментарий</div>
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            id="commentToggleButton"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#commentEditorCollapse"
+                            aria-expanded="false"
+                            aria-controls="commentEditorCollapse"
+                            data-collapsed-label="{% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}">
+                        <i class="bi bi-pencil-square"></i> {% if task.comment %}Изменить комментарий{% else %}Добавить комментарий{% endif %}
+                    </button>
+                </div>
+
+                <div class="task-label">Текущий комментарий</div>
+                {% if task.comment %}
+                <div class="task-comment-display">{{ task.comment|linebreaksbr }}</div>
+                {% else %}
+                <div class="task-comment-display task-comment-display--empty">При необходимости вы можете вписать сюда комментарий.</div>
+                {% endif %}
+
+                <div class="collapse mt-3" id="commentEditorCollapse">
+                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-comment-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <input type="hidden" name="action" value="comment">
+                        <div>
+                            <label for="taskComment" class="form-label fw-semibold">Редактирование комментария</label>
+                            <textarea id="taskComment" name="comment" class="form-control" rows="4">{{ task.comment }}</textarea>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Сохранить комментарий
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <div class="task-panel">
                 <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
                     <div class="task-section-title mb-0">Текст письма в СК</div>
@@ -267,34 +348,62 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const button = document.getElementById('copyLetterButton');
+        const copyButton = document.getElementById('copyLetterButton');
         const letter = document.getElementById('letterText');
-        if (!button || !letter) {
-            return;
-        }
 
-        function fitLetterHeight() {
-            letter.style.height = 'auto';
-            letter.style.height = `${letter.scrollHeight + 2}px`;
-        }
-
-        fitLetterHeight();
-        window.addEventListener('resize', fitLetterHeight);
-
-        button.addEventListener('click', async function () {
-            letter.select();
-            letter.setSelectionRange(0, letter.value.length);
-
-            try {
-                await navigator.clipboard.writeText(letter.value);
-                button.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
-                setTimeout(function () {
-                    button.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать';
-                }, 1600);
-            } catch (error) {
-                document.execCommand('copy');
+        if (copyButton && letter) {
+            function fitLetterHeight() {
+                letter.style.height = 'auto';
+                letter.style.height = `${letter.scrollHeight + 2}px`;
             }
-        });
+
+            fitLetterHeight();
+            window.addEventListener('resize', fitLetterHeight);
+
+            copyButton.addEventListener('click', async function () {
+                letter.select();
+                letter.setSelectionRange(0, letter.value.length);
+
+                try {
+                    await navigator.clipboard.writeText(letter.value);
+                    copyButton.innerHTML = '<i class="bi bi-check2"></i> Скопировано';
+                    setTimeout(function () {
+                        copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Скопировать';
+                    }, 1600);
+                } catch (error) {
+                    document.execCommand('copy');
+                }
+            });
+        }
+
+        const commentToggleButton = document.getElementById('commentToggleButton');
+        const commentEditorCollapse = document.getElementById('commentEditorCollapse');
+        const commentInput = document.getElementById('taskComment');
+
+        if (commentToggleButton && commentEditorCollapse) {
+            const collapsedLabel = commentToggleButton.dataset.collapsedLabel || 'Изменить комментарий';
+            const expandedLabel = 'Скрыть редактирование';
+
+            function updateCommentToggleLabel(isExpanded) {
+                commentToggleButton.innerHTML = isExpanded
+                    ? `<i class="bi bi-chevron-up"></i> ${expandedLabel}`
+                    : `<i class="bi bi-pencil-square"></i> ${collapsedLabel}`;
+            }
+
+            updateCommentToggleLabel(commentEditorCollapse.classList.contains('show'));
+
+            commentEditorCollapse.addEventListener('shown.bs.collapse', function () {
+                updateCommentToggleLabel(true);
+                if (commentInput) {
+                    commentInput.focus();
+                    commentInput.setSelectionRange(commentInput.value.length, commentInput.value.length);
+                }
+            });
+
+            commentEditorCollapse.addEventListener('hidden.bs.collapse', function () {
+                updateCommentToggleLabel(false);
+            });
+        }
     });
 </script>
 {% endblock %}

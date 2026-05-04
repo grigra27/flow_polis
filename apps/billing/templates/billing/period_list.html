@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load currency_filters %}
+{% load insurer_tags %}
 
 {% block title %}Очередные взносы{% endblock %}
 
@@ -96,6 +97,14 @@
         align-items: end;
     }
 
+    .billing-filter-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
     .billing-table {
         font-size: 0.92rem;
         vertical-align: middle;
@@ -107,6 +116,25 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         white-space: nowrap;
+    }
+
+    .billing-table th.billing-deadline-col,
+    .billing-table td.billing-deadline-col {
+        background: #fff8ee;
+    }
+
+    .billing-table th.billing-deadline-col {
+        color: #7a5a1f;
+        box-shadow: inset 0 -1px 0 #ead8b9;
+    }
+
+    .billing-table td.billing-deadline-col {
+        color: #6f4f13;
+        font-weight: 700;
+    }
+
+    .billing-table tbody tr:hover td.billing-deadline-col {
+        background: #fff3df;
     }
 
     .billing-row {
@@ -160,6 +188,50 @@
         gap: 0.75rem;
         flex-wrap: wrap;
         margin-bottom: 0.75rem;
+    }
+
+    .billing-pagination {
+        display: flex;
+        justify-content: center;
+        margin-top: 1.25rem;
+    }
+
+    .billing-pagination .pagination {
+        gap: 0.55rem;
+        margin-bottom: 0;
+    }
+
+    .billing-pagination .page-link {
+        min-width: 84px;
+        padding: 0.65rem 1rem;
+        border-radius: 12px;
+        border: 1px solid #bad0ea;
+        font-size: 0.97rem;
+        font-weight: 700;
+        text-align: center;
+        color: #0f4f97;
+        background: #fff;
+        box-shadow: 0 4px 12px rgba(15, 79, 151, 0.12);
+        transition: all 0.15s ease;
+    }
+
+    .billing-pagination .page-link:hover {
+        border-color: #1565c0;
+        background: #eff5ff;
+        color: #0b3f79;
+        transform: translateY(-1px);
+    }
+
+    .billing-pagination .page-item.active .page-link {
+        min-width: 110px;
+        border-color: #1565c0;
+        background: #1565c0;
+        color: #fff;
+        box-shadow: 0 6px 16px rgba(21, 101, 192, 0.25);
+    }
+
+    .billing-pagination .page-link:focus {
+        box-shadow: 0 0 0 0.18rem rgba(21, 101, 192, 0.2);
     }
 
     @media (max-width: 991.98px) {
@@ -237,9 +309,15 @@
                 <input id="q" type="search" name="q" class="form-control form-control-sm"
                        value="{{ search_query }}" placeholder="ДФА, полис, клиент, объект">
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">
-                <i class="bi bi-funnel"></i> Применить
-            </button>
+            <div class="billing-filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-funnel"></i> Применить
+                </button>
+                <a class="btn btn-outline-secondary btn-sm"
+                   href="{% url 'policies:scheduled_payments' %}?period={{ selected_period.code }}">
+                    <i class="bi bi-x-circle"></i> Сбросить
+                </a>
+            </div>
         </form>
     </div>
 
@@ -266,14 +344,13 @@
                     <tr>
                         <th style="width: 36px;"><input type="checkbox" id="selectAllTasks" class="form-check-input"></th>
                         <th>Статус</th>
-                        <th>Крайний срок</th>
+                        <th class="billing-deadline-col">Крайний срок</th>
                         <th>Дата платежа</th>
                         <th>Страховщик</th>
                         <th>ДФА / полис</th>
                         <th>Клиент</th>
                         <th class="text-end">Сумма</th>
                         <th>Менеджер</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -291,9 +368,9 @@
                             <div class="billing-warning mt-1">Платеж изменился</div>
                             {% endif %}
                         </td>
-                        <td>{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
+                        <td class="billing-deadline-col">{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
                         <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
-                        <td>{{ policy.insurer.insurer_name }}</td>
+                        <td>{% insurer_logo policy.insurer size='small' %}</td>
                         <td>
                             <div class="fw-semibold">{{ policy.dfa_number|default:"Без ДФА" }}</div>
                             <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
@@ -307,17 +384,11 @@
                                 <span class="billing-muted">Не указан</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            <a class="btn btn-outline-primary btn-sm"
-                               href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}">
-                                Открыть
-                            </a>
-                        </td>
                     </tr>
                     {% endwith %}
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center py-5 billing-muted">
+                        <td colspan="9" class="text-center py-5 billing-muted">
                             Нет задач по выбранным фильтрам.
                         </td>
                     </tr>
@@ -328,8 +399,8 @@
     </form>
 
     {% if page_obj.has_other_pages %}
-    <nav aria-label="Страницы" class="mt-3">
-        <ul class="pagination pagination-sm">
+    <nav aria-label="Страницы" class="billing-pagination">
+        <ul class="pagination">
             {% if page_obj.has_previous %}
             <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">Назад</a></li>
             {% endif %}

@@ -22,6 +22,7 @@
 <body>
     <!-- Navbar -->
     {% with current_namespace=request.resolver_match.namespace current_view=request.resolver_match.view_name %}
+    {% with check_view="|"|add:current_view|add:"|" payments_views="|policies:payments|policies:scheduled_payments|policies:scheduled_payment_task|policies:scheduled_payment_task_update|policies:scheduled_payment_bulk_update|policies:prolongation|" ecosystem_views="|insurers:ecosystem|insurers:list|insurers:detail|insurers:branches_list|insurers:branch_detail|insurers:managers_list|insurers:manager_detail|" %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary app-navbar-sticky">
         <div class="container-fluid">
             <a class="navbar-brand" style="padding-left:0.75rem;" href="{% url 'core:dashboard' %}">
@@ -38,17 +39,17 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' and current_view != 'policies:prolongation' %} active{% endif %}" href="{% url 'policies:list' %}" {% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' and current_view != 'policies:prolongation' %}aria-current="page"{% endif %}>
+                        <a class="nav-link{% if current_namespace == 'policies' and check_view not in payments_views %} active{% endif %}" href="{% url 'policies:list' %}" {% if current_namespace == 'policies' and check_view not in payments_views %}aria-current="page"{% endif %}>
                             <i class="bi bi-file-earmark-text"></i> Полисы
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:prolongation' %} active{% endif %}" href="{% url 'policies:payments' %}" {% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:prolongation' %}aria-current="page"{% endif %}>
+                        <a id="paymentsTopLink" class="nav-link{% if check_view in payments_views %} submenu-tab active{% endif %}" href="{% url 'policies:payments' %}" {% if check_view in payments_views %}aria-current="page"{% endif %}>
                             <i class="bi bi-calendar-check"></i> Платежи
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a id="ecosystemTopLink" class="nav-link ecosystem-main-link{% if current_namespace == 'clients' or current_view == 'insurers:ecosystem' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %} active{% endif %}{% if current_view == 'insurers:ecosystem' %} ecosystem-main-link-current{% endif %}" href="{% url 'insurers:ecosystem' %}" {% if current_namespace == 'clients' or current_view == 'insurers:ecosystem' or current_view == 'insurers:list' or current_view == 'insurers:detail' or current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' or current_view == 'insurers:managers_list' or current_view == 'insurers:manager_detail' %}aria-current="page"{% endif %}>
+                        <a id="ecosystemTopLink" class="nav-link{% if current_namespace == 'clients' or check_view in ecosystem_views %} submenu-tab active{% endif %}" href="{% url 'insurers:ecosystem' %}" {% if current_namespace == 'clients' or check_view in ecosystem_views %}aria-current="page"{% endif %}>
                             <i class="bi bi-diagram-3"></i> Экосистема
                         </a>
                     </li>
@@ -128,7 +129,27 @@
         </div>
     </nav>
 
-    <div id="ecosystemStrip" class="ecosystem-strip">
+    {% if check_view in payments_views %}
+    <div id="ecosystemStrip" class="ecosystem-strip" data-anchor-id="paymentsTopLink">
+        <div class="container-fluid">
+            <div id="ecosystemStripLinks" class="ecosystem-strip-links">
+                <a class="ecosystem-strip-link{% if current_view == 'policies:payments' %} active{% endif %}"
+                   href="{% url 'policies:payments' %}">
+                    <i class="bi bi-calendar2-week"></i> График
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:scheduled_payment_task_update' or current_view == 'policies:scheduled_payment_bulk_update' %} active{% endif %}"
+                   href="{% url 'policies:scheduled_payments' %}">
+                    <i class="bi bi-receipt-cutoff"></i> Очередные взносы
+                </a>
+                <a class="ecosystem-strip-link{% if current_view == 'policies:prolongation' %} active{% endif %}"
+                   href="{% url 'policies:prolongation' %}">
+                    <i class="bi bi-arrow-repeat"></i> Пролонгация
+                </a>
+            </div>
+        </div>
+    </div>
+    {% elif current_namespace == 'clients' or check_view in ecosystem_views %}
+    <div id="ecosystemStrip" class="ecosystem-strip" data-anchor-id="ecosystemTopLink">
         <div class="container-fluid">
             <div id="ecosystemStripLinks" class="ecosystem-strip-links">
                 <a class="ecosystem-strip-link{% if current_view == 'insurers:branches_list' or current_view == 'insurers:branch_detail' %} active{% endif %}"
@@ -150,6 +171,8 @@
             </div>
         </div>
     </div>
+    {% endif %}
+    {% endwith %}
     {% endwith %}
 
     <!-- Main Content -->
@@ -181,36 +204,35 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     (function() {
-        function syncEcosystemStripOffset() {
+        function syncSubmenuStripOffset() {
+            const strip = document.getElementById('ecosystemStrip');
+            if (!strip) {
+                return;
+            }
             const nav = document.querySelector('.app-navbar-sticky');
+            if (!nav || nav.offsetParent === null) {
+                strip.style.setProperty('--app-navbar-height', '0px');
+                return;
+            }
+            strip.style.setProperty('--app-navbar-height', `${Math.round(nav.offsetHeight)}px`);
+        }
+
+        function alignSubmenuStrip() {
             const strip = document.getElementById('ecosystemStrip');
             if (!strip) {
                 return;
             }
 
-            if (!nav || nav.offsetParent === null) {
-                strip.style.setProperty('--app-navbar-height', '0px');
-                return;
-            }
+            syncSubmenuStripOffset();
 
-            strip.style.setProperty('--app-navbar-height', `${Math.round(nav.offsetHeight)}px`);
-        }
-
-        function alignEcosystemStrip() {
-            const topLink = document.getElementById('ecosystemTopLink');
-            const strip = document.getElementById('ecosystemStrip');
             const links = document.getElementById('ecosystemStripLinks');
-
-            if (!strip || !links) {
-                return;
-            }
-
-            syncEcosystemStripOffset();
-
             const container = strip.querySelector('.container-fluid');
-            if (!container) {
+            if (!links || !container) {
                 return;
             }
+
+            const anchorId = strip.dataset.anchorId;
+            const topLink = anchorId ? document.getElementById(anchorId) : null;
 
             if (
                 window.matchMedia('(max-width: 991.98px)').matches ||
@@ -218,7 +240,6 @@
                 topLink.offsetParent === null
             ) {
                 links.style.marginLeft = '0px';
-                strip.style.removeProperty('--ecosystem-anchor-x');
                 return;
             }
 
@@ -235,21 +256,16 @@
             left = Math.max(0, Math.min(left, maxLeft));
 
             links.style.marginLeft = Math.round(left) + 'px';
-            const stripRect = strip.getBoundingClientRect();
-            strip.style.setProperty(
-                '--ecosystem-anchor-x',
-                `${Math.round(targetCenter - stripRect.left)}px`
-            );
         }
 
-        document.addEventListener('DOMContentLoaded', alignEcosystemStrip);
-        window.addEventListener('load', alignEcosystemStrip);
-        window.addEventListener('resize', alignEcosystemStrip);
+        document.addEventListener('DOMContentLoaded', alignSubmenuStrip);
+        window.addEventListener('load', alignSubmenuStrip);
+        window.addEventListener('resize', alignSubmenuStrip);
 
         const navbarCollapse = document.getElementById('navbarNav');
         if (navbarCollapse) {
-            navbarCollapse.addEventListener('shown.bs.collapse', alignEcosystemStrip);
-            navbarCollapse.addEventListener('hidden.bs.collapse', alignEcosystemStrip);
+            navbarCollapse.addEventListener('shown.bs.collapse', alignSubmenuStrip);
+            navbarCollapse.addEventListener('hidden.bs.collapse', alignSubmenuStrip);
         }
     })();
     </script>

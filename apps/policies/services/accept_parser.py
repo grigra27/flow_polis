@@ -188,7 +188,12 @@ class AcceptParser:
         current_pos = uploaded_file.tell()
         try:
             uploaded_file.seek(0)
-            book = xlrd.open_workbook(file_contents=uploaded_file.read())
+            # formatting_info=True is required to read cell number formats
+            # (needed for restoring leading zeros in numeric INN cells).
+            book = xlrd.open_workbook(
+                file_contents=uploaded_file.read(),
+                formatting_info=True,
+            )
         except Exception as exc:
             raise AcceptParseError(f"Не удалось открыть .xls файл: {exc}") from exc
         finally:
@@ -199,11 +204,12 @@ class AcceptParser:
         rows = []
         for row_idx in range(sheet.nrows):
             key = self._xls_cell_value(book, sheet.cell(row_idx, 0), xldate_as_datetime)
-            value = (
-                self._xls_cell_value(book, sheet.cell(row_idx, 1), xldate_as_datetime)
-                if sheet.ncols > 1
-                else ""
-            )
+            if sheet.ncols > 1:
+                value_cell = sheet.cell(row_idx, 1)
+                value = self._xls_cell_value(book, value_cell, xldate_as_datetime)
+                value = self._restore_inn_from_xls_cell(book, key, value_cell, value)
+            else:
+                value = ""
             rows.append((key, value))
         return rows, warnings
 
@@ -225,9 +231,12 @@ class AcceptParser:
         sheet = workbook[sheet_name] if isinstance(sheet_name, str) else sheet_name
 
         rows = []
-        for row in sheet.iter_rows(min_row=1, max_col=2, values_only=True):
-            key = row[0] if len(row) > 0 else ""
-            value = row[1] if len(row) > 1 else ""
+        for row in sheet.iter_rows(min_row=1, max_col=2, values_only=False):
+            key_cell = row[0] if len(row) > 0 else None
+            value_cell = row[1] if len(row) > 1 else None
+            key = key_cell.value if key_cell is not None else ""
+            value = value_cell.value if value_cell is not None else ""
+            value = self._restore_inn_from_xlsx_cell(key, value_cell, value)
             rows.append((key, value))
         workbook.close()
         return rows, warnings
@@ -333,3 +342,64 @@ class AcceptParser:
 
     def _normalize_label(self, value):
         return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+    def _restore_inn_from_xls_cell(self, book, key, cell, value):
+        if not self._is_inn_label(key):
+            return value
+        format_str = self._get_xls_number_format(book, cell)
+        return self._restore_padded_numeric_value(value, format_str)
+
+    def _restore_inn_from_xlsx_cell(self, key, cell, value):
+        if not self._is_inn_label(key):
+            return value
+        number_format = getattr(cell, "number_format", "") if cell is not None else ""
+        return self._restore_padded_numeric_value(value, number_format)
+
+    def _is_inn_label(self, label):
+        return self._normalize_label(label) == self._normalize_label(
+            FIELD_LABELS["client_inn"]
+        )
+
+    def _get_xls_number_format(self, book, cell):
+        xf_index = getattr(cell, "xf_index", None)
+        if xf_index is None:
+            return ""
+        try:
+            xf = book.xf_list[xf_index]
+            fmt = book.format_map.get(xf.format_key)
+            return fmt.format_str if fmt else ""
+        except Exception:
+            return ""
+
+    def _restore_padded_numeric_value(self, value, number_format):
+        width = self._extract_zero_mask_width(number_format)
+        if width <= 0:
+            return value
+        digits = self._numeric_digits(value)
+        if not digits:
+            return value
+        if len(digits) > width:
+            return value
+        return digits.zfill(width)
+
+    def _extract_zero_mask_width(self, number_format):
+        if not number_format:
+            return 0
+        # Use only the positive-number section of Excel format.
+        section = str(number_format).split(";", 1)[0].strip()
+        if re.fullmatch(r"0{2,20}", section):
+            return len(section)
+        return 0
+
+    def _numeric_digits(self, value):
+        if value in ("", None):
+            return ""
+        if isinstance(value, bool):
+            return ""
+        if isinstance(value, int):
+            return str(value)
+        if isinstance(value, float):
+            if not value.is_integer():
+                return ""
+            return str(int(value))
+        return ""

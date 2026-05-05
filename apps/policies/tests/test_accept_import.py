@@ -59,6 +59,103 @@ def make_accept_xls(**overrides):
     )
 
 
+def make_accept_xls_with_numeric_inn():
+    import xlwt
+
+    values = {
+        "Наименование сокращенное": "АЛТЫН ЯР ООО, ООО",
+        "Наименование полное": 'ООО "АЛТЫН ЯР"',
+        "Наименование по учредительным документам": 'ООО "АЛТЫН ЯР"',
+        "ИНН": 123456789,
+        "Лизингополучатель": "АЛТЫН ЯР ООО",
+        "Номер ДФА": "20212-ГА-КЗ",
+        "Дата ДФА": "15.08.2025",
+        "Страхователь": "Лизингополучатель",
+        "Банк-кредитор": "Собственные средства",
+        "Выгодоприобретатель (риск утраты)": "Лизингодатель",
+        "Выгодоприобретатель (риск ущерба)": "Лизингодатель",
+        "наименование страхуемого имущества": "специальный кран СПМ Авто 732457",
+        "стоимость по ДКП, валюта": "12 750 000,00 руб",
+        "Дата поставки / дата начала страхования": "26.08.2025",
+        "Дата окончания срока лизинга": "20.08.2028",
+        "Срок страхования": "на весь срок лизинга",
+        "Необходимый вид страхования": "КАСКО",
+        "ОСАГО": "да",
+        "Марка, модель предмета лизинга": "специальный кран СПМ Авто 732457",
+        "VIN (или иной ID)": "XDC732457S9003298",
+        "Год выпуска": "2025",
+        "Место регистрации": "город Казань",
+    }
+
+    workbook = xlwt.Workbook()
+    sheet = workbook.add_sheet("TDSheet")
+    inn_style = xlwt.easyxf(num_format_str="0000000000")
+
+    for row, (label, value) in enumerate(values.items()):
+        sheet.write(row, 0, label)
+        if label == "ИНН":
+            sheet.write(row, 1, value, inn_style)
+        else:
+            sheet.write(row, 1, value)
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return SimpleUploadedFile(
+        "accept.xls",
+        buffer.read(),
+        content_type="application/vnd.ms-excel",
+    )
+
+
+def make_accept_xlsx_with_numeric_inn():
+    from openpyxl import Workbook
+
+    values = {
+        "Наименование сокращенное": "АЛТЫН ЯР ООО, ООО",
+        "Наименование полное": 'ООО "АЛТЫН ЯР"',
+        "Наименование по учредительным документам": 'ООО "АЛТЫН ЯР"',
+        "ИНН": 123456789,
+        "Лизингополучатель": "АЛТЫН ЯР ООО",
+        "Номер ДФА": "20212-ГА-КЗ",
+        "Дата ДФА": "15.08.2025",
+        "Страхователь": "Лизингополучатель",
+        "Банк-кредитор": "Собственные средства",
+        "Выгодоприобретатель (риск утраты)": "Лизингодатель",
+        "Выгодоприобретатель (риск ущерба)": "Лизингодатель",
+        "наименование страхуемого имущества": "специальный кран СПМ Авто 732457",
+        "стоимость по ДКП, валюта": "12 750 000,00 руб",
+        "Дата поставки / дата начала страхования": "26.08.2025",
+        "Дата окончания срока лизинга": "20.08.2028",
+        "Срок страхования": "на весь срок лизинга",
+        "Необходимый вид страхования": "КАСКО",
+        "ОСАГО": "да",
+        "Марка, модель предмета лизинга": "специальный кран СПМ Авто 732457",
+        "VIN (или иной ID)": "XDC732457S9003298",
+        "Год выпуска": "2025",
+        "Место регистрации": "город Казань",
+    }
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "TDSheet"
+
+    for row_idx, (label, value) in enumerate(values.items(), start=1):
+        sheet.cell(row=row_idx, column=1, value=label)
+        value_cell = sheet.cell(row=row_idx, column=2, value=value)
+        if label == "ИНН":
+            value_cell.number_format = "0000000000"
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return SimpleUploadedFile(
+        "accept.xlsx",
+        buffer.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @pytest.mark.django_db
 class TestAcceptParser:
     def test_parses_core_accept_fields(self):
@@ -80,6 +177,16 @@ class TestAcceptParser:
 
         assert result.data.start_date is None
         assert "Дата начала страхования" in " ".join(result.warnings)
+
+    def test_preserves_leading_zero_inn_from_xls_number_format(self):
+        result = parse_accept_file(make_accept_xls_with_numeric_inn())
+
+        assert result.data.client_inn == "0123456789"
+
+    def test_preserves_leading_zero_inn_from_xlsx_number_format(self):
+        result = parse_accept_file(make_accept_xlsx_with_numeric_inn())
+
+        assert result.data.client_inn == "0123456789"
 
 
 @pytest.mark.django_db

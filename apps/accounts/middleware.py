@@ -174,9 +174,16 @@ class PermissionCheckMiddleware:
             r".*/delete/$",  # Delete URLs (generic)
             r".*/\d+/delete/$",  # Delete URLs with ID
         ]
+        # URL patterns explicitly opened to authenticated non-staff users.
+        self.exempt_patterns = [
+            r"^/policies/payments/scheduled/tasks/\d+/update/$",
+        ]
         # Compile patterns for better performance
         self.compiled_patterns = [
             re.compile(pattern) for pattern in self.protected_patterns
+        ]
+        self.compiled_exempt_patterns = [
+            re.compile(pattern) for pattern in self.exempt_patterns
         ]
 
     def __call__(self, request):
@@ -228,6 +235,9 @@ class PermissionCheckMiddleware:
         Returns:
             bool: True if the path is protected, False otherwise
         """
+        for pattern in self.compiled_exempt_patterns:
+            if pattern.match(path):
+                return False
         for pattern in self.compiled_patterns:
             if pattern.search(path):
                 return True

@@ -248,7 +248,10 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     content = response.content.decode("utf-8")
     assert "Пролонгация" in content
     assert "Страница находится в разработке." in content
-    assert f'class="nav-link active" href="{reverse("policies:payments")}"' in content
+    assert (
+        f'class="nav-link submenu-tab active" href="{reverse("policies:payments")}"'
+        in content
+    )
     assert f'class="nav-link active" href="{reverse("policies:list")}"' not in content
 
 

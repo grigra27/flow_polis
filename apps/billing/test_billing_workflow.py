@@ -209,26 +209,19 @@ def test_comment_update_does_not_create_history_event(billing_payment):
 
 
 @pytest.mark.django_db
-def test_scheduled_payments_pages_require_admin_access(client, billing_payment):
-    regular_user = User.objects.create_user(username="regular", password="testpass123")
-    client.force_login(regular_user)
-
+def test_scheduled_payments_pages_require_login(client, billing_payment):
     response = client.get(reverse("policies:scheduled_payments"))
 
     assert response.status_code == 302
-    assert reverse("accounts:access_denied") in response["Location"]
+    assert reverse("accounts:login") in response["Location"]
 
     response = client.get(reverse("policies:prolongation"))
 
     assert response.status_code == 302
-    assert reverse("accounts:access_denied") in response["Location"]
+    assert reverse("accounts:login") in response["Location"]
 
-    admin_user = User.objects.create_user(
-        username="billing_admin",
-        password="testpass123",
-        is_staff=True,
-    )
-    client.force_login(admin_user)
+    regular_user = User.objects.create_user(username="regular", password="testpass123")
+    client.force_login(regular_user)
 
     response = client.get(reverse("policies:scheduled_payments"))
 
@@ -252,8 +245,11 @@ def test_scheduled_payments_pages_require_admin_access(client, billing_payment):
     response = client.get(reverse("policies:prolongation"))
 
     assert response.status_code == 200
-    assert "Пролонгация" in response.content.decode("utf-8")
-    assert "Страница находится в разработке." in response.content.decode("utf-8")
+    content = response.content.decode("utf-8")
+    assert "Пролонгация" in content
+    assert "Страница находится в разработке." in content
+    assert f'class="nav-link active" href="{reverse("policies:payments")}"' in content
+    assert f'class="nav-link active" href="{reverse("policies:list")}"' not in content
 
 
 @pytest.mark.django_db
@@ -305,7 +301,7 @@ def test_task_detail_displays_payment_note(client, billing_payment):
 
 
 @pytest.mark.django_db
-def test_scheduled_payments_mark_policy_without_broker_in_list_and_detail(
+def test_scheduled_payments_exclude_policy_without_broker_from_list_and_counts(
     client, billing_payment
 ):
     billing_payment.policy.broker_participation = False
@@ -316,30 +312,35 @@ def test_scheduled_payments_mark_policy_without_broker_in_list_and_detail(
         password="testpass123",
         is_staff=True,
     )
-    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
-    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    period, _ = BillingPeriod.objects.get_or_create(
+        year=billing_payment.due_date.year,
+        month=billing_payment.due_date.month,
+    )
+    period_options = build_period_options([period], period)
+    payment_option = period_options[0]
+    assert payment_option.total == 0
+    assert payment_option.to_request == 0
+
+    sync_period(period.year, period.month)
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
 
     client.force_login(admin_user)
 
     response = client.get(
         reverse("policies:scheduled_payments"),
-        {"period": task.period.code},
+        {"period": period.code},
     )
     assert response.status_code == 200
     content = response.content.decode("utf-8")
-    assert "Без брокера" in content
-    assert 'title="Без участия брокера"' in content
-
-    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
-    assert response.status_code == 200
-    content = response.content.decode("utf-8")
-    assert "mgr-chip--nobroker" in content
-    assert "Без участия брокера" in content
+    assert billing_payment.policy.policy_number not in content
+    assert billing_payment.policy.client.client_name not in content
+    assert "Без брокера" not in content
+    assert 'title="Без участия брокера"' not in content
 
 
 @pytest.mark.django_db
 def test_task_status_form_updates_status_only(client, billing_payment):
-    user = User.objects.create_superuser(
+    user = User.objects.create_user(
         username="status_only_admin",
         password="testpass123",
     )
@@ -371,7 +372,7 @@ def test_task_status_form_updates_status_only(client, billing_payment):
 def test_task_comment_form_updates_comment_without_status_change(
     client, billing_payment
 ):
-    user = User.objects.create_superuser(
+    user = User.objects.create_user(
         username="comment_only_admin",
         password="testpass123",
     )
@@ -404,7 +405,36 @@ def test_task_comment_form_updates_comment_without_status_change(
 
 
 @pytest.mark.django_db
-def test_payments_page_shows_scheduled_payments_button_only_to_admin(
+def test_regular_user_can_bulk_update_task_status(client, billing_payment):
+    user = User.objects.create_user(
+        username="bulk_regular",
+        password="testpass123",
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    client.force_login(user)
+    next_url = reverse("policies:scheduled_payments")
+    response = client.post(
+        reverse("policies:scheduled_payment_bulk_update"),
+        {
+            "task_ids": [str(task.id)],
+            "status": BillingTask.STATUS_REQUESTED,
+            "next": next_url,
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.url == next_url
+
+    task.refresh_from_db()
+    assert task.status == BillingTask.STATUS_REQUESTED
+    assert task.responsible == user
+    assert task.events.filter(event_type=BillingTaskEvent.EVENT_STATUS_CHANGED).exists()
+
+
+@pytest.mark.django_db
+def test_payments_page_shows_scheduled_payments_buttons_to_authenticated_users(
     client, billing_payment
 ):
     regular_user = User.objects.create_user(
@@ -416,8 +446,10 @@ def test_payments_page_shows_scheduled_payments_button_only_to_admin(
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
-    assert "Очередные взносы" not in content
-    assert "Пролонгация" not in content
+    assert "Очередные взносы" in content
+    assert "Пролонгация" in content
+    assert reverse("policies:scheduled_payments") in content
+    assert reverse("policies:prolongation") in content
 
     admin_user = User.objects.create_user(
         username="payments_admin",

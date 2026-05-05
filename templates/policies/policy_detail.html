@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load currency_filters %}
 {% load insurer_tags %}
+{% load static %}
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
@@ -80,8 +81,9 @@
                         <div class="mt-3">
                             <strong>Менеджер:</strong><br>
                             {% if policy.leasing_manager %}
-                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" class="text-decoration-none">
-                                    {{ policy.leasing_manager }}
+                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
+                                    <img src="{% static 'images/alliance-logo.png' %}" alt="Allianz Leasing" title="Менеджер Allianz Leasing" style="width:18px;height:18px;object-fit:contain;vertical-align:-3px;">
+                                    <span>{{ policy.leasing_manager }}</span>
                                 </a>
                             {% else %}
                                 —

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load insurer_tags %}
 {% load currency_filters %}
+{% load static %}
 
 {% block title %}{{ manager.full_name|default:manager.name }}{% endblock %}
 
@@ -40,6 +41,12 @@
         letter-spacing: 0.07em;
         color: var(--v2-muted);
         margin-bottom: 0.2rem;
+    }
+    .mgr-brand-logo {
+        width: 22px;
+        height: 22px;
+        object-fit: contain;
+        flex-shrink: 0;
     }
     .mgr-page-title {
         font-size: 1.5rem;
@@ -264,7 +271,7 @@
     <!-- Page header -->
     <div class="mgr-page-header">
         <div>
-            <div class="mgr-page-kicker"><i class="bi bi-people"></i> Команда Альянс-лизинга</div>
+            <div class="mgr-page-kicker"><i class="bi bi-people"></i> Команда <img src="{% static 'images/alliance-logo.png' %}" alt="" style="width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin:0 0.15rem;"> Альянс-лизинга</div>
             <h1 class="mgr-page-title">{{ manager.full_name|default:manager.name }}</h1>
         </div>
         <div class="mgr-header-actions">
@@ -286,7 +293,9 @@
             <div class="mgr-section">
                 <div class="mgr-section-head">
                     <div class="mgr-section-head-title">
-                        <i class="bi bi-person-badge"></i> Информация о менеджере
+                        <i class="bi bi-person-badge"></i>
+                        <img src="{% static 'images/alliance-logo.png' %}" alt="" class="mgr-brand-logo">
+                        Информация о менеджере
                     </div>
                 </div>
                 <div class="mgr-section-body">

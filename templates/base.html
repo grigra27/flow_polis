@@ -38,12 +38,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' %} active{% endif %}" href="{% url 'policies:list' %}" {% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' %}aria-current="page"{% endif %}>
+                        <a class="nav-link{% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' and current_view != 'policies:prolongation' %} active{% endif %}" href="{% url 'policies:list' %}" {% if current_namespace == 'policies' and current_view != 'policies:payments' and current_view != 'policies:scheduled_payments' and current_view != 'policies:scheduled_payment_task' and current_view != 'policies:prolongation' %}aria-current="page"{% endif %}>
                             <i class="bi bi-file-earmark-text"></i> Полисы
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link{% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' %} active{% endif %}" href="{% url 'policies:payments' %}" {% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' %}aria-current="page"{% endif %}>
+                        <a class="nav-link{% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:prolongation' %} active{% endif %}" href="{% url 'policies:payments' %}" {% if current_view == 'policies:payments' or current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:prolongation' %}aria-current="page"{% endif %}>
                             <i class="bi bi-calendar-check"></i> Платежи
                         </a>
                     </li>

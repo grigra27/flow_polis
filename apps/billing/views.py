@@ -1,14 +1,13 @@
 from datetime import date
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, TemplateView
-
-from apps.accounts.mixins import AdminRequiredMixin
 
 from .models import BillingTask
 from .services import (
@@ -71,7 +70,7 @@ def _payment_context(task: BillingTask) -> str:
     return f"{head} · {payment.year_number}-й год"
 
 
-class BillingPeriodListView(AdminRequiredMixin, TemplateView):
+class BillingPeriodListView(LoginRequiredMixin, TemplateView):
     template_name = "billing/period_list.html"
     paginate_by = 50
 
@@ -117,11 +116,11 @@ class BillingPeriodListView(AdminRequiredMixin, TemplateView):
         return context
 
 
-class BillingProlongationPlaceholderView(AdminRequiredMixin, TemplateView):
+class BillingProlongationPlaceholderView(LoginRequiredMixin, TemplateView):
     template_name = "billing/prolongation_placeholder.html"
 
 
-class BillingTaskDetailView(AdminRequiredMixin, DetailView):
+class BillingTaskDetailView(LoginRequiredMixin, DetailView):
     model = BillingTask
     template_name = "billing/task_detail.html"
     context_object_name = "task"
@@ -141,6 +140,7 @@ class BillingTaskDetailView(AdminRequiredMixin, DetailView):
                 "payment_schedule__policy__branch",
                 "payment_schedule__policy__leasing_manager",
             )
+            .filter(payment_schedule__policy__broker_participation=True)
             .prefetch_related("events__user")
         )
 
@@ -169,9 +169,13 @@ class BillingTaskDetailView(AdminRequiredMixin, DetailView):
         return context
 
 
-class BillingTaskUpdateView(AdminRequiredMixin, View):
+class BillingTaskUpdateView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        task = get_object_or_404(BillingTask, pk=pk)
+        task = get_object_or_404(
+            BillingTask,
+            pk=pk,
+            payment_schedule__policy__broker_participation=True,
+        )
         next_url = request.POST.get("next") or task.get_absolute_url()
         action = request.POST.get("action")
         new_status = request.POST.get("status")
@@ -202,7 +206,7 @@ class BillingTaskUpdateView(AdminRequiredMixin, View):
         return redirect(next_url)
 
 
-class BillingTaskBulkUpdateView(AdminRequiredMixin, View):
+class BillingTaskBulkUpdateView(LoginRequiredMixin, View):
     def post(self, request):
         task_ids = request.POST.getlist("task_ids")
         new_status = request.POST.get("status")
@@ -218,7 +222,10 @@ class BillingTaskBulkUpdateView(AdminRequiredMixin, View):
             return redirect(next_url)
 
         updated_count = 0
-        for task in BillingTask.objects.filter(id__in=task_ids):
+        for task in BillingTask.objects.filter(
+            id__in=task_ids,
+            payment_schedule__policy__broker_participation=True,
+        ):
             previous_updated_at = task.updated_at
             update_task(task, request.user, new_status=new_status)
             if task.updated_at != previous_updated_at:

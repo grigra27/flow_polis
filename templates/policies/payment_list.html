@@ -664,7 +664,7 @@
                 <div class="mgr-page-kicker"><i class="bi bi-calendar2-week"></i> Страхование</div>
                 <h1 class="mgr-page-title">График платежей</h1>
             </div>
-            {% if request.user.is_staff %}
+            {% if request.user.is_authenticated %}
             <div class="mgr-page-actions">
                 <a class="btn-scheduled-payments" href="{% url 'policies:scheduled_payments' %}">
                     <i class="bi bi-receipt-cutoff"></i> Очередные взносы

@@ -134,6 +134,7 @@ def sync_period(year, month):
             due_date__lte=period.ends_on,
             paid_date__isnull=True,
             policy__policy_active=True,
+            policy__broker_participation=True,
         )
         .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
         .values("id", "due_date")
@@ -236,6 +237,7 @@ def build_period_options(periods, selected_period):
     period_keys = {(period.year, period.month) for period in periods}
     counts = (
         BillingTask.objects.filter(period__in=periods)
+        .filter(payment_schedule__policy__broker_participation=True)
         .exclude(
             payment_schedule__year_number=1,
             payment_schedule__installment_number=1,
@@ -256,6 +258,7 @@ def build_period_options(periods, selected_period):
                 due_date__lte=max_end,
                 paid_date__isnull=True,
                 policy__policy_active=True,
+                policy__broker_participation=True,
                 billing_task__isnull=True,
             )
             .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
@@ -308,6 +311,7 @@ def get_tasks_queryset(period, request_get):
         "payment_schedule__policy__branch",
         "payment_schedule__policy__leasing_manager",
     )
+    tasks = tasks.filter(payment_schedule__policy__broker_participation=True)
     tasks = tasks.exclude(
         payment_schedule__year_number=1,
         payment_schedule__installment_number=1,

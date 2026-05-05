@@ -811,6 +811,9 @@ class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
             reverse("insurers:manager_detail", args=[self.manager_ivan.id])
         )
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "images/alliance-logo.png")
+        self.assertContains(response, "Команда")
+        self.assertContains(response, "Альянс-лизинга")
 
         policies = list(response.context["policies"])
         self.assertEqual(len(policies), 2)
@@ -856,6 +859,8 @@ class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         manager_url = reverse("insurers:manager_detail", args=[self.manager_ivan.id])
         self.assertContains(response, manager_url)
+        self.assertContains(response, "images/alliance-logo.png")
+        self.assertContains(response, "Менеджер Allianz Leasing")
         self.assertContains(response, self.manager_ivan.name)
 
 

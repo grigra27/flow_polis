@@ -135,7 +135,7 @@
             <div id="ecosystemStripLinks" class="ecosystem-strip-links">
                 <a class="ecosystem-strip-link{% if current_view == 'policies:payments' %} active{% endif %}"
                    href="{% url 'policies:payments' %}">
-                    <i class="bi bi-calendar2-week"></i> График
+                    <i class="bi bi-calendar2-week"></i> График платежей
                 </a>
                 <a class="ecosystem-strip-link{% if current_view == 'policies:scheduled_payments' or current_view == 'policies:scheduled_payment_task' or current_view == 'policies:scheduled_payment_task_update' or current_view == 'policies:scheduled_payment_bulk_update' %} active{% endif %}"
                    href="{% url 'policies:scheduled_payments' %}">

@@ -241,9 +241,11 @@ class BillingTask(TimeStampedModel):
         return self._wrap_letter_html(self.build_letter_text())
 
     def build_alliance_letter_subject(self):
-        # Тема пока совпадает с письмом в СК; при необходимости легко
-        # отделить здесь свой формат.
-        return self.build_letter_subject()
+        dfa_number = self.policy.dfa_number or "Без ДФА"
+        insurer_name = (
+            self.policy.insurer.insurer_name or ""
+        ).strip() or "Без страховщика"
+        return f"Страхование --- счет --- {dfa_number} --- {insurer_name}"
 
     def build_alliance_letter_text(self):
         policy = self.policy

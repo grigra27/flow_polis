@@ -50,49 +50,6 @@
         margin: 0;
         line-height: 1.25;
     }
-    /* Кнопки-ссылки в смежные billing-модули. Тёплый amber из той же
-       гаммы, что warning-status (#92400e on #fef3c7) и hero-плитка
-       «Крайний срок запроса счёта» — контекстно близко к теме «дедлайны
-       и платежи», поэтому гармонично, и при этом ярко выделяется на
-       синей странице. */
-    .btn-scheduled-payments {
-        background: #d97706;
-        border: 1px solid #d97706;
-        color: #ffffff;
-        font-size: 0.95rem;
-        font-weight: 700;
-        border-radius: 10px;
-        padding: 0.58rem 1.1rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        text-decoration: none;
-        white-space: nowrap;
-        letter-spacing: 0.01em;
-        box-shadow: 0 3px 10px rgba(217,119,6,0.28);
-        transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn-scheduled-payments i {
-        font-size: 1.05rem;
-    }
-    .btn-scheduled-payments:hover {
-        background: #b45309;
-        border-color: #b45309;
-        color: #ffffff;
-        text-decoration: none;
-        box-shadow: 0 5px 14px rgba(180,83,9,0.34);
-    }
-    .btn-scheduled-payments:active {
-        background: #92400e;
-        box-shadow: 0 2px 6px rgba(146,64,14,0.38);
-    }
-    .mgr-page-actions {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
 
     /* Branch tabs */
     .pl-branch-tabs {
@@ -313,14 +270,6 @@
         .mgr-page-header-row {
             flex-direction: column;
             align-items: stretch;
-        }
-        .mgr-page-actions {
-            width: 100%;
-            justify-content: stretch;
-        }
-        .btn-scheduled-payments {
-            justify-content: center;
-            flex: 1 1 auto;
         }
         .mgr-section--filters .mgr-section-body {
             padding: 0.48rem 0.56rem 0.56rem;
@@ -664,16 +613,6 @@
                 <div class="mgr-page-kicker"><i class="bi bi-calendar2-week"></i> Страхование</div>
                 <h1 class="mgr-page-title">График платежей</h1>
             </div>
-            {% if request.user.is_authenticated %}
-            <div class="mgr-page-actions">
-                <a class="btn-scheduled-payments" href="{% url 'policies:scheduled_payments' %}">
-                    <i class="bi bi-receipt-cutoff"></i> Очередные взносы
-                </a>
-                <a class="btn-scheduled-payments" href="{% url 'policies:prolongation' %}">
-                    <i class="bi bi-arrow-repeat"></i> Пролонгация
-                </a>
-            </div>
-            {% endif %}
         </div>
     </div>
 

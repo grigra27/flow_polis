@@ -104,10 +104,13 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert "Всего платежей в году" not in letter
     assert "Этот платеж в году" not in letter
     alliance_letter = task.build_alliance_letter_text()
+    assert "Год страхования: 2 год страхования" in alliance_letter
     assert "Страховая сумма: 1 000 000,00 руб." in alliance_letter
     assert "Тип взноса: годовой" in alliance_letter
+    assert "Страховщик:" not in alliance_letter
+    assert "Лизингополучатель:" not in alliance_letter
     assert subject == "Счёт на годовой взнос --- DFA-001 --- POL-001"
-    assert alliance_subject == "Страхование --- счет --- DFA-001 --- Тестовая страховая"
+    assert alliance_subject == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая"
 
 
 @pytest.mark.django_db
@@ -132,9 +135,12 @@ def test_letter_contains_installment_metadata_for_installment_plan(billing_payme
     assert "Всего платежей в году" not in letter
     assert "Этот платеж в году" not in letter
     alliance_letter = task.build_alliance_letter_text()
+    assert "Год страхования: 2 год страхования" in alliance_letter
     assert "Тип взноса: рассрочка, платёж 1 из 2" in alliance_letter
+    assert "Страховщик:" not in alliance_letter
+    assert "Лизингополучатель:" not in alliance_letter
     assert subject == "Счёт на очередной взнос --- DFA-001 --- POL-001"
-    assert alliance_subject == "Страхование --- счет --- DFA-001 --- Тестовая страховая"
+    assert alliance_subject == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая"
 
 
 @pytest.mark.django_db
@@ -244,7 +250,8 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     assert "Тестовая страховая" in content
     assert "Тема письма" in content
     assert "Счёт на годовой взнос --- DFA-001 --- POL-001" in content
-    assert "Страхование --- счет --- DFA-001 --- Тестовая страховая" in content
+    assert "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая" in content
+    assert "Год страхования: 2 год страхования" in content
     assert reverse("policies:detail", args=[billing_payment.policy.id]) in content
 
     response = client.get(reverse("policies:prolongation"))

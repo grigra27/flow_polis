@@ -245,7 +245,7 @@ class BillingTask(TimeStampedModel):
         insurer_name = (
             self.policy.insurer.insurer_name or ""
         ).strip() or "Без страховщика"
-        return f"Страхование --- счет --- {dfa_number} --- {insurer_name}"
+        return f"СТРАХОВАНИЕ --- счет --- {dfa_number} --- {insurer_name}"
 
     def build_alliance_letter_text(self):
         policy = self.policy
@@ -271,13 +271,11 @@ class BillingTask(TimeStampedModel):
             f"Номер полиса: {policy.policy_number}",
             "Период договора страхования: "
             f"{_fmt_date(policy.start_date)} — {_fmt_date(policy.end_date)}",
-            f"Страховщик: {policy.insurer.insurer_name}",
         ]
         if policy.policyholder:
             contract_block.append(f"Страхователь: {policy.policyholder.client_name}")
         contract_block.extend(
             [
-                f"Лизингополучатель: {policy.client.client_name}",
                 f"Объект страхования: {policy.property_description or '—'}",
             ]
         )
@@ -292,6 +290,7 @@ class BillingTask(TimeStampedModel):
             f"Оплатить до: {alliance_due_str}",
             f"Сумма к оплате: {format_money(self.amount)}",
             f"Страховая сумма: {format_money(payment.insurance_sum)}",
+            f"Год страхования: {payment.year_number} год страхования",
             payment_type_line,
         ]
 

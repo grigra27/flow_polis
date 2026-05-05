@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.db.models import Q, Sum
+from django.db.models import Max, Q, Sum
 from django.db.models.functions import Coalesce
 from django.test import TestCase
 from django.urls import reverse
@@ -276,10 +276,15 @@ class DashboardV2ServiceTests(TestCase):
             policy__policy_active=True,
             policy__broker_participation=False,
         )
-        expected_non_broker_sum = non_broker_qs.filter(
-            Q(due_date__lt=current_month_start, paid_date__isnull=False)
-            | Q(due_date__gte=current_month_start)
-        ).aggregate(total=Coalesce(Sum("insurance_sum"), Decimal("0")))["total"]
+        expected_non_broker_sum = sum(
+            (
+                row["policy_max"] or Decimal("0")
+                for row in non_broker_qs.values("policy_id").annotate(
+                    policy_max=Max("insurance_sum")
+                )
+            ),
+            Decimal("0"),
+        )
         self.assertEqual(all_sum - broker_sum, expected_non_broker_sum)
 
         all_premium = all_structure["top_branch_premium"]["bridge_insurance_sum"]
@@ -289,6 +294,87 @@ class DashboardV2ServiceTests(TestCase):
             | Q(due_date__gte=current_month_start)
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"]
         self.assertEqual(all_premium - broker_premium, expected_non_broker_premium)
+
+    def test_structure_counts_one_max_insurance_sum_per_policy(self):
+        today = timezone.localdate()
+        current_month_start = today.replace(day=1)
+        client = Client.objects.create(
+            client_name="ООО Многолетний Клиент",
+            client_inn="9876543210",
+        )
+        insurer = Insurer.objects.get(insurer_name="СК Тест")
+        branch = Branch.objects.create(branch_name="Многолетний филиал")
+        insurance_type = InsuranceType.objects.get(name="КАСКО")
+        commission_rate = CommissionRate.objects.get(
+            insurer=insurer,
+            insurance_type=insurance_type,
+        )
+        policy = Policy.objects.create(
+            policy_number="P-MULTI",
+            dfa_number="DFA-MULTI",
+            client=client,
+            insurer=insurer,
+            branch=branch,
+            insurance_type=insurance_type,
+            property_description="Многолетний объект",
+            start_date=current_month_start - timedelta(days=30),
+            end_date=current_month_start + timedelta(days=900),
+            franchise=Decimal("0"),
+            policy_active=True,
+            policy_uploaded=True,
+            broker_participation=True,
+        )
+
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=current_month_start - timedelta(days=1),
+            amount=Decimal("10000.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=commission_rate,
+            kv_rub=Decimal("1000.00"),
+            paid_date=current_month_start - timedelta(days=1),
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=current_month_start + timedelta(days=180),
+            amount=Decimal("20000.00"),
+            insurance_sum=Decimal("900000.00"),
+            commission_rate=commission_rate,
+            kv_rub=Decimal("2000.00"),
+            paid_date=None,
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=3,
+            installment_number=1,
+            due_date=current_month_start + timedelta(days=540),
+            amount=Decimal("30000.00"),
+            insurance_sum=Decimal("800000.00"),
+            commission_rate=commission_rate,
+            kv_rub=Decimal("3000.00"),
+            paid_date=None,
+        )
+
+        structure = DashboardV2Service().get_dashboard_context()[
+            "dashboard_v2_structure"
+        ]
+        branch_sum_row = next(
+            row for row in structure["by_branch"] if row["name"] == branch.branch_name
+        )
+        branch_premium_row = next(
+            row
+            for row in structure["branch_breakdown_premium"]["top"]
+            if row["name"] == branch.branch_name
+        )
+
+        self.assertEqual(branch_sum_row["bridge_insurance_sum"], Decimal("1000000.00"))
+        self.assertEqual(
+            branch_premium_row["bridge_insurance_sum"], Decimal("60000.00")
+        )
 
 
 class DashboardV2ViewTests(TestCase):

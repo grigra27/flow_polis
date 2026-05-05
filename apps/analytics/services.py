@@ -12,6 +12,7 @@ from django.db.models import (
     Avg,
     Count,
     DecimalField,
+    Max,
     OuterRef,
     Q,
     QuerySet,
@@ -37,6 +38,24 @@ def _policy_premium_subquery():
         PaymentSchedule.objects.filter(policy=OuterRef("pk"))
         .values("policy")
         .annotate(total=Sum("amount"))
+        .values("total")
+    )
+
+
+def _policy_insurance_sum_subquery_for_payment():
+    """
+    Subquery для получения одной страховой суммы полиса.
+
+    Для аналитики страховая сумма договора считается как Max(insurance_sum)
+    по всему графику платежей договора, чтобы многолетние договоры не
+    умножались на количество лет или взносов.
+    """
+    from apps.policies.models import PaymentSchedule
+
+    return (
+        PaymentSchedule.objects.filter(policy_id=OuterRef("policy_id"))
+        .values("policy_id")
+        .annotate(total=Max("insurance_sum"))
         .values("total")
     )
 
@@ -138,6 +157,9 @@ class MetricsCalculator:
         """
         Calculate total insurance sum from payment schedule.
 
+        Each policy contributes only once, using the maximum insurance_sum
+        from the full payment schedule of that policy.
+
         Args:
             queryset: QuerySet of PaymentSchedule objects
             date_range: Optional dict with 'start' and 'end' date keys for filtering
@@ -151,8 +173,24 @@ class MetricsCalculator:
             if "end" in date_range and date_range["end"]:
                 queryset = queryset.filter(due_date__lte=date_range["end"])
 
-        result = queryset.aggregate(total=Coalesce(Sum("insurance_sum"), Decimal("0")))
-        return result["total"]
+        policy_rows = (
+            queryset.order_by()
+            .values("policy_id")
+            .distinct()
+            .annotate(
+                policy_insurance_sum=Coalesce(
+                    Subquery(
+                        _policy_insurance_sum_subquery_for_payment(),
+                        output_field=DecimalField(max_digits=15, decimal_places=2),
+                    ),
+                    Decimal("0"),
+                )
+            )
+        )
+        return sum(
+            (row.get("policy_insurance_sum") or Decimal("0") for row in policy_rows),
+            Decimal("0"),
+        )
 
     def calculate_policy_count(
         self, queryset: QuerySet, date_range: Optional[Dict[str, date]] = None
@@ -385,13 +423,19 @@ class AnalyticsService:
 
     @staticmethod
     def _build_payment_metrics_map(
-        payments_qs: QuerySet, group_field: str
+        payments_qs: QuerySet,
+        group_field: str,
+        *,
+        include_insurance_sum: bool = True,
     ) -> Dict[int, Dict[str, Decimal]]:
         """Build grouped premium/commission/insurance sum metrics by foreign key field."""
-        rows = payments_qs.values(group_field).annotate(
-            premium_volume=Coalesce(Sum("amount"), Decimal("0")),
-            commission_revenue=Coalesce(Sum("kv_rub"), Decimal("0")),
-            insurance_sum=Coalesce(Sum("insurance_sum"), Decimal("0")),
+        rows = (
+            payments_qs.order_by()
+            .values(group_field)
+            .annotate(
+                premium_volume=Coalesce(Sum("amount"), Decimal("0")),
+                commission_revenue=Coalesce(Sum("kv_rub"), Decimal("0")),
+            )
         )
         metrics_map: Dict[int, Dict[str, Decimal]] = {}
         for row in rows:
@@ -401,8 +445,40 @@ class AnalyticsService:
             metrics_map[int(group_id)] = {
                 "premium_volume": row.get("premium_volume") or Decimal("0"),
                 "commission_revenue": row.get("commission_revenue") or Decimal("0"),
-                "insurance_sum": row.get("insurance_sum") or Decimal("0"),
+                "insurance_sum": Decimal("0"),
             }
+
+        if not include_insurance_sum:
+            return metrics_map
+
+        insurance_rows = (
+            payments_qs.order_by()
+            .values(group_field, "policy_id")
+            .distinct()
+            .annotate(
+                policy_insurance_sum=Coalesce(
+                    Subquery(
+                        _policy_insurance_sum_subquery_for_payment(),
+                        output_field=DecimalField(max_digits=15, decimal_places=2),
+                    ),
+                    Decimal("0"),
+                )
+            )
+        )
+        for row in insurance_rows:
+            group_id = row.get(group_field)
+            if group_id is None:
+                continue
+            metrics = metrics_map.setdefault(
+                int(group_id),
+                {
+                    "premium_volume": Decimal("0"),
+                    "commission_revenue": Decimal("0"),
+                    "insurance_sum": Decimal("0"),
+                },
+            )
+            metrics["insurance_sum"] += row.get("policy_insurance_sum") or Decimal("0")
+
         return metrics_map
 
     @staticmethod
@@ -512,12 +588,18 @@ class AnalyticsService:
                 closed_months_actual_qs
             )
 
-            # Bridge totals: actual (closed months) + planned (current and future)
+            # Bridge totals: premium/commission are additive payment flows.
+            # Insurance sum is a policy exposure, so a policy contributes once.
             bridge_premium_volume = actual_premium_volume + planned_premium_volume
             bridge_commission_revenue = (
                 actual_commission_revenue + planned_commission_revenue
             )
-            bridge_insurance_sum = actual_insurance_sum + planned_insurance_sum
+            bridge_insurance_sum = self.calculator.calculate_insurance_sum(
+                payments_qs.filter(
+                    Q(due_date__lt=current_month_start, paid_date__isnull=False)
+                    | Q(due_date__gte=current_month_start)
+                )
+            )
 
             total_policy_count = self.calculator.calculate_policy_count(
                 policies_qs, date_range
@@ -1374,6 +1456,7 @@ class AnalyticsService:
             planned_metrics_map = self._build_payment_metrics_map(
                 payments_qs.filter(due_date__gte=current_month_start),
                 "policy__insurer_id",
+                include_insurance_sum=False,
             )
             actual_metrics_map = self._build_payment_metrics_map(
                 payments_qs.filter(
@@ -1381,6 +1464,7 @@ class AnalyticsService:
                     paid_date__isnull=False,
                 ),
                 "policy__insurer_id",
+                include_insurance_sum=False,
             )
 
             rows = []

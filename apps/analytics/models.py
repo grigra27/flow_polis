@@ -20,14 +20,14 @@ class DashboardMetrics:
         total_premium_volume: Legacy alias of planned premium volume
         total_commission_revenue: Legacy alias of planned commission revenue
         total_policy_count: Total number of policies
-        total_insurance_sum: Legacy alias of planned insurance sum
+        total_insurance_sum: Unique bridge insurance sum by max policy sum
         active_policies_count: Number of currently active policies
         planned_premium_volume: Scheduled premium volume
         actual_premium_volume: Collected premium volume (paid schedules only)
         planned_commission_revenue: Scheduled commission revenue
         actual_commission_revenue: Collected commission revenue (paid schedules only)
-        planned_insurance_sum: Scheduled insurance sum
-        actual_insurance_sum: Collected insurance sum (paid schedules only)
+        planned_insurance_sum: Scheduled policies' max insurance sum
+        actual_insurance_sum: Paid closed-month policies' max insurance sum
         current_year_growth: Growth percentage compared to previous year
         average_commission_rate: Average commission rate percentage
         filter_applied: Whether any filters are currently applied
@@ -59,7 +59,7 @@ class BranchMetric:
         premium_volume: Total premium volume for this branch
         commission_revenue: Total commission revenue for this branch
         policy_count: Number of policies for this branch
-        insurance_sum: Total insurance sum for this branch
+        insurance_sum: Sum of max policy insurance sums for this branch
         insurance_type_distribution: Distribution of policies by insurance type
         market_share: Branch's market share as percentage
     """
@@ -101,7 +101,7 @@ class InsurerMetric:
         premium_volume: Total premium volume for this insurer
         commission_revenue: Total commission revenue for this insurer
         policy_count: Number of policies for this insurer
-        insurance_sum: Total insurance sum for this insurer
+        insurance_sum: Sum of max policy insurance sums for this insurer
         insurance_type_distribution: Distribution of policies by insurance type
         market_share: Insurer's market share as percentage
     """
@@ -145,7 +145,7 @@ class ClientMetric:
         premium_volume: Total premium volume for this client
         commission_revenue: Total commission revenue for this client
         policy_count: Number of policies for this client
-        insurance_sum: Total insurance sum for this client
+        insurance_sum: Sum of max policy insurance sums for this client
         average_policy_value: Average policy value for this client
         insurance_type_distribution: Distribution of policies by insurance type
         branch_distribution: Distribution of policies by branch

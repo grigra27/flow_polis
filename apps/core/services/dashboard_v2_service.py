@@ -851,25 +851,22 @@ class DashboardV2Service:
         )
         planned_qs = scoped_payments_qs.filter(due_date__gte=current_month_start)
 
-        by_branch = self._build_bridge_distribution(
-            actual_qs=actual_qs,
-            planned_qs=planned_qs,
+        by_branch = self._build_policy_max_distribution(
+            payments_qs=scoped_payments_qs,
             label_field="policy__branch__branch_name",
             id_field="policy__branch_id",
             logo_field="policy__branch__logo",
             value_field="insurance_sum",
         )
-        by_insurer = self._build_bridge_distribution(
-            actual_qs=actual_qs,
-            planned_qs=planned_qs,
+        by_insurer = self._build_policy_max_distribution(
+            payments_qs=scoped_payments_qs,
             label_field="policy__insurer__insurer_name",
             id_field="policy__insurer_id",
             logo_field="policy__insurer__logo",
             value_field="insurance_sum",
         )
-        by_type = self._build_bridge_distribution(
-            actual_qs=actual_qs,
-            planned_qs=planned_qs,
+        by_type = self._build_policy_max_distribution(
+            payments_qs=scoped_payments_qs,
             label_field="policy__insurance_type__name",
             id_field="policy__insurance_type_id",
             logo_field="policy__insurance_type__icon",
@@ -926,6 +923,51 @@ class DashboardV2Service:
                 by_type_premium, palette=PIE_PALETTE_PREMIUM
             ),
         }
+
+    def _build_policy_max_distribution(
+        self,
+        *,
+        payments_qs,
+        label_field: str,
+        id_field: str | None = None,
+        logo_field: str | None = None,
+        value_field: str = "insurance_sum",
+    ) -> List[Dict[str, Any]]:
+        value_fields = [label_field, "policy_id"]
+        if id_field:
+            value_fields.append(id_field)
+        if logo_field:
+            value_fields.append(logo_field)
+
+        policy_rows = (
+            payments_qs.values(*value_fields)
+            .annotate(policy_max=Coalesce(Max(value_field), DECIMAL_ZERO))
+            .order_by()
+        )
+
+        aggregate_map: Dict[str, Dict[str, Any]] = {}
+
+        for row in policy_rows:
+            label = row.get(label_field) or "Не указано"
+            entity_id = row.get(id_field) if id_field else None
+            logo_url = _media_url(row.get(logo_field)) if logo_field else None
+            key = f"{entity_id}:{label}" if entity_id is not None else label
+
+            aggregate_map.setdefault(
+                key,
+                {
+                    "id": entity_id,
+                    "name": label,
+                    "logo_url": logo_url,
+                    "fact": DECIMAL_ZERO,
+                    "plan": DECIMAL_ZERO,
+                },
+            )
+            if logo_url and not aggregate_map[key]["logo_url"]:
+                aggregate_map[key]["logo_url"] = logo_url
+            aggregate_map[key]["plan"] += _to_decimal(row.get("policy_max"))
+
+        return self._finalize_bridge_distribution(aggregate_map)
 
     def _build_bridge_distribution(
         self,
@@ -996,6 +1038,11 @@ class DashboardV2Service:
                 aggregate_map[key]["logo_url"] = logo_url
             aggregate_map[key]["plan"] = _to_decimal(row.get("total"))
 
+        return self._finalize_bridge_distribution(aggregate_map)
+
+    def _finalize_bridge_distribution(
+        self, aggregate_map: Dict[str, Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         rows = []
         total_bridge_insurance_sum = DECIMAL_ZERO
         for totals in aggregate_map.values():

@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from apps.analytics.services import AnalyticsService
 from apps.clients.models import Client
@@ -78,6 +79,83 @@ class AnalyticsServiceQueryOptimizationTest(TestCase):
 
         self.assertEqual(len(rows), 3)
         self.assertLessEqual(len(queries), 6)
+
+    def test_group_analytics_count_max_insurance_sum_once_per_policy(self):
+        policy = Policy.objects.get(policy_number="POL-1")
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=date(2025, 2, 1),
+            insurance_sum=Decimal("90000.00"),
+            amount=Decimal("20000.00"),
+            kv_rub=Decimal("2000.00"),
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=3,
+            installment_number=1,
+            due_date=date(2026, 2, 1),
+            insurance_sum=Decimal("80000.00"),
+            amount=Decimal("30000.00"),
+            kv_rub=Decimal("3000.00"),
+        )
+
+        branch_data = self.service.get_branch_analytics()
+        branch_metric = next(
+            metric
+            for metric in branch_data["branch_metrics"]
+            if metric["branch"]["id"] == policy.branch_id
+        )
+        self.assertEqual(branch_metric["insurance_sum"], Decimal("100000.00"))
+        self.assertEqual(branch_metric["premium_volume"], Decimal("60000.00"))
+
+        insurer_data = self.service.get_insurer_analytics()
+        insurer_metric = next(
+            metric
+            for metric in insurer_data["insurer_metrics"]
+            if metric["insurer"].id == policy.insurer_id
+        )
+        self.assertEqual(insurer_metric["insurance_sum"], Decimal("100000.00"))
+        self.assertEqual(insurer_metric["premium_volume"], Decimal("60000.00"))
+
+        client_data = self.service.get_client_analytics()
+        client_metric = next(
+            metric
+            for metric in client_data["all_client_metrics"]
+            if metric["client"]["id"] == policy.client_id
+        )
+        self.assertEqual(client_metric["insurance_sum"], Decimal("100000.00"))
+        self.assertEqual(client_metric["premium_volume"], Decimal("60000.00"))
+
+    def test_dashboard_metrics_bridge_insurance_sum_counts_policy_once(self):
+        policy = Policy.objects.get(policy_number="POL-1")
+        current_month_start = timezone.localdate().replace(day=1)
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=current_month_start - timedelta(days=1),
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("10000.00"),
+            kv_rub=Decimal("1000.00"),
+            paid_date=current_month_start - timedelta(days=1),
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=3,
+            installment_number=1,
+            due_date=current_month_start + timedelta(days=30),
+            insurance_sum=Decimal("900000.00"),
+            amount=Decimal("20000.00"),
+            kv_rub=Decimal("2000.00"),
+        )
+
+        metrics = self.service.get_dashboard_metrics()
+
+        self.assertEqual(metrics["actual_insurance_sum"], Decimal("1000000.00"))
+        self.assertEqual(metrics["planned_insurance_sum"], Decimal("1000000.00"))
+        self.assertEqual(metrics["total_insurance_sum"], Decimal("1000000.00"))
 
     def test_get_branch_portfolio_analytics_v2_returns_expected_shape(self):
         data = self.service.get_branch_portfolio_analytics_v2(horizon_months=12)

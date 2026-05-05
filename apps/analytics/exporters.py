@@ -202,7 +202,7 @@ class AnalyticsExporter:
                 ),
                 ("Total Policy Count", metrics.get("total_policy_count", 0)),
                 (
-                    "Bridge Insurance Sum (Actual + Planned)",
+                    "Bridge Insurance Sum (Max Once Per Policy)",
                     metrics.get("total_insurance_sum", 0),
                 ),
                 (

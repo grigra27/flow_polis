@@ -1163,6 +1163,61 @@ class ThreePercentReportExportViewTest(TestCase):
         self.assertEqual(exported_insurer_date, date(2025, 2, 20))
         self.assertEqual(row[13], "Тестовое значение Инфо 3")
 
+    def test_three_percent_report_highlights_nonstandard_kv_rows(self):
+        """Тест: строки с КВ не по базовой ставке выделяются в Excel."""
+        from datetime import date
+        from decimal import Decimal
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from apps.policies.models import PaymentSchedule
+
+        PaymentSchedule.objects.filter(
+            policy=self.policy,
+            year_number=1,
+            installment_number=2,
+        ).update(
+            insurer_date=date(2025, 3, 20),
+            kv_rub=Decimal("1000.00"),
+        )
+
+        self.client.login(username="three_percent_admin", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_three_percent_report"),
+            {"three_percent_quarter": 1, "three_percent_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+        sheet = workbook.active
+
+        standard_cell = sheet.cell(row=5, column=1)
+        nonstandard_cell = sheet.cell(row=6, column=1)
+
+        standard_fill_rgb = (
+            standard_cell.fill.start_color.rgb
+            if standard_cell.fill and standard_cell.fill.start_color
+            else ""
+        )
+        nonstandard_fill_rgb = (
+            nonstandard_cell.fill.start_color.rgb
+            if nonstandard_cell.fill and nonstandard_cell.fill.start_color
+            else ""
+        )
+        nonstandard_font_rgb = (
+            nonstandard_cell.font.color.rgb
+            if nonstandard_cell.font and nonstandard_cell.font.color
+            else ""
+        )
+
+        self.assertEqual(sheet.cell(row=6, column=1).value, "DFA-3P-001")
+        self.assertAlmostEqual(float(sheet.cell(row=6, column=11).value), 15.0)
+        self.assertAlmostEqual(float(sheet.cell(row=6, column=12).value), 1000.0)
+        self.assertFalse(str(standard_fill_rgb).upper().endswith("7A1F2B"))
+        self.assertTrue(str(nonstandard_fill_rgb).upper().endswith("7A1F2B"))
+        self.assertTrue(str(nonstandard_font_rgb).upper().endswith("FFFFFF"))
+
     def test_admin_gets_redirect_when_no_three_percent_data(self):
         """Тест: при отсутствии согласованных платежей за квартал админ возвращается."""
         self.client.login(username="three_percent_admin", password="testpass123")

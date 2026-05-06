@@ -7,7 +7,7 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment, NamedSty
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from apps.policies.models import policy_premium_subquery
@@ -2349,6 +2349,9 @@ class MonthlyKVReportExporter(BaseExporter):
 class ThreePercentReportExporter(BaseExporter):
     """Экспортер для отчета по 3% за выбранный квартал."""
 
+    NONSTANDARD_KV_FILL_COLOR = "7A1F2B"
+    NONSTANDARD_KV_FONT_COLOR = "FFFFFF"
+
     QUARTER_LABELS = {
         1: "первый квартал",
         2: "второй квартал",
@@ -2462,10 +2465,29 @@ class ThreePercentReportExporter(BaseExporter):
             policy.info3,
         ]
 
+    def _round_percent_for_comparison(self, value):
+        return Decimal(value).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+    def _is_nonstandard_kv(self, payment):
+        """Проверяет, отличается ли фактический процент КВ от базовой ставки."""
+        if not payment.commission_rate:
+            return False
+
+        return self._round_percent_for_comparison(
+            payment.kv_percent_actual
+        ) != self._round_percent_for_comparison(payment.commission_rate.kv_percent)
+
     def apply_formatting(self, ws):
         """Применяет форматирование листа"""
         from datetime import date
-        from openpyxl.styles import Alignment
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        nonstandard_kv_fill = PatternFill(
+            start_color=self.NONSTANDARD_KV_FILL_COLOR,
+            end_color=self.NONSTANDARD_KV_FILL_COLOR,
+            fill_type="solid",
+        )
+        nonstandard_kv_font = Font(color=self.NONSTANDARD_KV_FONT_COLOR)
 
         column_widths = {
             "A": 16,
@@ -2505,6 +2527,14 @@ class ThreePercentReportExporter(BaseExporter):
                     )
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        for row_number, payment in enumerate(self.queryset, start=5):
+            if not self._is_nonstandard_kv(payment):
+                continue
+
+            for cell in ws[row_number]:
+                cell.fill = nonstandard_kv_fill
+                cell.font = nonstandard_kv_font
 
         ws.freeze_panes = "A5"
         if ws.max_row > 3:

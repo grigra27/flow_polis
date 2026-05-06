@@ -11,9 +11,14 @@ from django.views.generic import DetailView, TemplateView
 
 from .models import BillingTask
 from .services import (
+    BRANCH_GROUP_1,
+    BRANCH_GROUP_2,
+    BRANCH_GROUP_CHOICES,
     build_period_options,
     get_filter_options,
+    get_branch_ids_for_group,
     get_tasks_queryset,
+    parse_int_list_query_param,
     preload_periods,
     resolve_selected_period,
     sync_period,
@@ -91,11 +96,69 @@ class BillingPeriodListView(LoginRequiredMixin, TemplateView):
         # или в выбранный период попал свежесозданный платёж.
         selected_period = sync_period(selected_period.year, selected_period.month)
 
-        tasks_queryset = get_tasks_queryset(selected_period, self.request.GET)
+        filter_options = get_filter_options()
+        branches = list(filter_options["branches"])
+        group1_branch_ids = get_branch_ids_for_group(branches, BRANCH_GROUP_1)
+        group2_branch_ids = get_branch_ids_for_group(branches, BRANCH_GROUP_2)
+        branch_name_map = {branch.id: branch.branch_name for branch in branches}
+        group1_branch_names = [
+            branch_name_map[branch_id]
+            for branch_id in group1_branch_ids
+            if branch_id in branch_name_map
+        ]
+        group2_branch_names = [
+            branch_name_map[branch_id]
+            for branch_id in group2_branch_ids
+            if branch_id in branch_name_map
+        ]
+        requested_branch_ids = parse_int_list_query_param(self.request.GET, "branch")
+        requested_branch_group = self.request.GET.get("branch_group", "")
+        branch_group_ids = []
+        if requested_branch_group == BRANCH_GROUP_1:
+            branch_group_ids = group1_branch_ids
+        elif requested_branch_group == BRANCH_GROUP_2:
+            branch_group_ids = group2_branch_ids
+
+        if requested_branch_ids:
+            selected_branch_ids = requested_branch_ids
+            active_branch_group = ""
+            branch_ids_filter = selected_branch_ids
+        elif requested_branch_group in BRANCH_GROUP_CHOICES:
+            selected_branch_ids = branch_group_ids
+            active_branch_group = requested_branch_group
+            branch_ids_filter = selected_branch_ids
+        else:
+            selected_branch_ids = []
+            active_branch_group = ""
+            branch_ids_filter = None
+
+        tasks_queryset = get_tasks_queryset(
+            selected_period,
+            self.request.GET,
+            branch_ids_filter=branch_ids_filter,
+        )
         paginator = Paginator(tasks_queryset, self.paginate_by)
         page_obj = paginator.get_page(self.request.GET.get("page"))
 
-        filter_options = get_filter_options()
+        selected_branches = [str(branch_id) for branch_id in selected_branch_ids]
+
+        period_params = self.request.GET.copy()
+        period_params.pop("period", None)
+        period_params.pop("page", None)
+        period_query = period_params.urlencode()
+        period_query_suffix = f"&{period_query}" if period_query else ""
+
+        def _group_filter_url(group_code):
+            params = self.request.GET.copy()
+            params.pop("page", None)
+            params.pop("branch", None)
+            params.pop("branch_group", None)
+            params["period"] = selected_period.code
+            params["branch_group"] = group_code
+            return f"{reverse('policies:scheduled_payments')}?{params.urlencode()}"
+
+        group1_url = _group_filter_url(BRANCH_GROUP_1)
+        group2_url = _group_filter_url(BRANCH_GROUP_2)
         context.update(
             {
                 "period_options": build_period_options(periods, selected_period),
@@ -106,10 +169,18 @@ class BillingPeriodListView(LoginRequiredMixin, TemplateView):
                 "status_choices": BillingTask.STATUS_CHOICES,
                 "selected_status": self.request.GET.get("status", "all"),
                 "selected_insurer": self.request.GET.get("insurer", ""),
-                "selected_branch": self.request.GET.get("branch", ""),
+                "selected_branches": selected_branches,
+                "active_branch_group": active_branch_group,
+                "branch_group_1": BRANCH_GROUP_1,
+                "branch_group_2": BRANCH_GROUP_2,
+                "group1_url": group1_url,
+                "group2_url": group2_url,
+                "group1_branch_names": group1_branch_names,
+                "group2_branch_names": group2_branch_names,
+                "period_query_suffix": period_query_suffix,
                 "search_query": self.request.GET.get("q", ""),
                 "insurers": filter_options["insurers"],
-                "branches": filter_options["branches"],
+                "branches": branches,
                 "total_filtered": paginator.count,
             }
         )

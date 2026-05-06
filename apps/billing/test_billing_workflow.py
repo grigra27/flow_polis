@@ -109,8 +109,11 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert "Тип взноса: годовой" in alliance_letter
     assert "Страховщик:" not in alliance_letter
     assert "Лизингополучатель:" not in alliance_letter
-    assert subject == "Счёт на годовой взнос --- DFA-001 --- POL-001"
-    assert alliance_subject == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая"
+    assert subject == "Счёт на годовой взнос --- DFA-001 --- Москва --- POL-001"
+    assert (
+        alliance_subject
+        == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая"
+    )
 
 
 @pytest.mark.django_db
@@ -139,8 +142,11 @@ def test_letter_contains_installment_metadata_for_installment_plan(billing_payme
     assert "Тип взноса: рассрочка, платёж 1 из 2" in alliance_letter
     assert "Страховщик:" not in alliance_letter
     assert "Лизингополучатель:" not in alliance_letter
-    assert subject == "Счёт на очередной взнос --- DFA-001 --- POL-001"
-    assert alliance_subject == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая"
+    assert subject == "Счёт на очередной взнос --- DFA-001 --- Москва --- POL-001"
+    assert (
+        alliance_subject
+        == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая"
+    )
 
 
 @pytest.mark.django_db
@@ -249,8 +255,10 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     assert "Текст письма в" in content
     assert "Тестовая страховая" in content
     assert "Тема письма" in content
-    assert "Счёт на годовой взнос --- DFA-001 --- POL-001" in content
-    assert "СТРАХОВАНИЕ --- счет --- DFA-001 --- Тестовая страховая" in content
+    assert "Счёт на годовой взнос --- DFA-001 --- Москва --- POL-001" in content
+    assert (
+        "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая" in content
+    )
     assert "Год страхования: 2 год страхования" in content
     assert reverse("policies:detail", args=[billing_payment.policy.id]) in content
 
@@ -285,6 +293,181 @@ def test_task_history_displays_user_full_name(client, billing_payment):
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "Иван Петров" in content
+
+
+@pytest.mark.django_db
+def test_scheduled_payments_list_displays_task_comment_column(client, billing_payment):
+    user = User.objects.create_user(
+        username="comment_list_user", password="testpass123"
+    )
+    period = sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    task.comment = "Комментарий для строки списка"
+    task.save(update_fields=["comment"])
+
+    client.force_login(user)
+    response = client.get(
+        reverse("policies:scheduled_payments"),
+        {"period": period.code},
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "<th>Комментарии</th>" in content
+    assert "<th>Менеджер</th>" not in content
+    assert "Комментарий для строки списка" in content
+
+
+@pytest.mark.django_db
+def test_scheduled_payments_supports_multiple_branch_filter(client, billing_payment):
+    user = User.objects.create_user(
+        username="multi_branch_user", password="testpass123"
+    )
+    base_policy = billing_payment.policy
+    branch_spb = Branch.objects.create(branch_name="Санкт-Петербург")
+    branch_ekb = Branch.objects.create(branch_name="Екатеринбург")
+
+    def create_payment_for_branch(suffix, branch):
+        policy = Policy.objects.create(
+            policy_number=f"POL-MULTI-{suffix}",
+            dfa_number=f"DFA-MULTI-{suffix}",
+            client=Client.objects.create(client_name=f"ООО Клиент {suffix}"),
+            policyholder=Client.objects.create(
+                client_name=f"ООО Страхователь {suffix}"
+            ),
+            insurer=base_policy.insurer,
+            property_description=f"Тестовый объект {suffix}",
+            start_date=base_policy.start_date,
+            end_date=base_policy.end_date,
+            insurance_type=base_policy.insurance_type,
+            branch=branch,
+            leasing_manager=base_policy.leasing_manager,
+        )
+        return PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=billing_payment.due_date,
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("50000.00"),
+        )
+
+    payment_spb = create_payment_for_branch("SPB", branch_spb)
+    payment_ekb = create_payment_for_branch("EKB", branch_ekb)
+    period = sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    client.force_login(user)
+    response = client.get(
+        reverse("policies:scheduled_payments"),
+        {
+            "period": period.code,
+            "branch": [str(base_policy.branch_id), str(branch_spb.id)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.context["selected_branches"] == [
+        str(base_policy.branch_id),
+        str(branch_spb.id),
+    ]
+    content = response.content.decode("utf-8")
+    assert base_policy.policy_number in content
+    assert payment_spb.policy.policy_number in content
+    assert payment_ekb.policy.policy_number not in content
+    assert 'id="branchMultiselect"' in content
+    assert 'data-branch-action="all"' in content
+    assert 'type="checkbox" name="branch" value="' in content
+
+
+@pytest.mark.django_db
+def test_scheduled_payments_branch_group_shortcuts(client, billing_payment):
+    user = User.objects.create_user(
+        username="branch_group_user", password="testpass123"
+    )
+    base_policy = billing_payment.policy
+    branch_krasnodar = Branch.objects.create(branch_name="Краснодар")
+    branch_pskov = Branch.objects.create(branch_name="Псков")
+    branch_spb = Branch.objects.create(branch_name="Санкт-Петербург")
+    branch_ekb = Branch.objects.create(branch_name="Екатеринбург")
+
+    def create_payment_for_branch(suffix, branch):
+        policy = Policy.objects.create(
+            policy_number=f"POL-GRP-{suffix}",
+            dfa_number=f"DFA-GRP-{suffix}",
+            client=Client.objects.create(client_name=f"ООО Клиент grp {suffix}"),
+            policyholder=Client.objects.create(
+                client_name=f"ООО Страхователь grp {suffix}"
+            ),
+            insurer=base_policy.insurer,
+            property_description=f"Объект grp {suffix}",
+            start_date=base_policy.start_date,
+            end_date=base_policy.end_date,
+            insurance_type=base_policy.insurance_type,
+            branch=branch,
+            leasing_manager=base_policy.leasing_manager,
+        )
+        return PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=2,
+            installment_number=1,
+            due_date=billing_payment.due_date,
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("50000.00"),
+        )
+
+    payment_krasnodar = create_payment_for_branch("KRD", branch_krasnodar)
+    payment_pskov = create_payment_for_branch("PSK", branch_pskov)
+    payment_spb = create_payment_for_branch("SPB", branch_spb)
+    payment_ekb = create_payment_for_branch("EKB", branch_ekb)
+    period = sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    client.force_login(user)
+    response_group_1 = client.get(
+        reverse("policies:scheduled_payments"),
+        {
+            "period": period.code,
+            "branch_group": "group1",
+        },
+    )
+
+    assert response_group_1.status_code == 200
+    assert set(response_group_1.context["selected_branches"]) == {
+        str(base_policy.branch_id),
+        str(branch_krasnodar.id),
+        str(branch_pskov.id),
+        str(branch_spb.id),
+    }
+    content_group_1 = response_group_1.content.decode("utf-8")
+    assert 'id="branchGroupHidden" value="group1"' in content_group_1
+    assert "Шорткаты" in content_group_1
+    assert "Кластер 1:" in content_group_1
+    assert "Кластер 2:" in content_group_1
+    assert "Москва" in content_group_1
+    assert "Краснодар" in content_group_1
+    assert "Псков" in content_group_1
+    assert "Санкт-Петербург" in content_group_1
+    assert "Екатеринбург" in content_group_1
+    assert base_policy.policy_number in content_group_1
+    assert payment_krasnodar.policy.policy_number in content_group_1
+    assert payment_pskov.policy.policy_number in content_group_1
+    assert payment_spb.policy.policy_number in content_group_1
+    assert payment_ekb.policy.policy_number not in content_group_1
+    assert "branch_group=group1" in content_group_1
+
+    response_group_2 = client.get(
+        reverse("policies:scheduled_payments"),
+        {
+            "period": period.code,
+            "branch_group": "group2",
+        },
+    )
+
+    assert response_group_2.status_code == 200
+    assert response_group_2.context["selected_branches"] == [str(branch_ekb.id)]
+    content_group_2 = response_group_2.content.decode("utf-8")
+    assert payment_ekb.policy.policy_number in content_group_2
+    assert base_policy.policy_number not in content_group_2
+    assert payment_krasnodar.policy.policy_number not in content_group_2
 
 
 @pytest.mark.django_db

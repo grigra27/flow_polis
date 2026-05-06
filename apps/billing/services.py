@@ -32,6 +32,54 @@ class PeriodOption:
 VISIBLE_PAST_MONTHS = 2
 VISIBLE_FUTURE_MONTHS = 6
 
+BRANCH_GROUP_1 = "group1"
+BRANCH_GROUP_2 = "group2"
+BRANCH_GROUP_CHOICES = (BRANCH_GROUP_1, BRANCH_GROUP_2)
+BRANCH_GROUP_1_NAME_ALIASES = {
+    "краснодар",
+    "псков",
+    "санкт-петербург",
+    "санкт петербург",
+    "москва",
+}
+
+
+def parse_int_list_query_param(query_params, param_name):
+    values = []
+    for raw_value in query_params.getlist(param_name):
+        if raw_value is None:
+            continue
+        for part in str(raw_value).split(","):
+            cleaned = part.strip()
+            if not cleaned:
+                continue
+            try:
+                values.append(int(cleaned))
+            except (TypeError, ValueError):
+                continue
+    return list(dict.fromkeys(values))
+
+
+def normalize_branch_name(value):
+    return (value or "").strip().lower().replace("ё", "е")
+
+
+def get_branch_ids_for_group(branches, group_code):
+    normalized_group_1_names = {
+        normalize_branch_name(name) for name in BRANCH_GROUP_1_NAME_ALIASES
+    }
+    group_1_ids = [
+        branch.id
+        for branch in branches
+        if normalize_branch_name(branch.branch_name) in normalized_group_1_names
+    ]
+    if group_code == BRANCH_GROUP_1:
+        return group_1_ids
+    if group_code == BRANCH_GROUP_2:
+        group_1_ids_set = set(group_1_ids)
+        return [branch.id for branch in branches if branch.id not in group_1_ids_set]
+    return []
+
 
 def add_months(value, months):
     month_index = value.month - 1 + months
@@ -299,7 +347,7 @@ def build_period_options(periods, selected_period):
     return options
 
 
-def get_tasks_queryset(period, request_get):
+def get_tasks_queryset(period, request_get, branch_ids_filter=None):
     tasks = BillingTask.objects.filter(period=period).select_related(
         "period",
         "responsible",
@@ -325,9 +373,14 @@ def get_tasks_queryset(period, request_get):
     if insurer_id:
         tasks = tasks.filter(payment_schedule__policy__insurer_id=insurer_id)
 
-    branch_id = request_get.get("branch")
-    if branch_id:
-        tasks = tasks.filter(payment_schedule__policy__branch_id=branch_id)
+    if branch_ids_filter is not None:
+        if not branch_ids_filter:
+            return tasks.none()
+        tasks = tasks.filter(payment_schedule__policy__branch_id__in=branch_ids_filter)
+    else:
+        branch_ids = parse_int_list_query_param(request_get, "branch")
+        if branch_ids:
+            tasks = tasks.filter(payment_schedule__policy__branch_id__in=branch_ids)
 
     search = request_get.get("q", "").strip()
     if search:

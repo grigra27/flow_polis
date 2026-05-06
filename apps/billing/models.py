@@ -201,8 +201,15 @@ class BillingTask(TimeStampedModel):
         else:
             subject_prefix = "Счёт на очередной взнос"
         dfa_number = policy.dfa_number or "Без ДФА"
+        branch_name = (
+            policy.branch.branch_name
+            if policy.branch and policy.branch.branch_name
+            else ""
+        ).strip() or "Без филиала"
         policy_number = policy.policy_number or "Без номера полиса"
-        return f"{subject_prefix} --- {dfa_number} --- {policy_number}"
+        return (
+            f"{subject_prefix} --- {dfa_number} --- {branch_name} --- {policy_number}"
+        )
 
     def build_letter_text(self):
         policy = self.policy
@@ -242,10 +249,15 @@ class BillingTask(TimeStampedModel):
 
     def build_alliance_letter_subject(self):
         dfa_number = self.policy.dfa_number or "Без ДФА"
+        branch_name = (
+            self.policy.branch.branch_name
+            if self.policy.branch and self.policy.branch.branch_name
+            else ""
+        ).strip() or "Без филиала"
         insurer_name = (
             self.policy.insurer.insurer_name or ""
         ).strip() or "Без страховщика"
-        return f"СТРАХОВАНИЕ --- счет --- {dfa_number} --- {insurer_name}"
+        return f"СТРАХОВАНИЕ --- счет --- {dfa_number} --- {branch_name} --- {insurer_name}"
 
     def build_alliance_letter_text(self):
         policy = self.policy

@@ -59,11 +59,11 @@
         max-width: 720px;
     }
     .mgr-page-actions {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        flex-wrap: wrap;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
         justify-content: flex-end;
+        min-width: 280px;
     }
     .btn-mgr-back {
         background: var(--v2-card-bg);
@@ -84,6 +84,73 @@
         background: #eff5ff;
         color: var(--v2-accent);
         text-decoration: none;
+    }
+    .btn-mgr-group {
+        background: var(--v2-card-bg);
+        border: 2px solid #b7c7dc;
+        color: var(--v2-title);
+        font-size: 0.94rem;
+        font-weight: 800;
+        border-radius: 999px;
+        padding: 0.56rem 1.14rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        text-decoration: none;
+        transition: border-color 0.15s, background 0.15s, color 0.15s;
+        white-space: nowrap;
+        min-height: 42px;
+    }
+    .btn-mgr-group:hover {
+        border-color: var(--v2-accent);
+        background: #eff5ff;
+        color: var(--v2-accent);
+        text-decoration: none;
+    }
+    .btn-mgr-group.active {
+        background: #ff9800;
+        border-color: #ff9800;
+        color: #111111;
+        box-shadow: 0 4px 12px rgba(255, 152, 0, 0.35);
+    }
+    .mgr-shortcuts-card {
+        border: 1px solid var(--v2-border);
+        border-radius: 12px;
+        background: #ffffff;
+        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
+        padding: 0.62rem 0.72rem;
+        min-width: 280px;
+        max-width: 420px;
+    }
+    .mgr-shortcuts-title {
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--v2-muted);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .mgr-shortcuts-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-bottom: 0.34rem;
+    }
+    .mgr-shortcuts-note {
+        font-size: 0.67rem;
+        color: #6b7f96;
+        line-height: 1.2;
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+        margin-left: 0.22rem;
+    }
+    .mgr-shortcuts-note strong {
+        color: #39526d;
+        font-weight: 700;
     }
 
     /* Section card */
@@ -122,6 +189,11 @@
         padding: 0.15rem 0.6rem;
     }
     .mgr-section-body { padding: 0.9rem 1rem; }
+    .mgr-section--filters {
+        overflow: visible;
+        position: relative;
+        z-index: 5;
+    }
     .mgr-section--filters .mgr-section-head { padding: 0.55rem 0.76rem; }
     .mgr-section--filters .mgr-section-body { padding: 0.6rem 0.76rem; }
 
@@ -214,6 +286,108 @@
         color: var(--v2-muted);
         margin-bottom: 0.1rem;
         display: block;
+    }
+    .pl-multiselect {
+        position: relative;
+        width: 100%;
+    }
+    .pl-multiselect__summary {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #c8d5e6;
+        border-radius: 7px;
+        padding: 0.18rem 0.5rem;
+        background: #fff;
+        color: var(--v2-title);
+        font-size: 0.86rem;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.45rem;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+    }
+    .pl-multiselect__summary::-webkit-details-marker {
+        display: none;
+    }
+    .pl-multiselect[open] .pl-multiselect__summary {
+        border-color: var(--v2-accent);
+        box-shadow: 0 0 0 2px rgba(21,101,192,0.1);
+    }
+    .pl-multiselect__summary-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .pl-multiselect__menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        width: 100%;
+        min-width: 260px;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(14,28,46,0.12);
+        padding: 0.45rem;
+        z-index: 25;
+    }
+    .pl-multiselect__actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.45rem;
+        margin-bottom: 0.35rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid #e5edf7;
+    }
+    .pl-multiselect__action {
+        border: none;
+        background: transparent;
+        color: var(--v2-accent);
+        font-size: 0.77rem;
+        font-weight: 700;
+        padding: 0;
+        cursor: pointer;
+    }
+    .pl-multiselect__action:hover {
+        color: #0d47a1;
+        text-decoration: underline;
+    }
+    .pl-multiselect__options {
+        max-height: 180px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding-right: 0.1rem;
+    }
+    .pl-multiselect__option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.4rem;
+        font-size: 0.82rem;
+        color: var(--v2-title);
+        line-height: 1.25;
+        cursor: pointer;
+        border-radius: 6px;
+        padding: 0.18rem 0.24rem;
+    }
+    .pl-multiselect__option:hover {
+        background: #f4f8fe;
+    }
+    .pl-multiselect__option input[type="checkbox"] {
+        margin-top: 0.13rem;
+        flex-shrink: 0;
+    }
+    .pl-multiselect__empty {
+        font-size: 0.8rem;
+        color: var(--v2-muted);
+        padding: 0.2rem 0.1rem;
     }
     .pl-filter-form input[type="search"],
     .pl-filter-form select {
@@ -449,6 +623,33 @@
                 <h1 class="mgr-page-title">Очередные взносы</h1>
                 <div class="mgr-page-subtitle">Периоды создаются автоматически из графика платежей: два месяца назад, текущий месяц и будущие месяцы с платежами.</div>
             </div>
+            <div class="mgr-page-actions">
+                <div class="mgr-shortcuts-card">
+                    <div class="mgr-shortcuts-title"><i class="bi bi-lightning-charge"></i> Шорткаты</div>
+                    <div class="mgr-shortcuts-buttons">
+                        <a class="btn-mgr-group{% if active_branch_group == branch_group_1 %} active{% endif %}"
+                           href="{{ group1_url }}"
+                           data-branch-group="group1">
+                            Кластер 1
+                        </a>
+                        <a class="btn-mgr-group{% if active_branch_group == branch_group_2 %} active{% endif %}"
+                           href="{{ group2_url }}"
+                           data-branch-group="group2">
+                            Кластер 2
+                        </a>
+                    </div>
+                    <div class="mgr-shortcuts-note">
+                        <div>
+                            <strong>Кластер 1:</strong>
+                            {% if group1_branch_names %}{{ group1_branch_names|join:", " }}{% else %}нет филиалов{% endif %}
+                        </div>
+                        <div>
+                            <strong>Кластер 2:</strong>
+                            {% if group2_branch_names %}{{ group2_branch_names|join:", " }}{% else %}нет филиалов{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -456,7 +657,7 @@
     <div class="bil-periods" aria-label="Периоды очередных взносов">
         {% for option in period_options %}
         <a class="bil-period{% if option.selected %} active{% endif %}"
-           href="{% url 'policies:scheduled_payments' %}?period={{ option.period.code }}">
+           href="{% url 'policies:scheduled_payments' %}?period={{ option.period.code }}{{ period_query_suffix }}">
             <div class="bil-period-name">{{ option.period.label }}</div>
             <div class="bil-period-meta">
                 <span class="bil-chip">
@@ -488,6 +689,9 @@
         <div class="mgr-section-body">
             <form method="get" class="pl-filter-form">
                 <input type="hidden" name="period" value="{{ selected_period.code }}">
+                {% if active_branch_group %}
+                <input type="hidden" name="branch_group" id="branchGroupHidden" value="{{ active_branch_group }}">
+                {% endif %}
                 <div class="pl-filter-item">
                     <label class="pl-filter-label" for="status">Статус</label>
                     <select id="status" name="status">
@@ -507,13 +711,29 @@
                     </select>
                 </div>
                 <div class="pl-filter-item">
-                    <label class="pl-filter-label" for="branch">Филиал</label>
-                    <select id="branch" name="branch">
-                        <option value="">Все филиалы</option>
-                        {% for branch in branches %}
-                        <option value="{{ branch.id }}"{% if selected_branch == branch.id|stringformat:"s" %} selected{% endif %}>{{ branch.branch_name }}</option>
-                        {% endfor %}
-                    </select>
+                    <span class="pl-filter-label">Филиал</span>
+                    <details class="pl-multiselect" id="branchMultiselect">
+                        <summary class="pl-multiselect__summary" id="branchMultiselectSummary">
+                            <span class="pl-multiselect__summary-text" data-default-label="Все филиалы">Все филиалы</span>
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </summary>
+                        <div class="pl-multiselect__menu">
+                            <div class="pl-multiselect__actions">
+                                <button type="button" class="pl-multiselect__action" data-branch-action="all">Выбрать все</button>
+                                <button type="button" class="pl-multiselect__action" data-branch-action="none">Снять все</button>
+                            </div>
+                            <div class="pl-multiselect__options">
+                                {% for branch in branches %}
+                                <label class="pl-multiselect__option">
+                                    <input type="checkbox" name="branch" value="{{ branch.id }}"{% if branch.id|stringformat:"s" in selected_branches %} checked{% endif %}>
+                                    <span>{{ branch.branch_name }}</span>
+                                </label>
+                                {% empty %}
+                                <div class="pl-multiselect__empty">Филиалы не найдены.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </details>
                 </div>
                 <div class="pl-filter-item pl-filter-item--search">
                     <label class="pl-filter-label" for="q">Поиск</label>
@@ -578,7 +798,7 @@
                                 <th>ДФА / полис</th>
                                 <th>Клиент</th>
                                 <th class="text-end">Сумма</th>
-                                <th>Менеджер</th>
+                                <th>Комментарии</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -610,13 +830,7 @@
                                 </td>
                                 <td>{{ policy.client.client_name }}</td>
                                 <td class="text-end"><strong>{{ task.payment_schedule.amount|currency }}</strong></td>
-                                <td>
-                                    {% if policy.leasing_manager %}
-                                        {{ policy.leasing_manager.name }}
-                                    {% else %}
-                                        <span style="color: var(--v2-muted);">Не указан</span>
-                                    {% endif %}
-                                </td>
+                                <td>{{ task.comment|default:"—" }}</td>
                             </tr>
                             {% endwith %}
                             {% empty %}
@@ -660,6 +874,89 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const branchMultiselect = document.getElementById('branchMultiselect');
+        if (branchMultiselect) {
+            const summaryText = branchMultiselect.querySelector('.pl-multiselect__summary-text');
+            const branchCheckboxes = Array.from(branchMultiselect.querySelectorAll('input[name="branch"]'));
+            const selectAllBranchesButton = branchMultiselect.querySelector('[data-branch-action="all"]');
+            const clearBranchesButton = branchMultiselect.querySelector('[data-branch-action="none"]');
+            const branchGroupHidden = document.getElementById('branchGroupHidden');
+
+            const clearBranchGroupShortcut = function () {
+                if (branchGroupHidden && branchGroupHidden.parentNode) {
+                    branchGroupHidden.parentNode.removeChild(branchGroupHidden);
+                }
+            };
+
+            const updateBranchSummary = function () {
+                if (!summaryText) {
+                    return;
+                }
+                const checked = branchCheckboxes.filter(function (checkbox) {
+                    return checkbox.checked;
+                });
+                const fallbackLabel = summaryText.dataset.defaultLabel || 'Все филиалы';
+                if (!checked.length) {
+                    summaryText.textContent = fallbackLabel;
+                    return;
+                }
+                const checkedLabels = checked.map(function (checkbox) {
+                    const optionLabel = checkbox.closest('label');
+                    const optionLabelTextNode = optionLabel ? optionLabel.querySelector('span') : null;
+                    const labelText = optionLabelTextNode ? optionLabelTextNode.textContent : '';
+                    return labelText.trim();
+                }).filter(Boolean);
+                if (checked.length <= 2 && checkedLabels.length === checked.length) {
+                    summaryText.textContent = checkedLabels.join(', ');
+                    return;
+                }
+                summaryText.textContent = 'Выбрано: ' + checked.length;
+            };
+
+            branchCheckboxes.forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    clearBranchGroupShortcut();
+                    updateBranchSummary();
+                });
+            });
+
+            if (selectAllBranchesButton) {
+                selectAllBranchesButton.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    clearBranchGroupShortcut();
+                    branchCheckboxes.forEach(function (checkbox) {
+                        checkbox.checked = true;
+                    });
+                    updateBranchSummary();
+                });
+            }
+
+            if (clearBranchesButton) {
+                clearBranchesButton.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    clearBranchGroupShortcut();
+                    branchCheckboxes.forEach(function (checkbox) {
+                        checkbox.checked = false;
+                    });
+                    updateBranchSummary();
+                });
+            }
+
+            document.addEventListener('click', function (event) {
+                if (!branchMultiselect.contains(event.target)) {
+                    branchMultiselect.removeAttribute('open');
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    branchMultiselect.removeAttribute('open');
+                }
+            });
+
+            updateBranchSummary();
+        }
+
         const selectAll = document.getElementById('selectAllTasks');
         const checkboxes = document.querySelectorAll('.task-checkbox');
         if (selectAll) {

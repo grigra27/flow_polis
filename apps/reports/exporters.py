@@ -368,6 +368,8 @@ class CustomExporter(BaseExporter):
         # Виртуальные поля (premium_total) читаем из annotate'нутого источника
         if self.data_source == "policies" and field in self.POLICY_VIRTUAL_FIELDS:
             value = getattr(obj, self.POLICY_VIRTUAL_FIELDS[field], None)
+            if value is None:
+                value = getattr(obj, field, None)
             return self.format_value(value)
         parts = field.split("__")
         value = obj
@@ -2331,6 +2333,176 @@ class MonthlyKVReportExporter(BaseExporter):
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     if isinstance(cell.value, date):
                         cell.number_format = "DD.MM.YYYY"
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        ws.freeze_panes = "A5"
+        if ws.max_row > 3:
+            ws.auto_filter.ref = (
+                f"A3:{ws.cell(row=ws.max_row, column=ws.max_column).coordinate}"
+            )
+
+        for row in range(5, ws.max_row + 1):
+            ws.row_dimensions[row].height = 20
+
+
+class ThreePercentReportExporter(BaseExporter):
+    """Экспортер для отчета по 3% за выбранный квартал."""
+
+    QUARTER_LABELS = {
+        1: "первый квартал",
+        2: "второй квартал",
+        3: "третий квартал",
+        4: "четвертый квартал",
+    }
+
+    def __init__(self, queryset, fields, quarter, year, date_from=None, date_to=None):
+        super().__init__(queryset, fields)
+        self.quarter = quarter
+        self.year = year
+        self.date_from = date_from
+        self.date_to = date_to
+
+    def get_filename(self):
+        """Возвращает базовое имя файла"""
+        return f"three_percent_report_{self.year}_q{self.quarter}"
+
+    def get_headers(self):
+        """Возвращает список заголовков"""
+        return [
+            "Номер ДФА",
+            "Номер полиса",
+            "Лизингополучатель",
+            "Страхователь",
+            "Страховая премия",
+            "Дата фактической оплаты",
+            "Ставка вознаграждения в процентах",
+            "Сумма вознаграждения в рублях",
+            "Страховщик",
+            "Филиал",
+            "КВ в процентах",
+            "КВ в рублях",
+            "Дата согласования акта с СК",
+            "Инфо 3",
+        ]
+
+    def export(self):
+        """Генерирует Excel файл с форматированием в стиле готовых отчетов"""
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        wb = Workbook()
+        ws = wb.active
+
+        quarter_label = self.QUARTER_LABELS.get(self.quarter, f"{self.quarter} квартал")
+        report_title = (
+            "Расчет комиссионного вознаграждения ЗАО «Альянс-Лизинг» "
+            f"за {quarter_label} {self.year} года"
+        )
+        ws.append([report_title])
+
+        title_cell = ws.cell(row=1, column=1)
+        title_cell.font = Font(bold=True, size=14, color="000000")
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 30
+
+        ws.merge_cells(
+            start_row=1, start_column=1, end_row=1, end_column=len(self.get_headers())
+        )
+        ws.append([""])
+
+        headers = self.get_headers()
+        ws.append(headers)
+
+        header_fill = PatternFill(
+            start_color="6B1F2F", end_color="6B1F2F", fill_type="solid"
+        )
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        for cell in ws[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+        ws.row_dimensions[3].height = 38
+
+        ws.append([""] * len(headers))
+
+        for payment in self.queryset:
+            ws.append(self.get_row_data(payment))
+
+        self.apply_formatting(ws)
+        return self.create_response(wb)
+
+    def get_row_data(self, payment):
+        """Возвращает данные строки для платежа"""
+        policy = payment.policy
+        three_percent_amount = (
+            payment.amount * Decimal("0.03") if payment.amount else Decimal("0")
+        )
+        kv_percent = (
+            payment.commission_rate.kv_percent
+            if payment.commission_rate
+            else payment.kv_percent_actual
+        )
+
+        return [
+            policy.dfa_number,
+            policy.policy_number,
+            policy.client.client_name if policy.client else "",
+            policy.policyholder.client_name if policy.policyholder else "",
+            self.format_value(payment.amount),
+            self.format_value(payment.paid_date),
+            3,
+            self.format_value(three_percent_amount),
+            policy.insurer.insurer_name if policy.insurer else "",
+            policy.branch.branch_name if policy.branch else "",
+            self.format_value(kv_percent),
+            self.format_value(payment.kv_rub),
+            self.format_value(payment.insurer_date),
+            policy.info3,
+        ]
+
+    def apply_formatting(self, ws):
+        """Применяет форматирование листа"""
+        from datetime import date
+        from openpyxl.styles import Alignment
+
+        column_widths = {
+            "A": 16,
+            "B": 16,
+            "C": 26,
+            "D": 26,
+            "E": 18,
+            "F": 18,
+            "G": 24,
+            "H": 24,
+            "I": 24,
+            "J": 20,
+            "K": 16,
+            "L": 16,
+            "M": 22,
+            "N": 36,
+        }
+
+        for column_letter, width in column_widths.items():
+            ws.column_dimensions[column_letter].width = width
+
+        for row in ws.iter_rows(min_row=5):
+            for idx, cell in enumerate(row, start=1):
+                if idx in [5, 8, 12]:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    cell.number_format = "#,##0.00"
+                elif idx in [7, 11]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.number_format = "0.##"
+                elif idx in [6, 13]:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    if isinstance(cell.value, date):
+                        cell.number_format = "DD.MM.YYYY"
+                elif idx == 14:
+                    cell.alignment = Alignment(
+                        horizontal="left", vertical="top", wrap_text=True
+                    )
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
 

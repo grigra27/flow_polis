@@ -769,6 +769,106 @@ def export_monthly_kv_report(request):
 
 
 @login_required
+def export_three_percent_report(request):
+    """Export approved payments for selected quarter to Excel (admin only)."""
+    if not _is_admin_user(request.user):
+        messages.error(request, "У вас нет прав для выполнения этого действия")
+        return redirect("reports:index")
+
+    try:
+        quarter_param = request.GET.get("three_percent_quarter")
+        year_param = request.GET.get("three_percent_year")
+
+        if not quarter_param or not year_param:
+            messages.error(request, "Необходимо выбрать квартал и год")
+            return redirect("reports:index")
+
+        try:
+            quarter = int(quarter_param)
+            year = int(year_param)
+        except (TypeError, ValueError):
+            messages.error(request, "Некорректные значения квартала или года")
+            return redirect("reports:index")
+
+        if quarter < 1 or quarter > 4:
+            messages.error(request, "Квартал должен быть в диапазоне от 1 до 4")
+            return redirect("reports:index")
+
+        current_year = timezone.now().year
+        if year < 2000 or year > current_year + 5:
+            messages.error(request, "Некорректное значение года")
+            return redirect("reports:index")
+
+        from datetime import date, timedelta
+
+        start_month = (quarter - 1) * 3 + 1
+        date_from = date(year, start_month, 1)
+        if quarter == 4:
+            date_to = date(year, 12, 31)
+        else:
+            date_to = date(year, start_month + 3, 1) - timedelta(days=1)
+
+        payments = (
+            PaymentSchedule.objects.select_related(
+                "policy",
+                "policy__client",
+                "policy__insurer",
+                "policy__policyholder",
+                "policy__branch",
+                "policy__insurance_type",
+                "commission_rate",
+            )
+            .filter(
+                insurer_date__gte=date_from,
+                insurer_date__lte=date_to,
+            )
+            .order_by(
+                "insurer_date",
+                "policy__insurer__insurer_name",
+                "policy__policy_number",
+                "year_number",
+                "installment_number",
+            )
+        )
+
+        if not payments.exists():
+            messages.warning(
+                request,
+                (
+                    "Нет платежей со статусом «Акт согласован СК» "
+                    f"за {quarter} квартал {year}"
+                ),
+            )
+            return redirect("reports:index")
+
+        from .exporters import ThreePercentReportExporter
+
+        exporter = ThreePercentReportExporter(
+            payments,
+            [],
+            quarter=quarter,
+            year=year,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        logger.info(
+            "User %s exported three percent report (quarter: Q%s %s, count: %s)",
+            request.user.username,
+            quarter,
+            year,
+            payments.count(),
+        )
+
+        return exporter.export()
+
+    except Exception as e:
+        logger.error(f"Error exporting three percent report: {e}")
+        messages.error(request, "Ошибка при создании отчета по 3%")
+        return redirect("reports:index")
+
+
+@login_required
 def export_database_backup(request):
     """Скачивание актуального backup-файла базы данных."""
     return _download_backup_file(request, "database")
@@ -851,6 +951,49 @@ class ExportsIndexView(LoginRequiredMixin, TemplateView):
 
         context["selected_kv_month"] = selected_kv_month
         context["selected_kv_year"] = selected_kv_year
+
+        three_percent_years = (
+            PaymentSchedule.objects.filter(insurer_date__isnull=False)
+            .annotate(year=ExtractYear("insurer_date"))
+            .values_list("year", flat=True)
+            .distinct()
+            .order_by("-year")
+        )
+        three_percent_year_choices = [year for year in three_percent_years if year]
+        if not three_percent_year_choices:
+            three_percent_year_choices = [current_date.year]
+
+        context["three_percent_quarter_choices"] = [
+            (1, "1 квартал"),
+            (2, "2 квартал"),
+            (3, "3 квартал"),
+            (4, "4 квартал"),
+        ]
+        context["three_percent_year_choices"] = three_percent_year_choices
+
+        default_quarter = (current_date.month - 1) // 3 + 1
+        try:
+            selected_three_percent_quarter = int(
+                self.request.GET.get("three_percent_quarter", default_quarter)
+            )
+        except (TypeError, ValueError):
+            selected_three_percent_quarter = default_quarter
+        if selected_three_percent_quarter < 1 or selected_three_percent_quarter > 4:
+            selected_three_percent_quarter = default_quarter
+
+        try:
+            selected_three_percent_year = int(
+                self.request.GET.get(
+                    "three_percent_year", three_percent_year_choices[0]
+                )
+            )
+        except (TypeError, ValueError):
+            selected_three_percent_year = three_percent_year_choices[0]
+        if selected_three_percent_year not in three_percent_year_choices:
+            selected_three_percent_year = three_percent_year_choices[0]
+
+        context["selected_three_percent_quarter"] = selected_three_percent_quarter
+        context["selected_three_percent_year"] = selected_three_percent_year
 
         if _is_admin_user(self.request.user):
             context["database_backup_info"] = _get_backup_file_info("database")

@@ -280,7 +280,7 @@ class CustomExporterTest(TestCase):
     def setUp(self):
         from apps.clients.models import Client
         from apps.insurers.models import Insurer, Branch, InsuranceType
-        from apps.policies.models import Policy
+        from apps.policies.models import Policy, PaymentSchedule
         from datetime import date
         from decimal import Decimal
 
@@ -304,6 +304,15 @@ class CustomExporterTest(TestCase):
             start_date=date(2024, 1, 15),
             end_date=date(2024, 12, 31),
             policy_active=True,
+        )
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2024, 1, 20),
+            insurance_sum=Decimal("1000000.00"),
+            amount=Decimal("100000.00"),
+            kv_rub=Decimal("0.00"),
         )
 
     def test_custom_exporter_get_headers(self):
@@ -974,6 +983,193 @@ class MonthlyKVExportViewTest(TestCase):
         response = self.client.get(
             reverse("reports:export_monthly_kv_report"),
             {"kv_month": 1, "kv_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("reports:index"))
+
+
+class ThreePercentReportExportViewTest(TestCase):
+    """Тесты экспорта «Отчет по 3%»."""
+
+    def setUp(self):
+        from datetime import date
+        from decimal import Decimal
+        from apps.clients.models import Client
+        from apps.insurers.models import Branch, CommissionRate, InsuranceType, Insurer
+        from apps.policies.models import Policy, PaymentSchedule
+
+        self.user = User.objects.create_user(
+            username="three_percent_user", password="testpass123"
+        )
+        self.admin = User.objects.create_user(
+            username="three_percent_admin", password="testpass123", is_staff=True
+        )
+
+        self.client_obj = Client.objects.create(
+            client_name="Лизингополучатель 3%", client_inn="7700000011"
+        )
+        self.policyholder = Client.objects.create(
+            client_name="Страхователь 3%", client_inn="7700000012"
+        )
+        self.insurer = Insurer.objects.create(insurer_name="СК 3%")
+        self.branch = Branch.objects.create(branch_name="Санкт-Петербург")
+        self.insurance_type = InsuranceType.objects.create(name="ОСАГО")
+        self.commission_rate = CommissionRate.objects.create(
+            insurer=self.insurer,
+            insurance_type=self.insurance_type,
+            kv_percent=Decimal("15.00"),
+        )
+
+        self.policy = Policy.objects.create(
+            policy_number="POL-3P-001",
+            dfa_number="DFA-3P-001",
+            client=self.client_obj,
+            policyholder=self.policyholder,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Тестовое имущество для 3%",
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            policy_active=True,
+            info3="Тестовое значение Инфо 3",
+        )
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2025, 2, 10),
+            amount=Decimal("10000.00"),
+            insurance_sum=Decimal("500000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("1500.00"),
+            paid_date=date(2025, 2, 15),
+            insurer_date=date(2025, 2, 20),
+        )
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=2,
+            due_date=date(2025, 3, 10),
+            amount=Decimal("12000.00"),
+            insurance_sum=Decimal("500000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("1800.00"),
+            paid_date=date(2025, 3, 15),
+            insurer_date=None,
+        )
+
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=1,
+            installment_number=3,
+            due_date=date(2025, 4, 10),
+            amount=Decimal("14000.00"),
+            insurance_sum=Decimal("500000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2100.00"),
+            paid_date=date(2025, 4, 15),
+            insurer_date=date(2025, 4, 20),
+        )
+
+    def test_non_admin_cannot_export_three_percent_report(self):
+        """Тест: обычный пользователь не может выгрузить отчет по 3%."""
+        self.client.login(username="three_percent_user", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_three_percent_report"),
+            {"three_percent_quarter": 1, "three_percent_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("reports:index"))
+
+    def test_admin_can_export_three_percent_report_for_quarter(self):
+        """Тест: админ получает Excel только с согласованными платежами квартала."""
+        from datetime import date
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        self.client.login(username="three_percent_admin", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_three_percent_report"),
+            {"three_percent_quarter": 1, "three_percent_year": 2025},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn("three_percent_report_2025_q1_", response["Content-Disposition"])
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+        sheet = workbook.active
+
+        self.assertEqual(
+            sheet["A1"].value,
+            (
+                "Расчет комиссионного вознаграждения ЗАО «Альянс-Лизинг» "
+                "за первый квартал 2025 года"
+            ),
+        )
+        self.assertEqual(
+            [cell.value for cell in sheet[3]],
+            [
+                "Номер ДФА",
+                "Номер полиса",
+                "Лизингополучатель",
+                "Страхователь",
+                "Страховая премия",
+                "Дата фактической оплаты",
+                "Ставка вознаграждения в процентах",
+                "Сумма вознаграждения в рублях",
+                "Страховщик",
+                "Филиал",
+                "КВ в процентах",
+                "КВ в рублях",
+                "Дата согласования акта с СК",
+                "Инфо 3",
+            ],
+        )
+
+        data_rows = [
+            row
+            for row in sheet.iter_rows(min_row=5, max_col=14, values_only=True)
+            if any(value is not None and value != "" for value in row)
+        ]
+
+        self.assertEqual(len(data_rows), 1)
+        row = data_rows[0]
+
+        self.assertEqual(row[0], "DFA-3P-001")
+        self.assertEqual(row[1], "POL-3P-001")
+        self.assertEqual(row[2], "Лизингополучатель 3%")
+        self.assertEqual(row[3], "Страхователь 3%")
+        self.assertAlmostEqual(float(row[4]), 10000.0)
+        exported_paid_date = row[5].date() if hasattr(row[5], "date") else row[5]
+        self.assertEqual(exported_paid_date, date(2025, 2, 15))
+        self.assertEqual(row[6], 3)
+        self.assertAlmostEqual(float(row[7]), 300.0)
+        self.assertEqual(row[8], "СК 3%")
+        self.assertEqual(row[9], "Санкт-Петербург")
+        self.assertAlmostEqual(float(row[10]), 15.0)
+        self.assertAlmostEqual(float(row[11]), 1500.0)
+        exported_insurer_date = row[12].date() if hasattr(row[12], "date") else row[12]
+        self.assertEqual(exported_insurer_date, date(2025, 2, 20))
+        self.assertEqual(row[13], "Тестовое значение Инфо 3")
+
+    def test_admin_gets_redirect_when_no_three_percent_data(self):
+        """Тест: при отсутствии согласованных платежей за квартал админ возвращается."""
+        self.client.login(username="three_percent_admin", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:export_three_percent_report"),
+            {"three_percent_quarter": 3, "three_percent_year": 2025},
         )
 
         self.assertEqual(response.status_code, 302)

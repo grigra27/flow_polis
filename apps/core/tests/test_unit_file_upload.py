@@ -57,6 +57,69 @@ class TestFileUploadValidator:
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
+    def create_xlsx_with_uppercase_shared_strings(self, filename="test.xlsx"):
+        """Helper for XLSX files exported with xl/SharedStrings.xml."""
+        from io import BytesIO
+        from zipfile import ZIP_DEFLATED, ZipFile
+
+        buf = BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr(
+                "[Content_Types].xml",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/SharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+</Types>""",
+            )
+            zf.writestr(
+                "_rels/.rels",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>""",
+            )
+            zf.writestr(
+                "xl/workbook.xml",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="TDSheet" sheetId="1" r:id="rId1"/></sheets>
+</workbook>""",
+            )
+            zf.writestr(
+                "xl/_rels/workbook.xml.rels",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>""",
+            )
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c></row>
+  </sheetData>
+</worksheet>""",
+            )
+            zf.writestr(
+                "xl/SharedStrings.xml",
+                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1">
+  <si><t>test</t></si>
+</sst>""",
+            )
+
+        buf.seek(0)
+        return SimpleUploadedFile(
+            filename,
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
     def create_xls_file(self, filename="test.xls"):
         """Helper to create a real old-style XLS file."""
         from io import BytesIO
@@ -147,6 +210,19 @@ class TestFileUploadValidator:
         Validates: Requirement 8.1
         """
         uploaded_file = self.create_xlsx_file("spreadsheet.xlsx")
+        is_valid, error, safe_filename = FileUploadValidator.validate_file(
+            uploaded_file
+        )
+
+        assert is_valid, f"XLSX file should be accepted, error: {error}"
+        assert error is None
+        assert safe_filename is not None
+        assert safe_filename.endswith(".xlsx")
+
+    def test_allowed_xlsx_with_uppercase_shared_strings(self):
+        uploaded_file = self.create_xlsx_with_uppercase_shared_strings(
+            "spreadsheet.xlsx"
+        )
         is_valid, error, safe_filename = FileUploadValidator.validate_file(
             uploaded_file
         )

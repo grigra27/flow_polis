@@ -10,6 +10,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 import logging
 
+from apps.core.xlsx import load_workbook_compat
+
 # Get security logger
 security_logger = logging.getLogger("security")
 
@@ -230,13 +232,15 @@ class FileUploadValidator:
 
         Validates: PLAN 9 (a) — защита от загрузки произвольного ZIP под видом xlsx.
         """
-        from openpyxl import load_workbook
-
         current_pos = uploaded_file.tell()
         try:
             uploaded_file.seek(0)
             # read_only=True не парсит ячейки сразу, только структуру
-            wb = load_workbook(uploaded_file, read_only=True, data_only=False)
+            wb = load_workbook_compat(
+                uploaded_file,
+                read_only=True,
+                data_only=False,
+            )
             # На всякий случай — проверим что есть хоть один лист
             if not wb.sheetnames:
                 return False, "Excel-файл повреждён или не содержит листов"

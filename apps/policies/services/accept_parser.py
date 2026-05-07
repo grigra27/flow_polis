@@ -7,6 +7,8 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 
+from apps.core.xlsx import load_workbook_compat
+
 
 class AcceptParseError(ValidationError):
     """Raised when an insurance accept file cannot be parsed."""
@@ -214,12 +216,14 @@ class AcceptParser:
         return rows, warnings
 
     def _read_xlsx_rows(self, uploaded_file):
-        from openpyxl import load_workbook
-
         current_pos = uploaded_file.tell()
         try:
             uploaded_file.seek(0)
-            workbook = load_workbook(uploaded_file, read_only=True, data_only=True)
+            workbook = load_workbook_compat(
+                uploaded_file,
+                read_only=True,
+                data_only=True,
+            )
         except Exception as exc:
             raise AcceptParseError(f"Не удалось открыть .xlsx файл: {exc}") from exc
         finally:

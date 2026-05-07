@@ -156,6 +156,109 @@ def make_accept_xlsx_with_numeric_inn():
     )
 
 
+def make_accept_xlsx_with_uppercase_shared_strings():
+    import zipfile
+    from xml.sax.saxutils import escape
+
+    values = {
+        "Наименование сокращенное": "БАЛТИЙСКАЯ ЗВЕЗДА, ООО",
+        "Наименование полное": 'ООО "БАЛТИЙСКАЯ ЗВЕЗДА"',
+        "Наименование по учредительным документам": 'ООО "БАЛТИЙСКАЯ ЗВЕЗДА"',
+        "ИНН": "7801308015",
+        "Лизингополучатель": "БАЛТИЙСКАЯ ЗВЕЗДА",
+        "Номер ДФА": "20604-3-ЛА",
+        "Дата ДФА": "20.04.2026",
+        "Страхователь": "Лизингополучатель",
+        "Банк-кредитор": "Альфа-Банк",
+        "Выгодоприобретатель (риск утраты)": "согласно требованиям банка",
+        "Выгодоприобретатель (риск ущерба)": "согласно требованиям банка",
+        "наименование страхуемого имущества": "б/у Автомобиль GWM WEY 80",
+        "стоимость по ДКП, валюта": "6 449 250,00 руб",
+        "Дата поставки / дата начала страхования": "07.05.2026",
+        "Дата окончания срока лизинга": "25.04.2029",
+        "Срок страхования": "на весь срок лизинга",
+        "Необходимый вид страхования": "КАСКО",
+        "Марка, модель предмета лизинга": "Автомобиль GWM WEY 80",
+        "VIN (или иной ID)": "LGWFGVA91SN600202",
+        "Год выпуска": "2025",
+    }
+
+    shared_strings = []
+    rows = []
+    for row_idx, (label, value) in enumerate(values.items(), start=1):
+        label_idx = len(shared_strings)
+        shared_strings.append(label)
+        value_idx = len(shared_strings)
+        shared_strings.append(value)
+        rows.append(
+            f'<row r="{row_idx}">'
+            f'<c r="A{row_idx}" t="s"><v>{label_idx}</v></c>'
+            f'<c r="B{row_idx}" t="s"><v>{value_idx}</v></c>'
+            "</row>"
+        )
+
+    shared_strings_xml = "\n".join(
+        f"<si><t>{escape(str(value))}</t></si>" for value in shared_strings
+    )
+    rows_xml = "\n".join(rows)
+
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/SharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+</Types>""",
+        )
+        zf.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>""",
+        )
+        zf.writestr(
+            "xl/workbook.xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="TDSheet" sheetId="1" r:id="rId1"/></sheets>
+</workbook>""",
+        )
+        zf.writestr(
+            "xl/_rels/workbook.xml.rels",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>""",
+        )
+        zf.writestr(
+            "xl/worksheets/sheet1.xml",
+            f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>{rows_xml}</sheetData>
+</worksheet>""",
+        )
+        zf.writestr(
+            "xl/SharedStrings.xml",
+            f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="{len(shared_strings)}" uniqueCount="{len(shared_strings)}">
+  {shared_strings_xml}
+</sst>""",
+        )
+
+    buffer.seek(0)
+    return SimpleUploadedFile(
+        "accept-uppercase-shared-strings.xlsx",
+        buffer.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @pytest.mark.django_db
 class TestAcceptParser:
     def test_parses_core_accept_fields(self):
@@ -187,6 +290,16 @@ class TestAcceptParser:
         result = parse_accept_file(make_accept_xlsx_with_numeric_inn())
 
         assert result.data.client_inn == "0123456789"
+
+    def test_parses_xlsx_with_uppercase_shared_strings(self):
+        result = parse_accept_file(make_accept_xlsx_with_uppercase_shared_strings())
+
+        assert result.data.client_inn == "7801308015"
+        assert result.data.dfa_number == "20604-3-ЛА"
+        assert result.data.purchase_price == Decimal("6449250.00")
+        assert result.data.start_date == date(2026, 5, 7)
+        assert result.data.end_date == date(2029, 4, 25)
+        assert result.data.vin_number == "LGWFGVA91SN600202"
 
 
 @pytest.mark.django_db
@@ -225,6 +338,29 @@ class TestAcceptResolver:
 
         assert "vin_number" not in resolved.policy_initial
         assert any("не прошел валидацию" in warning for warning in resolved.warnings)
+
+    @pytest.mark.parametrize("branch_code", ["LA", "ЛА"])
+    def test_resolves_saint_petersburg_branch_code(
+        self,
+        branch_code,
+        client_factory,
+        branch_factory,
+        insurance_type_factory,
+    ):
+        client_factory(client_inn="1686035567")
+        branch = branch_factory(branch_name="Санкт-Петербург")
+        insurance_type_factory(name="КАСКО")
+
+        parsed = parse_accept_file(
+            make_accept_xls(**{"Номер ДФА": f"20604-3-{branch_code}"})
+        )
+        resolved = resolve_accept_data(parsed.data, parsed.warnings)
+
+        assert resolved.policy_initial["branch"] == branch.pk
+        assert resolved.resolved["branch"] == {
+            "status": "matched",
+            "label": "Санкт-Петербург",
+        }
 
 
 @pytest.mark.django_db

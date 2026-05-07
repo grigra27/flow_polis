@@ -239,7 +239,13 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     regular_user = User.objects.create_user(username="regular", password="testpass123")
     client.force_login(regular_user)
 
-    response = client.get(reverse("policies:scheduled_payments"))
+    payment_period_code = (
+        f"{billing_payment.due_date.year:04d}-{billing_payment.due_date.month:02d}"
+    )
+    response = client.get(
+        reverse("policies:scheduled_payments"),
+        {"period": payment_period_code},
+    )
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")

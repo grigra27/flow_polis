@@ -2519,7 +2519,11 @@ class ThreePercentReportExporter(BaseExporter):
                     cell.number_format = '0"%"'
                 elif idx == 11:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                    cell.number_format = '0.##"%"'
+                    value = cell.value
+                    if isinstance(value, (int, float)) and float(value).is_integer():
+                        cell.number_format = '0"%"'
+                    else:
+                        cell.number_format = '0.##"%"'
                 elif idx in [6, 13]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     if isinstance(cell.value, date):

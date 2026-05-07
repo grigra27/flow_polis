@@ -2349,8 +2349,8 @@ class MonthlyKVReportExporter(BaseExporter):
 class ThreePercentReportExporter(BaseExporter):
     """Экспортер для отчета по 3% за выбранный квартал."""
 
-    NONSTANDARD_KV_FILL_COLOR = "7A1F2B"
-    NONSTANDARD_KV_FONT_COLOR = "FFFFFF"
+    NONSTANDARD_KV_FILL_COLOR = "D9D9D9"
+    NONSTANDARD_KV_FONT_COLOR = "C00000"
 
     QUARTER_LABELS = {
         1: "первый квартал",
@@ -2514,9 +2514,12 @@ class ThreePercentReportExporter(BaseExporter):
                 if idx in [5, 8, 12]:
                     cell.alignment = Alignment(horizontal="right", vertical="center")
                     cell.number_format = "#,##0.00"
-                elif idx in [7, 11]:
+                elif idx == 7:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
-                    cell.number_format = "0.##"
+                    cell.number_format = '0"%"'
+                elif idx == 11:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.number_format = '0.##"%"'
                 elif idx in [6, 13]:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     if isinstance(cell.value, date):

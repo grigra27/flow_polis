@@ -957,6 +957,7 @@ class ThursdayReportExporter(BaseExporter):
             "Дата факт. оплаты",
             "Причина",
             "Участие брокера",
+            "Примечание",
         ]
 
     def export(self):
@@ -970,9 +971,15 @@ class ThursdayReportExporter(BaseExporter):
         wb = Workbook()
         ws = wb.active
 
-        # Добавляем заголовок отчета с текущей датой
-        current_date = date.today().strftime("%d.%m.%Y")
-        report_title = f"ПЕРЕЧЕНЬ ДФА, ПО КОТОРЫМ НЕ ХВАТАЕТ ДОКУМЕНТОВ ПО СТРАХОВАНИЮ НА {current_date}"
+        # Заголовок: текущая дата + (опционально) дата среза, если оператор
+        # выбрал в форме отличную от сегодняшней.
+        today = date.today()
+        report_title = (
+            f"ПЕРЕЧЕНЬ ДФА, ПО КОТОРЫМ НЕ ХВАТАЕТ ДОКУМЕНТОВ ПО СТРАХОВАНИЮ "
+            f"НА {today.strftime('%d.%m.%Y')}"
+        )
+        if self.payment_date and self.payment_date != today:
+            report_title += f" (дата среза - {self.payment_date.strftime('%d.%m.%Y')})"
         ws.append([report_title])
 
         # Форматирование заголовка отчета
@@ -1034,20 +1041,27 @@ class ThursdayReportExporter(BaseExporter):
             "policy__branch",
         ).order_by("due_date", "policy__policy_number")
 
-        # Группируем записи по городам и полисам для объединения дубликатов
+        # Группируем по городам и полисам.
+        # На каждый неоплаченный платёж формируется отдельная строка;
+        # признак not_uploaded хранится на уровне полиса и клеится только
+        # к первой строке (чтобы пометка не дублировалась).
         records_by_branch = defaultdict(
-            lambda: defaultdict(lambda: {"reasons": set(), "data": None})
+            lambda: defaultdict(
+                lambda: {
+                    "policy": None,
+                    "has_not_uploaded": False,
+                    "unpaid_payments": [],
+                }
+            )
         )
 
-        # Добавляем полисы без документов
         for policy in self.queryset:
             branch_name = policy.branch.branch_name if policy.branch else "Без филиала"
             policy_key = policy.id
-            records_by_branch[branch_name][policy_key]["reasons"].add("not_uploaded")
-            if records_by_branch[branch_name][policy_key]["data"] is None:
-                records_by_branch[branch_name][policy_key]["data"] = policy
+            records_by_branch[branch_name][policy_key]["has_not_uploaded"] = True
+            if records_by_branch[branch_name][policy_key]["policy"] is None:
+                records_by_branch[branch_name][policy_key]["policy"] = policy
 
-        # Добавляем платежи без оплаты
         for payment in unpaid_payments:
             branch_name = (
                 payment.policy.branch.branch_name
@@ -1055,68 +1069,44 @@ class ThursdayReportExporter(BaseExporter):
                 else "Без филиала"
             )
             policy_key = payment.policy.id
-            records_by_branch[branch_name][policy_key]["reasons"].add("not_paid")
-            if records_by_branch[branch_name][policy_key]["data"] is None:
-                records_by_branch[branch_name][policy_key]["data"] = payment.policy
+            records_by_branch[branch_name][policy_key]["unpaid_payments"].append(
+                payment
+            )
+            if records_by_branch[branch_name][policy_key]["policy"] is None:
+                records_by_branch[branch_name][policy_key]["policy"] = payment.policy
 
         # Сортируем города по алфавиту
         sorted_branches = sorted(records_by_branch.keys())
 
-        # Добавляем данные по городам
-        rows_with_reasons = (
-            []
-        )  # Сохраняем информацию о строках для последующего форматирования
-
         for branch_name in sorted_branches:
-            # Добавляем заголовок города
             self._add_section_header(ws, branch_name, len(headers))
 
-            # Добавляем записи города (сортируем по номеру полиса)
             policies_in_branch = sorted(
                 records_by_branch[branch_name].items(),
-                key=lambda x: x[1]["data"].policy_number,
+                key=lambda x: x[1]["policy"].policy_number,
             )
 
             for policy_id, record_info in policies_in_branch:
-                policy = record_info["data"]
-                reasons = record_info["reasons"]
+                policy = record_info["policy"]
+                has_not_uploaded = record_info["has_not_uploaded"]
+                unpaid_payments_for_policy = sorted(
+                    record_info["unpaid_payments"],
+                    key=lambda p: (p.year_number, p.installment_number),
+                )
 
-                # Получаем базовые данные строки
-                row = self.get_row_data(policy)
-
-                # Формируем столбец "Причина" с форматированием
-                reason_cell_value = self._format_reasons(reasons)
-                row[11] = reason_cell_value  # 12-й столбец - "Причина"
-
-                current_row = ws.max_row + 1
-                ws.append(row)
-
-                # Сохраняем информацию о строке и причинах для форматирования
-                rows_with_reasons.append({"row": current_row, "reasons": reasons})
-
-                # Применяем форматирование к ячейке "Причина"
-                reason_cell = ws.cell(
-                    row=current_row, column=12
-                )  # 12-й столбец - Причина
-                reason_cell.alignment = Alignment(wrap_text=True, vertical="top")
-
-                # Увеличиваем высоту строки если есть обе причины
-                if len(reasons) > 1:
-                    ws.row_dimensions[current_row].height = 35
-                    # Применяем цветовой фон для ячейки с двумя причинами
-                    reason_cell.fill = PatternFill(
-                        start_color="FFF3CD", end_color="FFF3CD", fill_type="solid"
-                    )  # Светло-желтый фон для привлечения внимания
-                elif "not_uploaded" in reasons:
-                    # Светло-красный фон для "не подгружены документы"
-                    reason_cell.fill = PatternFill(
-                        start_color="FFE5E5", end_color="FFE5E5", fill_type="solid"
+                if not unpaid_payments_for_policy:
+                    # Только not_uploaded — одна строка с fallback-платежом
+                    self._write_policy_row(
+                        ws, policy, payment=None, reasons={"not_uploaded"}
                     )
-                elif "not_paid" in reasons:
-                    # Светло-оранжевый фон для "нет данных об оплате"
-                    reason_cell.fill = PatternFill(
-                        start_color="FFE8CC", end_color="FFE8CC", fill_type="solid"
-                    )
+                else:
+                    for idx, payment in enumerate(unpaid_payments_for_policy):
+                        reasons = {"not_paid"}
+                        if idx == 0 and has_not_uploaded:
+                            reasons.add("not_uploaded")
+                        self._write_policy_row(
+                            ws, policy, payment=payment, reasons=reasons
+                        )
 
             # Пустая строка после блока города
             ws.append([])
@@ -1155,33 +1145,38 @@ class ThursdayReportExporter(BaseExporter):
         # Увеличенная высота строки заголовка города
         ws.row_dimensions[current_row].height = 25
 
-    def get_row_data(self, policy):
-        """Возвращает данные строки для полиса"""
+    def get_row_data(self, policy, payment=None):
+        """Возвращает данные строки для полиса.
+
+        Если payment передан — используется он. Иначе подбирается
+        первый неоплаченный платёж с учётом фильтра по дате, а при его
+        отсутствии — самый ранний платёж полиса (fallback для случая,
+        когда у полиса есть только пометка not_uploaded).
+        """
         from apps.policies.models import PaymentSchedule
 
-        # Сначала ищем первый неоплаченный платеж с учетом фильтра по дате (если задан)
-        unpaid_filter = {"policy": policy, "paid_date__isnull": True}
+        if payment is not None:
+            payment_to_show = payment
+        else:
+            unpaid_filter = {"policy": policy, "paid_date__isnull": True}
+            if self.payment_date:
+                unpaid_filter["due_date__lte"] = self.payment_date
 
-        # Применяем фильтр по дате, если он задан
-        if self.payment_date:
-            unpaid_filter["due_date__lte"] = self.payment_date
-
-        first_unpaid_payment = (
-            PaymentSchedule.objects.filter(**unpaid_filter)
-            .order_by("year_number", "installment_number")
-            .first()
-        )
-
-        # Если неоплаченных нет (или они не попадают в фильтр по дате), берем первый платеж вообще
-        payment_to_show = first_unpaid_payment
-        if not payment_to_show:
             payment_to_show = (
-                PaymentSchedule.objects.filter(policy=policy)
+                PaymentSchedule.objects.filter(**unpaid_filter)
                 .order_by("year_number", "installment_number")
                 .first()
             )
 
-        # Определяем причину только по полису (не по платежу)
+            if not payment_to_show:
+                payment_to_show = (
+                    PaymentSchedule.objects.filter(policy=policy)
+                    .order_by("year_number", "installment_number")
+                    .first()
+                )
+
+        # Колонка "Причина" перезаписывается в _write_policy_row на основе
+        # переданного reasons-набора, поэтому здесь оставляем заглушку.
         reason = self.get_reason(policy, payment=None)
 
         return [
@@ -1198,6 +1193,7 @@ class ThursdayReportExporter(BaseExporter):
             self.format_value(payment_to_show.paid_date) if payment_to_show else "",
             reason,
             self.format_value(policy.broker_participation),
+            payment_to_show.payment_info if payment_to_show else "",
         ]
 
     def get_payment_row_data(self, payment):
@@ -1267,6 +1263,37 @@ class ThursdayReportExporter(BaseExporter):
         # Используем \n для универсальной совместимости с Excel на всех платформах
         return "\n".join(reason_texts)
 
+    def _write_policy_row(self, ws, policy, payment, reasons):
+        """Пишет одну строку отчёта и применяет форматирование колонки "Причина".
+
+        reasons — set из {"not_uploaded", "not_paid"}, определяющий заливку
+        и высоту строки.
+        """
+        from openpyxl.styles import Alignment, PatternFill
+
+        row = self.get_row_data(policy, payment=payment)
+        row[11] = self._format_reasons(reasons)
+
+        current_row = ws.max_row + 1
+        ws.append(row)
+
+        reason_cell = ws.cell(row=current_row, column=12)
+        reason_cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        if len(reasons) > 1:
+            ws.row_dimensions[current_row].height = 35
+            reason_cell.fill = PatternFill(
+                start_color="FFF3CD", end_color="FFF3CD", fill_type="solid"
+            )
+        elif "not_uploaded" in reasons:
+            reason_cell.fill = PatternFill(
+                start_color="FFE5E5", end_color="FFE5E5", fill_type="solid"
+            )
+        elif "not_paid" in reasons:
+            reason_cell.fill = PatternFill(
+                start_color="FFE8CC", end_color="FFE8CC", fill_type="solid"
+            )
+
     def apply_formatting(self, ws):
         """Применяет расширенное форматирование к листу"""
         from openpyxl.styles import Alignment
@@ -1287,6 +1314,7 @@ class ThursdayReportExporter(BaseExporter):
             "K": 13,  # Дата фактической оплаты
             "L": 30,  # Причина - увеличена ширина
             "M": 14,  # Участие брокера
+            "N": None,  # Примечание - автоподгонка с большим лимитом
         }
 
         from openpyxl.utils import get_column_letter
@@ -1315,7 +1343,7 @@ class ThursdayReportExporter(BaseExporter):
 
                 adjusted_width = max_length + 2
 
-                if column_letter == "H":  # Объект страхования (теперь столбец H)
+                if column_letter in ("H", "N"):  # Объект страхования / Примечание
                     adjusted_width = min(max(adjusted_width, 12), 60)
                 else:
                     adjusted_width = min(max(adjusted_width, 10), 50)
@@ -1376,6 +1404,11 @@ class ThursdayReportExporter(BaseExporter):
                 # Столбец "Участие брокера" (M) - по центру
                 elif idx == 13:
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                # Столбец "Примечание" (N) - перенос текста
+                elif idx == 14:
+                    cell.alignment = Alignment(
+                        horizontal="left", vertical="top", wrap_text=True
+                    )
                 # Остальные - слева
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")

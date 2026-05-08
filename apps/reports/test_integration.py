@@ -601,6 +601,7 @@ class ReadyExportsTest(TestCase):
             "Дата факт. оплаты",
             "Причина",
             "Участие брокера",
+            "Примечание",
         ]
         self.assertEqual(headers, expected_headers)
 
@@ -726,6 +727,118 @@ class ReadyExportsTest(TestCase):
             found_future_payment,
             "Платеж с датой 2025-01-01 не должен попасть в отчет с фильтром 2024-12-31",
         )
+
+    def test_thursday_report_multiple_unpaid_payments(self):
+        """Несколько неоплаченных платежей по одному полису → отдельные строки.
+
+        Проверяем, что каждый неоплаченный платёж становится своей строкой,
+        и что not_uploaded клеится только к первой строке полиса.
+        """
+        from apps.policies.models import PaymentSchedule
+
+        # Базовый платёж из setUp оплачен — оставляем как есть.
+        # Полис self.policy уже policy_uploaded=False по умолчанию.
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=2,
+            installment_number=2,
+            due_date=date(2024, 5, 1),
+            amount=Decimal("12500.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2500.00"),
+            paid_date=None,
+            payment_info="Ждём счёт",
+        )
+        PaymentSchedule.objects.create(
+            policy=self.policy,
+            year_number=2,
+            installment_number=3,
+            due_date=date(2024, 8, 1),
+            amount=Decimal("12500.00"),
+            insurance_sum=Decimal("1000000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("2500.00"),
+            paid_date=None,
+            payment_info="Согласовано на следующий квартал",
+        )
+
+        self.test_client.login(username="testuser", password="testpass123")
+        response = self.test_client.get(
+            "/reports/export/thursday/?payment_date=2024-12-31"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excel_file = BytesIO(response.content)
+        wb = load_workbook(excel_file)
+        ws = wb.active
+
+        # Собираем все строки полиса READY-001
+        ready_rows = []
+        for row in range(6, ws.max_row + 1):
+            if ws.cell(row=row, column=1).value == "READY-001":
+                ready_rows.append(row)
+
+        self.assertEqual(
+            len(ready_rows),
+            2,
+            "Должно быть две строки READY-001 — по одной на каждый неоплаченный платёж",
+        )
+
+        first_row, second_row = ready_rows
+
+        # Первая строка: обе причины, жёлтый фон FFF3CD, высота 35
+        first_reason = ws.cell(row=first_row, column=12).value
+        self.assertIn("не подгружены документы", first_reason)
+        self.assertIn("нет данных об оплате", first_reason)
+        first_fill = ws.cell(row=first_row, column=12).fill.start_color.rgb
+        self.assertTrue(first_fill.upper().endswith("FFF3CD"))
+        self.assertEqual(ws.row_dimensions[first_row].height, 35)
+
+        # Вторая строка: только not_paid, оранжевый фон FFE8CC
+        second_reason = ws.cell(row=second_row, column=12).value
+        self.assertNotIn("не подгружены документы", second_reason)
+        self.assertIn("нет данных об оплате", second_reason)
+        second_fill = ws.cell(row=second_row, column=12).fill.start_color.rgb
+        self.assertTrue(second_fill.upper().endswith("FFE8CC"))
+
+        # Платежи в строках разные и отсортированы по (year, installment)
+        from datetime import datetime as dt
+
+        def _as_date(value):
+            return value.date() if isinstance(value, dt) else value
+
+        first_due = _as_date(ws.cell(row=first_row, column=10).value)
+        second_due = _as_date(ws.cell(row=second_row, column=10).value)
+        self.assertEqual(first_due, date(2024, 5, 1))
+        self.assertEqual(second_due, date(2024, 8, 1))
+
+        # Каждая строка несёт своё примечание (column 14)
+        self.assertEqual(ws.cell(row=first_row, column=14).value, "Ждём счёт")
+        self.assertEqual(
+            ws.cell(row=second_row, column=14).value,
+            "Согласовано на следующий квартал",
+        )
+
+    def test_thursday_report_title_includes_cutoff_date(self):
+        """В заголовке отображается дата среза, если она отличается от сегодняшней."""
+        self.test_client.login(username="testuser", password="testpass123")
+
+        # Кейс 1: дата среза задана и отличается от сегодняшней — суффикс есть
+        response = self.test_client.get(
+            "/reports/export/thursday/?payment_date=2024-12-31"
+        )
+        wb = load_workbook(BytesIO(response.content))
+        title = wb.active.cell(row=1, column=1).value
+        self.assertIn("ПЕРЕЧЕНЬ ДФА", title)
+        self.assertIn("(дата среза - 31.12.2024)", title)
+
+        # Кейс 2: дата среза = сегодня (или не указана) — суффикса нет
+        response = self.test_client.get("/reports/export/thursday/")
+        wb = load_workbook(BytesIO(response.content))
+        title = wb.active.cell(row=1, column=1).value
+        self.assertIn("ПЕРЕЧЕНЬ ДФА", title)
+        self.assertNotIn("дата среза", title)
 
     def test_policy_expiration_export(self):
         """Тест экспорта полисов с окончанием страхования в заданном периоде"""

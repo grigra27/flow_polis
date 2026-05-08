@@ -1030,7 +1030,8 @@ class ThursdayReportExporter(BaseExporter):
         # Применяем фильтр по дате, если указана
         if self.payment_date:
             unpaid_payments_query = unpaid_payments_query.filter(
-                due_date__lte=self.payment_date
+                due_date__lte=self.payment_date,
+                policy__start_date__lte=self.payment_date,
             )
 
         unpaid_payments = unpaid_payments_query.select_related(

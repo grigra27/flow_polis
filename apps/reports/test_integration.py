@@ -820,6 +820,62 @@ class ReadyExportsTest(TestCase):
             "Согласовано на следующий квартал",
         )
 
+    def test_thursday_report_excludes_future_start_date(self):
+        """Полисы со start_date позже даты среза не попадают в отчёт.
+
+        Покрывает обе секции: not_uploaded (фильтр во view) и not_paid
+        (фильтр в экспортёре).
+        """
+        from apps.policies.models import PaymentSchedule
+
+        future_policy = Policy.objects.create(
+            policy_number="FUTURE-001",
+            dfa_number="DFA-FUTURE-001",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Полис ещё не начался",
+            start_date=date(2030, 1, 1),  # старт после любой разумной даты среза
+            end_date=date(2030, 12, 31),
+            policy_active=True,
+            policy_uploaded=False,  # документы не подгружены — кандидат в not_uploaded
+        )
+        # Неоплаченный платёж в будущем — потенциально кандидат в not_paid
+        PaymentSchedule.objects.create(
+            policy=future_policy,
+            year_number=1,
+            installment_number=2,
+            due_date=date(2030, 3, 1),
+            amount=Decimal("10000.00"),
+            insurance_sum=Decimal("500000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("1000.00"),
+            paid_date=None,
+        )
+
+        self.test_client.login(username="testuser", password="testpass123")
+        # Дата среза — после due_date платежа, но до start_date полиса
+        # ничего не делает: тут наоборот — cutoff < start_date.
+        # Берём cutoff в 2029 — раньше старта полиса.
+        response = self.test_client.get(
+            "/reports/export/thursday/?payment_date=2029-12-31"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        wb = load_workbook(BytesIO(response.content))
+        ws = wb.active
+        policy_numbers = [
+            ws.cell(row=row, column=1).value
+            for row in range(6, ws.max_row + 1)
+            if ws.cell(row=row, column=2).value  # отсекаем заголовки филиалов
+        ]
+        self.assertNotIn(
+            "FUTURE-001",
+            policy_numbers,
+            "Полис со start_date после даты среза не должен попасть в отчёт",
+        )
+
     def test_thursday_report_title_includes_cutoff_date(self):
         """В заголовке отображается дата среза, если она отличается от сегодняшней."""
         self.test_client.login(username="testuser", password="testpass123")

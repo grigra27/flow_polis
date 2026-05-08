@@ -388,6 +388,10 @@ def export_thursday_report(request):
 
             payment_date = timezone.now().date()
 
+        # Отсекаем полисы, чьё страхование ещё не началось на дату среза —
+        # по ним требовать документы/оплату преждевременно.
+        policies = policies.filter(start_date__lte=payment_date)
+
         # Генерируем отчет с использованием специального экспортера
         from .exporters import ThursdayReportExporter
 

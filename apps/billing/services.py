@@ -29,7 +29,7 @@ class PeriodOption:
     selected: bool = False
 
 
-VISIBLE_PAST_MONTHS = 2
+VISIBLE_PAST_MONTHS = 1
 VISIBLE_FUTURE_MONTHS = 6
 
 BRANCH_GROUP_1 = "group1"

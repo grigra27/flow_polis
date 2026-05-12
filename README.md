@@ -1443,6 +1443,7 @@ Workflow настроен в `.github/workflows/deploy.yml` и включает:
 - [SSL Setup Guide](nginx/SSL_SETUP.md) - Настройка SSL сертификатов
 - [Docker Compose Reference](DOCKER_COMPOSE_REFERENCE.md) - Справка по Docker Compose
 - [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) - Переменные окружения
+- [Email Communications Setup](docs/EMAIL_COMMUNICATIONS_SETUP.md) - Настройка почтового контура на Яндекс.Почте
 
 #### Мониторинг и обслуживание
 - [Monitoring Guide](docs/MONITORING.md) - Полное руководство по мониторингу и логированию

@@ -230,6 +230,18 @@ ALLOWED_HOSTS=...       # polis.insflow.ru,www.polis.insflow.ru
 DB_PASSWORD=...         # Пароль PostgreSQL
 EMAIL_HOST_USER=...     # Email для уведомлений
 EMAIL_HOST_PASSWORD=... # Пароль email
+
+# Почтовый контур (отправка писем из карточки задачи billing).
+# Полное описание и пошаговая настройка — в docs/EMAIL_COMMUNICATIONS_SETUP.md
+COMMUNICATIONS_EMAIL_ENABLED=True
+COMMUNICATIONS_SMTP_HOST=smtp.yandex.ru
+COMMUNICATIONS_SMTP_PORT=465
+COMMUNICATIONS_SMTP_USE_SSL=True
+COMMUNICATIONS_SMTP_USERNAME=onlinepolis-billing@yandex.ru
+COMMUNICATIONS_SMTP_PASSWORD=...  # пароль приложения Яндекса
+COMMUNICATIONS_FROM_EMAIL=onlinepolis-billing@yandex.ru
+COMMUNICATIONS_FROM_NAME=ОнлайнПолис
+COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True
 ```
 
 ---
@@ -328,6 +340,7 @@ docker compose -f docker-compose.prod.yml ps
 - [Настройка DNS](docs/DNS_SETUP.md)
 - [Бэкапы](docs/BACKUP_RESTORE.md)
 - [Мониторинг](docs/MONITORING.md)
+- [Почтовый контур: Яндекс.Почта на проде](docs/EMAIL_COMMUNICATIONS_SETUP.md)
 
 ---
 

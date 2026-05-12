@@ -1,7 +1,9 @@
 from datetime import date
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -9,6 +11,19 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
+from apps.communications.models import OutboundEmail
+from apps.communications.services import (
+    CommunicationsError,
+    CommunicationsConfigurationError,
+    create_outbound_email,
+    queue_outbound_email,
+)
+
+from .forms import AllianceEmailForm, ManualRecipientEmailForm
+from .mail_builders import (
+    build_alliance_forward_email_payload,
+    build_insurer_request_email_payload,
+)
 from .models import BillingTask
 from .services import (
     BRANCH_GROUP_1,
@@ -219,6 +234,11 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         today = timezone.localdate()
         task = self.object
+        outbound_emails = (
+            OutboundEmail.objects.for_object(task)
+            .select_related("created_by", "sent_by")
+            .prefetch_related("recipients", "attachments", "delivery_attempts")
+        )
         context.update(
             {
                 "status_choices": BillingTask.STATUS_CHOICES,
@@ -235,6 +255,9 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
                 "deadline_hint": _date_hint(task.invoice_request_deadline, today),
                 "due_hint": _date_hint(task.payment_schedule.due_date, today),
                 "payment_context": _payment_context(task),
+                "outbound_emails": outbound_emails,
+                "manual_recipient_form": ManualRecipientEmailForm(),
+                "alliance_email_form": AllianceEmailForm(),
             }
         )
         return context
@@ -303,4 +326,98 @@ class BillingTaskBulkUpdateView(LoginRequiredMixin, View):
                 updated_count += 1
 
         messages.success(request, f"Обновлено задач: {updated_count}")
+        return redirect(next_url)
+
+
+class SuperuserEmailSendMixin:
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_task(self, pk):
+        return get_object_or_404(
+            BillingTask.objects.select_related(
+                "period",
+                "responsible",
+                "payment_schedule",
+                "payment_schedule__policy",
+                "payment_schedule__policy__client",
+                "payment_schedule__policy__policyholder",
+                "payment_schedule__policy__insurer",
+                "payment_schedule__policy__branch",
+                "payment_schedule__policy__leasing_manager",
+            ),
+            pk=pk,
+            payment_schedule__policy__broker_participation=True,
+        )
+
+    def get_next_url(self, request, task):
+        return request.POST.get("next") or task.get_absolute_url()
+
+    def create_and_queue_email(self, request, payload, attachments=None):
+        if not settings.COMMUNICATIONS_EMAIL_ENABLED:
+            raise CommunicationsConfigurationError("Отправка писем временно отключена")
+        outbound_email = create_outbound_email(
+            **payload,
+            created_by=request.user,
+            attachments=attachments,
+        )
+        return queue_outbound_email(outbound_email, user=request.user)
+
+
+class BillingTaskSendInsurerEmailView(
+    LoginRequiredMixin, SuperuserEmailSendMixin, View
+):
+    def post(self, request, pk):
+        task = self.get_task(pk)
+        next_url = self.get_next_url(request, task)
+        form = ManualRecipientEmailForm(request.POST)
+        if not form.is_valid():
+            messages.warning(request, "Укажите корректный email получателя")
+            return redirect(next_url)
+
+        try:
+            payload = build_insurer_request_email_payload(
+                task, form.cleaned_data["recipient_email"]
+            )
+            self.create_and_queue_email(request, payload)
+        except (CommunicationsError, ValidationError) as exc:
+            messages.error(request, str(exc))
+            return redirect(next_url)
+
+        messages.success(request, "Письмо в СК поставлено в очередь отправки")
+        return redirect(next_url)
+
+
+class BillingTaskSendAllianceEmailView(
+    LoginRequiredMixin, SuperuserEmailSendMixin, View
+):
+    def post(self, request, pk):
+        task = self.get_task(pk)
+        next_url = self.get_next_url(request, task)
+        form = AllianceEmailForm(request.POST, request.FILES)
+        if not form.is_valid():
+            error_text = "Проверьте email получателя и файл счета"
+            if form.errors:
+                first_errors = next(iter(form.errors.values()))
+                if first_errors:
+                    error_text = first_errors[0]
+            messages.warning(request, error_text)
+            return redirect(next_url)
+
+        try:
+            payload = build_alliance_forward_email_payload(
+                task, form.cleaned_data["recipient_email"]
+            )
+            self.create_and_queue_email(
+                request,
+                payload,
+                attachments=[form.cleaned_data["invoice_file"]],
+            )
+        except (CommunicationsError, ValidationError) as exc:
+            messages.error(request, str(exc))
+            return redirect(next_url)
+
+        messages.success(request, "Письмо в Альянс поставлено в очередь отправки")
         return redirect(next_url)

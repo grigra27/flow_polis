@@ -423,6 +423,67 @@
         white-space: nowrap;
         flex-shrink: 0;
     }
+    .task-email-send-form {
+        margin-top: 0.9rem;
+        padding-top: 0.9rem;
+        border-top: 1px dashed var(--v2-border);
+        display: grid;
+        gap: 0.6rem;
+    }
+    .task-email-send-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.55rem;
+        align-items: end;
+    }
+    .task-email-send-row .task-letter-subject-input {
+        font-weight: 500;
+    }
+    .task-email-file-input {
+        width: 100%;
+        border: 1px solid #c8d5e6;
+        border-radius: 8px;
+        background: #fbfdff;
+        color: #13283f;
+        font-size: 0.86rem;
+        padding: 0.45rem 0.55rem;
+    }
+    .task-email-send-hint {
+        color: var(--v2-muted);
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+    .task-email-history {
+        display: grid;
+        gap: 0.55rem;
+    }
+    .task-email-history-item {
+        border: 1px solid var(--v2-border);
+        border-radius: 8px;
+        background: #fbfdff;
+        padding: 0.65rem 0.75rem;
+    }
+    .task-email-history-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.7rem;
+        align-items: flex-start;
+        color: var(--v2-title);
+        font-weight: 700;
+        font-size: 0.88rem;
+    }
+    .task-email-history-meta {
+        margin-top: 0.35rem;
+        color: var(--v2-muted);
+        font-size: 0.8rem;
+        line-height: 1.45;
+    }
+    .task-email-history-error {
+        margin-top: 0.45rem;
+        color: #b42318;
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
     @media (max-width: 575.98px) {
         .task-letter-block-head {
             flex-direction: column;
@@ -430,6 +491,9 @@
         }
         .task-letter-copy-btn {
             justify-content: center;
+        }
+        .task-email-send-row {
+            grid-template-columns: 1fr;
         }
     }
 
@@ -1104,6 +1168,22 @@
                         <div id="letterRendered" class="task-letter task-letter-rendered">{{ letter_html }}</div>
                         <textarea id="letterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ letter_text }}</textarea>
                     </div>
+                    {% if request.user.is_superuser %}
+                    <form method="post" action="{% url 'policies:scheduled_payment_send_insurer_email' task.pk %}" class="task-email-send-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <div class="task-email-send-row">
+                            <div>
+                                <label for="insurerRecipientEmail" class="task-letter-label">Email получателя</label>
+                                <input type="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
+                            </div>
+                            <button type="submit" class="btn-pl-apply">
+                                <i class="bi bi-send"></i> Отправить в СК
+                            </button>
+                        </div>
+                        <div class="task-email-send-hint">Тема и текст отправятся без редактирования. Отправка доступна только суперпользователю на период тестирования.</div>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1134,8 +1214,56 @@
                         <div id="allianceLetterRendered" class="task-letter task-letter-rendered">{{ alliance_letter_html }}</div>
                         <textarea id="allianceLetterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ alliance_letter_text }}</textarea>
                     </div>
+                    {% if request.user.is_superuser %}
+                    <form method="post" action="{% url 'policies:scheduled_payment_send_alliance_email' task.pk %}" class="task-email-send-form" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <div class="task-email-send-row">
+                            <div>
+                                <label for="allianceRecipientEmail" class="task-letter-label">Email получателя</label>
+                                <input type="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
+                            </div>
+                            <button type="submit" class="btn-pl-apply">
+                                <i class="bi bi-send"></i> Отправить в Альянс
+                            </button>
+                        </div>
+                        <div>
+                            <label for="allianceInvoiceFile" class="task-letter-label">Счет</label>
+                            <input type="file" id="allianceInvoiceFile" name="invoice_file" class="task-email-file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" required>
+                        </div>
+                        <div class="task-email-send-hint">Для письма в Альянс счет обязателен. Разрешены PDF, изображения, Word и Excel-файлы до настроенного лимита.</div>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
+
+            {% if outbound_emails %}
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-send-check"></i> История отправок из системы</span>
+                </div>
+                <div class="mgr-section-body">
+                    <div class="task-email-history">
+                        {% for email in outbound_emails %}
+                        <div class="task-email-history-item">
+                            <div class="task-email-history-head">
+                                <span>{{ email.get_kind_display }}</span>
+                                <span>{{ email.get_status_display }}</span>
+                            </div>
+                            <div class="task-email-history-meta">
+                                <div>Получатель: {% for recipient in email.recipients.all %}{{ recipient.address }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+                                <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
+                                <div>Тема: {{ email.subject }}</div>
+                            </div>
+                            {% if email.last_error %}
+                            <div class="task-email-history-error">{{ email.last_error }}</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
         </div>
     </div>

@@ -3,6 +3,8 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,6 +16,7 @@ from apps.billing.services import (
     update_task,
 )
 from apps.clients.models import Client
+from apps.communications.models import OutboundEmail
 from apps.insurers.models import Branch, InsuranceType, Insurer, LeasingManager
 from apps.policies.models import PaymentSchedule, Policy
 
@@ -683,6 +686,147 @@ def test_letter_skips_policyholder_line_when_absent(billing_payment):
 
     assert "Страхователь:" not in letter
     assert "Лизингополучатель:" in letter
+
+
+@pytest.mark.django_db
+def test_email_send_forms_visible_only_to_superuser(client, billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    regular = User.objects.create_user(
+        username="regular_sender", password="testpass123"
+    )
+    client.login(username=regular.username, password="testpass123")
+
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    content = response.content.decode()
+
+    assert "scheduled_payment_send_insurer_email" not in content
+    assert "Отправить в СК" not in content
+
+    client.logout()
+    admin = User.objects.create_superuser(
+        username="root_sender",
+        email="root_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    content = response.content.decode()
+
+    assert (
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk])
+        in content
+    )
+    assert "Отправить в СК" in content
+    assert "Отправить в Альянс" in content
+
+
+@pytest.mark.django_db
+def test_regular_user_cannot_post_email_send(client, billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    regular = User.objects.create_user(
+        username="regular_post_sender", password="testpass123"
+    )
+    client.login(username=regular.username, password="testpass123")
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "recipient@example.com"},
+    )
+
+    assert response.status_code == 403
+    assert not OutboundEmail.objects.exists()
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+def test_superuser_can_create_insurer_email_with_manual_recipient(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="insurer_sender",
+        email="insurer_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "recipient@example.com"},
+    )
+
+    assert response.status_code == 302
+    email = OutboundEmail.objects.get()
+    assert email.kind == OutboundEmail.KIND_BILLING_INSURER_REQUEST
+    assert email.recipients.get().address == "recipient@example.com"
+    assert email.subject == task.build_letter_subject()
+
+
+@pytest.mark.django_db
+def test_alliance_email_requires_invoice_file(client, billing_payment, monkeypatch):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="alliance_no_file_sender",
+        email="alliance_no_file_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_alliance_email", args=[task.pk]),
+        {"recipient_email": "alliance@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert not OutboundEmail.objects.exists()
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+def test_superuser_can_create_alliance_email_with_invoice_attachment(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="alliance_sender",
+        email="alliance_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    invoice = SimpleUploadedFile(
+        "invoice.pdf",
+        b"%PDF-1.4\ninvoice",
+        content_type="application/pdf",
+    )
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_alliance_email", args=[task.pk]),
+        {"recipient_email": "alliance@example.com", "invoice_file": invoice},
+    )
+
+    assert response.status_code == 302
+    email = OutboundEmail.objects.get()
+    assert email.kind == OutboundEmail.KIND_BILLING_ALLIANCE_FORWARD
+    assert email.recipients.get().address == "alliance@example.com"
+    assert email.attachments.filter(original_filename="invoice.pdf").exists()
 
 
 @pytest.mark.django_db

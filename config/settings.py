@@ -162,6 +162,7 @@ INSTALLED_APPS = [
     "apps.insurers",
     "apps.policies",
     "apps.notifications",
+    "apps.communications",
     "apps.reports",
     "apps.analytics",
     "apps.billing",
@@ -306,6 +307,37 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+
+# Communications email contour.
+# This is intentionally separate from Django's EMAIL_* settings because the
+# communications app is an auditable business outbox, not generic notifications.
+COMMUNICATIONS_EMAIL_ENABLED = config(
+    "COMMUNICATIONS_EMAIL_ENABLED", default=False, cast=bool
+)
+COMMUNICATIONS_DEFAULT_ACCOUNT = config(
+    "COMMUNICATIONS_DEFAULT_ACCOUNT", default="billing"
+)
+COMMUNICATIONS_SMTP_HOST = config("COMMUNICATIONS_SMTP_HOST", default="")
+COMMUNICATIONS_SMTP_PORT = config("COMMUNICATIONS_SMTP_PORT", default=465, cast=int)
+COMMUNICATIONS_SMTP_USE_TLS = config(
+    "COMMUNICATIONS_SMTP_USE_TLS", default=False, cast=bool
+)
+COMMUNICATIONS_SMTP_USE_SSL = config(
+    "COMMUNICATIONS_SMTP_USE_SSL", default=True, cast=bool
+)
+COMMUNICATIONS_SMTP_USERNAME = config("COMMUNICATIONS_SMTP_USERNAME", default="")
+COMMUNICATIONS_SMTP_PASSWORD = config("COMMUNICATIONS_SMTP_PASSWORD", default="")
+COMMUNICATIONS_FROM_EMAIL = config("COMMUNICATIONS_FROM_EMAIL", default="")
+COMMUNICATIONS_FROM_NAME = config("COMMUNICATIONS_FROM_NAME", default="")
+COMMUNICATIONS_MESSAGE_ID_DOMAIN = config(
+    "COMMUNICATIONS_MESSAGE_ID_DOMAIN", default=""
+)
+COMMUNICATIONS_ATTACHMENT_MAX_SIZE_MB = config(
+    "COMMUNICATIONS_ATTACHMENT_MAX_SIZE_MB", default=10, cast=int
+)
+COMMUNICATIONS_SEND_TIMEOUT = config(
+    "COMMUNICATIONS_SEND_TIMEOUT", default=30, cast=int
+)
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

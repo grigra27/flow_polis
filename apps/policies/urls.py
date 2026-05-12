@@ -29,6 +29,16 @@ urlpatterns = [
         name="scheduled_payment_task_update",
     ),
     path(
+        "payments/scheduled/tasks/<int:pk>/send-insurer-email/",
+        billing_views.BillingTaskSendInsurerEmailView.as_view(),
+        name="scheduled_payment_send_insurer_email",
+    ),
+    path(
+        "payments/scheduled/tasks/<int:pk>/send-alliance-email/",
+        billing_views.BillingTaskSendAllianceEmailView.as_view(),
+        name="scheduled_payment_send_alliance_email",
+    ),
+    path(
         "payments/scheduled/bulk-update/",
         billing_views.BillingTaskBulkUpdateView.as_view(),
         name="scheduled_payment_bulk_update",

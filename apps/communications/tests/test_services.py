@@ -103,6 +103,7 @@ def test_create_outbound_email_adds_recipient_and_technical_code(
 
 
 @pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=False)
 def test_queue_outbound_email_requires_enabled_setting(billing_task, superuser):
     email = _create_email(billing_task, superuser)
 
@@ -142,6 +143,7 @@ def test_queue_outbound_email_marks_queued_and_enqueues_task(
 
 
 @pytest.mark.django_db
+@override_settings(BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT=True)
 def test_send_outbound_email_now_marks_sent_and_updates_billing_status(
     billing_task, superuser, monkeypatch
 ):
@@ -227,6 +229,7 @@ def test_send_does_not_change_billing_status_when_flag_disabled(
 
 
 @pytest.mark.django_db
+@override_settings(BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT=True)
 def test_insurer_request_does_not_retreat_status_for_advanced_task(
     billing_task, superuser, monkeypatch
 ):

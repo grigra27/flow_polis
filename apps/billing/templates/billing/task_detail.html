@@ -1163,6 +1163,60 @@
                 </div>
             </div>
 
+            {% if outbound_emails %}
+            <div class="mgr-section">
+                <div class="mgr-section-head">
+                    <span class="mgr-section-head-title"><i class="bi bi-send-check"></i> История отправок из системы</span>
+                </div>
+                <div class="mgr-section-body">
+                    <div class="task-email-history">
+                        {% for email in outbound_emails %}
+                        <div class="task-email-history-item">
+                            <div class="task-email-history-head">
+                                <span>{{ email.get_kind_display }}</span>
+                                <span>{{ email.get_status_display }}</span>
+                            </div>
+                            {% if can_send_outbound_email or email.sent_by == request.user or email.created_by == request.user %}
+                            <div class="task-email-history-meta">
+                                <div>Получатель: {% for recipient in email.recipients.all %}{{ recipient.address }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+                                <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
+                                <div>Тема: {{ email.subject }}</div>
+                                {% if email.sent_by %}
+                                <div>Отправил: {{ email.sent_by.get_full_name|default:email.sent_by.username }}</div>
+                                {% endif %}
+                            </div>
+                            <details class="task-email-history-body">
+                                <summary>Показать тело письма</summary>
+                                <pre class="task-email-history-body-text">{{ email.body_text }}</pre>
+                            </details>
+                            {% if email.last_error %}
+                            <div class="task-email-history-error">{{ email.last_error }}</div>
+                            {% endif %}
+                            {% if can_send_outbound_email and email.status == outbound_failed_status %}
+                            <form method="post" action="{% url 'policies:scheduled_payment_retry_email' task.pk email.pk %}" class="task-email-history-retry">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="btn-mgr-soft">
+                                    <i class="bi bi-arrow-clockwise"></i> Повторить отправку
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% else %}
+                            <div class="task-email-history-meta">
+                                <div>
+                                    {% if email.sent_at %}Отправлено{% else %}Создано{% endif %}:
+                                    {{ email.sent_at|default:email.created_at|date:"d.m.Y H:i" }}
+                                    {% if email.sent_by %} · {{ email.sent_by.get_full_name|default:email.sent_by.username }}{% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
 
         <!-- Right column -->
@@ -1263,47 +1317,6 @@
                     {% endif %}
                 </div>
             </div>
-
-            {% if outbound_emails %}
-            <div class="mgr-section">
-                <div class="mgr-section-head">
-                    <span class="mgr-section-head-title"><i class="bi bi-send-check"></i> История отправок из системы</span>
-                </div>
-                <div class="mgr-section-body">
-                    <div class="task-email-history">
-                        {% for email in outbound_emails %}
-                        <div class="task-email-history-item">
-                            <div class="task-email-history-head">
-                                <span>{{ email.get_kind_display }}</span>
-                                <span>{{ email.get_status_display }}</span>
-                            </div>
-                            <div class="task-email-history-meta">
-                                <div>Получатель: {% for recipient in email.recipients.all %}{{ recipient.address }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
-                                <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
-                                <div>Тема: {{ email.subject }}</div>
-                            </div>
-                            <details class="task-email-history-body">
-                                <summary>Показать тело письма</summary>
-                                <pre class="task-email-history-body-text">{{ email.body_text }}</pre>
-                            </details>
-                            {% if email.last_error %}
-                            <div class="task-email-history-error">{{ email.last_error }}</div>
-                            {% endif %}
-                            {% if can_send_outbound_email and email.status == outbound_failed_status %}
-                            <form method="post" action="{% url 'policies:scheduled_payment_retry_email' task.pk email.pk %}" class="task-email-history-retry">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <button type="submit" class="btn-mgr-soft">
-                                    <i class="bi bi-arrow-clockwise"></i> Повторить отправку
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
         </div>
     </div>

@@ -199,6 +199,34 @@ def test_send_outbound_email_now_failure_keeps_billing_status(
 
 
 @pytest.mark.django_db
+@override_settings(BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT=False)
+def test_send_does_not_change_billing_status_when_flag_disabled(
+    billing_task, superuser, monkeypatch
+):
+    """При выключенном флаге успешная отправка не меняет BillingTask.status,
+    но email всё равно переходит в sent и попадает в историю."""
+
+    class Provider:
+        def send(self, outbound_email):
+            return SendResult(success=True, provider_message_id="", response="ok")
+
+    monkeypatch.setattr(
+        "apps.communications.services.get_provider", lambda account: Provider()
+    )
+    email = _create_email(billing_task, superuser)
+    email.status = OutboundEmail.STATUS_QUEUED
+    email.sent_by = superuser
+    email.save(update_fields=["status", "sent_by", "updated_at"])
+
+    send_outbound_email_now(email.id)
+
+    email.refresh_from_db()
+    billing_task.refresh_from_db()
+    assert email.status == OutboundEmail.STATUS_SENT
+    assert billing_task.status == BillingTask.STATUS_TO_REQUEST
+
+
+@pytest.mark.django_db
 def test_insurer_request_does_not_retreat_status_for_advanced_task(
     billing_task, superuser, monkeypatch
 ):

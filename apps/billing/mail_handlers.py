@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from apps.communications.models import OutboundEmail
 
 from .models import BillingTask
@@ -20,6 +22,12 @@ def _is_forward_status_change(task, target_status):
 
 
 def handle_billing_email_sent(email):
+    # На время тестирования отправки SMTP можно выключить авто-перевод статуса
+    # через BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT=False — отправка работает,
+    # история письма пишется, но статус задачи меняется только вручную.
+    if not getattr(settings, "BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT", True):
+        return
+
     task = email.content_object
     if not isinstance(task, BillingTask):
         return

@@ -343,6 +343,13 @@ COMMUNICATIONS_SEND_TIMEOUT = config(
 COMMUNICATIONS_RESTRICT_TO_SUPERUSER = config(
     "COMMUNICATIONS_RESTRICT_TO_SUPERUSER", default=True, cast=bool
 )
+# Когда True (production-режим) успешная отправка письма автоматически
+# переводит BillingTask в соответствующий статус. На время тестирования
+# отправки имеет смысл выставить False — тогда статус задачи меняется
+# только вручную, и можно тестировать SMTP без побочного эффекта.
+BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT = config(
+    "BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT", default=True, cast=bool
+)
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

@@ -193,23 +193,27 @@ class BillingTask(TimeStampedModel):
             return "Высылаем счет на годовой взнос по договору страхования."
         return "Высылаем счет на очередной взнос по договору страхования."
 
-    def build_letter_subject(self):
+    def _build_standard_letter_subject(self):
         policy = self.policy
-        installment_status, _, _ = self._get_installment_metadata()
-        if installment_status == "годовой":
-            subject_prefix = "Счёт на годовой взнос"
-        else:
-            subject_prefix = "Счёт на очередной взнос"
-        dfa_number = policy.dfa_number or "Без ДФА"
+        dfa_number = (policy.dfa_number or "").strip() or "Без ДФА"
+        policy_number = (policy.policy_number or "").strip() or "Без номера полиса"
         branch_name = (
             policy.branch.branch_name
             if policy.branch and policy.branch.branch_name
             else ""
         ).strip() or "Без филиала"
-        policy_number = policy.policy_number or "Без номера полиса"
+        insurer_name = (
+            policy.insurer.insurer_name
+            if policy.insurer and policy.insurer.insurer_name
+            else ""
+        ).strip() or "Без страховщика"
         return (
-            f"{subject_prefix} --- {dfa_number} --- {branch_name} --- {policy_number}"
+            f"СТРАХОВАНИЕ — Счет — {dfa_number} — {policy_number} — "
+            f"{branch_name} — {insurer_name}"
         )
+
+    def build_letter_subject(self):
+        return self._build_standard_letter_subject()
 
     def build_letter_text(self):
         policy = self.policy
@@ -248,16 +252,7 @@ class BillingTask(TimeStampedModel):
         return self._wrap_letter_html(self.build_letter_text())
 
     def build_alliance_letter_subject(self):
-        dfa_number = self.policy.dfa_number or "Без ДФА"
-        branch_name = (
-            self.policy.branch.branch_name
-            if self.policy.branch and self.policy.branch.branch_name
-            else ""
-        ).strip() or "Без филиала"
-        insurer_name = (
-            self.policy.insurer.insurer_name or ""
-        ).strip() or "Без страховщика"
-        return f"СТРАХОВАНИЕ --- счет --- {dfa_number} --- {branch_name} --- {insurer_name}"
+        return self._build_standard_letter_subject()
 
     def build_alliance_letter_text(self):
         policy = self.policy

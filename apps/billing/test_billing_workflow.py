@@ -112,10 +112,13 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert "Тип взноса: годовой" in alliance_letter
     assert "Страховщик:" not in alliance_letter
     assert "Лизингополучатель:" not in alliance_letter
-    assert subject == "Счёт на годовой взнос --- DFA-001 --- Москва --- POL-001"
+    assert (
+        subject
+        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+    )
     assert (
         alliance_subject
-        == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
 
 
@@ -145,10 +148,13 @@ def test_letter_contains_installment_metadata_for_installment_plan(billing_payme
     assert "Тип взноса: рассрочка, платёж 1 из 2" in alliance_letter
     assert "Страховщик:" not in alliance_letter
     assert "Лизингополучатель:" not in alliance_letter
-    assert subject == "Счёт на очередной взнос --- DFA-001 --- Москва --- POL-001"
+    assert (
+        subject
+        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+    )
     assert (
         alliance_subject
-        == "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
 
 
@@ -264,9 +270,9 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     assert "Текст письма в" in content
     assert "Тестовая страховая" in content
     assert "Тема письма" in content
-    assert "Счёт на годовой взнос --- DFA-001 --- Москва --- POL-001" in content
     assert (
-        "СТРАХОВАНИЕ --- счет --- DFA-001 --- Москва --- Тестовая страховая" in content
+        "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        in content
     )
     assert "Год страхования: 2 год страхования" in content
     assert reverse("policies:detail", args=[billing_payment.policy.id]) in content

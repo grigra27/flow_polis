@@ -39,6 +39,11 @@ urlpatterns = [
         name="scheduled_payment_send_alliance_email",
     ),
     path(
+        "payments/scheduled/tasks/<int:pk>/retry-email/<int:email_id>/",
+        billing_views.BillingTaskRetryEmailView.as_view(),
+        name="scheduled_payment_retry_email",
+    ),
+    path(
         "payments/scheduled/bulk-update/",
         billing_views.BillingTaskBulkUpdateView.as_view(),
         name="scheduled_payment_bulk_update",

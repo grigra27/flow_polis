@@ -14,9 +14,9 @@ from django.views.generic import DetailView, TemplateView
 from apps.communications.models import OutboundEmail
 from apps.communications.services import (
     CommunicationsError,
-    CommunicationsConfigurationError,
     create_outbound_email,
     queue_outbound_email,
+    retry_outbound_email,
 )
 
 from .forms import AllianceEmailForm, ManualRecipientEmailForm
@@ -258,6 +258,10 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
                 "outbound_emails": outbound_emails,
                 "manual_recipient_form": ManualRecipientEmailForm(),
                 "alliance_email_form": AllianceEmailForm(),
+                "can_send_outbound_email": user_can_send_outbound_email(
+                    self.request.user
+                ),
+                "outbound_failed_status": OutboundEmail.STATUS_FAILED,
             }
         )
         return context
@@ -329,9 +333,24 @@ class BillingTaskBulkUpdateView(LoginRequiredMixin, View):
         return redirect(next_url)
 
 
-class SuperuserEmailSendMixin:
+def user_can_send_outbound_email(user):
+    """Гейт на отправку писем из системы.
+
+    Пока флаг COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True, доступ есть только у
+    суперпользователей — это режим тестирования из плана. После снятия флага
+    доступ управляется стандартным Django-permission
+    communications.send_outbound_email.
+    """
+    if not user.is_authenticated:
+        return False
+    if settings.COMMUNICATIONS_RESTRICT_TO_SUPERUSER:
+        return bool(user.is_superuser)
+    return user.is_superuser or user.has_perm("communications.send_outbound_email")
+
+
+class EmailSendPermissionMixin:
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_superuser:
+        if not user_can_send_outbound_email(request.user):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
@@ -356,8 +375,6 @@ class SuperuserEmailSendMixin:
         return request.POST.get("next") or task.get_absolute_url()
 
     def create_and_queue_email(self, request, payload, attachments=None):
-        if not settings.COMMUNICATIONS_EMAIL_ENABLED:
-            raise CommunicationsConfigurationError("Отправка писем временно отключена")
         outbound_email = create_outbound_email(
             **payload,
             created_by=request.user,
@@ -367,7 +384,7 @@ class SuperuserEmailSendMixin:
 
 
 class BillingTaskSendInsurerEmailView(
-    LoginRequiredMixin, SuperuserEmailSendMixin, View
+    LoginRequiredMixin, EmailSendPermissionMixin, View
 ):
     def post(self, request, pk):
         task = self.get_task(pk)
@@ -391,7 +408,7 @@ class BillingTaskSendInsurerEmailView(
 
 
 class BillingTaskSendAllianceEmailView(
-    LoginRequiredMixin, SuperuserEmailSendMixin, View
+    LoginRequiredMixin, EmailSendPermissionMixin, View
 ):
     def post(self, request, pk):
         task = self.get_task(pk)
@@ -420,4 +437,23 @@ class BillingTaskSendAllianceEmailView(
             return redirect(next_url)
 
         messages.success(request, "Письмо в Альянс поставлено в очередь отправки")
+        return redirect(next_url)
+
+
+class BillingTaskRetryEmailView(LoginRequiredMixin, EmailSendPermissionMixin, View):
+    def post(self, request, pk, email_id):
+        task = self.get_task(pk)
+        next_url = self.get_next_url(request, task)
+        email = get_object_or_404(
+            OutboundEmail.objects.for_object(task),
+            pk=email_id,
+        )
+
+        try:
+            retry_outbound_email(email, user=request.user)
+        except (CommunicationsError, ValidationError) as exc:
+            messages.error(request, str(exc))
+            return redirect(next_url)
+
+        messages.success(request, "Письмо снова поставлено в очередь отправки")
         return redirect(next_url)

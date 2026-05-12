@@ -795,6 +795,126 @@ def test_alliance_email_requires_invoice_file(client, billing_payment, monkeypat
 
 
 @pytest.mark.django_db
+@override_settings(COMMUNICATIONS_RESTRICT_TO_SUPERUSER=False)
+def test_user_with_send_permission_can_post_email_send(
+    client, billing_payment, monkeypatch
+):
+    from django.contrib.auth.models import Permission
+
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    regular = User.objects.create_user(
+        username="empowered_sender", password="testpass123"
+    )
+    permission = Permission.objects.get(
+        content_type__app_label="communications",
+        codename="send_outbound_email",
+    )
+    regular.user_permissions.add(permission)
+
+    with override_settings(COMMUNICATIONS_EMAIL_ENABLED=True):
+        client.login(username=regular.username, password="testpass123")
+        response = client.post(
+            reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+            {"recipient_email": "recipient@example.com"},
+        )
+
+    assert response.status_code == 302
+    assert OutboundEmail.objects.filter(
+        kind=OutboundEmail.KIND_BILLING_INSURER_REQUEST
+    ).exists()
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+def test_retry_failed_email_button_visible_and_works(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    monkeypatch.setattr(
+        "apps.billing.views.retry_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="retry_admin",
+        email="retry@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    response = client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "recipient@example.com"},
+    )
+    assert response.status_code == 302
+    email = OutboundEmail.objects.get()
+    email.status = OutboundEmail.STATUS_FAILED
+    email.last_error = "smtp unavailable"
+    email.save(update_fields=["status", "last_error", "updated_at"])
+
+    detail_response = client.get(
+        reverse("policies:scheduled_payment_task", args=[task.pk])
+    )
+    detail_content = detail_response.content.decode()
+    retry_url = reverse(
+        "policies:scheduled_payment_retry_email", args=[task.pk, email.pk]
+    )
+    assert retry_url in detail_content
+    assert "Повторить отправку" in detail_content
+
+    retry_response = client.post(retry_url)
+    assert retry_response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_retry_email_requires_send_permission(client, billing_payment):
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    # Создаём письмо вручную, без отправки.
+    from django.contrib.contenttypes.models import ContentType
+
+    from apps.communications.models import MailAccount
+
+    account = MailAccount.objects.create(
+        code="billing",
+        name="Тестовый ящик",
+        email="sender@example.com",
+        display_name="ОнлайнПолис",
+        provider=MailAccount.PROVIDER_SMTP,
+        is_default=True,
+    )
+    email = OutboundEmail.objects.create(
+        account=account,
+        kind=OutboundEmail.KIND_BILLING_INSURER_REQUEST,
+        from_email="sender@example.com",
+        subject="Тест",
+        body_text="тело",
+        content_type=ContentType.objects.get_for_model(task),
+        object_id=task.pk,
+        message_id="<test@onlinepolis.local>",
+        status=OutboundEmail.STATUS_FAILED,
+        last_error="smtp unavailable",
+    )
+
+    regular = User.objects.create_user(username="cannot_retry", password="testpass123")
+    client.login(username=regular.username, password="testpass123")
+
+    response = client.post(
+        reverse("policies:scheduled_payment_retry_email", args=[task.pk, email.pk])
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 @override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
 def test_superuser_can_create_alliance_email_with_invoice_attachment(
     client, billing_payment, monkeypatch

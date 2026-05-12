@@ -484,6 +484,33 @@
         font-size: 0.82rem;
         line-height: 1.45;
     }
+    .task-email-history-body {
+        margin-top: 0.5rem;
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+    }
+    .task-email-history-body summary {
+        cursor: pointer;
+        user-select: none;
+    }
+    .task-email-history-body-text {
+        margin: 0.4rem 0 0;
+        padding: 0.55rem 0.7rem;
+        background: #ffffff;
+        border: 1px solid var(--v2-border);
+        border-radius: 6px;
+        color: var(--v2-title);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 220px;
+        overflow: auto;
+    }
+    .task-email-history-retry {
+        margin-top: 0.55rem;
+    }
     @media (max-width: 575.98px) {
         .task-letter-block-head {
             flex-direction: column;
@@ -1168,8 +1195,8 @@
                         <div id="letterRendered" class="task-letter task-letter-rendered">{{ letter_html }}</div>
                         <textarea id="letterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ letter_text }}</textarea>
                     </div>
-                    {% if request.user.is_superuser %}
-                    <form method="post" action="{% url 'policies:scheduled_payment_send_insurer_email' task.pk %}" class="task-email-send-form">
+                    {% if can_send_outbound_email %}
+                    <form method="post" action="{% url 'policies:scheduled_payment_send_insurer_email' task.pk %}" class="task-email-send-form" data-email-send-form>
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
                         <div class="task-email-send-row">
@@ -1177,11 +1204,11 @@
                                 <label for="insurerRecipientEmail" class="task-letter-label">Email получателя</label>
                                 <input type="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
                             </div>
-                            <button type="submit" class="btn-pl-apply">
+                            <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в СК
                             </button>
                         </div>
-                        <div class="task-email-send-hint">Тема и текст отправятся без редактирования. Отправка доступна только суперпользователю на период тестирования.</div>
+                        <div class="task-email-send-hint">Тема и текст отправятся без редактирования. Отправка доступна только пользователям с правом отправки писем.</div>
                     </form>
                     {% endif %}
                 </div>
@@ -1214,8 +1241,8 @@
                         <div id="allianceLetterRendered" class="task-letter task-letter-rendered">{{ alliance_letter_html }}</div>
                         <textarea id="allianceLetterPlain" class="task-letter-plain" tabindex="-1" aria-hidden="true" readonly>{{ alliance_letter_text }}</textarea>
                     </div>
-                    {% if request.user.is_superuser %}
-                    <form method="post" action="{% url 'policies:scheduled_payment_send_alliance_email' task.pk %}" class="task-email-send-form" enctype="multipart/form-data">
+                    {% if can_send_outbound_email %}
+                    <form method="post" action="{% url 'policies:scheduled_payment_send_alliance_email' task.pk %}" class="task-email-send-form" enctype="multipart/form-data" data-email-send-form>
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
                         <div class="task-email-send-row">
@@ -1223,7 +1250,7 @@
                                 <label for="allianceRecipientEmail" class="task-letter-label">Email получателя</label>
                                 <input type="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
                             </div>
-                            <button type="submit" class="btn-pl-apply">
+                            <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в Альянс
                             </button>
                         </div>
@@ -1255,8 +1282,21 @@
                                 <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
                                 <div>Тема: {{ email.subject }}</div>
                             </div>
+                            <details class="task-email-history-body">
+                                <summary>Показать тело письма</summary>
+                                <pre class="task-email-history-body-text">{{ email.body_text }}</pre>
+                            </details>
                             {% if email.last_error %}
                             <div class="task-email-history-error">{{ email.last_error }}</div>
+                            {% endif %}
+                            {% if can_send_outbound_email and email.status == outbound_failed_status %}
+                            <form method="post" action="{% url 'policies:scheduled_payment_retry_email' task.pk email.pk %}" class="task-email-history-retry">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="btn-mgr-soft">
+                                    <i class="bi bi-arrow-clockwise"></i> Повторить отправку
+                                </button>
+                            </form>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -1324,6 +1364,16 @@
                     setTimeout(function () {
                         button.innerHTML = idleLabels[kind] || idleLabels.text;
                     }, 1600);
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-email-send-form]').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                const btn = form.querySelector('[data-email-send-btn]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Отправляем...';
                 }
             });
         });

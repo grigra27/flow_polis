@@ -9,16 +9,24 @@ class CommunicationsConfig(AppConfig):
     def ready(self):
         from auditlog.registry import auditlog
 
-        from .models import (
-            EmailDeliveryAttempt,
-            MailAccount,
-            OutboundEmail,
-            OutboundEmailAttachment,
-            OutboundEmailRecipient,
-        )
+        from .models import MailAccount, OutboundEmail
 
+        # Регистрируем только корневые сущности. Получателей, вложения и
+        # попытки отправки писать в auditlog не имеет смысла — их история
+        # уже хранится в самих моделях, а daily_digest читает auditlog
+        # и не должен заваливаться техническими событиями.
         auditlog.register(MailAccount)
-        auditlog.register(OutboundEmail)
-        auditlog.register(OutboundEmailRecipient)
-        auditlog.register(OutboundEmailAttachment)
-        auditlog.register(EmailDeliveryAttempt)
+        auditlog.register(
+            OutboundEmail,
+            exclude_fields=[
+                "queued_at",
+                "sending_started_at",
+                "sent_at",
+                "failed_at",
+                "last_error",
+                "provider_message_id",
+                "headers",
+                "body_text",
+                "body_html",
+            ],
+        )

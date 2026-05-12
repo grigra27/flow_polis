@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import User
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.billing.models import BillingTask
@@ -17,9 +17,11 @@ from apps.communications.models import (
 from apps.communications.providers.base import SendResult
 from apps.communications.services import (
     CommunicationsConfigurationError,
+    CommunicationsQueueError,
     CommunicationsSendError,
     create_outbound_email,
     queue_outbound_email,
+    retry_outbound_email,
     send_outbound_email_now,
 )
 from apps.insurers.models import Branch, InsuranceType, Insurer, LeasingManager
@@ -130,7 +132,8 @@ def test_queue_outbound_email_marks_queued_and_enqueues_task(
     )
     email = _create_email(billing_task, superuser)
 
-    queue_outbound_email(email, user=superuser)
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        queue_outbound_email(email, user=superuser)
 
     email.refresh_from_db()
     assert email.status == OutboundEmail.STATUS_QUEUED
@@ -193,3 +196,86 @@ def test_send_outbound_email_now_failure_keeps_billing_status(
     assert email.status == OutboundEmail.STATUS_FAILED
     assert "smtp unavailable" in email.last_error
     assert billing_task.status == BillingTask.STATUS_TO_REQUEST
+
+
+@pytest.mark.django_db
+def test_insurer_request_does_not_retreat_status_for_advanced_task(
+    billing_task, superuser, monkeypatch
+):
+    """Если задача уже в sent_to_leasing, успешная отправка письма в СК
+    не должна откатывать статус назад в requested."""
+    billing_task.status = BillingTask.STATUS_SENT_TO_LEASING
+    billing_task.save(update_fields=["status", "updated_at"])
+
+    class Provider:
+        def send(self, outbound_email):
+            return SendResult(success=True, provider_message_id="", response="ok")
+
+    monkeypatch.setattr(
+        "apps.communications.services.get_provider", lambda account: Provider()
+    )
+    email = _create_email(billing_task, superuser)
+    email.status = OutboundEmail.STATUS_QUEUED
+    email.sent_by = superuser
+    email.save(update_fields=["status", "sent_by", "updated_at"])
+
+    send_outbound_email_now(email.id)
+
+    billing_task.refresh_from_db()
+    assert billing_task.status == BillingTask.STATUS_SENT_TO_LEASING
+
+
+@pytest.mark.django_db
+def test_create_outbound_email_rejects_recent_duplicate(billing_task, superuser):
+    _create_email(billing_task, superuser)
+
+    with pytest.raises(CommunicationsQueueError):
+        _create_email(billing_task, superuser)
+
+
+@pytest.mark.django_db
+def test_retry_outbound_email_re_enqueues_failed_message(
+    billing_task, superuser, monkeypatch
+):
+    queued_ids = []
+    from apps.communications import tasks
+
+    monkeypatch.setattr(
+        tasks.send_outbound_email,
+        "delay",
+        lambda email_id: queued_ids.append(email_id),
+    )
+    email = _create_email(billing_task, superuser)
+    email.status = OutboundEmail.STATUS_FAILED
+    email.last_error = "boom"
+    email.save(update_fields=["status", "last_error", "updated_at"])
+
+    with override_settings(
+        COMMUNICATIONS_EMAIL_ENABLED=True,
+        COMMUNICATIONS_SMTP_HOST="smtp.example.com",
+        COMMUNICATIONS_SMTP_USERNAME="sender@example.com",
+        COMMUNICATIONS_SMTP_PASSWORD="not-a-real-password",  # pragma: allowlist secret
+        COMMUNICATIONS_FROM_EMAIL="sender@example.com",
+    ), TestCase.captureOnCommitCallbacks(execute=True):
+        retry_outbound_email(email, user=superuser)
+
+    email.refresh_from_db()
+    assert email.status == OutboundEmail.STATUS_QUEUED
+    assert email.last_error == ""
+    assert queued_ids == [email.id]
+
+
+@pytest.mark.django_db
+@override_settings(
+    COMMUNICATIONS_EMAIL_ENABLED=True,
+    COMMUNICATIONS_SMTP_HOST="smtp.example.com",
+    COMMUNICATIONS_SMTP_USERNAME="sender@example.com",
+    COMMUNICATIONS_SMTP_PASSWORD="not-a-real-password",  # pragma: allowlist secret
+    COMMUNICATIONS_FROM_EMAIL="sender@example.com",
+)
+def test_retry_outbound_email_rejects_non_failed_email(billing_task, superuser):
+    email = _create_email(billing_task, superuser)
+    # Письмо в статусе draft не подлежит retry.
+
+    with pytest.raises(CommunicationsQueueError):
+        retry_outbound_email(email, user=superuser)

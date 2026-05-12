@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import (
     EmailDeliveryAttempt,
@@ -7,6 +7,7 @@ from .models import (
     OutboundEmailAttachment,
     OutboundEmailRecipient,
 )
+from .services import CommunicationsError, retry_outbound_email
 
 
 @admin.register(MailAccount)
@@ -21,6 +22,13 @@ class OutboundEmailRecipientInline(admin.TabularInline):
     model = OutboundEmailRecipient
     extra = 0
     readonly_fields = ["created_at", "updated_at"]
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class OutboundEmailAttachmentInline(admin.TabularInline):
@@ -34,6 +42,13 @@ class OutboundEmailAttachmentInline(admin.TabularInline):
         "created_at",
         "updated_at",
     ]
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class EmailDeliveryAttemptInline(admin.TabularInline):
@@ -50,6 +65,12 @@ class EmailDeliveryAttemptInline(admin.TabularInline):
         "updated_at",
     ]
     can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OutboundEmail)
@@ -73,6 +94,15 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["created_by", "sent_by", "content_type"]
     readonly_fields = [
+        "kind",
+        "from_email",
+        "from_name",
+        "reply_to",
+        "subject",
+        "body_text",
+        "body_html",
+        "content_type",
+        "object_id",
         "queued_at",
         "sending_started_at",
         "sent_at",
@@ -89,6 +119,30 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         OutboundEmailAttachmentInline,
         EmailDeliveryAttemptInline,
     ]
+    actions = ["retry_failed_emails"]
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.action(description="Повторить отправку failed-писем")
+    def retry_failed_emails(self, request, queryset):
+        retried = 0
+        for email in queryset:
+            try:
+                retry_outbound_email(email, user=request.user)
+                retried += 1
+            except CommunicationsError as exc:
+                self.message_user(
+                    request,
+                    f"Письмо #{email.id}: {exc}",
+                    level=messages.WARNING,
+                )
+        if retried:
+            self.message_user(
+                request,
+                f"Поставлено в очередь повторно: {retried}",
+                level=messages.SUCCESS,
+            )
 
 
 @admin.register(OutboundEmailRecipient)
@@ -99,6 +153,12 @@ class OutboundEmailRecipientAdmin(admin.ModelAdmin):
     raw_id_fields = ["email"]
     readonly_fields = ["created_at", "updated_at"]
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(OutboundEmailAttachment)
 class OutboundEmailAttachmentAdmin(admin.ModelAdmin):
@@ -106,6 +166,12 @@ class OutboundEmailAttachmentAdmin(admin.ModelAdmin):
     search_fields = ["original_filename", "checksum", "email__subject"]
     raw_id_fields = ["email"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(EmailDeliveryAttempt)
@@ -115,3 +181,9 @@ class EmailDeliveryAttemptAdmin(admin.ModelAdmin):
     search_fields = ["email__subject", "error_message", "provider_response"]
     raw_id_fields = ["email"]
     readonly_fields = ["created_at", "updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

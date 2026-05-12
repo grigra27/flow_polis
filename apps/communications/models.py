@@ -150,6 +150,9 @@ class OutboundEmail(TimeStampedModel):
             models.Index(fields=["content_type", "object_id"]),
             models.Index(fields=["message_id"]),
         ]
+        permissions = [
+            ("send_outbound_email", "Может отправлять письма из системы"),
+        ]
 
     def __str__(self):
         return f"{self.get_kind_display()} — {self.subject}"

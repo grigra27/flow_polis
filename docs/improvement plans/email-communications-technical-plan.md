@@ -1030,3 +1030,139 @@ MVP можно считать готовым, если:
 - история писем видна в карточке задачи;
 - старые кнопки копирования остались;
 - тесты `apps.billing` и `apps.communications` проходят.
+
+## 22. Пересмотренные требования по итогам ревью MVP
+
+Эти разделы добавлены после ревью реализованного первого этапа. Они уточняют пункты §13 и §19, делают требования более строгими и закрывают пробелы, которые в плане были описаны слишком общими словами.
+
+### S1. Status-machine: запрет отката статуса
+
+Hook `apps.billing.mail_handlers.handle_billing_email_sent` должен сравнивать статус задачи по упорядоченному списку:
+
+```text
+to_request < requested < sent_to_leasing
+```
+
+Если целевой статус письма «ниже» текущего, hook не должен ничего менять. Это нужно из-за следующих сценариев:
+
+- суперпользователь повторно отправляет письмо в СК уже после того, как задача переведена в `sent_to_leasing`;
+- по одной задаче в разное время отправлены оба письма, и второй email-success приходит позже первого.
+
+Реализация хранит ordinal-таблицу в `mail_handlers.py` и явно делает проверку перед `update_task`. Ordinal-таблица — единственный источник истины: не вычислять её по `BillingTask.STATUS_CHOICES`, потому что добавление новых статусов в `STATUS_CHOICES` (например, «отменён») не должно автоматически становиться «более поздним» состоянием.
+
+### S2. Транзакционная фиксация постановки в Celery
+
+`send_outbound_email.delay(...)` ставится через `transaction.on_commit`. Это гарантирует, что worker не получит ID письма до фиксации транзакции и не увидит «фантомные» строки. Соответствующее ограничение для тестов: pytest-тест, прогоняющий полный путь queue → delay, должен оборачиваться в `TestCase.captureOnCommitCallbacks(execute=True)`.
+
+Тесты во view-слое monkey-patch'ат `queue_outbound_email` целиком — там on_commit не нужен.
+
+### S3. Celery soft/hard time-limits
+
+Для `apps.communications.tasks.send_outbound_email` рекомендуется:
+
+```python
+@shared_task(bind=True, max_retries=0, soft_time_limit=60, time_limit=120)
+```
+
+`COMMUNICATIONS_SEND_TIMEOUT` уже защищает SMTP-этап, но worker может зависнуть на чтении больших вложений, IMAP-копии в Sent (когда будет), DNS-резолве. На staging проверить, что hung worker корректно убивается без сохранения промежуточных статусов.
+
+### S4. Permission-модель и feature flag
+
+Жёсткая проверка `request.user.is_superuser` запрещена. Используем:
+
+1. Django-permission `communications.send_outbound_email` (объявлена в `OutboundEmail.Meta.permissions`).
+2. Feature flag `COMMUNICATIONS_RESTRICT_TO_SUPERUSER` (default=True). Пока он включён, доступ имеет только суперпользователь; при выключении доступ управляется permission'ом.
+
+Helper `apps.billing.views.user_can_send_outbound_email(user)` — единственный источник истины и для server-side, и для template-условий (`can_send_outbound_email`). UI и view используют один и тот же helper, чтобы их состояния не расходились.
+
+### S5. Защита от двойного клика на server side
+
+`create_outbound_email` отказывает в создании нового письма того же `kind` для того же `content_object`, если в окне `RECENT_DUPLICATE_WINDOW` (60 секунд) уже есть письмо в статусе `draft/queued/sending/sent`. Это страхует JS-блокировку submit'а: даже если она не сработает, второй POST вернёт `CommunicationsQueueError` и пользователь увидит человекочитаемое сообщение.
+
+Окно умеренно широкое (60 сек), потому что:
+
+- двойной клик — это секунды;
+- ретрансмит браузера — это секунды;
+- сетевые таймауты на reverse proxy — это секунды;
+- но через минуту повторная сознательная отправка уже возможна.
+
+### S6. Retry для failed-писем
+
+Failed-письмо ставится обратно в очередь через сервис `retry_outbound_email`. Он:
+
+- разрешает retry только из статуса `failed`;
+- проверяет наличие получателя;
+- для `billing_alliance_forward` проверяет наличие вложения;
+- очищает `last_error`, проставляет новый `queued_at`;
+- ставит `transaction.on_commit` для `send_outbound_email.delay`.
+
+В UI карточки задачи под каждым failed-письмом отображается форма «Повторить отправку» с CSRF-токеном. В админке есть admin action «Повторить отправку failed-писем».
+
+Snapshot тела/получателей/вложений при retry не теряется. Это сознательно отличает retry от «отправить такое же письмо заново».
+
+### S7. Семантика `provider_message_id`
+
+Поле `provider_message_id` предназначено для ID, возвращённого почтовым сервером (например, Zimbra REST API). SMTP backend Django такого ID не возвращает. Поэтому `SmtpEmailProvider` оставляет `provider_message_id` пустым — наш собственный `Message-ID` лежит отдельно в `OutboundEmail.message_id` и в `headers["Message-ID"]`.
+
+Если в будущем появится Zimbra API-провайдер, он должен заполнять `provider_message_id` тем, что вернул сервер. Запрос «найти письмо у провайдера по нашему Message-ID» допустим, но не должен заменять server-side ID.
+
+### S8. Domain Message-ID и DKIM
+
+`COMMUNICATIONS_MESSAGE_ID_DOMAIN` должен совпадать с DKIM-доменом отправителя. По умолчанию берём домен `COMMUNICATIONS_FROM_EMAIL`. Если для production используется поддомен (например, `billing.example.ru`) — то и Message-ID, и DKIM-подпись должны быть в этом же домене.
+
+Перед production администратор почты подтверждает:
+
+- SPF разрешает наш IP;
+- DKIM настроен на DKIM-домене;
+- DMARC alignment проходит (Message-ID-домен идёт в одной зоне со From-доменом).
+
+### S9. HTML-санитизация технического кода
+
+`append_technical_code_to_html` escape'ит технический код через `django.utils.html.escape`. Сейчас код имеет фиксированный формат `OP-<APP_LABEL>-<INT>` и опасных символов не содержит, но привычка обязательна — она защитит от будущей фантазии вида «добавим в код имя пользователя».
+
+### S10. Snapshot vs current state
+
+`OutboundEmail` хранит snapshot темы, тела, HTML, получателей и вложений. Это значит:
+
+- изменение `BillingTask` после отправки письма не меняет содержимое уже отправленного письма;
+- в UI блок «История отправок» должен показывать тело письма (через `<details>`), чтобы было видно, что было отправлено;
+- при retry мы не пересчитываем subject/body заново — это специально, чтобы получатель не получил неожиданно изменённое письмо.
+
+Если в будущем понадобится «пересоздать письмо по актуальным данным задачи» — это отдельный сервис `recreate_outbound_email_from_task(task)`, а не флаг на retry.
+
+### S11. Auditlog: что писать, что нет
+
+В `auditlog.registry` регистрируем только `MailAccount` и `OutboundEmail`. Не регистрируем:
+
+- `OutboundEmailRecipient`, `OutboundEmailAttachment`, `EmailDeliveryAttempt` — это технические подчинённые сущности, их история уже хранится в полях.
+
+Для `OutboundEmail` исключаем технические поля: `queued_at`, `sending_started_at`, `sent_at`, `failed_at`, `last_error`, `provider_message_id`, `headers`, `body_text`, `body_html`. Они меняются часто и сами по себе аудита не требуют — аудит важен на бизнес-операциях (создание письма, смена статуса), а не на тайминге отправки.
+
+Это особенно важно потому, что `daily_digest` читает auditlog для сводки и не должен заваливаться техническими событиями.
+
+### S12. Admin: read-only для подчинённых
+
+В админке `OutboundEmail` запрещено создавать/менять recipients, attachments и attempts вручную (`has_add_permission = False`, `has_change_permission = False` на inline'ах). Сам `OutboundEmail` тоже запрещён к ручному созданию (`has_add_permission = False` на ModelAdmin). Это страхует от случайного обхода snapshot-логики.
+
+Allowed actions:
+
+- посмотреть письмо;
+- запустить retry failed-писем admin action'ом.
+
+Запрещённые операции:
+
+- добавить вручную получателя или вложение к отправленному письму;
+- пере-добавить delivery attempt;
+- создать «ручное» письмо без `BillingTask`.
+
+### S13. Просмотр тела письма из карточки задачи
+
+В карточке задачи блок «История отправок» включает `<details>` с `body_text` для каждого письма. Это покрывает базовый кейс «что именно мы отправили». Если бизнесу понадобится отдельная страница для письма с headers/attempts/HTML — это отдельный list/detail view, но в MVP его делать не нужно.
+
+### S14. Что осталось зафиксировать до этапа 2
+
+Перед началом этапа 2 («четверговый отчёт через communications»):
+
+- получить адрес общего ящика billing на Яндекс/Zimbra;
+- определить, как формируется подпись (внутри `build_letter_text` или отдельным шаблоном);
+- зафиксировать, в каких ящиках хранятся ответы СК — это нужно для будущего IMAP-этапа.

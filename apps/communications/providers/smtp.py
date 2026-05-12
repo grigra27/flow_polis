@@ -55,9 +55,12 @@ class SmtpEmailProvider(BaseEmailProvider):
                 )
 
         sent_count = message.send(fail_silently=False)
+        # Django SMTP backend не возвращает server-side message id, поэтому
+        # оставляем provider_message_id пустым: в model.message_id уже хранится
+        # наш собственный RFC2822 Message-ID для входящего сопоставления.
         return SendResult(
             success=sent_count > 0,
-            provider_message_id=outbound_email.message_id,
+            provider_message_id="",
             response=f"smtp sent count: {sent_count}",
         )
 

@@ -338,6 +338,11 @@ COMMUNICATIONS_ATTACHMENT_MAX_SIZE_MB = config(
 COMMUNICATIONS_SEND_TIMEOUT = config(
     "COMMUNICATIONS_SEND_TIMEOUT", default=30, cast=int
 )
+# Пока идёт тестирование, отправка доступна только суперпользователю.
+# После завершения тестирования снимается флагом, не правкой кода.
+COMMUNICATIONS_RESTRICT_TO_SUPERUSER = config(
+    "COMMUNICATIONS_RESTRICT_TO_SUPERUSER", default=True, cast=bool
+)
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

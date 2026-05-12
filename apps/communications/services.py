@@ -1,12 +1,13 @@
 import logging
+from datetime import timedelta
 from email.utils import make_msgid
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
+from django.utils.html import escape
 
 from .models import (
     EmailDeliveryAttempt,
@@ -19,6 +20,10 @@ from .providers.smtp import SmtpEmailProvider
 from .validators import validate_outbound_attachment
 
 logger = logging.getLogger(__name__)
+
+
+# Окно подавления дублирующих писем одного и того же типа на один объект.
+RECENT_DUPLICATE_WINDOW = timedelta(seconds=60)
 
 
 class CommunicationsError(Exception):
@@ -83,6 +88,8 @@ def create_outbound_email(
     content_type = ContentType.objects.get_for_model(
         content_object, for_concrete_model=False
     )
+    _ensure_no_recent_duplicate(kind, content_type, content_object.pk)
+
     technical_code = build_technical_code(content_type, content_object.pk)
     message_id = build_message_id(technical_code)
     headers = build_headers(content_type, content_object.pk, kind, message_id)
@@ -177,26 +184,84 @@ def queue_outbound_email(outbound_email, user=None):
                 "updated_at",
             ]
         )
+        transaction.on_commit(lambda email_id=email.id: _dispatch_send(email_id))
 
+    return email
+
+
+def retry_outbound_email(outbound_email, user=None):
+    """Перевести failed-письмо обратно в очередь и заново разбудить worker."""
+    if not settings.COMMUNICATIONS_EMAIL_ENABLED:
+        raise CommunicationsConfigurationError("Отправка писем временно отключена")
+    _validate_smtp_settings()
+
+    with transaction.atomic():
+        email = (
+            OutboundEmail.objects.select_for_update()
+            .prefetch_related("recipients", "attachments")
+            .get(pk=outbound_email.pk)
+        )
+        if email.status != OutboundEmail.STATUS_FAILED:
+            raise CommunicationsQueueError(
+                "Повторная отправка возможна только для писем со статусом «Ошибка»"
+            )
+        if not email.recipients.filter(
+            recipient_type=OutboundEmailRecipient.TYPE_TO
+        ).exists():
+            raise CommunicationsQueueError("Укажите получателя письма")
+        if (
+            email.kind == OutboundEmail.KIND_BILLING_ALLIANCE_FORWARD
+            and not email.attachments.exists()
+        ):
+            raise CommunicationsQueueError(
+                "Для письма в Альянс необходимо приложить счет"
+            )
+
+        now = timezone.now()
+        email.status = OutboundEmail.STATUS_QUEUED
+        email.queued_at = now
+        email.failed_at = None
+        email.last_error = ""
+        if user is not None:
+            email.sent_by = user
+        email.save(
+            update_fields=[
+                "status",
+                "queued_at",
+                "failed_at",
+                "last_error",
+                "sent_by",
+                "updated_at",
+            ]
+        )
+        transaction.on_commit(lambda email_id=email.id: _dispatch_send(email_id))
+
+    return email
+
+
+def _dispatch_send(email_id):
+    """Поставить Celery-задачу. На ошибке брокера переводим письмо в failed."""
     try:
         from .tasks import send_outbound_email
 
-        send_outbound_email.delay(email.id)
+        send_outbound_email.delay(email_id)
     except Exception as exc:
-        logger.exception("Failed to enqueue outbound email %s", email.id)
-        with transaction.atomic():
-            failed_email = OutboundEmail.objects.select_for_update().get(pk=email.pk)
-            failed_email.status = OutboundEmail.STATUS_FAILED
-            failed_email.failed_at = timezone.now()
-            failed_email.last_error = f"Не удалось поставить письмо в очередь: {exc}"
-            failed_email.save(
-                update_fields=["status", "failed_at", "last_error", "updated_at"]
-            )
-        raise CommunicationsQueueError(
-            "Не удалось поставить письмо в очередь отправки"
-        ) from exc
+        logger.exception("Failed to enqueue outbound email %s", email_id)
+        _mark_email_failed_after_enqueue(email_id, exc)
 
-    return email
+
+def _mark_email_failed_after_enqueue(email_id, exc):
+    with transaction.atomic():
+        try:
+            failed_email = OutboundEmail.objects.select_for_update().get(pk=email_id)
+        except OutboundEmail.DoesNotExist:
+            return
+        failed_email.status = OutboundEmail.STATUS_FAILED
+        failed_email.failed_at = timezone.now()
+        failed_email.last_error = f"Не удалось поставить письмо в очередь: {exc}"
+        failed_email.save(
+            update_fields=["status", "failed_at", "last_error", "updated_at"]
+        )
 
 
 def send_outbound_email_now(email_id):
@@ -246,7 +311,8 @@ def send_outbound_email_now(email_id):
         email.sent_at = now
         email.failed_at = None
         email.last_error = ""
-        email.provider_message_id = result.provider_message_id
+        if result.provider_message_id:
+            email.provider_message_id = result.provider_message_id
         email.save(
             update_fields=[
                 "status",
@@ -321,10 +387,39 @@ def append_technical_code_to_text(body_text, technical_code):
 def append_technical_code_to_html(body_html, technical_code):
     if not body_html:
         return ""
+    safe_code = escape(technical_code)
     return (
         f"{str(body_html).rstrip()}"
-        f"<hr><p><small>Код запроса: {technical_code}</small></p>"
+        f"<hr><p><small>Код запроса: {safe_code}</small></p>"
     )
+
+
+def _ensure_no_recent_duplicate(kind, content_type, object_id):
+    """Защита от двойного клика: один и тот же kind на тот же объект
+    нельзя создать, если только что уже было поставлено письмо в работу."""
+    threshold = timezone.now() - RECENT_DUPLICATE_WINDOW
+    active_statuses = {
+        OutboundEmail.STATUS_DRAFT,
+        OutboundEmail.STATUS_QUEUED,
+        OutboundEmail.STATUS_SENDING,
+        OutboundEmail.STATUS_SENT,
+    }
+    recent = (
+        OutboundEmail.objects.filter(
+            kind=kind,
+            content_type=content_type,
+            object_id=object_id,
+            status__in=active_statuses,
+            created_at__gte=threshold,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if recent is not None:
+        raise CommunicationsQueueError(
+            "Аналогичное письмо только что уже было создано. "
+            "Подождите минуту или откройте историю отправок."
+        )
 
 
 def _next_attempt_number(email):

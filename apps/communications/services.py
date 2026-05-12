@@ -265,26 +265,38 @@ def _mark_email_failed_after_enqueue(email_id, exc):
 
 
 def send_outbound_email_now(email_id):
-    with transaction.atomic():
-        email = (
-            OutboundEmail.objects.select_for_update()
-            .select_related("account", "created_by", "sent_by", "content_type")
-            .prefetch_related("recipients", "attachments")
-            .get(pk=email_id)
-        )
-        if email.status != OutboundEmail.STATUS_QUEUED:
-            return f"skipped email {email.id} with status {email.status}"
+    # PostgreSQL запрещает FOR UPDATE на nullable стороне OUTER JOIN.
+    # У OutboundEmail поля created_by/sent_by — nullable, поэтому select_related
+    # вместе с обычным select_for_update даёт NotSupportedError. of=("self",)
+    # говорит «лочим только outboundemail», и джойны остаются вне локов.
+    try:
+        with transaction.atomic():
+            email = (
+                OutboundEmail.objects.select_for_update(of=("self",))
+                .select_related("account", "created_by", "sent_by", "content_type")
+                .prefetch_related("recipients", "attachments")
+                .get(pk=email_id)
+            )
+            if email.status != OutboundEmail.STATUS_QUEUED:
+                return f"skipped email {email.id} with status {email.status}"
 
-        now = timezone.now()
-        email.status = OutboundEmail.STATUS_SENDING
-        email.sending_started_at = now
-        email.save(update_fields=["status", "sending_started_at", "updated_at"])
-        attempt = EmailDeliveryAttempt.objects.create(
-            email=email,
-            attempt_number=_next_attempt_number(email),
-            status=EmailDeliveryAttempt.STATUS_SENDING,
-            started_at=now,
-        )
+            now = timezone.now()
+            email.status = OutboundEmail.STATUS_SENDING
+            email.sending_started_at = now
+            email.save(update_fields=["status", "sending_started_at", "updated_at"])
+            attempt = EmailDeliveryAttempt.objects.create(
+                email=email,
+                attempt_number=_next_attempt_number(email),
+                status=EmailDeliveryAttempt.STATUS_SENDING,
+                started_at=now,
+            )
+    except Exception as exc:
+        # Любая ошибка до перехода в sending — оставила бы письмо в queued
+        # навсегда. Помечаем его failed (без attempt'а, потому что он не создался),
+        # чтобы UI-retry мог поднять.
+        logger.exception("Failed to prepare outbound email %s for sending", email_id)
+        _mark_email_failed_before_attempt(email_id, str(exc))
+        raise CommunicationsSendError(str(exc)) from exc
 
     try:
         provider = get_provider(email.account)
@@ -301,7 +313,7 @@ def send_outbound_email_now(email_id):
 
     with transaction.atomic():
         email = (
-            OutboundEmail.objects.select_for_update()
+            OutboundEmail.objects.select_for_update(of=("self",))
             .select_related("account", "created_by", "sent_by", "content_type")
             .prefetch_related("recipients", "attachments")
             .get(pk=email_id)
@@ -430,6 +442,29 @@ def _next_attempt_number(email):
         or 0
     )
     return max_attempt + 1
+
+
+def _mark_email_failed_before_attempt(email_id, error_message):
+    """Перевести письмо в failed, когда EmailDeliveryAttempt ещё не создан.
+
+    Срабатывает при ошибке на стадии select_for_update / select_related до того,
+    как мы успели зафиксировать sending. Без этого письмо вечно висело бы в
+    queued: queue_outbound_email не разрешает переотправку из queued.
+    """
+    try:
+        with transaction.atomic():
+            email = OutboundEmail.objects.select_for_update().get(pk=email_id)
+            now = timezone.now()
+            email.status = OutboundEmail.STATUS_FAILED
+            email.failed_at = now
+            email.last_error = error_message
+            email.save(
+                update_fields=["status", "failed_at", "last_error", "updated_at"]
+            )
+    except OutboundEmail.DoesNotExist:
+        return
+    except Exception:
+        logger.exception("Failed to mark email %s as failed", email_id)
 
 
 def _mark_email_failed(email_id, attempt_id, error_message):

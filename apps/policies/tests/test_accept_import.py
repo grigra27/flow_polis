@@ -362,6 +362,29 @@ class TestAcceptResolver:
             "label": "Санкт-Петербург",
         }
 
+    @pytest.mark.parametrize("branch_code", ["NN", "НН"])
+    def test_resolves_nizhny_novgorod_branch_code(
+        self,
+        branch_code,
+        client_factory,
+        branch_factory,
+        insurance_type_factory,
+    ):
+        client_factory(client_inn="1686035567")
+        branch = branch_factory(branch_name="Нижний Новгород")
+        insurance_type_factory(name="КАСКО")
+
+        parsed = parse_accept_file(
+            make_accept_xls(**{"Номер ДФА": f"20604-3-{branch_code}"})
+        )
+        resolved = resolve_accept_data(parsed.data, parsed.warnings)
+
+        assert resolved.policy_initial["branch"] == branch.pk
+        assert resolved.resolved["branch"] == {
+            "status": "matched",
+            "label": "Нижний Новгород",
+        }
+
 
 @pytest.mark.django_db
 class TestAcceptAdminFlow:

@@ -946,6 +946,56 @@ def test_retry_failed_email_button_visible_and_works(
 
 
 @pytest.mark.django_db
+@override_settings(
+    COMMUNICATIONS_EMAIL_ENABLED=True,
+    COMMUNICATIONS_BCC_EMAILS="audit@example.com",
+)
+def test_regular_user_sees_full_email_history_but_no_retry_button(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+
+    admin = User.objects.create_superuser(
+        username="hist_sender",
+        email="hist_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "visible@example.com"},
+    )
+    email = OutboundEmail.objects.get()
+    email.status = OutboundEmail.STATUS_FAILED
+    email.last_error = "smtp failure"
+    email.save(update_fields=["status", "last_error", "updated_at"])
+
+    client.logout()
+    regular = User.objects.create_user(username="hist_reader", password="testpass123")
+    client.login(username=regular.username, password="testpass123")
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    content = response.content.decode()
+
+    # Видна полная информация по письму (получатель TO, тема, тело, ошибка).
+    assert "visible@example.com" in content
+    assert email.subject in content
+    assert "smtp failure" in content
+    # BCC по-прежнему скрыт от всех.
+    assert "audit@example.com" not in content
+    # Кнопка retry — гейтнута на право отправки, обычному не показывается.
+    retry_url = reverse(
+        "policies:scheduled_payment_retry_email", args=[task.pk, email.pk]
+    )
+    assert retry_url not in content
+    assert "Повторить отправку" not in content
+
+
+@pytest.mark.django_db
 def test_retry_email_requires_send_permission(client, billing_payment):
     sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
     task = BillingTask.objects.get(payment_schedule=billing_payment)

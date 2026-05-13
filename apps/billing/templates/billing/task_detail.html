@@ -1177,7 +1177,6 @@
                                 <span>{{ email.get_kind_display }}</span>
                                 <span>{{ email.get_status_display }}</span>
                             </div>
-                            {% if can_send_outbound_email or email.sent_by == request.user or email.created_by == request.user %}
                             <div class="task-email-history-meta">
                                 <div>Получатель: {{ email.to_addresses|join:", "|default:"—" }}</div>
                                 <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
@@ -1201,15 +1200,6 @@
                                     <i class="bi bi-arrow-clockwise"></i> Повторить отправку
                                 </button>
                             </form>
-                            {% endif %}
-                            {% else %}
-                            <div class="task-email-history-meta">
-                                <div>
-                                    {% if email.sent_at %}Отправлено{% else %}Создано{% endif %}:
-                                    {{ email.sent_at|default:email.created_at|date:"d.m.Y H:i" }}
-                                    {% if email.sent_by %} · {{ email.sent_by.get_full_name|default:email.sent_by.username }}{% endif %}
-                                </div>
-                            </div>
                             {% endif %}
                         </div>
                         {% endfor %}

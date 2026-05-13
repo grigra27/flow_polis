@@ -188,16 +188,29 @@ docker-compose -f docker-compose.prod.yml exec web python manage.py shell -c \
 
 ### 5.2 Раздать права
 
-Пока `COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True`, нажать «Отправить в СК / в Альянс» может только суперпользователь. Это специально, чтобы на старте тестировал один человек.
+Гейт всего один — флаг `COMMUNICATIONS_RESTRICT_TO_SUPERUSER` в `.env.prod`:
 
-Когда захотите расширить доступ:
+- `True` (по умолчанию): отправлять может **только суперпользователь**. Удобно на старте — тестирует один человек.
+- `False`: отправлять может **любой авторизованный сотрудник**, у которого открыт раздел «Очередные взносы». Это тот же круг, который может менять статусы задач — логика «кто видит и двигает задачу, тот и шлёт письмо».
 
-1. В админке создайте/выберите группу «Может отправлять письма».
-2. Дайте этой группе permission `communications | Исходящее письмо | Может отправлять письма из системы` (`send_outbound_email`).
-3. Добавьте в группу нужных пользователей.
-4. Снимите флаг: на сервере выставьте `COMMUNICATIONS_RESTRICT_TO_SUPERUSER=False` в `.env.prod` и перезапустите `web`/`celery_worker` (чтобы settings перечитались).
+Чтобы расширить доступ на всех сотрудников:
 
-Только после этого участники группы увидят формы отправки и кнопку retry.
+1. На сервере в `.env.prod` поменяй `COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True` на `False`.
+2. Перезапусти `web` и `celery_worker` (settings читаются один раз при старте процесса):
+
+   ```bash
+   docker-compose -f docker-compose.prod.yml --env-file .env.prod stop web celery_worker
+   docker-compose -f docker-compose.prod.yml rm -f web celery_worker
+   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-deps web celery_worker
+   ```
+
+3. Любой залогиненный пользователь, открыв карточку задачи очередного взноса, увидит формы отправки и кнопку «Повторить отправку» для failed.
+
+Все действия пишутся в БД и в auditlog: `OutboundEmail.created_by` (кто сформировал письмо), `OutboundEmail.sent_by` (кто нажал «отправить»). Видно в `/admin/communications/outboundemail/` и в блоке «История отправок» прямо на странице задачи.
+
+**Если нужно срочно вернуть всё под контроль одного человека** — выставь `RESTRICT_TO_SUPERUSER=True` обратно и перезапусти. Это рубильник, права не теряются — просто игнорируются.
+
+Django-permission `communications.send_outbound_email` существует в БД (создан миграцией), но сейчас не используется. Останется на случай, если потом понадобится более тонкая ролевая модель (например, отдельная роль «может отправлять, но только в СК»).
 
 ### 5.3 Проверить, что Celery работает
 

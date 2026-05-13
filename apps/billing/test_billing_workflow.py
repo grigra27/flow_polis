@@ -865,12 +865,14 @@ def test_alliance_email_requires_invoice_file(client, billing_payment, monkeypat
 
 
 @pytest.mark.django_db
-@override_settings(COMMUNICATIONS_RESTRICT_TO_SUPERUSER=False)
-def test_user_with_send_permission_can_post_email_send(
+@override_settings(
+    COMMUNICATIONS_EMAIL_ENABLED=True,
+    COMMUNICATIONS_RESTRICT_TO_SUPERUSER=False,
+    COMMUNICATIONS_BCC_EMAILS="",
+)
+def test_any_authenticated_user_can_send_when_restriction_disabled(
     client, billing_payment, monkeypatch
 ):
-    from django.contrib.auth.models import Permission
-
     monkeypatch.setattr(
         "apps.billing.views.queue_outbound_email",
         lambda outbound_email, user=None: outbound_email,
@@ -879,25 +881,22 @@ def test_user_with_send_permission_can_post_email_send(
     task = BillingTask.objects.get(payment_schedule=billing_payment)
 
     regular = User.objects.create_user(
-        username="empowered_sender", password="testpass123"
+        username="open_access_sender", password="testpass123"
     )
-    permission = Permission.objects.get(
-        content_type__app_label="communications",
-        codename="send_outbound_email",
-    )
-    regular.user_permissions.add(permission)
+    client.login(username=regular.username, password="testpass123")
 
-    with override_settings(COMMUNICATIONS_EMAIL_ENABLED=True):
-        client.login(username=regular.username, password="testpass123")
-        response = client.post(
-            reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
-            {"recipient_email": "recipient@example.com"},
-        )
+    response = client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "recipient@example.com"},
+    )
 
     assert response.status_code == 302
-    assert OutboundEmail.objects.filter(
-        kind=OutboundEmail.KIND_BILLING_INSURER_REQUEST
-    ).exists()
+    email = OutboundEmail.objects.get()
+    assert email.kind == OutboundEmail.KIND_BILLING_INSURER_REQUEST
+    # Действие атрибутировано — created_by пишется create_outbound_email.
+    # sent_by заполняется внутри queue_outbound_email (он замоканный); в
+    # настоящей отправке это тот же пользователь, см. queue_outbound_email.
+    assert email.created_by == regular
 
 
 @pytest.mark.django_db

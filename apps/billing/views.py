@@ -338,14 +338,19 @@ def user_can_send_outbound_email(user):
 
     Пока флаг COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True, доступ есть только у
     суперпользователей — это режим тестирования из плана. После снятия флага
-    доступ управляется стандартным Django-permission
-    communications.send_outbound_email.
+    отправка доступна любому авторизованному пользователю, которому открыт
+    раздел «Очередные взносы» (там же, где он меняет статусы). Все действия
+    фиксируются в OutboundEmail.created_by/sent_by и в auditlog.
+
+    Django-permission communications.send_outbound_email остаётся в БД на
+    случай, если потом потребуется более тонкая ролевая модель — сейчас он
+    не проверяется.
     """
     if not user.is_authenticated:
         return False
     if settings.COMMUNICATIONS_RESTRICT_TO_SUPERUSER:
         return bool(user.is_superuser)
-    return user.is_superuser or user.has_perm("communications.send_outbound_email")
+    return True
 
 
 class EmailSendPermissionMixin:

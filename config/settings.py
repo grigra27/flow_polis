@@ -307,6 +307,10 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+# Date-заголовок исходящих писем формируется в локальной таймзоне (Europe/Moscow)
+# вместо «-0000» (UTC, unspecified). Применяется ко всем письмам Django,
+# в том числе к outbound через apps.communications.providers.smtp.
+EMAIL_USE_LOCALTIME = True
 
 # Communications email contour.
 # This is intentionally separate from Django's EMAIL_* settings because the

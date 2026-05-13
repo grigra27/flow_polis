@@ -1178,7 +1178,7 @@
                             </div>
                             {% if can_send_outbound_email or email.sent_by == request.user or email.created_by == request.user %}
                             <div class="task-email-history-meta">
-                                <div>Получатель: {% for recipient in email.recipients.all %}{{ recipient.address }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+                                <div>Получатель: {{ email.to_addresses|join:", "|default:"—" }}</div>
                                 <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
                                 <div>Тема: {{ email.subject }}</div>
                                 {% if email.sent_by %}
@@ -1256,13 +1256,13 @@
                         <div class="task-email-send-row">
                             <div>
                                 <label for="insurerRecipientEmail" class="task-letter-label">Email получателя</label>
-                                <input type="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
+                                <input type="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" multiple required>
                             </div>
                             <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в СК
                             </button>
                         </div>
-                        <div class="task-email-send-hint">Тема и текст отправятся без редактирования. Отправка доступна только пользователям с правом отправки писем.</div>
+                        <div class="task-email-send-hint">Несколько адресов — через запятую или точку с запятой. Тема и текст отправятся без редактирования. Отправка доступна только пользователям с правом отправки писем.</div>
                     </form>
                     {% endif %}
                 </div>
@@ -1302,7 +1302,7 @@
                         <div class="task-email-send-row">
                             <div>
                                 <label for="allianceRecipientEmail" class="task-letter-label">Email получателя</label>
-                                <input type="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="recipient@example.com" required>
+                                <input type="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" multiple required>
                             </div>
                             <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в Альянс

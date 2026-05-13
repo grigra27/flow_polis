@@ -84,6 +84,10 @@ def create_outbound_email(
     created_by=None,
     attachments=None,
 ):
+    to_addresses = _normalize_recipient_list(to)
+    if not to_addresses:
+        raise CommunicationsQueueError("Укажите хотя бы одного получателя")
+
     account = get_default_mail_account()
     content_type = ContentType.objects.get_for_model(
         content_object, for_concrete_model=False
@@ -95,6 +99,7 @@ def create_outbound_email(
     headers = build_headers(content_type, content_object.pk, kind, message_id)
     body_text = append_technical_code_to_text(body_text, technical_code)
     body_html = append_technical_code_to_html(body_html, technical_code)
+    bcc_addresses = _get_default_bcc_addresses()
 
     with transaction.atomic():
         outbound_email = OutboundEmail.objects.create(
@@ -112,14 +117,47 @@ def create_outbound_email(
             message_id=message_id,
             headers=headers,
         )
-        OutboundEmailRecipient.objects.create(
-            email=outbound_email,
-            recipient_type=OutboundEmailRecipient.TYPE_TO,
-            address=to,
-        )
+        for address in to_addresses:
+            OutboundEmailRecipient.objects.create(
+                email=outbound_email,
+                recipient_type=OutboundEmailRecipient.TYPE_TO,
+                address=address,
+            )
+        for address in bcc_addresses:
+            OutboundEmailRecipient.objects.create(
+                email=outbound_email,
+                recipient_type=OutboundEmailRecipient.TYPE_BCC,
+                address=address,
+            )
         for uploaded_file in attachments or []:
             attach_uploaded_file(outbound_email, uploaded_file)
     return outbound_email
+
+
+def _normalize_recipient_list(value):
+    """Принимает str (один email или несколько через запятую/точку с запятой)
+    либо итерируемое — возвращает список уникальных непустых адресов в порядке
+    появления."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parts = value.replace(";", ",").split(",")
+    else:
+        parts = list(value)
+    seen = set()
+    result = []
+    for raw in parts:
+        address = (raw or "").strip()
+        if not address or address in seen:
+            continue
+        seen.add(address)
+        result.append(address)
+    return result
+
+
+def _get_default_bcc_addresses():
+    raw = getattr(settings, "COMMUNICATIONS_BCC_EMAILS", "") or ""
+    return _normalize_recipient_list(raw)
 
 
 def attach_uploaded_file(outbound_email, uploaded_file):

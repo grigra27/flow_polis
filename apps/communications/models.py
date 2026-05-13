@@ -170,6 +170,15 @@ class OutboundEmail(TimeStampedModel):
             recipients = recipients.filter(recipient_type=recipient_type)
         return [recipient.address for recipient in recipients]
 
+    @property
+    def to_addresses(self):
+        """Список адресов TO без CC/BCC, в порядке добавления.
+        Используется в задачной карточке: скрытая копия в историю
+        не попадает, а пользователь видит адреса в том же порядке,
+        как он их ввёл в форму."""
+        recipients = sorted(self.recipients.all(), key=lambda r: r.id)
+        return [r.address for r in recipients if r.recipient_type == "to"]
+
 
 class OutboundEmailRecipient(TimeStampedModel):
     """Recipient snapshot for an outgoing email."""

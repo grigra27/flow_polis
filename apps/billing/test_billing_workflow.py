@@ -747,7 +747,7 @@ def test_regular_user_cannot_post_email_send(client, billing_payment):
 
 
 @pytest.mark.django_db
-@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True, COMMUNICATIONS_BCC_EMAILS="")
 def test_superuser_can_create_insurer_email_with_manual_recipient(
     client, billing_payment, monkeypatch
 ):
@@ -772,8 +772,69 @@ def test_superuser_can_create_insurer_email_with_manual_recipient(
     assert response.status_code == 302
     email = OutboundEmail.objects.get()
     assert email.kind == OutboundEmail.KIND_BILLING_INSURER_REQUEST
-    assert email.recipients.get().address == "recipient@example.com"
+    assert email.to_addresses == ["recipient@example.com"]
     assert email.subject == task.build_letter_subject()
+
+
+@pytest.mark.django_db
+@override_settings(
+    COMMUNICATIONS_EMAIL_ENABLED=True,
+    COMMUNICATIONS_BCC_EMAILS="audit@example.com",
+)
+def test_superuser_can_send_to_multiple_recipients_and_bcc_is_added(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="multi_sender",
+        email="multi_sender@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "one@example.com, two@example.com"},
+    )
+
+    assert response.status_code == 302
+    email = OutboundEmail.objects.get()
+    assert email.to_addresses == ["one@example.com", "two@example.com"]
+    assert email.recipient_addresses("bcc") == ["audit@example.com"]
+
+
+@pytest.mark.django_db
+@override_settings(
+    COMMUNICATIONS_EMAIL_ENABLED=True,
+    COMMUNICATIONS_BCC_EMAILS="audit@example.com",
+)
+def test_history_block_hides_bcc_addresses(client, billing_payment, monkeypatch):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="history_check",
+        email="history_check@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    client.post(
+        reverse("policies:scheduled_payment_send_insurer_email", args=[task.pk]),
+        {"recipient_email": "visible@example.com"},
+    )
+
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    content = response.content.decode()
+    assert "visible@example.com" in content
+    assert "audit@example.com" not in content
 
 
 @pytest.mark.django_db

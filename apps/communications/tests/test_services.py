@@ -88,6 +88,7 @@ def _create_email(task, user):
 
 
 @pytest.mark.django_db
+@override_settings(COMMUNICATIONS_BCC_EMAILS="")
 def test_create_outbound_email_adds_recipient_and_technical_code(
     billing_task, superuser
 ):
@@ -100,6 +101,57 @@ def test_create_outbound_email_adds_recipient_and_technical_code(
     assert f"Код запроса: OP-BILLING-{billing_task.id}" in email.body_text
     assert email.message_id
     assert email.headers["X-Onlinepolis-Email-Kind"] == email.kind
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_BCC_EMAILS="")
+def test_create_outbound_email_supports_multiple_to_recipients(billing_task, superuser):
+    email = create_outbound_email(
+        kind=OutboundEmail.KIND_BILLING_INSURER_REQUEST,
+        content_object=billing_task,
+        subject="Тема",
+        body_text="Тело",
+        to="one@example.com, two@example.com; three@example.com",
+        created_by=superuser,
+    )
+
+    assert email.to_addresses == [
+        "one@example.com",
+        "two@example.com",
+        "three@example.com",
+    ]
+    assert not email.recipient_addresses(OutboundEmailRecipient.TYPE_BCC)
+
+
+@pytest.mark.django_db
+@override_settings(
+    COMMUNICATIONS_BCC_EMAILS="audit@example.com, second-audit@example.com"
+)
+def test_create_outbound_email_adds_bcc_from_settings(billing_task, superuser):
+    email = _create_email(billing_task, superuser)
+
+    assert sorted(email.recipient_addresses(OutboundEmailRecipient.TYPE_BCC)) == [
+        "audit@example.com",
+        "second-audit@example.com",
+    ]
+    # TO остаётся как был — BCC отдельной пачкой.
+    assert email.to_addresses == ["recipient@example.com"]
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_BCC_EMAILS="")
+def test_create_outbound_email_rejects_empty_recipient_list(billing_task, superuser):
+    from apps.communications.services import CommunicationsQueueError
+
+    with pytest.raises(CommunicationsQueueError):
+        create_outbound_email(
+            kind=OutboundEmail.KIND_BILLING_INSURER_REQUEST,
+            content_object=billing_task,
+            subject="Тема",
+            body_text="Тело",
+            to=[],
+            created_by=superuser,
+        )
 
 
 @pytest.mark.django_db

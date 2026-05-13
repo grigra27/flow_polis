@@ -338,6 +338,11 @@ COMMUNICATIONS_ATTACHMENT_MAX_SIZE_MB = config(
 COMMUNICATIONS_SEND_TIMEOUT = config(
     "COMMUNICATIONS_SEND_TIMEOUT", default=30, cast=int
 )
+# Скрытая копия для аудита: указывается через запятую/точку с запятой.
+# Эти адреса автоматически добавляются как BCC к каждому исходящему письму.
+# Получатели TO/CC не видят их в заголовках, в task_detail.html они тоже не показаны.
+# Полная картина видна только в /admin/communications/outboundemail/.
+COMMUNICATIONS_BCC_EMAILS = config("COMMUNICATIONS_BCC_EMAILS", default="")
 # Пока идёт тестирование, отправка доступна только суперпользователю.
 # После завершения тестирования снимается флагом, не правкой кода.
 COMMUNICATIONS_RESTRICT_TO_SUPERUSER = config(

@@ -1382,6 +1382,20 @@
             });
         });
 
+        // Браузер на input[type=email multiple] разрешает только запятую.
+        // Чтобы пользователь мог разделять адреса и точкой с запятой
+        // (как написано в подсказке), на каждое изменение значения
+        // заменяем `;` на `,`, прозрачно для пользователя.
+        document.querySelectorAll('input[type="email"][multiple]').forEach(function (input) {
+            input.addEventListener('input', function () {
+                if (this.value.indexOf(';') === -1) return;
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.replace(/;/g, ',');
+                try { this.setSelectionRange(start, end); } catch (e) { /* readonly или несовместимый input */ }
+            });
+        });
+
         document.querySelectorAll('[data-email-send-form]').forEach(function (form) {
             form.addEventListener('submit', function () {
                 const btn = form.querySelector('[data-email-send-btn]');

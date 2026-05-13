@@ -112,6 +112,9 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert "Тип взноса: годовой" in alliance_letter
     assert "Страховщик:" not in alliance_letter
     assert "Лизингополучатель:" not in alliance_letter
+    expected_signature = 'С Уважением\nООО "Он-лайн брокер"'
+    assert letter.rstrip().endswith(expected_signature)
+    assert alliance_letter.rstrip().endswith(expected_signature)
     assert (
         subject
         == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"

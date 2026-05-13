@@ -245,6 +245,7 @@ class BillingTask(TimeStampedModel):
             context_block,
             ["Просим направить счет для дальнейшей передачи в оплату."],
             ["Спасибо."],
+            ["С Уважением", 'ООО "Он-лайн брокер"'],
         ]
         return "\n\n".join("\n".join(block) for block in blocks)
 
@@ -308,6 +309,7 @@ class BillingTask(TimeStampedModel):
             payment_block,
             [f"Просим оплатить счет до {alliance_due_str} включительно."],
             ["Спасибо."],
+            ["С Уважением", 'ООО "Он-лайн брокер"'],
         ]
         return "\n\n".join("\n".join(block) for block in blocks)
 

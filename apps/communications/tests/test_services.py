@@ -98,7 +98,10 @@ def test_create_outbound_email_adds_recipient_and_technical_code(
         recipient_type=OutboundEmailRecipient.TYPE_TO,
         address="recipient@example.com",
     ).exists()
-    assert f"Код запроса: OP-BILLING-{billing_task.id}" in email.body_text
+    assert (
+        f"Код запроса(просьба не удалять): OP-BILLING-{billing_task.id}"
+        in email.body_text
+    )
     assert email.message_id
     assert email.headers["X-Onlinepolis-Email-Kind"] == email.kind
 

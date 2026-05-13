@@ -431,7 +431,10 @@ def build_headers(content_type, object_id, kind, message_id):
 
 
 def append_technical_code_to_text(body_text, technical_code):
-    return f"{body_text.rstrip()}\n\n---\nКод запроса: {technical_code}\n"
+    return (
+        f"{body_text.rstrip()}\n\n---\n"
+        f"Код запроса(просьба не удалять): {technical_code}\n"
+    )
 
 
 def append_technical_code_to_html(body_html, technical_code):
@@ -440,7 +443,7 @@ def append_technical_code_to_html(body_html, technical_code):
     safe_code = escape(technical_code)
     return (
         f"{str(body_html).rstrip()}"
-        f"<hr><p><small>Код запроса: {safe_code}</small></p>"
+        f"<hr><p><small>Код запроса(просьба не удалять): {safe_code}</small></p>"
     )
 
 

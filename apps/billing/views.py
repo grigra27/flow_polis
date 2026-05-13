@@ -268,6 +268,13 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
 
 
 class BillingTaskUpdateView(LoginRequiredMixin, View):
+    """Только редактирование комментария задачи.
+
+    Статус двигается автоматически после успешной отправки писем (см.
+    apps.billing.mail_handlers). Для аварийной ручной правки статуса —
+    Django admin /admin/billing/billingtask/.
+    """
+
     def post(self, request, pk):
         task = get_object_or_404(
             BillingTask,
@@ -275,61 +282,10 @@ class BillingTaskUpdateView(LoginRequiredMixin, View):
             payment_schedule__policy__broker_participation=True,
         )
         next_url = request.POST.get("next") or task.get_absolute_url()
-        action = request.POST.get("action")
-        new_status = request.POST.get("status")
         comment = request.POST.get("comment")
-        valid_statuses = {status for status, _ in BillingTask.STATUS_CHOICES}
 
-        if action == "comment":
-            update_task(task, request.user, comment=comment)
-            messages.success(request, "Комментарий сохранен")
-            return redirect(next_url)
-
-        if action == "status":
-            if new_status not in valid_statuses:
-                messages.warning(request, "Выберите корректный статус")
-                return redirect(next_url)
-
-            update_task(task, request.user, new_status=new_status)
-            messages.success(request, "Статус обновлен")
-            return redirect(next_url)
-
-        # Fallback for legacy combined form submissions.
-        if new_status not in valid_statuses:
-            messages.warning(request, "Выберите корректный статус")
-            return redirect(next_url)
-
-        update_task(task, request.user, new_status=new_status, comment=comment)
-        messages.success(request, "Задача обновлена")
-        return redirect(next_url)
-
-
-class BillingTaskBulkUpdateView(LoginRequiredMixin, View):
-    def post(self, request):
-        task_ids = request.POST.getlist("task_ids")
-        new_status = request.POST.get("status")
-        next_url = request.POST.get("next") or reverse("policies:scheduled_payments")
-        valid_statuses = {status for status, _ in BillingTask.STATUS_CHOICES}
-
-        if new_status not in valid_statuses:
-            messages.warning(request, "Выберите корректный статус")
-            return redirect(next_url)
-
-        if not task_ids:
-            messages.warning(request, "Выберите хотя бы одну задачу")
-            return redirect(next_url)
-
-        updated_count = 0
-        for task in BillingTask.objects.filter(
-            id__in=task_ids,
-            payment_schedule__policy__broker_participation=True,
-        ):
-            previous_updated_at = task.updated_at
-            update_task(task, request.user, new_status=new_status)
-            if task.updated_at != previous_updated_at:
-                updated_count += 1
-
-        messages.success(request, f"Обновлено задач: {updated_count}")
+        update_task(task, request.user, comment=comment)
+        messages.success(request, "Комментарий сохранен")
         return redirect(next_url)
 
 

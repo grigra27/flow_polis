@@ -759,94 +759,71 @@
     </div>
 
     <!-- Tasks Table -->
-    <form method="post" action="{% url 'policies:scheduled_payment_bulk_update' %}">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title">
+                <i class="bi bi-calendar2-week"></i> {{ selected_period.label }}
+            </span>
+            <span class="mgr-section-head-badge">{{ total_filtered }}</span>
+        </div>
 
-        <div class="mgr-section">
-            <div class="mgr-section-head">
-                <span class="mgr-section-head-title">
-                    <i class="bi bi-calendar2-week"></i> {{ selected_period.label }}
-                </span>
-                <span class="mgr-section-head-badge">{{ total_filtered }}</span>
-            </div>
-
-            <div class="bil-bulkbar">
-                <select name="status" required>
-                    <option value="">Сменить статус выбранных...</option>
-                    {% for value, label in status_choices %}
-                    <option value="{{ value }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn-pl-apply">
-                    <i class="bi bi-check2-square"></i> Применить к выбранным
-                </button>
-            </div>
-
-            <div class="mgr-section-body" style="padding: 0 0 0.6rem;">
-                <div class="table-responsive">
-                    <table class="mgr-table">
-                        <thead>
-                            <tr>
-                                <th class="bil-checkbox-col" style="padding-left:1rem;">
-                                    <input type="checkbox" id="selectAllTasks" class="form-check-input">
-                                </th>
-                                <th>Статус</th>
-                                <th class="bil-deadline-col">Крайний срок</th>
-                                <th>Дата платежа</th>
-                                <th>Страховщик</th>
-                                <th>ДФА / полис</th>
-                                <th>Клиент</th>
-                                <th class="text-end">Сумма</th>
-                                <th>Комментарии</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for task in tasks %}
-                            {% with policy=task.payment_schedule.policy %}
-                            <tr class="tbl-row-clickable{% if not policy.broker_participation %} tbl-row-nobroker{% endif %}"
-                                data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
-                                tabindex="0"
-                                role="link"
-                                aria-label="Открыть задачу {{ policy.policy_number }}">
-                                <td class="bil-checkbox-col" style="padding-left:1rem;">
-                                    <input type="checkbox" name="task_ids" value="{{ task.id }}" class="form-check-input task-checkbox">
-                                </td>
-                                <td>
-                                    <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                                    {% if not task.is_actual %}
-                                    <div class="bil-warning">Платеж изменился</div>
-                                    {% endif %}
-                                </td>
-                                <td class="bil-deadline-col">{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
-                                <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
-                                <td>{% insurer_logo policy.insurer size='small' %}</td>
-                                <td class="bil-policy-line">
-                                    <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
-                                    <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
-                                    {% if not policy.broker_participation %}
-                                    <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ policy.client.client_name }}</td>
-                                <td class="text-end"><strong>{{ task.payment_schedule.amount|currency }}</strong></td>
-                                <td>{{ task.comment|default:"—" }}</td>
-                            </tr>
-                            {% endwith %}
-                            {% empty %}
-                            <tr>
-                                <td colspan="9" class="pl-empty">
-                                    <i class="bi bi-inbox"></i>
-                                    Нет задач по выбранным фильтрам.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+        <div class="mgr-section-body" style="padding: 0 0 0.6rem;">
+            <div class="table-responsive">
+                <table class="mgr-table">
+                    <thead>
+                        <tr>
+                            <th>Статус</th>
+                            <th class="bil-deadline-col">Крайний срок</th>
+                            <th>Дата платежа</th>
+                            <th>Страховщик</th>
+                            <th>ДФА / полис</th>
+                            <th>Клиент</th>
+                            <th class="text-end">Сумма</th>
+                            <th>Комментарии</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        {% with policy=task.payment_schedule.policy %}
+                        <tr class="tbl-row-clickable{% if not policy.broker_participation %} tbl-row-nobroker{% endif %}"
+                            data-href="{% url 'policies:scheduled_payment_task' task.pk %}?next={{ request.get_full_path|urlencode }}"
+                            tabindex="0"
+                            role="link"
+                            aria-label="Открыть задачу {{ policy.policy_number }}">
+                            <td>
+                                <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
+                                {% if not task.is_actual %}
+                                <div class="bil-warning">Платеж изменился</div>
+                                {% endif %}
+                            </td>
+                            <td class="bil-deadline-col">{{ task.invoice_request_deadline|date:"d.m.Y" }}</td>
+                            <td>{{ task.payment_schedule.due_date|date:"d.m.Y" }}</td>
+                            <td>{% insurer_logo policy.insurer size='small' %}</td>
+                            <td class="bil-policy-line">
+                                <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
+                                <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                                {% if not policy.broker_participation %}
+                                <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ policy.client.client_name }}</td>
+                            <td class="text-end"><strong>{{ task.payment_schedule.amount|currency }}</strong></td>
+                            <td>{{ task.comment|default:"—" }}</td>
+                        </tr>
+                        {% endwith %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="pl-empty">
+                                <i class="bi bi-inbox"></i>
+                                Нет задач по выбранным фильтрам.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-    </form>
+    </div>
 
     {% if page_obj.has_other_pages %}
     <nav aria-label="Страницы" class="pl-pagination">
@@ -955,16 +932,6 @@
             });
 
             updateBranchSummary();
-        }
-
-        const selectAll = document.getElementById('selectAllTasks');
-        const checkboxes = document.querySelectorAll('.task-checkbox');
-        if (selectAll) {
-            selectAll.addEventListener('change', function () {
-                checkboxes.forEach(function (checkbox) {
-                    checkbox.checked = selectAll.checked;
-                });
-            });
         }
 
         const ignoredSelector = 'a, button, input, select, textarea, label';

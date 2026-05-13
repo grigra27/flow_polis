@@ -647,62 +647,12 @@
         color: #fff;
     }
 
-    /* Status change row */
+    /* Current status row (read-only) */
     .task-status-row {
         display: flex;
         align-items: center;
         gap: 0.6rem;
         flex-wrap: wrap;
-    }
-    .task-status-arrow {
-        color: var(--v2-muted);
-        font-size: 1.15rem;
-        flex-shrink: 0;
-    }
-    .task-status-select-wrap {
-        flex: 1 1 180px;
-        min-width: 160px;
-    }
-    .task-status-select {
-        width: 100%;
-        height: 38px;
-        border: 1px solid #c8d5e6;
-        border-radius: 8px;
-        padding: 0.35rem 0.6rem;
-        font-size: 0.92rem;
-        color: var(--v2-title);
-        background: #fff;
-    }
-    .task-status-select:focus {
-        outline: none;
-        border-color: var(--v2-accent);
-        box-shadow: 0 0 0 2px rgba(21,101,192,0.15);
-    }
-    .btn-status-save {
-        background: linear-gradient(180deg, #1e7be0 0%, #1565c0 100%);
-        border: none;
-        color: #fff;
-        font-size: 0.92rem;
-        font-weight: 700;
-        border-radius: 10px;
-        padding: 0.55rem 1.1rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(21,101,192,0.28);
-        transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
-        flex-shrink: 0;
-    }
-    .btn-status-save:hover {
-        background: linear-gradient(180deg, #2587ec 0%, #0d47a1 100%);
-        box-shadow: 0 6px 16px rgba(13,71,161,0.35);
-        transform: translateY(-1px);
-        color: #fff;
-    }
-    .btn-status-save:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 6px rgba(13,71,161,0.4);
     }
 
     .alert-warn {
@@ -926,27 +876,13 @@
 
             <div class="mgr-section">
                 <div class="mgr-section-head">
-                    <span class="mgr-section-head-title"><i class="bi bi-arrow-repeat"></i> Смена статуса</span>
+                    <span class="mgr-section-head-title"><i class="bi bi-arrow-repeat"></i> Текущий статус</span>
                 </div>
                 <div class="mgr-section-body">
-                    <form method="post" action="{% url 'policies:scheduled_payment_task_update' task.pk %}" class="task-status-row">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <input type="hidden" name="action" value="status">
+                    <div class="task-status-row">
                         <span class="bil-status bil-status--{{ task.status }}">{{ task.get_status_display }}</span>
-                        <i class="bi bi-arrow-right task-status-arrow" aria-hidden="true"></i>
-                        <div class="task-status-select-wrap">
-                            <label for="statusSelect" class="visually-hidden">Новый статус</label>
-                            <select id="statusSelect" name="status" class="task-status-select">
-                                {% for value, label in status_choices %}
-                                <option value="{{ value }}"{% if task.status == value %} selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="submit" class="btn-status-save">
-                            <i class="bi bi-check2-circle"></i> Сохранить
-                        </button>
-                    </form>
+                        <span class="task-email-send-hint">Статус двигается автоматически после успешной отправки писем. Для ручной правки — админка.</span>
+                    </div>
                 </div>
             </div>
 

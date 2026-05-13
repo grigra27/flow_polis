@@ -555,41 +555,11 @@ def test_scheduled_payments_exclude_policy_without_broker_from_list_and_counts(
 
 
 @pytest.mark.django_db
-def test_task_status_form_updates_status_only(client, billing_payment):
+def test_task_update_view_saves_comment_only(client, billing_payment):
+    """Фронтенд-form редактирует только комментарий. Смена статуса оттуда
+    больше не идёт — она автоматическая после отправки писем."""
     user = User.objects.create_user(
-        username="status_only_admin",
-        password="testpass123",
-    )
-    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
-    task = BillingTask.objects.get(payment_schedule=billing_payment)
-    update_task(task, user, comment="Комментарий должен остаться")
-
-    client.force_login(user)
-    detail_url = reverse("policies:scheduled_payment_task", args=[task.pk])
-    response = client.post(
-        reverse("policies:scheduled_payment_task_update", args=[task.pk]),
-        {
-            "action": "status",
-            "status": BillingTask.STATUS_REQUESTED,
-            "next": detail_url,
-        },
-    )
-
-    assert response.status_code == 302
-    assert response.url == detail_url
-
-    task.refresh_from_db()
-    assert task.status == BillingTask.STATUS_REQUESTED
-    assert task.comment == "Комментарий должен остаться"
-    assert task.events.filter(event_type=BillingTaskEvent.EVENT_STATUS_CHANGED).exists()
-
-
-@pytest.mark.django_db
-def test_task_comment_form_updates_comment_without_status_change(
-    client, billing_payment
-):
-    user = User.objects.create_user(
-        username="comment_only_admin",
+        username="comment_writer",
         password="testpass123",
     )
     sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
@@ -602,7 +572,6 @@ def test_task_comment_form_updates_comment_without_status_change(
     response = client.post(
         reverse("policies:scheduled_payment_task_update", args=[task.pk]),
         {
-            "action": "comment",
             "comment": "Отдельное сохранение комментария",
             "next": detail_url,
         },
@@ -617,36 +586,76 @@ def test_task_comment_form_updates_comment_without_status_change(
     task.refresh_from_db()
     assert task.status == initial_status
     assert task.comment == "Отдельное сохранение комментария"
+    # Комментарий не создаёт event — это было осознанное решение.
     assert task.events.count() == initial_event_count
 
 
 @pytest.mark.django_db
-def test_regular_user_can_bulk_update_task_status(client, billing_payment):
-    user = User.objects.create_user(
-        username="bulk_regular",
-        password="testpass123",
-    )
+def test_task_detail_no_longer_shows_status_form(client, billing_payment):
+    """Блок «Смена статуса» убран с фронтенда, осталось только табло
+    с текущим статусом и подсказка про админку."""
+    user = User.objects.create_user(username="task_reader", password="testpass123")
     sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
     task = BillingTask.objects.get(payment_schedule=billing_payment)
 
     client.force_login(user)
-    next_url = reverse("policies:scheduled_payments")
-    response = client.post(
-        reverse("policies:scheduled_payment_bulk_update"),
-        {
-            "task_ids": [str(task.id)],
-            "status": BillingTask.STATUS_REQUESTED,
-            "next": next_url,
-        },
-    )
+    response = client.get(reverse("policies:scheduled_payment_task", args=[task.pk]))
+    content = response.content.decode()
 
-    assert response.status_code == 302
-    assert response.url == next_url
+    # Старого селекта статусов и кнопки сохранения нет.
+    assert 'id="statusSelect"' not in content
+    assert "btn-status-save" not in content
+    # Но текущий статус всё ещё показан.
+    assert task.get_status_display() in content
+    # И подсказка про админку как аварийный канал.
+    assert "Текущий статус" in content
+
+
+@pytest.mark.django_db
+def test_bulk_update_url_removed(client, billing_payment):
+    """Bulk-update URL и view удалены — обращение к нему должно быть 404."""
+    from django.urls import NoReverseMatch
+
+    with pytest.raises(NoReverseMatch):
+        reverse("policies:scheduled_payment_bulk_update")
+
+
+@pytest.mark.django_db
+def test_admin_status_change_creates_billing_task_event(billing_payment, rf):
+    """Изменение статуса через Django admin идёт через save_model,
+    переопределённый в BillingTaskAdmin → попадает в BillingTaskEvent
+    с правильным пользователем."""
+    from django.contrib.admin.sites import AdminSite
+
+    from apps.billing.admin import BillingTaskAdmin
+
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    initial_event_count = task.events.count()
+    admin_user = User.objects.create_superuser(
+        username="status_admin",
+        email="status_admin@example.com",
+        password="testpass123",
+    )
+    request = rf.post(f"/admin/billing/billingtask/{task.pk}/change/")
+    request.user = admin_user
+
+    admin_obj = BillingTaskAdmin(BillingTask, AdminSite())
+    # Эмулируем форму админки: пользователь сменил status.
+    task.status = BillingTask.STATUS_REQUESTED
+
+    class _Form:
+        changed_data = ["status"]
+
+    admin_obj.save_model(request, task, _Form(), change=True)
 
     task.refresh_from_db()
     assert task.status == BillingTask.STATUS_REQUESTED
-    assert task.responsible == user
-    assert task.events.filter(event_type=BillingTaskEvent.EVENT_STATUS_CHANGED).exists()
+    assert task.events.count() == initial_event_count + 1
+    new_event = task.events.order_by("-created_at").first()
+    assert new_event.event_type == BillingTaskEvent.EVENT_STATUS_CHANGED
+    assert new_event.user == admin_user
+    assert new_event.new_status == BillingTask.STATUS_REQUESTED
 
 
 @pytest.mark.django_db

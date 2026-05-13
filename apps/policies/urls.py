@@ -43,9 +43,4 @@ urlpatterns = [
         billing_views.BillingTaskRetryEmailView.as_view(),
         name="scheduled_payment_retry_email",
     ),
-    path(
-        "payments/scheduled/bulk-update/",
-        billing_views.BillingTaskBulkUpdateView.as_view(),
-        name="scheduled_payment_bulk_update",
-    ),
 ]

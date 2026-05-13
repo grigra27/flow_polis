@@ -1257,7 +1257,7 @@
                         <div class="task-email-send-row">
                             <div>
                                 <label for="insurerRecipientEmail" class="task-letter-label">Email получателя</label>
-                                <input type="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" multiple required>
+                                <input type="text" inputmode="email" autocomplete="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" required>
                             </div>
                             <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в СК
@@ -1303,7 +1303,7 @@
                         <div class="task-email-send-row">
                             <div>
                                 <label for="allianceRecipientEmail" class="task-letter-label">Email получателя</label>
-                                <input type="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" multiple required>
+                                <input type="text" inputmode="email" autocomplete="email" id="allianceRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" required>
                             </div>
                             <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в Альянс
@@ -1379,20 +1379,6 @@
                         button.innerHTML = idleLabels[kind] || idleLabels.text;
                     }, 1600);
                 }
-            });
-        });
-
-        // Браузер на input[type=email multiple] разрешает только запятую.
-        // Чтобы пользователь мог разделять адреса и точкой с запятой
-        // (как написано в подсказке), на каждое изменение значения
-        // заменяем `;` на `,`, прозрачно для пользователя.
-        document.querySelectorAll('input[type="email"][multiple]').forEach(function (input) {
-            input.addEventListener('input', function () {
-                if (this.value.indexOf(';') === -1) return;
-                const start = this.selectionStart;
-                const end = this.selectionEnd;
-                this.value = this.value.replace(/;/g, ',');
-                try { this.setSelectionRange(start, end); } catch (e) { /* readonly или несовместимый input */ }
             });
         });
 

@@ -391,7 +391,12 @@ class BillingTaskSendInsurerEmailView(
         next_url = self.get_next_url(request, task)
         form = ManualRecipientEmailForm(request.POST)
         if not form.is_valid():
-            messages.warning(request, "Укажите корректный email получателя")
+            error_text = "Укажите корректный email получателя"
+            if form.errors:
+                first_errors = next(iter(form.errors.values()))
+                if first_errors:
+                    error_text = first_errors[0]
+            messages.warning(request, error_text)
             return redirect(next_url)
 
         try:

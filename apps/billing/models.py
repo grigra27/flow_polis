@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 
+from apps.core.date_utils import previous_business_day
 from apps.core.models import TimeStampedModel
 from apps.policies.models import PaymentSchedule
 
@@ -264,10 +265,11 @@ class BillingTask(TimeStampedModel):
             payment_position,
         ) = self._get_installment_metadata()
 
-        # В письме в Альянс указываем дату платежа на день раньше
-        # фактической из базы — это технологический сдвиг лизинговой
-        # компании (нужно успеть провести оплату до дедлайна СК).
-        alliance_due_date = self.due_date - timedelta(days=1)
+        # В письме в Альянс указываем дату платежа на предыдущий
+        # рабочий день относительно фактической даты из базы — это
+        # технологический сдвиг лизинговой компании (нужно успеть
+        # провести оплату до дедлайна СК в банковский день).
+        alliance_due_date = previous_business_day(self.due_date)
         alliance_due_str = alliance_due_date.strftime("%d.%m.%Y")
 
         def _fmt_date(value):

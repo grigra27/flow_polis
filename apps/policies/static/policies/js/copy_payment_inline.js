@@ -136,6 +136,7 @@
                 'kv_rub',
                 'paid_date',
                 'insurer_date',
+                'alliance_paid',
                 'payment_info'
             ];
 

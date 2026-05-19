@@ -215,6 +215,16 @@
                                                 </small>
                                             </div>
                                         </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-6">
+                                                <small><strong>Оплатил Альянс:</strong></small><br>
+                                                {% if payment.alliance_paid %}
+                                                    <span class="badge bg-info text-dark"><i class="bi bi-check-circle"></i> Да</span>
+                                                {% else %}
+                                                    <span class="badge bg-light text-dark border"><i class="bi bi-x-circle"></i> Нет</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                         {% if payment.payment_info %}
                                         <div class="row mt-2">
                                             <div class="col-md-12">

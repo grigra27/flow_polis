@@ -272,6 +272,7 @@ class PaymentSchedule(TimeStampedModel):
     insurer_date = models.DateField(
         "Дата согласования акта с СК", blank=True, null=True
     )
+    alliance_paid = models.BooleanField("Оплатил Альянс", default=False)
     payment_info = models.TextField("Дополнительная информация", blank=True)
 
     class Meta:

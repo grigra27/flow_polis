@@ -77,6 +77,7 @@ class PaymentScheduleInline(admin.TabularInline):
         "kv_rub",
         "paid_date",
         "insurer_date",
+        "alliance_paid",
         "payment_info",
     ]
     # commission_rate is excluded from visible fields but still saved via JavaScript
@@ -517,6 +518,7 @@ class PolicyAdmin(admin.ModelAdmin):
                     kv_rub=payment.kv_rub,
                     paid_date=payment.paid_date,
                     insurer_date=payment.insurer_date,
+                    alliance_paid=payment.alliance_paid,
                     payment_info=payment.payment_info,
                 )
                 payment_count += 1
@@ -606,6 +608,7 @@ class PaymentScheduleAdmin(admin.ModelAdmin):
             "amount": payment.amount,
             "insurance_sum": payment.insurance_sum,
             "kv_rub": payment.kv_rub,
+            "alliance_paid": payment.alliance_paid,
             "payment_info": payment.payment_info,
         }
 

@@ -2421,6 +2421,7 @@ class ThreePercentReportExporter(BaseExporter):
             "КВ в рублях",
             "Дата согласования акта с СК",
             "Инфо 3",
+            "Оплатил Альянс",
         ]
 
     def export(self):
@@ -2497,6 +2498,7 @@ class ThreePercentReportExporter(BaseExporter):
             self.format_value(payment.kv_rub),
             self.format_value(payment.insurer_date),
             policy.info3,
+            "Да" if payment.alliance_paid else "Нет",
         ]
 
     def _round_percent_for_comparison(self, value):
@@ -2538,6 +2540,7 @@ class ThreePercentReportExporter(BaseExporter):
             "L": 16,
             "M": 22,
             "N": 36,
+            "O": 16,
         }
 
         for column_letter, width in column_widths.items():
@@ -2566,6 +2569,8 @@ class ThreePercentReportExporter(BaseExporter):
                     cell.alignment = Alignment(
                         horizontal="left", vertical="top", wrap_text=True
                     )
+                elif idx == 15:
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
                 else:
                     cell.alignment = Alignment(horizontal="left", vertical="center")
 

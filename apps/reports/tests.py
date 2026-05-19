@@ -1134,12 +1134,13 @@ class ThreePercentReportExportViewTest(TestCase):
                 "КВ в рублях",
                 "Дата согласования акта с СК",
                 "Инфо 3",
+                "Оплатил Альянс",
             ],
         )
 
         data_rows = [
             row
-            for row in sheet.iter_rows(min_row=5, max_col=14, values_only=True)
+            for row in sheet.iter_rows(min_row=5, max_col=15, values_only=True)
             if any(value is not None and value != "" for value in row)
         ]
 
@@ -1162,6 +1163,7 @@ class ThreePercentReportExportViewTest(TestCase):
         exported_insurer_date = row[12].date() if hasattr(row[12], "date") else row[12]
         self.assertEqual(exported_insurer_date, date(2025, 2, 20))
         self.assertEqual(row[13], "Тестовое значение Инфо 3")
+        self.assertEqual(row[14], "Нет")
 
     def test_three_percent_report_highlights_nonstandard_kv_rows(self):
         """Тест: строки с КВ не по базовой ставке выделяются в Excel."""

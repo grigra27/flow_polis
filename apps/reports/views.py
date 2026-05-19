@@ -919,11 +919,16 @@ def export_three_percent_report(request):
 
 @login_required
 def property_snapshot_report(request):
-    """Снимок распределения портфеля действующих полисов по страховой сумме.
+    """Снэпшот по СС: распределение действующих полисов по страховой сумме.
 
     Рендерит HTML-страницу-отчёт, готовую к печати в PDF из браузера.
-    Данные считаются на момент открытия страницы.
+    Данные считаются на момент открытия страницы. Доступ — только админам,
+    карточка-ссылка на эту страницу тоже скрыта от обычных пользователей.
     """
+    if not _is_admin_user(request.user):
+        messages.error(request, "У вас нет прав для просмотра этого отчёта")
+        return redirect("reports:index")
+
     from .services.property_snapshot import build_property_snapshot
 
     context = build_property_snapshot()

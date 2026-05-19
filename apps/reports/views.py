@@ -529,6 +529,20 @@ def export_policies_csv(request):
             return redirect("reports:index")
 
         # Получаем платежи с оптимизированными запросами
+        from django.db.models import F, Q
+
+        # SQL-аналог PaymentSchedule.is_cancelled:
+        # платёж не оплачен, полис расторгнут, и (даты расторжения нет
+        # или дата платежа после расторжения).
+        cancelled_filter = (
+            Q(paid_date__isnull=True)
+            & Q(policy__policy_active=False)
+            & (
+                Q(policy__termination_date__isnull=True)
+                | Q(due_date__gt=F("policy__termination_date"))
+            )
+        )
+
         payments = (
             PaymentSchedule.objects.select_related(
                 "policy__client",
@@ -542,6 +556,7 @@ def export_policies_csv(request):
                 due_date__lte=end_date,
                 installment_number=1,
             )
+            .exclude(cancelled_filter)
             .order_by("due_date")
         )
 

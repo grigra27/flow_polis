@@ -100,9 +100,11 @@ def _aggregate_dimension(
             )
         else:
             item["share"] = DECIMAL_ZERO
+        # Округляем до целых рублей: отчёт для руководства, копейки лишние.
+        item["insurance_sum"] = item["insurance_sum"].quantize(Decimal("1"))
         item["color"] = PIE_PALETTE[index % len(PIE_PALETTE)]
 
-    return items, total
+    return items, total.quantize(Decimal("1"))
 
 
 def _build_pie_gradient(items: List[Dict[str, Any]]) -> str:

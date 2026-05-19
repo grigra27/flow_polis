@@ -184,6 +184,7 @@ class PolicyAdmin(admin.ModelAdmin):
                     "dfa_active",
                     "policy_uploaded",
                     "broker_participation",
+                    "renewal_to_old_dfa",
                 )
             },
         ),
@@ -499,6 +500,7 @@ class PolicyAdmin(admin.ModelAdmin):
                 dfa_active=policy.dfa_active,
                 policy_uploaded=policy.policy_uploaded,
                 broker_participation=policy.broker_participation,
+                renewal_to_old_dfa=policy.renewal_to_old_dfa,
             )
 
             # Copy payment schedule

@@ -100,6 +100,9 @@ class Policy(TimeStampedModel):
     dfa_active = models.BooleanField("ДФА активен", default=True)
     policy_uploaded = models.BooleanField("Полис подгружен", default=False)
     broker_participation = models.BooleanField("Участие брокера", default=True)
+    renewal_to_old_dfa = models.BooleanField(
+        "Перезаключение (к старому ДФА)", default=False
+    )
     termination_date = models.DateField(
         "Дата расторжения",
         blank=True,

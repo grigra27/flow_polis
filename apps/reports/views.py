@@ -585,7 +585,7 @@ def export_policies_csv(request):
             "Описание застрахованного имущества",
             "Страховая сумма",
             "Страховая премия",
-            "КВ в рублях",
+            "КВ в процентах",
             "Вид страхования",
             "Филиал",
             "Месяц",
@@ -597,6 +597,11 @@ def export_policies_csv(request):
         # Данные
         for payment in payments:
             policy = payment.policy
+            kv_percent = (
+                "{:.2f}".format(payment.kv_percent_actual)
+                if payment.amount and payment.kv_rub
+                else ""
+            )
             row = [
                 policy.dfa_number or "",
                 policy.client.client_name if policy.client else "",
@@ -605,11 +610,13 @@ def export_policies_csv(request):
                 policy.property_description or "",
                 str(payment.insurance_sum) if payment.insurance_sum else "",
                 str(payment.amount) if payment.amount else "",
-                str(payment.kv_rub) if payment.kv_rub else "",
+                kv_percent,
                 policy.insurance_type.name if policy.insurance_type else "",
                 policy.branch.branch_name if policy.branch else "",
                 month_names_ru[payment.due_date.month] if payment.due_date else "",
-                "Новая" if payment.year_number == 1 else "Пролонгация",
+                "Новая"
+                if payment.year_number == 1 and not policy.renewal_to_old_dfa
+                else "Пролонгация",
                 "Да" if policy.broker_participation else "Нет",
             ]
             writer.writerow(row)

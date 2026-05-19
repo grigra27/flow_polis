@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+{% load currency_filters %}
+
+{% block title %}Распределение портфеля{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --ps-bg: #f3f7fc;
+        --ps-card-bg: #ffffff;
+        --ps-border: #dbe5f1;
+        --ps-title: #17324f;
+        --ps-muted: #5d748d;
+        --ps-accent: #1565c0;
+        --ps-soft: #f6f9fd;
+    }
+
+    body {
+        background: var(--ps-bg);
+    }
+
+    .ps-root {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    .ps-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .ps-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 1rem;
+        background: var(--ps-accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .ps-btn:hover { background: #104a91; color: #fff; }
+    .ps-btn--ghost {
+        background: #fff;
+        color: var(--ps-title);
+        border: 1px solid var(--ps-border);
+    }
+    .ps-btn--ghost:hover {
+        background: var(--ps-soft);
+        color: var(--ps-title);
+    }
+
+    /* ── Cover header ── */
+    .ps-cover {
+        background: #fff;
+        border: 1px solid var(--ps-border);
+        border-radius: 16px;
+        padding: 2rem 2.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .ps-kicker {
+        font-size: 0.85rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ps-muted);
+        margin-bottom: 0.5rem;
+    }
+    .ps-cover-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--ps-title);
+        margin: 0 0 0.4rem;
+        line-height: 1.15;
+    }
+    .ps-cover-sub {
+        font-size: 1.05rem;
+        color: var(--ps-muted);
+        margin-bottom: 1.75rem;
+    }
+    .ps-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+    }
+    .ps-summary-card {
+        background: var(--ps-soft);
+        border: 1px solid var(--ps-border);
+        border-radius: 12px;
+        padding: 1.1rem 1.25rem;
+    }
+    .ps-summary-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ps-muted);
+        margin-bottom: 0.35rem;
+    }
+    .ps-summary-value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--ps-title);
+        line-height: 1.1;
+    }
+    .ps-summary-value small {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--ps-muted);
+        margin-left: 0.3rem;
+    }
+
+    /* ── Section ── */
+    .ps-section {
+        background: #fff;
+        border: 1px solid var(--ps-border);
+        border-radius: 16px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.5rem;
+        page-break-inside: avoid;
+    }
+    .ps-section-head { margin-bottom: 1.25rem; }
+    .ps-section-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--ps-title);
+        margin: 0 0 0.2rem;
+    }
+    .ps-section-sub {
+        font-size: 0.95rem;
+        color: var(--ps-muted);
+        margin: 0;
+    }
+
+    .ps-section-body {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 1.75rem;
+        align-items: start;
+    }
+
+    /* ── Pie ── */
+    .ps-pie-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+    }
+    .ps-pie {
+        width: 240px;
+        height: 240px;
+        border-radius: 50%;
+        position: relative;
+        box-shadow: 0 6px 18px rgba(23, 50, 79, 0.08);
+    }
+    .ps-pie::after {
+        content: "";
+        position: absolute;
+        inset: 35%;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px var(--ps-border);
+    }
+    .ps-pie-center {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+        text-align: center;
+        line-height: 1.1;
+    }
+    .ps-pie-center-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ps-muted);
+    }
+    .ps-pie-center-value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--ps-title);
+    }
+
+    /* ── Table ── */
+    .ps-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+    }
+    .ps-table thead th {
+        text-align: left;
+        font-weight: 600;
+        color: var(--ps-muted);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 0.55rem 0.75rem;
+        border-bottom: 1px solid var(--ps-border);
+    }
+    .ps-table tbody td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #eef3f9;
+        vertical-align: middle;
+    }
+    .ps-table tbody tr:last-child td { border-bottom: none; }
+    .ps-table tfoot td {
+        padding: 0.75rem 0.75rem;
+        font-weight: 700;
+        color: var(--ps-title);
+        border-top: 2px solid var(--ps-border);
+        background: var(--ps-soft);
+    }
+    .ps-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+    .ps-swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .ps-num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .ps-share {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: var(--ps-title);
+    }
+
+    .ps-empty {
+        padding: 2rem;
+        text-align: center;
+        color: var(--ps-muted);
+        font-style: italic;
+    }
+
+    /* ── Print ── */
+    @media print {
+        body { background: #fff; }
+        .ps-toolbar, .navbar, nav, footer, .messages, .alert { display: none !important; }
+        .ps-root { padding: 0; max-width: none; }
+        .ps-cover, .ps-section {
+            border: 1px solid #d0d7de;
+            box-shadow: none;
+            page-break-inside: avoid;
+        }
+        .ps-section { margin-bottom: 0.75rem; }
+        a { color: inherit; text-decoration: none; }
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 1.25cm;
+    }
+
+    @media (max-width: 780px) {
+        .ps-summary { grid-template-columns: 1fr; }
+        .ps-section-body { grid-template-columns: 1fr; }
+        .ps-pie-wrap { order: 2; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ps-root">
+    <div class="ps-toolbar">
+        <a href="{% url 'reports:index' %}" class="ps-btn ps-btn--ghost">
+            <i class="bi bi-arrow-left"></i> К экспортам
+        </a>
+        <button type="button" class="ps-btn" onclick="window.print()">
+            <i class="bi bi-printer"></i> Печать / Сохранить как PDF
+        </button>
+    </div>
+
+    <section class="ps-cover">
+        <div class="ps-kicker">Снимок портфеля</div>
+        <h1 class="ps-cover-title">Распределение страховой стоимости имущества</h1>
+        <p class="ps-cover-sub">
+            По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>.
+            Учитываются только действующие полисы.
+        </p>
+
+        <div class="ps-summary">
+            <div class="ps-summary-card">
+                <div class="ps-summary-label">Дата среза</div>
+                <div class="ps-summary-value">{{ as_of|date:"d.m.Y" }}</div>
+            </div>
+            <div class="ps-summary-card">
+                <div class="ps-summary-label">Действующих полисов</div>
+                <div class="ps-summary-value">{{ active_policies_count }}<small>шт.</small></div>
+            </div>
+            <div class="ps-summary-card">
+                <div class="ps-summary-label">Общая страховая стоимость</div>
+                <div class="ps-summary-value">{{ total_insurance_sum|rub }}<small>₽</small></div>
+            </div>
+        </div>
+    </section>
+
+    {% for section in sections %}
+    <section class="ps-section">
+        <div class="ps-section-head">
+            <h2 class="ps-section-title">{{ section.title }}</h2>
+            <p class="ps-section-sub">{{ section.subtitle }}</p>
+        </div>
+
+        {% if section.items %}
+        <div class="ps-section-body">
+            <div class="ps-pie-wrap">
+                <div class="ps-pie" style="background: {{ section.pie_css }};">
+                    <div class="ps-pie-center">
+                        <div class="ps-pie-center-label">Всего</div>
+                        <div class="ps-pie-center-value">{{ total_insurance_sum|rub }} ₽</div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="ps-table">
+                <thead>
+                    <tr>
+                        <th>Наименование</th>
+                        <th class="ps-num">Полисов</th>
+                        <th class="ps-num">Страховая стоимость, ₽</th>
+                        <th class="ps-num">Доля</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in section.items %}
+                    <tr>
+                        <td>
+                            <div class="ps-name-cell">
+                                <span class="ps-swatch" style="background: {{ item.color }};"></span>
+                                <span>{{ item.name }}</span>
+                            </div>
+                        </td>
+                        <td class="ps-num">{{ item.policy_count }}</td>
+                        <td class="ps-num">{{ item.insurance_sum|rub }}</td>
+                        <td class="ps-share">{{ item.share }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Итого</td>
+                        <td class="ps-num">{{ active_policies_count }}</td>
+                        <td class="ps-num">{{ total_insurance_sum|rub }}</td>
+                        <td class="ps-share">100%</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="ps-empty">Нет данных для отображения.</div>
+        {% endif %}
+    </section>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1010,6 +1010,36 @@
                 </div>
             </div>
 
+            <!-- Распределение портфеля -->
+            <div class="col-md-6">
+                <div class="exp-card exp-card--navy">
+                    <div class="exp-card-head">
+                        <div>
+                            <div class="exp-card-kicker"><i class="bi bi-pie-chart-fill"></i> Распределение портфеля</div>
+                            <div class="exp-card-title">Снимок распределения имущества</div>
+                            <p class="exp-card-desc mb-1"><strong style="color:var(--v2-title)">Презентация для руководства</strong></p>
+                            <p class="exp-card-desc">Распределение страховой стоимости действующих полисов по филиалам, страховщикам и видам страхования. Открывается как страница-отчёт, готовая к печати в PDF.</p>
+                        </div>
+                        <button type="button" class="exp-faq-icon"
+                                data-bs-toggle="modal" data-bs-target="#propertySnapshotFaqModal"
+                                title="FAQ">
+                            <i class="bi bi-question-lg"></i>
+                        </button>
+                    </div>
+
+                    <div class="exp-features">
+                        <span class="exp-feat"><i class="bi bi-check2"></i> Срез на момент открытия</span>
+                        <span class="exp-feat"><i class="bi bi-check2"></i> Только действующие полисы</span>
+                        <span class="exp-feat"><i class="bi bi-check2"></i> Три разреза</span>
+                        <span class="exp-feat"><i class="bi bi-check2"></i> Печать в PDF</span>
+                    </div>
+
+                    <a href="{% url 'reports:property_snapshot_report' %}" target="_blank" rel="noopener" class="btn-exp-primary" style="text-decoration:none;">
+                        <i class="bi bi-pie-chart-fill"></i> Открыть отчёт
+                    </a>
+                </div>
+            </div>
+
         </div>
     </div><!-- /section-body -->
 
@@ -1089,6 +1119,30 @@
                         <li>КВ в рублях равно нулю;</li>
                         <li>по выбранному периоду нет оплаченных платежей.</li>
                     </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ: Распределение портфеля -->
+    <div class="modal fade" id="propertySnapshotFaqModal" tabindex="-1" aria-labelledby="propertySnapshotFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header exp-modal-header">
+                    <h5 class="modal-title" id="propertySnapshotFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: Распределение портфеля
+                    </h5>
+                    <button type="button" class="btn-close exp-modal-header" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Что это:</strong> страница-отчёт, показывающая, как распределена страховая стоимость имущества по действующим полисам на момент открытия. Готова к печати в PDF из браузера (кнопка «Печать / Сохранить как PDF» в правом верхнем углу).</p>
+                    <p><strong>Что попадает в снимок:</strong> только полисы со статусом «Полис активен» (<code>policy_active = Да</code>). Расторгнутые и архивные полисы в распределение не включаются.</p>
+                    <p><strong>Какие срезы:</strong> филиалы, страховщики, виды страхования. По каждому срезу — пирог + полная таблица со всеми группами (без сворачивания в «Прочие»), отсортированная по убыванию страховой стоимости.</p>
+                    <p><strong>Как считается страховая стоимость полиса:</strong> для каждого полиса берётся максимальное значение <code>insurance_sum</code> из его графика платежей (та же логика, что в дашборде). Эти значения суммируются по группам внутри среза.</p>
+                    <p><strong>Дата среза:</strong> текущая дата на момент открытия страницы. Если перезагрузить страницу — пересчитается заново.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>

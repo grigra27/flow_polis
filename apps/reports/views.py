@@ -918,6 +918,19 @@ def export_three_percent_report(request):
 
 
 @login_required
+def property_snapshot_report(request):
+    """Снимок распределения портфеля действующих полисов по страховой сумме.
+
+    Рендерит HTML-страницу-отчёт, готовую к печати в PDF из браузера.
+    Данные считаются на момент открытия страницы.
+    """
+    from .services.property_snapshot import build_property_snapshot
+
+    context = build_property_snapshot()
+    return render(request, "reports/property_snapshot.html", context)
+
+
+@login_required
 def export_database_backup(request):
     """Скачивание актуального backup-файла базы данных."""
     return _download_backup_file(request, "database")

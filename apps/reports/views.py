@@ -537,7 +537,11 @@ def export_policies_csv(request):
                 "policy__insurance_type",
                 "policy__policyholder",
             )
-            .filter(due_date__gte=start_date, due_date__lte=end_date)
+            .filter(
+                due_date__gte=start_date,
+                due_date__lte=end_date,
+                installment_number=1,
+            )
             .order_by("due_date")
         )
 

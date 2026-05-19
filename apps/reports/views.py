@@ -559,6 +559,23 @@ def export_policies_csv(request):
 
         writer = csv.writer(response, delimiter=";")
 
+        # Названия месяцев на русском
+        month_names_ru = [
+            "",
+            "Январь",
+            "Февраль",
+            "Март",
+            "Апрель",
+            "Май",
+            "Июнь",
+            "Июль",
+            "Август",
+            "Сентябрь",
+            "Октябрь",
+            "Ноябрь",
+            "Декабрь",
+        ]
+
         # Заголовки в требуемом порядке
         headers = [
             "Номер ДФА",
@@ -572,6 +589,7 @@ def export_policies_csv(request):
             "Вид страхования",
             "Филиал",
             "Месяц",
+            "Статус",
             "Участие брокера",
         ]
         writer.writerow(headers)
@@ -590,7 +608,8 @@ def export_policies_csv(request):
                 str(payment.kv_rub) if payment.kv_rub else "",
                 policy.insurance_type.name if policy.insurance_type else "",
                 policy.branch.branch_name if policy.branch else "",
-                str(payment.due_date.month) if payment.due_date else "",
+                month_names_ru[payment.due_date.month] if payment.due_date else "",
+                "Новая" if payment.year_number == 1 else "Пролонгация",
                 "Да" if policy.broker_participation else "Нет",
             ]
             writer.writerow(row)

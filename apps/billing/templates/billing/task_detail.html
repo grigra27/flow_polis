@@ -454,6 +454,44 @@
         font-size: 0.8rem;
         line-height: 1.4;
     }
+    .task-email-suggest-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: center;
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+    }
+    .task-email-suggest-label {
+        font-weight: 600;
+        color: var(--v2-title);
+    }
+    .task-email-suggest-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid #c8d5e6;
+        background: #fbfdff;
+        color: #13283f;
+        font-size: 0.82rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .task-email-suggest-chip:hover {
+        background: #eef4ff;
+        border-color: #9ab6dd;
+    }
+    .task-email-suggest-chip.is-active {
+        background: #1565c0;
+        border-color: #1565c0;
+        color: #fff;
+    }
+    .task-email-suggest-chip .bi {
+        font-size: 0.85rem;
+    }
     .task-email-history {
         display: grid;
         gap: 0.55rem;
@@ -1183,12 +1221,24 @@
                         <div class="task-email-send-row">
                             <div>
                                 <label for="insurerRecipientEmail" class="task-letter-label">Email получателя</label>
-                                <input type="text" inputmode="email" autocomplete="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" required>
+                                <input type="text" inputmode="email" autocomplete="email" id="insurerRecipientEmail" name="recipient_email" class="task-letter-subject-input" placeholder="addr1@example.com, addr2@example.com" data-email-recipient-input required>
                             </div>
                             <button type="submit" class="btn-pl-apply" data-email-send-btn>
                                 <i class="bi bi-send"></i> Отправить в СК
                             </button>
                         </div>
+                        {% with insurer_emails=policy.insurer.emails %}
+                        {% if insurer_emails %}
+                        <div class="task-email-suggest-row" data-email-suggest-target="insurerRecipientEmail">
+                            <span class="task-email-suggest-label">Адреса СК:</span>
+                            {% for address in insurer_emails %}
+                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ address }}">
+                                <i class="bi bi-plus-lg"></i>{{ address }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
                         <div class="task-email-send-hint">Несколько адресов — через запятую или точку с запятой. Тема и текст отправятся без редактирования. Отправка доступна только пользователям с правом отправки писем.</div>
                     </form>
                     {% endif %}
@@ -1316,6 +1366,50 @@
                     btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Отправляем...';
                 }
             });
+        });
+
+        document.querySelectorAll('[data-email-suggest-target]').forEach(function (row) {
+            const input = document.getElementById(row.dataset.emailSuggestTarget);
+            if (!input) return;
+            const chips = row.querySelectorAll('[data-email-suggest]');
+
+            function parseAddresses(value) {
+                if (!value) return [];
+                return value.replace(/;/g, ',').split(',')
+                    .map(function (part) { return part.trim(); })
+                    .filter(function (part) { return part.length > 0; });
+            }
+
+            function syncChips() {
+                const addresses = parseAddresses(input.value);
+                chips.forEach(function (chip) {
+                    const active = addresses.indexOf(chip.dataset.emailSuggest) !== -1;
+                    chip.classList.toggle('is-active', active);
+                    const icon = chip.querySelector('.bi');
+                    if (icon) {
+                        icon.classList.toggle('bi-plus-lg', !active);
+                        icon.classList.toggle('bi-check-lg', active);
+                    }
+                });
+            }
+
+            chips.forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    const address = chip.dataset.emailSuggest;
+                    const addresses = parseAddresses(input.value);
+                    const idx = addresses.indexOf(address);
+                    if (idx === -1) {
+                        addresses.push(address);
+                    } else {
+                        addresses.splice(idx, 1);
+                    }
+                    input.value = addresses.join(', ');
+                    syncChips();
+                });
+            });
+
+            input.addEventListener('input', syncChips);
+            syncChips();
         });
 
         const commentToggleButton = document.getElementById('commentToggleButton');

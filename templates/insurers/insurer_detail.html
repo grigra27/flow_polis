@@ -334,6 +334,22 @@
                         </span>
                     </div>
                     {% endif %}
+                    {% if insurer.email_primary %}
+                    <div class="mgr-info-row">
+                        <span class="mgr-info-label">Email (основной)</span>
+                        <span class="mgr-info-value">
+                            <a href="mailto:{{ insurer.email_primary }}">{{ insurer.email_primary }}</a>
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if insurer.email_secondary %}
+                    <div class="mgr-info-row">
+                        <span class="mgr-info-label">Email (дополнительный)</span>
+                        <span class="mgr-info-value">
+                            <a href="mailto:{{ insurer.email_secondary }}">{{ insurer.email_secondary }}</a>
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 

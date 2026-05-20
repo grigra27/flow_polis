@@ -11,9 +11,22 @@ from .models import (
 
 @admin.register(Insurer)
 class InsurerAdmin(admin.ModelAdmin):
-    list_display = ["insurer_name", "contacts", "has_logo"]
-    search_fields = ["insurer_name"]
-    fields = ["insurer_name", "logo", "contacts", "notes"]
+    list_display = [
+        "insurer_name",
+        "contacts",
+        "email_primary",
+        "email_secondary",
+        "has_logo",
+    ]
+    search_fields = ["insurer_name", "email_primary", "email_secondary"]
+    fields = [
+        "insurer_name",
+        "logo",
+        "contacts",
+        "email_primary",
+        "email_secondary",
+        "notes",
+    ]
     readonly_fields = ["logo_preview"]
 
     def has_logo(self, obj):
@@ -35,8 +48,23 @@ class InsurerAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if obj and obj.logo:
-            return ["insurer_name", "logo", "logo_preview", "contacts", "notes"]
-        return ["insurer_name", "logo", "contacts", "notes"]
+            return [
+                "insurer_name",
+                "logo",
+                "logo_preview",
+                "contacts",
+                "email_primary",
+                "email_secondary",
+                "notes",
+            ]
+        return [
+            "insurer_name",
+            "logo",
+            "contacts",
+            "email_primary",
+            "email_secondary",
+            "notes",
+        ]
 
 
 @admin.register(Branch)

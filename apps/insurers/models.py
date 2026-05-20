@@ -20,7 +20,14 @@ class Insurer(models.Model):
     contacts = models.URLField(
         "Контакты (ссылка)", blank=True, help_text="Ссылка на yonote"
     )
+    email_primary = models.EmailField("Email (основной)", blank=True)
+    email_secondary = models.EmailField("Email (дополнительный)", blank=True)
     notes = models.TextField("Примечание", blank=True)
+
+    @property
+    def emails(self):
+        """Список заполненных e-mail адресов страховщика."""
+        return [e for e in (self.email_primary, self.email_secondary) if e]
 
     class Meta:
         verbose_name = "Страховая компания"

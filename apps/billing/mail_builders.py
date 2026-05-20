@@ -13,6 +13,20 @@ def get_alliance_backup_manager():
     return LeasingManager.objects.filter(pk=manager_id).first()
 
 
+def get_alliance_primary_manager(policy):
+    """Основной получатель альянс-письма для конкретного полиса.
+    Для филиалов из ALLIANCE_BRANCH_MANAGER_OVERRIDES берётся фиксированный
+    LeasingManager, для остальных — leasing_manager из карточки полиса."""
+    overrides = getattr(settings, "ALLIANCE_BRANCH_MANAGER_OVERRIDES", {}) or {}
+    branch_id = getattr(policy, "branch_id", None)
+    override_id = overrides.get(branch_id)
+    if override_id:
+        manager = LeasingManager.objects.filter(pk=override_id).first()
+        if manager:
+            return manager
+    return policy.leasing_manager
+
+
 def build_insurer_request_email_payload(task, recipient_emails):
     insurer = task.payment_schedule.policy.insurer
     snapshot = list(getattr(insurer, "emails", []) or [])
@@ -28,7 +42,7 @@ def build_insurer_request_email_payload(task, recipient_emails):
 
 
 def build_alliance_forward_email_payload(task, recipient_emails):
-    manager = task.payment_schedule.policy.leasing_manager
+    manager = get_alliance_primary_manager(task.payment_schedule.policy)
     primary_email = (getattr(manager, "email", "") or "").strip() if manager else ""
     backup_manager = get_alliance_backup_manager()
     backup_email = (backup_manager.email or "").strip() if backup_manager else ""

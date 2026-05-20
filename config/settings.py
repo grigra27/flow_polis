@@ -364,6 +364,14 @@ BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT = config(
 # Подставляется как дополнительный чип в форме отправки и попадает в
 # snapshot отправки наравне с основным менеджером из карточки полиса.
 ALLIANCE_BACKUP_MANAGER_ID = 20
+# Переопределение основного менеджера лизинга для альянс-писем по
+# branch_id полиса: для перечисленных филиалов «основным» считается
+# не leasing_manager из карточки полиса, а указанный в значении
+# LeasingManager.id. Резервный менеджер (ALLIANCE_BACKUP_MANAGER_ID)
+# и snapshot работают как обычно.
+ALLIANCE_BRANCH_MANAGER_OVERRIDES = {
+    4: 3,
+}
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

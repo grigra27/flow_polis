@@ -550,6 +550,31 @@
     .task-email-history-retry {
         margin-top: 0.55rem;
     }
+    .task-email-history-recipient {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.3rem;
+    }
+    .task-email-history-recipient + .task-email-history-recipient::before {
+        content: ", ";
+        color: var(--v2-muted);
+    }
+    .task-email-history-external-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.05rem 0.45rem;
+        border-radius: 999px;
+        background: #fff4d6;
+        color: #8a5a00;
+        border: 1px solid #f0c66d;
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+    .task-email-history-external-badge .bi {
+        font-size: 0.72rem;
+    }
     @media (max-width: 575.98px) {
         .task-letter-block-head {
             flex-direction: column;
@@ -1152,7 +1177,21 @@
                                 <span>{{ email.get_status_display }}</span>
                             </div>
                             <div class="task-email-history-meta">
-                                <div>Получатель: {{ email.to_addresses|join:", "|default:"—" }}</div>
+                                <div>
+                                    Получатель:
+                                    {% if email.to_addresses %}
+                                        {% for address in email.to_addresses %}
+                                        <span class="task-email-history-recipient">
+                                            {{ address }}
+                                            {% if address in email.external_recipients %}
+                                            <span class="task-email-history-external-badge" title="Этот адрес не входил в карточку СК на момент отправки">
+                                                <i class="bi bi-exclamation-triangle"></i> не из карточки СК
+                                            </span>
+                                            {% endif %}
+                                        </span>
+                                        {% endfor %}
+                                    {% else %}—{% endif %}
+                                </div>
                                 <div>Создано: {{ email.created_at|date:"d.m.Y H:i" }}{% if email.sent_at %} · отправлено: {{ email.sent_at|date:"d.m.Y H:i" }}{% endif %}</div>
                                 <div>Тема: {{ email.subject }}</div>
                                 {% if email.sent_by %}

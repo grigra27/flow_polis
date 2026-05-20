@@ -135,6 +135,7 @@ class OutboundEmail(TimeStampedModel):
         "ID письма у провайдера", max_length=255, blank=True
     )
     headers = models.JSONField("Служебные заголовки", default=dict, blank=True)
+    metadata = models.JSONField("Служебные данные", default=dict, blank=True)
 
     objects = OutboundEmailQuerySet.as_manager()
 
@@ -178,6 +179,31 @@ class OutboundEmail(TimeStampedModel):
         как он их ввёл в форму."""
         recipients = sorted(self.recipients.all(), key=lambda r: r.id)
         return [r.address for r in recipients if r.recipient_type == "to"]
+
+    @property
+    def insurer_emails_snapshot(self):
+        """Адреса страховщика, зафиксированные на момент создания письма.
+        Пусто для писем, созданных до того, как сохранение снапшота
+        включили — такие письма не помечаем как «вне списка»."""
+        value = (self.metadata or {}).get("insurer_emails_snapshot")
+        if not isinstance(value, list):
+            return []
+        return [str(v) for v in value if v]
+
+    @property
+    def external_recipients(self):
+        """TO-адреса, которых не было в снапшоте карточки СК.
+        Если снапшота нет — возвращаем пустой список, чтобы старые
+        письма не считались «нестандартными» задним числом."""
+        snapshot = self.insurer_emails_snapshot
+        if not snapshot:
+            return []
+        snapshot_set = set(snapshot)
+        return [addr for addr in self.to_addresses if addr not in snapshot_set]
+
+    @property
+    def has_external_recipients(self):
+        return bool(self.external_recipients)
 
 
 class OutboundEmailRecipient(TimeStampedModel):

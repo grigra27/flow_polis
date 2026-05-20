@@ -83,6 +83,7 @@ def create_outbound_email(
     to,
     created_by=None,
     attachments=None,
+    metadata=None,
 ):
     to_addresses = _normalize_recipient_list(to)
     if not to_addresses:
@@ -116,6 +117,7 @@ def create_outbound_email(
             created_by=created_by,
             message_id=message_id,
             headers=headers,
+            metadata=dict(metadata or {}),
         )
         for address in to_addresses:
             OutboundEmailRecipient.objects.create(

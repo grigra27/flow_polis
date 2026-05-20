@@ -2,6 +2,8 @@ from apps.communications.models import OutboundEmail
 
 
 def build_insurer_request_email_payload(task, recipient_emails):
+    insurer = task.payment_schedule.policy.insurer
+    snapshot = list(getattr(insurer, "emails", []) or [])
     return {
         "kind": OutboundEmail.KIND_BILLING_INSURER_REQUEST,
         "content_object": task,
@@ -9,6 +11,7 @@ def build_insurer_request_email_payload(task, recipient_emails):
         "body_text": task.build_letter_text(),
         "body_html": task.build_letter_html(),
         "to": recipient_emails,
+        "metadata": {"insurer_emails_snapshot": snapshot},
     }
 
 

@@ -27,6 +27,24 @@ def get_alliance_primary_manager(policy):
     return policy.leasing_manager
 
 
+def get_alliance_branch_extra_emails(policy):
+    """Дополнительные адреса альянс-письма для филиала.
+    Возвращает список (возможно пустой) непустых, очищенных от пробелов email."""
+    mapping = getattr(settings, "ALLIANCE_BRANCH_EXTRA_EMAILS", {}) or {}
+    branch_id = getattr(policy, "branch_id", None)
+    raw = mapping.get(branch_id, [])
+    if isinstance(raw, str):
+        raw = [raw]
+    cleaned = []
+    seen = set()
+    for address in raw or []:
+        address = (address or "").strip()
+        if address and address not in seen:
+            seen.add(address)
+            cleaned.append(address)
+    return cleaned
+
+
 def build_insurer_request_email_payload(task, recipient_emails):
     insurer = task.payment_schedule.policy.insurer
     snapshot = list(getattr(insurer, "emails", []) or [])
@@ -42,12 +60,14 @@ def build_insurer_request_email_payload(task, recipient_emails):
 
 
 def build_alliance_forward_email_payload(task, recipient_emails):
-    manager = get_alliance_primary_manager(task.payment_schedule.policy)
+    policy = task.payment_schedule.policy
+    manager = get_alliance_primary_manager(policy)
     primary_email = (getattr(manager, "email", "") or "").strip() if manager else ""
     backup_manager = get_alliance_backup_manager()
     backup_email = (backup_manager.email or "").strip() if backup_manager else ""
+    branch_extra_emails = get_alliance_branch_extra_emails(policy)
     snapshot = []
-    for address in (primary_email, backup_email):
+    for address in (primary_email, backup_email, *branch_extra_emails):
         if address and address not in snapshot:
             snapshot.append(address)
     return {

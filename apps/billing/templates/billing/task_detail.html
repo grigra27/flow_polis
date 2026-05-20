@@ -1352,6 +1352,14 @@
                                 {% endif %}
                             </button>
                             {% endif %}
+                            {% for address in alliance_branch_extra_emails %}
+                            {% if address != primary_manager_email and address != backup_manager_email %}
+                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ address }}">
+                                <i class="bi bi-plus-lg"></i>{{ address }}
+                                <span style="opacity:0.75;font-weight:400;">(филиал)</span>
+                            </button>
+                            {% endif %}
+                            {% endfor %}
                         </div>
                         {% endif %}
                         {% endwith %}

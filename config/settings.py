@@ -372,6 +372,12 @@ ALLIANCE_BACKUP_MANAGER_ID = 20
 ALLIANCE_BRANCH_MANAGER_OVERRIDES = {
     4: 3,
 }
+# Дополнительные адреса для альянс-писем по branch_id полиса. К стандартной
+# паре (основной менеджер + резервный) добавляются перечисленные адреса.
+# В форме отрисовываются отдельными чипами, попадают в snapshot.
+ALLIANCE_BRANCH_EXTRA_EMAILS = {
+    1: ["arkhangelsk@alliance-leasing.ru"],
+}
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

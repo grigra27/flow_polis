@@ -22,6 +22,7 @@ from apps.communications.services import (
 from .forms import AllianceEmailForm, ManualRecipientEmailForm
 from .mail_builders import (
     get_alliance_backup_manager,
+    get_alliance_branch_extra_emails,
     get_alliance_primary_manager,
     build_alliance_forward_email_payload,
     build_insurer_request_email_payload,
@@ -263,6 +264,9 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
                     task.payment_schedule.policy
                 ),
                 "alliance_backup_manager": get_alliance_backup_manager(),
+                "alliance_branch_extra_emails": get_alliance_branch_extra_emails(
+                    task.payment_schedule.policy
+                ),
                 "can_send_outbound_email": user_can_send_outbound_email(
                     self.request.user
                 ),

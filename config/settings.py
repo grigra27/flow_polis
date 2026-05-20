@@ -1,6 +1,7 @@
 """
 Django settings for insurance_broker project.
 """
+
 from pathlib import Path
 from decouple import config, Csv
 import sys
@@ -60,9 +61,9 @@ if SENTRY_DSN:
         attach_stacktrace=True,
         max_breadcrumbs=50,
         # Filter out some common errors
-        before_send=lambda event, hint: event
-        if not _should_filter_sentry_event(event, hint)
-        else None,
+        before_send=lambda event, hint: (
+            event if not _should_filter_sentry_event(event, hint) else None
+        ),
     )
 
 
@@ -359,6 +360,10 @@ COMMUNICATIONS_RESTRICT_TO_SUPERUSER = config(
 BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT = config(
     "BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT", default=True, cast=bool
 )
+# ID карточки LeasingManager — резервный получатель альянс-писем.
+# Подставляется как дополнительный чип в форме отправки и попадает в
+# snapshot отправки наравне с основным менеджером из карточки полиса.
+ALLIANCE_BACKUP_MANAGER_ID = 20
 
 # Debug Toolbar
 INTERNAL_IPS = ["127.0.0.1"]

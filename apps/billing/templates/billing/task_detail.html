@@ -1184,9 +1184,15 @@
                                         <span class="task-email-history-recipient">
                                             {{ address }}
                                             {% if address in email.external_recipients %}
+                                            {% if email.kind == "billing_alliance_forward" %}
+                                            <span class="task-email-history-external-badge" title="Этот адрес не совпадал с e-mail менеджера лизинга на момент отправки">
+                                                <i class="bi bi-exclamation-triangle"></i> не email менеджера
+                                            </span>
+                                            {% else %}
                                             <span class="task-email-history-external-badge" title="Этот адрес не входил в карточку СК на момент отправки">
                                                 <i class="bi bi-exclamation-triangle"></i> не из карточки СК
                                             </span>
+                                            {% endif %}
                                             {% endif %}
                                         </span>
                                         {% endfor %}
@@ -1324,6 +1330,31 @@
                                 <i class="bi bi-send"></i> Отправить в Альянс
                             </button>
                         </div>
+                        {% with primary_manager_email=policy.leasing_manager.email|default:"" backup_manager_email=alliance_backup_manager.email|default:"" %}
+                        {% if primary_manager_email or backup_manager_email %}
+                        <div class="task-email-suggest-row" data-email-suggest-target="allianceRecipientEmail">
+                            <span class="task-email-suggest-label">Менеджеры лизинга:</span>
+                            {% if primary_manager_email %}
+                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ primary_manager_email }}">
+                                <i class="bi bi-plus-lg"></i>{{ primary_manager_email }}
+                                {% if policy.leasing_manager.full_name or policy.leasing_manager.name %}
+                                <span style="opacity:0.75;font-weight:400;">({{ policy.leasing_manager.full_name|default:policy.leasing_manager.name }})</span>
+                                {% endif %}
+                            </button>
+                            {% endif %}
+                            {% if backup_manager_email and backup_manager_email != primary_manager_email %}
+                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ backup_manager_email }}">
+                                <i class="bi bi-plus-lg"></i>{{ backup_manager_email }}
+                                {% if alliance_backup_manager.full_name or alliance_backup_manager.name %}
+                                <span style="opacity:0.75;font-weight:400;">({{ alliance_backup_manager.full_name|default:alliance_backup_manager.name }}, доп.)</span>
+                                {% else %}
+                                <span style="opacity:0.75;font-weight:400;">(доп.)</span>
+                                {% endif %}
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
                         <div>
                             <label for="allianceInvoiceFile" class="task-letter-label">Счет</label>
                             <input type="file" id="allianceInvoiceFile" name="invoice_file" class="task-email-file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" required>

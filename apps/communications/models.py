@@ -180,22 +180,34 @@ class OutboundEmail(TimeStampedModel):
         recipients = sorted(self.recipients.all(), key=lambda r: r.id)
         return [r.address for r in recipients if r.recipient_type == "to"]
 
-    @property
-    def insurer_emails_snapshot(self):
-        """Адреса страховщика, зафиксированные на момент создания письма.
-        Пусто для писем, созданных до того, как сохранение снапшота
-        включили — такие письма не помечаем как «вне списка»."""
-        value = (self.metadata or {}).get("insurer_emails_snapshot")
+    def _snapshot_field(self, key):
+        value = (self.metadata or {}).get(key)
         if not isinstance(value, list):
             return []
         return [str(v) for v in value if v]
 
     @property
+    def insurer_emails_snapshot(self):
+        """Адреса страховщика на момент создания письма (для писем в СК)."""
+        return self._snapshot_field("insurer_emails_snapshot")
+
+    @property
+    def manager_emails_snapshot(self):
+        """Адрес менеджера лизинга на момент создания письма (для альянс-писем)."""
+        return self._snapshot_field("manager_emails_snapshot")
+
+    @property
+    def reference_emails_snapshot(self):
+        """Объединение всех «эталонных» адресов из снапшотов.
+        Используется для пометки «не из карточки» в истории писем."""
+        return self.insurer_emails_snapshot + self.manager_emails_snapshot
+
+    @property
     def external_recipients(self):
-        """TO-адреса, которых не было в снапшоте карточки СК.
+        """TO-адреса, которых не было в эталонном снапшоте.
         Если снапшота нет — возвращаем пустой список, чтобы старые
         письма не считались «нестандартными» задним числом."""
-        snapshot = self.insurer_emails_snapshot
+        snapshot = self.reference_emails_snapshot
         if not snapshot:
             return []
         snapshot_set = set(snapshot)

@@ -157,6 +157,9 @@
         border-radius: 50%;
         position: relative;
         box-shadow: 0 6px 18px rgba(23, 50, 79, 0.08);
+        /* Цвет берётся из inline-стиля через --ps-pie-color; в @media print
+           подменяем на Ч/Б-вариант --ps-pie-bw. */
+        background: var(--ps-pie-color, conic-gradient(#e5e7eb 0% 100%));
         /* Обязательно для печати фона/градиента в PDF */
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
@@ -171,27 +174,26 @@
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }
-    .ps-pie-center {
+    .ps-slice-num {
         position: absolute;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
+        transform: translate(-50%, -50%);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #fff;
+        color: var(--ps-title);
+        border: 1px solid #1d2b3a;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        z-index: 1;
-        text-align: center;
-        line-height: 1.1;
-    }
-    .ps-pie-center-label {
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--ps-muted);
-    }
-    .ps-pie-center-value {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: var(--ps-title);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+        z-index: 2;
+        font-variant-numeric: tabular-nums;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 
     /* ── Table ── */
@@ -223,16 +225,22 @@
         border-top: 2px solid var(--ps-border);
         background: var(--ps-soft);
     }
-    .ps-name-cell {
-        display: flex;
+    .ps-num-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--ps-badge-color, #cbd5e1);
+        color: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.35);
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-flex;
         align-items: center;
-        gap: 0.65rem;
-    }
-    .ps-swatch {
-        width: 12px;
-        height: 12px;
-        border-radius: 3px;
+        justify-content: center;
         flex-shrink: 0;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+        font-variant-numeric: tabular-nums;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }
@@ -257,27 +265,28 @@
 
     /* ── Print ── */
     @media print {
-        /* Печатаем фоны/цвета (пироги, свотчи, заливки строк "Итого") */
+        /* Печатаем фоны/цвета (пироги, бейджи, заливки строк "Итого") */
         body,
         .ps-pie,
         .ps-pie::after,
-        .ps-swatch,
+        .ps-slice-num,
+        .ps-num-badge,
         .ps-summary-card,
         .ps-table tfoot td {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        body { background: #fff; }
+        body { background: #fff; color: #000; }
         .ps-toolbar, .navbar, nav, footer, .messages, .alert { display: none !important; }
         .ps-root { padding: 0; max-width: none; }
         .ps-cover, .ps-section {
-            border: 1px solid #d0d7de;
+            border: 1px solid #888;
             box-shadow: none;
             page-break-inside: avoid;
         }
         .ps-cover { padding: 1rem 1.25rem; margin-bottom: 0.6rem; }
-        .ps-cover-title { font-size: 1.4rem; }
-        .ps-cover-sub { margin-bottom: 0.7rem; }
+        .ps-cover-title { font-size: 1.4rem; color: #000; }
+        .ps-cover-sub { margin-bottom: 0.7rem; color: #333; }
         .ps-section { margin-bottom: 0.6rem; padding: 1rem 1.25rem; }
         /* По одной диаграмме на страницу: разрыв перед каждой секцией,
            кроме первой (она остаётся вместе с обложкой). */
@@ -286,19 +295,67 @@
             page-break-before: always;
         }
         .ps-section-head { margin-bottom: 0.7rem; }
-        .ps-section-title { font-size: 1.15rem; }
+        .ps-section-title { font-size: 1.15rem; color: #000; }
+        .ps-section-sub { color: #333; }
         .ps-section-body { grid-template-columns: 200px 1fr; gap: 1.2rem; }
-        .ps-pie { width: 180px; height: 180px; }
-        .ps-table { font-size: 0.82rem; }
-        .ps-table thead th { padding: 0.4rem 0.55rem; font-size: 0.7rem; }
-        .ps-table tbody td { padding: 0.4rem 0.55rem; }
-        .ps-table tfoot td { padding: 0.55rem 0.55rem; }
+        /* Подмена пирога на градиент из палитры серых: в Ч/Б соседние
+           секторы гарантированно различимы по яркости. */
+        .ps-pie {
+            width: 180px;
+            height: 180px;
+            background: var(--ps-pie-bw, var(--ps-pie-color));
+            box-shadow: 0 0 0 1px #444;
+        }
+        .ps-pie::after { box-shadow: inset 0 0 0 1px #444; }
+        /* Бейджи на пироге слегка крупнее, чтобы остаться читаемыми
+           при уменьшении самого пирога. */
+        .ps-slice-num {
+            background: #fff;
+            color: #000;
+            border-color: #000;
+            box-shadow: none;
+            width: 22px;
+            height: 22px;
+            font-size: 0.72rem;
+        }
+        /* Номерной бейдж в легенде: оставляем цветную (на принтере — серую)
+           заливку, белая цифра и тёмная рамка обеспечивают читаемость
+           даже на самых светлых тонах серого. */
+        .ps-num-badge {
+            border-color: #000;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+        }
+        .ps-summary-card { background: #f3f3f3; border-color: #888; }
+        .ps-summary-label { color: #333; }
+        .ps-summary-value { color: #000; }
+        .ps-summary-value small { color: #444; }
+        .ps-table { font-size: 0.82rem; color: #000; }
+        /* Повторять шапку таблицы при переносе на следующую страницу. */
+        .ps-table thead { display: table-header-group; }
+        .ps-table tfoot { display: table-row-group; }
+        .ps-table thead th {
+            padding: 0.4rem 0.55rem;
+            font-size: 0.7rem;
+            color: #333;
+            border-bottom-color: #888;
+        }
+        .ps-table tbody td {
+            padding: 0.4rem 0.55rem;
+            border-bottom-color: #d8d8d8;
+        }
+        .ps-table tbody tr { page-break-inside: avoid; }
+        .ps-table tfoot td {
+            padding: 0.55rem 0.55rem;
+            color: #000;
+            background: #ececec;
+            border-top-color: #888;
+        }
         a { color: inherit; text-decoration: none; }
     }
 
     @page {
         size: A4 portrait;
-        margin: 1cm;
+        margin: 16mm 12mm 16mm 12mm;
     }
 
     @media (max-width: 780px) {
@@ -350,17 +407,21 @@
         {% if section.items %}
         <div class="ps-section-body">
             <div class="ps-pie-wrap">
-                <div class="ps-pie" style="background: {{ section.pie_css }};">
-                    <div class="ps-pie-center">
-                        <div class="ps-pie-center-label">Всего</div>
-                        <div class="ps-pie-center-value">{{ total_insurance_sum|rub }} ₽</div>
-                    </div>
+                <div class="ps-pie"
+                     style="--ps-pie-color: {{ section.pie_css }}; --ps-pie-bw: {{ section.pie_css_bw }};">
+                    {% for item in section.items %}
+                        {% if item.show_label %}
+                        <span class="ps-slice-num"
+                              style="left: {{ item.label_left }}%; top: {{ item.label_top }}%;">{{ item.number }}</span>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
 
             <table class="ps-table">
                 <thead>
                     <tr>
+                        <th>№</th>
                         <th>Наименование</th>
                         <th class="ps-num">Полисов</th>
                         <th class="ps-num">Страховая стоимость, ₽</th>
@@ -371,11 +432,9 @@
                     {% for item in section.items %}
                     <tr>
                         <td>
-                            <div class="ps-name-cell">
-                                <span class="ps-swatch" style="background: {{ item.color }};"></span>
-                                <span>{{ item.name }}</span>
-                            </div>
+                            <span class="ps-num-badge" style="--ps-badge-color: {{ item.color }};">{{ item.number }}</span>
                         </td>
+                        <td>{{ item.name }}</td>
                         <td class="ps-num">{{ item.policy_count }}</td>
                         <td class="ps-num">{{ item.insurance_sum|rub }}</td>
                         <td class="ps-share">{{ item.share }}%</td>
@@ -384,6 +443,7 @@
                 </tbody>
                 <tfoot>
                     <tr>
+                        <td></td>
                         <td>Итого</td>
                         <td class="ps-num">{{ active_policies_count }}</td>
                         <td class="ps-num">{{ total_insurance_sum|rub }}</td>

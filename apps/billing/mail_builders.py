@@ -13,18 +13,36 @@ def get_alliance_backup_manager():
     return LeasingManager.objects.filter(pk=manager_id).first()
 
 
-def get_alliance_primary_manager(policy):
-    """Основной получатель альянс-письма для конкретного полиса.
-    Для филиалов из ALLIANCE_BRANCH_MANAGER_OVERRIDES берётся фиксированный
-    LeasingManager, для остальных — leasing_manager из карточки полиса."""
-    overrides = getattr(settings, "ALLIANCE_BRANCH_MANAGER_OVERRIDES", {}) or {}
+def get_alliance_branch_managers(policy):
+    """Менеджеры-получатели альянс-письма для конкретного полиса.
+
+    В список попадают:
+    1) все LeasingManager филиала полиса с непустым email;
+    2) leasing_manager карточки полиса, если у него есть email и он
+       не вошёл в выборку по филиалу (например, прикреплён к другому филиалу).
+
+    Сортировка по name, дедуп по pk. Менеджеры без email отбрасываются —
+    кликабельный чип без адреса бесполезен.
+    """
+    managers = []
+    seen_ids = set()
     branch_id = getattr(policy, "branch_id", None)
-    override_id = overrides.get(branch_id)
-    if override_id:
-        manager = LeasingManager.objects.filter(pk=override_id).first()
-        if manager:
-            return manager
-    return policy.leasing_manager
+    if branch_id:
+        for manager in (
+            LeasingManager.objects.filter(branch_id=branch_id)
+            .exclude(email="")
+            .order_by("name")
+        ):
+            managers.append(manager)
+            seen_ids.add(manager.pk)
+    policy_manager = policy.leasing_manager
+    if (
+        policy_manager
+        and policy_manager.pk not in seen_ids
+        and (policy_manager.email or "").strip()
+    ):
+        managers.append(policy_manager)
+    return managers
 
 
 def get_alliance_branch_extra_emails(policy):
@@ -61,13 +79,16 @@ def build_insurer_request_email_payload(task, recipient_emails):
 
 def build_alliance_forward_email_payload(task, recipient_emails):
     policy = task.payment_schedule.policy
-    manager = get_alliance_primary_manager(policy)
-    primary_email = (getattr(manager, "email", "") or "").strip() if manager else ""
+    branch_managers = get_alliance_branch_managers(policy)
     backup_manager = get_alliance_backup_manager()
     backup_email = (backup_manager.email or "").strip() if backup_manager else ""
     branch_extra_emails = get_alliance_branch_extra_emails(policy)
     snapshot = []
-    for address in (primary_email, backup_email, *branch_extra_emails):
+    for manager in branch_managers:
+        address = (manager.email or "").strip()
+        if address and address not in snapshot:
+            snapshot.append(address)
+    for address in (backup_email, *branch_extra_emails):
         if address and address not in snapshot:
             snapshot.append(address)
     return {

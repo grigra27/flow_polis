@@ -23,7 +23,7 @@ from .forms import AllianceEmailForm, ManualRecipientEmailForm
 from .mail_builders import (
     get_alliance_backup_manager,
     get_alliance_branch_extra_emails,
-    get_alliance_primary_manager,
+    get_alliance_branch_managers,
     build_alliance_forward_email_payload,
     build_insurer_request_email_payload,
 )
@@ -241,6 +241,7 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
             .select_related("created_by", "sent_by")
             .prefetch_related("recipients", "attachments", "delivery_attempts")
         )
+        branch_managers = get_alliance_branch_managers(task.payment_schedule.policy)
         context.update(
             {
                 "status_choices": BillingTask.STATUS_CHOICES,
@@ -260,9 +261,8 @@ class BillingTaskDetailView(LoginRequiredMixin, DetailView):
                 "outbound_emails": outbound_emails,
                 "manual_recipient_form": ManualRecipientEmailForm(),
                 "alliance_email_form": AllianceEmailForm(),
-                "alliance_primary_manager": get_alliance_primary_manager(
-                    task.payment_schedule.policy
-                ),
+                "alliance_branch_managers": branch_managers,
+                "alliance_branch_manager_emails": [m.email for m in branch_managers],
                 "alliance_backup_manager": get_alliance_backup_manager(),
                 "alliance_branch_extra_emails": get_alliance_branch_extra_emails(
                     task.payment_schedule.policy

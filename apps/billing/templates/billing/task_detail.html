@@ -1330,19 +1330,19 @@
                                 <i class="bi bi-send"></i> Отправить в Альянс
                             </button>
                         </div>
-                        {% with primary_manager_email=alliance_primary_manager.email|default:"" backup_manager_email=alliance_backup_manager.email|default:"" %}
-                        {% if primary_manager_email or backup_manager_email %}
+                        {% with backup_manager_email=alliance_backup_manager.email|default:"" %}
+                        {% if alliance_branch_managers or backup_manager_email or alliance_branch_extra_emails %}
                         <div class="task-email-suggest-row" data-email-suggest-target="allianceRecipientEmail">
                             <span class="task-email-suggest-label">Менеджеры лизинга:</span>
-                            {% if primary_manager_email %}
-                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ primary_manager_email }}">
-                                <i class="bi bi-plus-lg"></i>{{ primary_manager_email }}
-                                {% if alliance_primary_manager.full_name or alliance_primary_manager.name %}
-                                <span style="opacity:0.75;font-weight:400;">({{ alliance_primary_manager.full_name|default:alliance_primary_manager.name }})</span>
+                            {% for manager in alliance_branch_managers %}
+                            <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ manager.email }}">
+                                <i class="bi bi-plus-lg"></i>{{ manager.email }}
+                                {% if manager.full_name or manager.name %}
+                                <span style="opacity:0.75;font-weight:400;">({{ manager.full_name|default:manager.name }})</span>
                                 {% endif %}
                             </button>
-                            {% endif %}
-                            {% if backup_manager_email and backup_manager_email != primary_manager_email %}
+                            {% endfor %}
+                            {% if backup_manager_email and backup_manager_email not in alliance_branch_manager_emails %}
                             <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ backup_manager_email }}">
                                 <i class="bi bi-plus-lg"></i>{{ backup_manager_email }}
                                 {% if alliance_backup_manager.full_name or alliance_backup_manager.name %}
@@ -1353,7 +1353,7 @@
                             </button>
                             {% endif %}
                             {% for address in alliance_branch_extra_emails %}
-                            {% if address != primary_manager_email and address != backup_manager_email %}
+                            {% if address not in alliance_branch_manager_emails and address != backup_manager_email %}
                             <button type="button" class="task-email-suggest-chip" data-email-suggest="{{ address }}">
                                 <i class="bi bi-plus-lg"></i>{{ address }}
                                 <span style="opacity:0.75;font-weight:400;">(филиал)</span>

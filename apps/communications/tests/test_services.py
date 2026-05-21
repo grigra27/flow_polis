@@ -39,6 +39,7 @@ def billing_task(db):
         name="Петров",
         full_name="Петров Петр Петрович",
         email="petrov@example.com",
+        branch=branch,
     )
     today = timezone.localdate()
     policy = Policy.objects.create(

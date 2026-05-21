@@ -117,7 +117,7 @@ def commission_rate_factory(db, insurer_factory, insurance_type_factory):
 
 
 @pytest.fixture
-def leasing_manager_factory(db):
+def leasing_manager_factory(db, branch_factory):
     """
     Factory fixture for creating LeasingManager instances.
 
@@ -127,6 +127,8 @@ def leasing_manager_factory(db):
     from apps.insurers.models import LeasingManager
 
     def create_leasing_manager(**kwargs):
+        if "branch" not in kwargs:
+            kwargs["branch"] = branch_factory()
         defaults = {
             "name": "Test Manager",
             "full_name": "Test Manager Full Name",

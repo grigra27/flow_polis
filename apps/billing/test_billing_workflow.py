@@ -32,6 +32,7 @@ def billing_payment(db):
         name="Иванов",
         full_name="Иванов Иван Иванович",
         email="ivanov@example.com",
+        branch=branch,
     )
 
     today = timezone.localdate()

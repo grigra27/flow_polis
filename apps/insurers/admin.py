@@ -135,9 +135,11 @@ class InfoTagAdmin(admin.ModelAdmin):
 
 @admin.register(LeasingManager)
 class LeasingManagerAdmin(admin.ModelAdmin):
-    list_display = ["name", "full_name", "phone", "email"]
-    search_fields = ["name", "full_name", "phone", "email"]
-    fields = ["name", "full_name", "phone", "email", "notes"]
+    list_display = ["name", "full_name", "branch", "phone", "email"]
+    list_filter = ["branch"]
+    search_fields = ["name", "full_name", "phone", "email", "branch__branch_name"]
+    fields = ["name", "full_name", "branch", "phone", "email", "notes"]
+    autocomplete_fields = ["branch"]
     ordering = ["name"]
 
 

@@ -605,9 +605,12 @@ class BranchDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
             full_name="Иван Иванович Иванов",
             phone="+79990001122",
             email="ivanov@example.com",
+            branch=self.branch_a,
         )
         self.manager_petr = LeasingManager.objects.create(
-            name="Петров", full_name="Петр Петрович Петров"
+            name="Петров",
+            full_name="Петр Петрович Петров",
+            branch=self.branch_a,
         )
         self.policy_a1.leasing_manager = self.manager_ivan
         self.policy_a1.save(update_fields=["leasing_manager"])
@@ -730,8 +733,8 @@ class EcosystemHubViewTest(TestCase):
         self.assertIn(reverse("accounts:login"), response.url)
 
     def test_ecosystem_hub_renders_links_and_counts(self):
-        Branch.objects.create(branch_name="Тестовый филиал")
-        LeasingManager.objects.create(name="Смирнов")
+        branch = Branch.objects.create(branch_name="Тестовый филиал")
+        LeasingManager.objects.create(name="Смирнов", branch=branch)
         Insurer.objects.create(insurer_name="Тестовый страховщик")
         LeasingClient.objects.create(
             client_name="Тестовый лизингополучатель", client_inn="7700000001"
@@ -766,11 +769,16 @@ class LeasingManagerViewsTest(InsurerStatisticsTestDataMixin, TestCase):
             full_name="Иван Иванович Иванов",
             phone="+79990001122",
             email="ivanov@example.com",
+            branch=self.branch_a,
         )
         self.manager_petr = LeasingManager.objects.create(
-            name="Петров", full_name="Петр Петрович Петров"
+            name="Петров",
+            full_name="Петр Петрович Петров",
+            branch=self.branch_a,
         )
-        self.manager_empty = LeasingManager.objects.create(name="Сидоров")
+        self.manager_empty = LeasingManager.objects.create(
+            name="Сидоров", branch=self.branch_b
+        )
 
         self.policy_a1.leasing_manager = self.manager_ivan
         self.policy_a1.save(update_fields=["leasing_manager"])
@@ -899,7 +907,8 @@ class InsurerTemplateTagsTest(TestCase):
 
 class InsurerModelStringRepresentationTest(TestCase):
     def test_info_tag_and_leasing_manager_str(self):
+        branch = Branch.objects.create(branch_name="Тестовый филиал")
         tag = InfoTag.objects.create(name="VIP")
-        manager = LeasingManager.objects.create(name="Иванов")
+        manager = LeasingManager.objects.create(name="Иванов", branch=branch)
         self.assertEqual(str(tag), "VIP")
         self.assertEqual(str(manager), "Иванов")

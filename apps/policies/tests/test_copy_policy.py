@@ -18,14 +18,11 @@ from apps.policies.models import Policy, PaymentSchedule, PolicyInfo
 class TestCopyPolicyAction:
     """Unit tests for the copy_policy admin action."""
 
-    def test_copy_single_policy(self, policy_factory):
+    def test_copy_single_policy(self, policy_factory, leasing_manager_factory):
         """
         Test copying a single policy creates a new policy with copied data.
         """
-        # Create leasing manager
-        from apps.insurers.models import LeasingManager
-
-        leasing_manager = LeasingManager.objects.create(
+        leasing_manager = leasing_manager_factory(
             name="Test Manager",
             full_name="Test Manager Full Name",
             phone="+7 (123) 456-78-90",

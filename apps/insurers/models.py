@@ -118,6 +118,12 @@ class LeasingManager(models.Model):
     phone = models.CharField("Телефон", max_length=50, blank=True)
     email = models.EmailField("Email", blank=True)
     notes = models.TextField("Примечание", blank=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        verbose_name="Филиал",
+        related_name="leasing_managers",
+    )
 
     class Meta:
         verbose_name = "Менеджер лизинговой компании"

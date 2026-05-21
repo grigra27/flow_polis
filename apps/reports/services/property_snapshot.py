@@ -17,6 +17,7 @@ from django.db.models import Max
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from apps.insurers.models import Insurer
 from apps.policies.models import PaymentSchedule, Policy
 
 
@@ -168,6 +169,17 @@ def _build_pie_gradient(items: List[Dict[str, Any]], color_field: str = "color")
     return "conic-gradient(" + ", ".join(segments) + ")"
 
 
+def _attach_insurer_logos(items: List[Dict[str, Any]]) -> None:
+    """Подтянуть logo_url из БД к items, сгруппированным по страховщику."""
+    insurer_ids = [item["id"] for item in items if item.get("id") is not None]
+    logos: Dict[int, str] = {}
+    if insurer_ids:
+        for obj in Insurer.objects.filter(id__in=insurer_ids).only("id", "logo"):
+            logos[obj.id] = obj.logo.url if obj.logo else ""
+    for item in items:
+        item["logo_url"] = logos.get(item.get("id"), "")
+
+
 def build_property_snapshot() -> Dict[str, Any]:
     """Сформировать данные для отчёта-снимка распределения портфеля."""
     by_branch, total = _aggregate_dimension(
@@ -183,6 +195,8 @@ def build_property_snapshot() -> Dict[str, Any]:
         id_field="policy__insurance_type_id",
     )
 
+    _attach_insurer_logos(by_insurer)
+
     active_policies_count = Policy.objects.filter(policy_active=True).count()
 
     return {
@@ -196,6 +210,7 @@ def build_property_snapshot() -> Dict[str, Any]:
                 "items": by_branch,
                 "pie_css": _build_pie_gradient(by_branch),
                 "pie_css_bw": _build_pie_gradient(by_branch, color_field="bw_color"),
+                "show_logo": False,
             },
             {
                 "title": "По страховщикам",
@@ -203,6 +218,7 @@ def build_property_snapshot() -> Dict[str, Any]:
                 "items": by_insurer,
                 "pie_css": _build_pie_gradient(by_insurer),
                 "pie_css_bw": _build_pie_gradient(by_insurer, color_field="bw_color"),
+                "show_logo": True,
             },
             {
                 "title": "По видам страхования",
@@ -210,6 +226,7 @@ def build_property_snapshot() -> Dict[str, Any]:
                 "items": by_type,
                 "pie_css": _build_pie_gradient(by_type),
                 "pie_css_bw": _build_pie_gradient(by_type, color_field="bw_color"),
+                "show_logo": False,
             },
         ],
     }

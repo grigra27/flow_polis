@@ -244,6 +244,20 @@
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }
+    .ps-row-logo {
+        width: 44px;
+        height: 28px;
+        object-fit: contain;
+        display: block;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .ps-logo-cell {
+        width: 52px;
+        text-align: center;
+        padding-right: 0.25rem !important;
+        padding-left: 0.25rem !important;
+    }
     .ps-num {
         text-align: right;
         font-variant-numeric: tabular-nums;
@@ -422,6 +436,7 @@
                 <thead>
                     <tr>
                         <th>№</th>
+                        {% if section.show_logo %}<th class="ps-logo-cell"></th>{% endif %}
                         <th>Наименование</th>
                         <th class="ps-num">Полисов</th>
                         <th class="ps-num">Страховая стоимость, ₽</th>
@@ -434,6 +449,13 @@
                         <td>
                             <span class="ps-num-badge" style="--ps-badge-color: {{ item.color }};">{{ item.number }}</span>
                         </td>
+                        {% if section.show_logo %}
+                        <td class="ps-logo-cell">
+                            {% if item.logo_url %}
+                                <img src="{{ item.logo_url }}" alt="" class="ps-row-logo">
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>{{ item.name }}</td>
                         <td class="ps-num">{{ item.policy_count }}</td>
                         <td class="ps-num">{{ item.insurance_sum|rub }}</td>
@@ -444,6 +466,7 @@
                 <tfoot>
                     <tr>
                         <td></td>
+                        {% if section.show_logo %}<td class="ps-logo-cell"></td>{% endif %}
                         <td>Итого</td>
                         <td class="ps-num">{{ active_policies_count }}</td>
                         <td class="ps-num">{{ total_insurance_sum|rub }}</td>

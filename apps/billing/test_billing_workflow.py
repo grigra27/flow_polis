@@ -1079,6 +1079,77 @@ def test_superuser_can_create_alliance_email_with_invoice_attachment(
 
 
 @pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+def test_alliance_email_accepts_two_invoice_files(client, billing_payment, monkeypatch):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="alliance_sender_2files",
+        email="alliance_sender_2files@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    invoice = SimpleUploadedFile(
+        "invoice.pdf", b"%PDF-1.4\ninvoice", content_type="application/pdf"
+    )
+    spec = SimpleUploadedFile(
+        "spec.pdf", b"%PDF-1.4\nspec", content_type="application/pdf"
+    )
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_alliance_email", args=[task.pk]),
+        {
+            "recipient_email": "alliance@example.com",
+            "invoice_file": [invoice, spec],
+        },
+    )
+
+    assert response.status_code == 302
+    email = OutboundEmail.objects.get()
+    filenames = set(email.attachments.values_list("original_filename", flat=True))
+    assert filenames == {"invoice.pdf", "spec.pdf"}
+
+
+@pytest.mark.django_db
+@override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
+def test_alliance_email_rejects_three_invoice_files(
+    client, billing_payment, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.billing.views.queue_outbound_email",
+        lambda outbound_email, user=None: outbound_email,
+    )
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    task = BillingTask.objects.get(payment_schedule=billing_payment)
+    admin = User.objects.create_superuser(
+        username="alliance_sender_3files",
+        email="alliance_sender_3files@example.com",
+        password="testpass123",
+    )
+    client.login(username=admin.username, password="testpass123")
+    files = [
+        SimpleUploadedFile(
+            f"f{i}.pdf",
+            b"%PDF-1.4\n" + bytes(str(i), "ascii"),
+            content_type="application/pdf",
+        )
+        for i in range(3)
+    ]
+
+    response = client.post(
+        reverse("policies:scheduled_payment_send_alliance_email", args=[task.pk]),
+        {"recipient_email": "alliance@example.com", "invoice_file": files},
+    )
+
+    assert response.status_code == 302
+    assert not OutboundEmail.objects.exists()
+
+
+@pytest.mark.django_db
 def test_paid_payment_removes_billing_task(billing_payment):
     sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
     assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()

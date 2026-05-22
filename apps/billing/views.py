@@ -405,7 +405,7 @@ class BillingTaskSendAllianceEmailView(
             self.create_and_queue_email(
                 request,
                 payload,
-                attachments=[form.cleaned_data["invoice_file"]],
+                attachments=form.cleaned_data["invoice_file"],
             )
         except (CommunicationsError, ValidationError) as exc:
             messages.error(request, str(exc))

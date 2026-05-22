@@ -64,10 +64,54 @@ class ManualRecipientEmailForm(forms.Form):
     )
 
 
+class _MultipleFileInput(forms.ClearableFileInput):
+    """Виджет file-input с поддержкой множественного выбора.
+
+    В Django 4.2 базовый FileInput.value_from_datadict делает files.get(name)
+    и теряет все файлы кроме последнего. Здесь явно дергаем getlist, чтобы
+    форма получила все загруженные файлы целиком.
+
+    HTML-атрибут `multiple` уже выставлен в шаблоне task_detail.html, так
+    что сам виджет здесь нужен только ради value_from_datadict."""
+
+    def value_from_datadict(self, data, files, name):
+        if hasattr(files, "getlist"):
+            return files.getlist(name)
+        return files.get(name)
+
+
+class _MultipleFileField(forms.FileField):
+    """FileField, который валидирует список файлов целиком."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", _MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_clean = super().clean
+        if not data:
+            # Сохраняем поведение required: super().clean пустое значение
+            # уронит ValidationError("This field is required").
+            return single_clean(data, initial)
+        if isinstance(data, (list, tuple)):
+            return [single_clean(item, initial) for item in data]
+        return [single_clean(data, initial)]
+
+
 class AllianceEmailForm(ManualRecipientEmailForm):
-    invoice_file = forms.FileField(label="Счет")
+    # До 2 файлов (типичный кейс: счёт + спецификация/доп. документ).
+    MAX_INVOICE_FILES = 2
+
+    invoice_file = _MultipleFileField(label="Счет")
 
     def clean_invoice_file(self):
-        invoice_file = self.cleaned_data["invoice_file"]
-        validate_outbound_attachment(invoice_file)
-        return invoice_file
+        files = self.cleaned_data["invoice_file"] or []
+        if not files:
+            raise ValidationError("Прикрепите файл счета")
+        if len(files) > self.MAX_INVOICE_FILES:
+            raise ValidationError(
+                f"Можно прикрепить не более {self.MAX_INVOICE_FILES} файлов"
+            )
+        for uploaded in files:
+            validate_outbound_attachment(uploaded)
+        return files

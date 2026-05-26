@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polis.insflow.ru/schemas/policy.v1.schema.json",
+  "title": "Policy JSON export response v1",
+  "description": "Possible JSON contract for exporting one insurance policy from Online Polis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "exported_at",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "policy.v1"
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    }
+  },
+  "$defs": {
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "properties": {
+        "amount": {
+          "type": "string",
+          "pattern": "^-?\\d+\\.\\d{2}$"
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "RUB"
+          ]
+        }
+      }
+    },
+    "percent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?\\d+\\.\\d{2}$"
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "inn"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "inn": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "named_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "leasing_manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "full_name",
+        "phone",
+        "email"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "policy_number",
+        "dfa_number",
+        "period",
+        "statuses",
+        "parties",
+        "insurance",
+        "finance_summary",
+        "payments",
+        "info",
+        "timestamps"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "policy_number": {
+          "type": "string"
+        },
+        "dfa_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_date",
+            "end_date",
+            "termination_date"
+          ],
+          "properties": {
+            "start_date": {
+              "$ref": "#/$defs/date"
+            },
+            "end_date": {
+              "$ref": "#/$defs/date"
+            },
+            "termination_date": {
+              "$ref": "#/$defs/date"
+            }
+          }
+        },
+        "statuses": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_active",
+            "dfa_active",
+            "policy_uploaded",
+            "broker_participation",
+            "renewal_to_old_dfa"
+          ],
+          "properties": {
+            "policy_active": {
+              "type": "boolean"
+            },
+            "dfa_active": {
+              "type": "boolean"
+            },
+            "policy_uploaded": {
+              "type": "boolean"
+            },
+            "broker_participation": {
+              "type": "boolean"
+            },
+            "renewal_to_old_dfa": {
+              "type": "boolean"
+            }
+          }
+        },
+        "parties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "client",
+            "policyholder",
+            "insurer",
+            "branch",
+            "leasing_manager"
+          ],
+          "properties": {
+            "client": {
+              "$ref": "#/$defs/client"
+            },
+            "policyholder": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/client"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "insurer": {
+              "$ref": "#/$defs/named_reference"
+            },
+            "branch": {
+              "$ref": "#/$defs/named_reference"
+            },
+            "leasing_manager": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/leasing_manager"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "insurance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "object",
+            "franchise"
+          ],
+          "properties": {
+            "type": {
+              "$ref": "#/$defs/named_reference"
+            },
+            "object": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "description",
+                "year",
+                "vin_number"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "year": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "vin_number": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "franchise": {
+              "$ref": "#/$defs/money"
+            }
+          }
+        },
+        "finance_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "premium_total",
+            "commission_total",
+            "rates_by_year"
+          ],
+          "properties": {
+            "premium_total": {
+              "$ref": "#/$defs/money"
+            },
+            "commission_total": {
+              "$ref": "#/$defs/money"
+            },
+            "rates_by_year": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "year_number",
+                  "insurance_sum",
+                  "premium_total",
+                  "rate_percent",
+                  "is_current"
+                ],
+                "properties": {
+                  "year_number": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "insurance_sum": {
+                    "$ref": "#/$defs/money"
+                  },
+                  "premium_total": {
+                    "$ref": "#/$defs/money"
+                  },
+                  "rate_percent": {
+                    "$ref": "#/$defs/percent"
+                  },
+                  "is_current": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "payments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/payment"
+          }
+        },
+        "info": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tags",
+            "info3",
+            "info4"
+          ],
+          "properties": {
+            "tags": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "info1",
+                "info2"
+              ],
+              "properties": {
+                "info1": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/tag"
+                  }
+                },
+                "info2": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/tag"
+                  }
+                }
+              }
+            },
+            "info3": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "info4": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Internal field. For public profile this can be null or omitted in a future profile-specific schema."
+            }
+          }
+        },
+        "timestamps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "created_at",
+            "updated_at"
+          ],
+          "properties": {
+            "created_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "year_number",
+        "installment_number",
+        "due_date",
+        "insurance_sum",
+        "premium",
+        "commission",
+        "paid_date",
+        "insurer_approved_date",
+        "alliance_paid",
+        "status",
+        "payment_info"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "year_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "installment_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "due_date": {
+          "$ref": "#/$defs/date"
+        },
+        "insurance_sum": {
+          "$ref": "#/$defs/money"
+        },
+        "premium": {
+          "$ref": "#/$defs/money"
+        },
+        "commission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rate_id",
+            "rate_percent",
+            "actual_percent",
+            "amount"
+          ],
+          "properties": {
+            "rate_id": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "rate_percent": {
+              "$ref": "#/$defs/percent"
+            },
+            "actual_percent": {
+              "$ref": "#/$defs/percent"
+            },
+            "amount": {
+              "$ref": "#/$defs/money"
+            }
+          }
+        },
+        "paid_date": {
+          "$ref": "#/$defs/date"
+        },
+        "insurer_approved_date": {
+          "$ref": "#/$defs/date"
+        },
+        "alliance_paid": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "approved",
+            "paid",
+            "cancelled",
+            "overdue",
+            "waiting"
+          ]
+        },
+        "payment_info": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schema_version": "policy.v1",
+      "exported_at": "2026-05-26T16:40:00+03:00",
+      "policy": {
+        "id": 123,
+        "policy_number": "POL-001",
+        "dfa_number": "DFA-001",
+        "period": {
+          "start_date": "2024-01-01",
+          "end_date": "2024-12-31",
+          "termination_date": null
+        },
+        "statuses": {
+          "policy_active": true,
+          "dfa_active": true,
+          "policy_uploaded": false,
+          "broker_participation": true,
+          "renewal_to_old_dfa": false
+        },
+        "parties": {
+          "client": {
+            "id": 10,
+            "name": "ООО Клиент",
+            "inn": "7700000000"
+          },
+          "policyholder": {
+            "id": 10,
+            "name": "ООО Клиент",
+            "inn": "7700000000"
+          },
+          "insurer": {
+            "id": 5,
+            "name": "Страховая компания"
+          },
+          "branch": {
+            "id": 2,
+            "name": "Москва"
+          },
+          "leasing_manager": {
+            "id": 7,
+            "name": "Иванов",
+            "full_name": "Иванов Иван Иванович",
+            "phone": "+7...",
+            "email": "manager@example.com"
+          }
+        },
+        "insurance": {
+          "type": {
+            "id": 1,
+            "name": "КАСКО"
+          },
+          "object": {
+            "description": "Автомобиль ...",
+            "year": 2022,
+            "vin_number": "X1234567890"
+          },
+          "franchise": {
+            "amount": "0.00",
+            "currency": "RUB"
+          }
+        },
+        "finance_summary": {
+          "premium_total": {
+            "amount": "150000.00",
+            "currency": "RUB"
+          },
+          "commission_total": {
+            "amount": "15000.00",
+            "currency": "RUB"
+          },
+          "rates_by_year": [
+            {
+              "year_number": 1,
+              "insurance_sum": {
+                "amount": "3000000.00",
+                "currency": "RUB"
+              },
+              "premium_total": {
+                "amount": "150000.00",
+                "currency": "RUB"
+              },
+              "rate_percent": "5.00",
+              "is_current": true
+            }
+          ]
+        },
+        "payments": [
+          {
+            "id": 456,
+            "year_number": 1,
+            "installment_number": 1,
+            "due_date": "2024-01-15",
+            "insurance_sum": {
+              "amount": "3000000.00",
+              "currency": "RUB"
+            },
+            "premium": {
+              "amount": "75000.00",
+              "currency": "RUB"
+            },
+            "commission": {
+              "rate_id": 3,
+              "rate_percent": "10.00",
+              "actual_percent": "10.00",
+              "amount": {
+                "amount": "7500.00",
+                "currency": "RUB"
+              }
+            },
+            "paid_date": "2024-01-12",
+            "insurer_approved_date": "2024-01-20",
+            "alliance_paid": true,
+            "status": "approved",
+            "payment_info": ""
+          }
+        ],
+        "info": {
+          "tags": {
+            "info1": [
+              {
+                "id": 1,
+                "name": "Особые условия"
+              }
+            ],
+            "info2": []
+          },
+          "info3": "",
+          "info4": null
+        },
+        "timestamps": {
+          "created_at": "2024-01-01T12:00:00+03:00",
+          "updated_at": "2024-01-02T12:00:00+03:00"
+        }
+      }
+    }
+  ]
+}

@@ -118,11 +118,11 @@ def test_sync_period_creates_task_for_unpaid_active_payment(billing_payment):
     assert alliance_letter.rstrip().endswith(expected_signature)
     assert (
         subject
-        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — ООО Страхователь — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
     assert (
         alliance_subject
-        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — ООО Страхователь — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
 
 
@@ -154,11 +154,11 @@ def test_letter_contains_installment_metadata_for_installment_plan(billing_payme
     assert "Лизингополучатель:" not in alliance_letter
     assert (
         subject
-        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — ООО Страхователь — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
     assert (
         alliance_subject
-        == "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        == "СТРАХОВАНИЕ — Счет — ООО Страхователь — DFA-001 — POL-001 — Москва — Тестовая страховая"
     )
 
 
@@ -275,7 +275,7 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     assert "Тестовая страховая" in content
     assert "Тема письма" in content
     assert (
-        "СТРАХОВАНИЕ — Счет — DFA-001 — POL-001 — Москва — Тестовая страховая"
+        "СТРАХОВАНИЕ — Счет — ООО Страхователь — DFA-001 — POL-001 — Москва — Тестовая страховая"
         in content
     )
     assert "Год страхования: 2 год страхования" in content
@@ -702,9 +702,11 @@ def test_letter_skips_policyholder_line_when_absent(billing_payment):
     task = BillingTask.objects.get(payment_schedule=billing_payment)
 
     letter = task.build_letter_text()
+    subject = task.build_letter_subject()
 
     assert "Страхователь:" not in letter
     assert "Лизингополучатель:" in letter
+    assert "СТРАХОВАНИЕ — Счет — Без страхователя — " in subject
 
 
 @pytest.mark.django_db

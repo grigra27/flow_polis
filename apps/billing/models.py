@@ -196,6 +196,11 @@ class BillingTask(TimeStampedModel):
 
     def _build_standard_letter_subject(self):
         policy = self.policy
+        policyholder_name = (
+            policy.policyholder.client_name
+            if policy.policyholder and policy.policyholder.client_name
+            else ""
+        ).strip() or "Без страхователя"
         dfa_number = (policy.dfa_number or "").strip() or "Без ДФА"
         policy_number = (policy.policy_number or "").strip() or "Без номера полиса"
         branch_name = (
@@ -209,7 +214,8 @@ class BillingTask(TimeStampedModel):
             else ""
         ).strip() or "Без страховщика"
         return (
-            f"СТРАХОВАНИЕ — Счет — {dfa_number} — {policy_number} — "
+            f"СТРАХОВАНИЕ — Счет — {policyholder_name} — "
+            f"{dfa_number} — {policy_number} — "
             f"{branch_name} — {insurer_name}"
         )
 

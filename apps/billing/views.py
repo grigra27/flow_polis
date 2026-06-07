@@ -19,15 +19,17 @@ from apps.communications.services import (
     retry_outbound_email,
 )
 
-from .forms import AllianceEmailForm, ManualRecipientEmailForm
+from . import prolongation_services as prol
+from .forms import AllianceEmailForm, ManualRecipientEmailForm, ProlongationEmailForm
 from .mail_builders import (
     get_alliance_backup_manager,
     get_alliance_branch_extra_emails,
     get_alliance_branch_managers,
     build_alliance_forward_email_payload,
     build_insurer_request_email_payload,
+    build_prolongation_forward_email_payload,
 )
-from .models import BillingTask
+from .models import MONTH_NAMES_RU, BillingTask, ProlongationBatch
 from .services import (
     BRANCH_GROUP_1,
     BRANCH_GROUP_2,
@@ -37,6 +39,7 @@ from .services import (
     get_branch_ids_for_group,
     get_tasks_queryset,
     parse_int_list_query_param,
+    parse_period_code,
     preload_periods,
     resolve_selected_period,
     sync_period,
@@ -204,8 +207,106 @@ class BillingPeriodListView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class BillingProlongationPlaceholderView(LoginRequiredMixin, TemplateView):
-    template_name = "billing/prolongation_placeholder.html"
+class ProlongationListView(LoginRequiredMixin, TemplateView):
+    """Раздел «Пролонгация»: помесячный просмотр договоров с окончанием срока
+    страхования и отправка таблицы одним письмом с Excel-вложением."""
+
+    template_name = "billing/prolongation_list.html"
+    paginate_by = 50
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        months = prol.visible_prolongation_months()
+        selected_year, selected_month = prol.resolve_selected_month(
+            months, self.request.GET.get("period")
+        )
+        selected_code = f"{selected_year:04d}-{selected_month:02d}"
+
+        requested_branch_ids = parse_int_list_query_param(self.request.GET, "branch")
+        branch_ids_filter = requested_branch_ids or None
+
+        policies_qs = prol.get_prolongation_policies(
+            selected_year,
+            selected_month,
+            self.request.GET,
+            branch_ids_filter=branch_ids_filter,
+        )
+        paginator = Paginator(policies_qs, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        # Полное число договоров за месяц (без UI-фильтров) — именно оно
+        # попадает в письмо: фильтры на странице нужны только для просмотра.
+        full_month_count = prol.get_prolongation_policies(
+            selected_year, selected_month
+        ).count()
+
+        batch = prol.get_existing_batch(selected_year, selected_month)
+        outbound_emails = []
+        if batch:
+            outbound_emails = (
+                OutboundEmail.objects.for_object(batch)
+                .select_related("created_by", "sent_by")
+                .prefetch_related("recipients", "attachments", "delivery_attempts")
+            )
+
+        filter_options = prol.get_filter_options()
+        selected_label = (
+            f"{MONTH_NAMES_RU.get(selected_month, selected_month)} {selected_year}"
+        )
+
+        period_params = self.request.GET.copy()
+        period_params.pop("period", None)
+        period_params.pop("page", None)
+        period_query = period_params.urlencode()
+        period_query_suffix = f"&{period_query}" if period_query else ""
+
+        # Предпросмотр письма строим на несохранённой партии — запись в БД
+        # создаётся только при фактической отправке.
+        preview_batch = ProlongationBatch(year=selected_year, month=selected_month)
+        month_start, month_end = prol.month_bounds(selected_year, selected_month)
+
+        # Адрес по умолчанию — тот же резервный менеджер лизинга, что
+        # подставляется в очередных взносах (ALLIANCE_BACKUP_MANAGER_ID).
+        backup_manager = get_alliance_backup_manager()
+        default_recipient_email = (
+            (backup_manager.email or "").strip() if backup_manager else ""
+        )
+
+        context.update(
+            {
+                "month_options": prol.build_prolongation_month_options(
+                    months, selected_year, selected_month
+                ),
+                "selected_code": selected_code,
+                "selected_label": selected_label,
+                "policies": page_obj.object_list,
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "total_filtered": paginator.count,
+                "full_month_count": full_month_count,
+                "selected_insurer": self.request.GET.get("insurer", ""),
+                "selected_branches": [str(b) for b in requested_branch_ids],
+                "search_query": self.request.GET.get("q", ""),
+                "insurers": filter_options["insurers"],
+                "branches": filter_options["branches"],
+                "period_query_suffix": period_query_suffix,
+                "month_start": month_start,
+                "month_end": month_end,
+                "default_recipient_email": default_recipient_email,
+                "backup_manager": backup_manager,
+                "outbound_emails": outbound_emails,
+                "letter_subject": preview_batch.build_letter_subject(),
+                "letter_text": preview_batch.build_letter_text(full_month_count),
+                "letter_html": preview_batch.build_letter_html(full_month_count),
+                "can_send_outbound_email": user_can_send_outbound_email(
+                    self.request.user
+                ),
+                "prolongation_form": ProlongationEmailForm(),
+                "outbound_failed_status": OutboundEmail.STATUS_FAILED,
+            }
+        )
+        return context
 
 
 class BillingTaskDetailView(LoginRequiredMixin, DetailView):
@@ -431,4 +532,51 @@ class BillingTaskRetryEmailView(LoginRequiredMixin, EmailSendPermissionMixin, Vi
             return redirect(next_url)
 
         messages.success(request, "Письмо снова поставлено в очередь отправки")
+        return redirect(next_url)
+
+
+class ProlongationSendEmailView(LoginRequiredMixin, EmailSendPermissionMixin, View):
+    def post(self, request):
+        next_url = request.POST.get("next") or reverse("policies:prolongation")
+        parsed = parse_period_code(request.POST.get("period", ""))
+        if not parsed:
+            messages.warning(request, "Не указан корректный период пролонгации")
+            return redirect(next_url)
+        year, month = parsed
+
+        form = ProlongationEmailForm(request.POST, request.FILES)
+        if not form.is_valid():
+            error_text = "Укажите корректный email получателя"
+            if form.errors:
+                first_errors = next(iter(form.errors.values()))
+                if first_errors:
+                    error_text = first_errors[0]
+            messages.warning(request, error_text)
+            return redirect(next_url)
+
+        policies = prol.get_prolongation_policies(year, month)
+        policies_count = policies.count()
+        uploaded = form.cleaned_data.get("attachment_file") or []
+        if not uploaded and policies_count == 0:
+            messages.warning(
+                request, "За выбранный месяц нет договоров для пролонгации"
+            )
+            return redirect(next_url)
+
+        batch = prol.get_or_create_batch(year, month)
+        if uploaded:
+            attachments = uploaded
+        else:
+            attachments = [prol.build_prolongation_attachment(batch, policies)]
+
+        try:
+            payload = build_prolongation_forward_email_payload(
+                batch, form.cleaned_data["recipient_email"], policies_count
+            )
+            self.create_and_queue_email(request, payload, attachments=attachments)
+        except (CommunicationsError, ValidationError) as exc:
+            messages.error(request, str(exc))
+            return redirect(next_url)
+
+        messages.success(request, "Письмо пролонгации поставлено в очередь отправки")
         return redirect(next_url)

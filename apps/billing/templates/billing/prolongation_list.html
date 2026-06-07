@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Пролонгация{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    :root {
+        --v2-bg: #f3f7fc;
+        --v2-card-bg: #ffffff;
+        --v2-border: #dbe5f1;
+        --v2-title: #17324f;
+        --v2-muted: #5d748d;
+        --v2-accent: #1565c0;
+    }
+
+    .mgr-root {
+        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
+        border: 1px solid var(--v2-border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .mgr-breadcrumb {
+        font-size: 0.82rem;
+        color: var(--v2-muted);
+        margin-bottom: 0.85rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .mgr-breadcrumb a { color: var(--v2-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; }
+    .mgr-breadcrumb a:hover { color: var(--v2-accent); }
+    .mgr-breadcrumb .sep { color: #c1cfde; }
+    .mgr-breadcrumb .current { color: var(--v2-title); font-weight: 600; }
+
+    .mgr-page-header { padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--v2-border); }
+    .mgr-page-kicker { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--v2-muted); margin-bottom: 0.2rem; }
+    .mgr-page-title { font-size: 1.45rem; font-weight: 800; color: var(--v2-title); margin: 0; line-height: 1.25; }
+    .mgr-page-subtitle { font-size: 0.85rem; color: var(--v2-muted); margin-top: 0.35rem; max-width: 720px; }
+
+    .mgr-section { border: 1px solid var(--v2-border); border-radius: 12px; background: var(--v2-card-bg); box-shadow: 0 2px 10px rgba(14,28,46,0.05); margin-bottom: 1rem; overflow: hidden; }
+    .mgr-section-head { background: #1e3a5f; padding: 0.65rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .mgr-section-head-title { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #e8f3ff; display: flex; align-items: center; gap: 0.4rem; }
+    .mgr-section-head-badge { font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.15); color: #e8f3ff; border-radius: 999px; padding: 0.15rem 0.6rem; }
+    .mgr-section-body { padding: 0.9rem 1rem; }
+    .mgr-section--filters { overflow: visible; position: relative; z-index: 5; }
+
+    /* Period strip */
+    .bil-periods { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .bil-period { min-width: 160px; background: var(--v2-card-bg); border: 1px solid var(--v2-border); border-radius: 12px; padding: 0.65rem 0.8rem; text-decoration: none; color: var(--v2-title); box-shadow: 0 1px 4px rgba(14,28,46,0.04); transition: border-color 0.15s, background 0.15s, color 0.15s; }
+    .bil-period:hover { border-color: var(--v2-accent); color: var(--v2-accent); text-decoration: none; }
+    .bil-period.active { border-color: var(--v2-accent); background: #eff5ff; color: var(--v2-accent); }
+    .bil-period-name { font-weight: 800; margin-bottom: 0.3rem; font-size: 0.95rem; }
+    .bil-chip { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.74rem; font-weight: 600; border-radius: 8px; padding: 0.25rem 0.55rem; border: 1px solid var(--v2-border); background: #f8fbff; color: var(--v2-muted); white-space: nowrap; line-height: 1.1; }
+    .bil-chip-label { text-transform: uppercase; letter-spacing: 0.04em; }
+    .bil-chip-num { font-size: 1rem; font-weight: 800; color: var(--v2-title); font-variant-numeric: tabular-nums; }
+
+    /* Filters */
+    .pl-filter-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.4rem 0.5rem; }
+    .pl-filter-item { flex: 0 1 160px; }
+    .pl-filter-item--insurer { flex-basis: 220px; }
+    .pl-filter-item--search { flex: 1 1 240px; min-width: 200px; }
+    .pl-filter-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--v2-muted); margin-bottom: 0.1rem; display: block; }
+    .pl-multiselect { position: relative; width: 100%; }
+    .pl-multiselect__summary { width: 100%; height: 32px; border: 1px solid #c8d5e6; border-radius: 7px; padding: 0.18rem 0.5rem; background: #fff; color: var(--v2-title); font-size: 0.86rem; line-height: 1.2; display: inline-flex; align-items: center; justify-content: space-between; gap: 0.45rem; cursor: pointer; list-style: none; user-select: none; }
+    .pl-multiselect__summary::-webkit-details-marker { display: none; }
+    .pl-multiselect[open] .pl-multiselect__summary { border-color: var(--v2-accent); box-shadow: 0 0 0 2px rgba(21,101,192,0.1); }
+    .pl-multiselect__summary-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pl-multiselect__menu { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; min-width: 260px; border: 1px solid #c8d5e6; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(14,28,46,0.12); padding: 0.45rem; z-index: 25; }
+    .pl-multiselect__actions { display: flex; align-items: center; justify-content: space-between; gap: 0.45rem; margin-bottom: 0.35rem; padding-bottom: 0.35rem; border-bottom: 1px solid #e5edf7; }
+    .pl-multiselect__action { border: none; background: transparent; color: var(--v2-accent); font-size: 0.77rem; font-weight: 700; padding: 0; cursor: pointer; }
+    .pl-multiselect__options { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 0.2rem; }
+    .pl-multiselect__option { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.82rem; color: var(--v2-title); line-height: 1.25; cursor: pointer; border-radius: 6px; padding: 0.18rem 0.24rem; }
+    .pl-multiselect__option:hover { background: #f4f8fe; }
+    .pl-filter-form input[type="search"], .pl-filter-form select { width: 100%; height: 32px; border: 1px solid #c8d5e6; border-radius: 7px; padding: 0.18rem 0.5rem; background: #fff; color: var(--v2-title); font-size: 0.86rem; line-height: 1.2; }
+    .pl-filter-actions { display: flex; justify-content: flex-end; gap: 0.5rem; align-items: center; flex-wrap: nowrap; margin-left: auto; }
+    .pl-filter-result { font-size: 0.84rem; color: #3d5f7d; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+    .pl-filter-result strong { color: var(--v2-title); font-weight: 700; }
+    .btn-pl-apply { background: var(--v2-accent); border: none; color: #fff; font-size: 0.85rem; font-weight: 600; border-radius: 7px; padding: 0.35rem 0.75rem; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+    .btn-pl-apply:hover { background: #0d47a1; color: #fff; }
+    .btn-pl-reset { background: var(--v2-card-bg); border: 1px solid var(--v2-border); color: var(--v2-title); font-size: 0.85rem; font-weight: 600; border-radius: 7px; padding: 0.32rem 0.72rem; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; }
+    .btn-pl-reset:hover { border-color: var(--v2-accent); background: #eff5ff; color: var(--v2-accent); text-decoration: none; }
+
+    /* Table */
+    .mgr-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .mgr-table thead tr { border-bottom: 2px solid var(--v2-border); }
+    .mgr-table th { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--v2-muted); padding: 0.55rem 0.65rem; white-space: nowrap; text-align: left; }
+    .mgr-table td { padding: 0.55rem 0.65rem; border-bottom: 1px solid #f0f5fc; vertical-align: top; color: var(--v2-title); }
+    .mgr-table tbody tr:last-child td { border-bottom: none; }
+    .mgr-table tbody tr.row-nobroker td { background: #f3f4f6; color: #4b5563; }
+    .mgr-table tbody tr.row-dfa-closed td { background: #fffbe6; }
+    .bil-policy-line { line-height: 1.25; }
+    .bil-policy-line a { color: var(--v2-accent); text-decoration: none; }
+    .bil-policy-line a:hover { text-decoration: underline; }
+    .tbl-badge { font-size: 0.68rem; font-weight: 700; border-radius: 999px; padding: 0.1rem 0.45rem; white-space: nowrap; display: inline-block; line-height: 1.3; }
+    .tbl-badge--nobroker { background: #eceff3; color: #5f6b7a; border: 1px solid #d1d5db; }
+    .tbl-badge--dfa { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+    .pl-empty { text-align: center; padding: 2.5rem 1rem !important; color: var(--v2-muted); font-size: 0.9rem; }
+    .pl-empty i { font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4; }
+
+    /* Pagination */
+    .pl-pagination { display: flex; justify-content: center; gap: 0.3rem; padding-top: 1rem; flex-wrap: wrap; }
+    .pl-page-btn { background: var(--v2-card-bg); border: 1px solid var(--v2-border); color: var(--v2-title); border-radius: 8px; padding: 0.4rem 0.85rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; min-width: 2rem; justify-content: center; }
+    .pl-page-btn:hover { border-color: var(--v2-accent); background: #eff5ff; color: var(--v2-accent); text-decoration: none; }
+    .pl-page-btn.active { background: var(--v2-accent); border-color: var(--v2-accent); color: #fff; cursor: default; }
+    .pl-page-btn.disabled { opacity: 0.4; pointer-events: none; }
+
+    /* Letter / send */
+    .letter-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--v2-muted); margin-bottom: 0.2rem; display: block; }
+    .letter-input { width: 100%; border: 1px solid #c8d5e6; border-radius: 7px; padding: 0.4rem 0.6rem; font-size: 0.9rem; color: var(--v2-title); background: #fff; }
+    .letter-rendered { border: 1px solid var(--v2-border); border-radius: 8px; background: #f9fbff; padding: 0.7rem 0.85rem; font-size: 0.9rem; line-height: 1.5; color: var(--v2-title); margin-bottom: 0.75rem; }
+    .send-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
+    .send-row > div { flex: 1 1 240px; }
+    .send-hint { font-size: 0.76rem; color: #6b7f96; margin-top: 0.4rem; line-height: 1.35; }
+    .send-warn { font-size: 0.82rem; color: #b45309; font-weight: 600; background: #fffaf0; border: 1px solid #fde9c8; border-radius: 8px; padding: 0.5rem 0.7rem; margin-bottom: 0.75rem; }
+
+    /* History */
+    .hist-item { border: 1px solid var(--v2-border); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .hist-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+    .hist-status { font-size: 0.72rem; font-weight: 700; border-radius: 999px; padding: 0.14rem 0.55rem; border: 1px solid transparent; }
+    .hist-status--sent { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+    .hist-status--queued, .hist-status--sending { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+    .hist-status--failed { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+    .hist-status--draft, .hist-status--cancelled { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+    .hist-meta { color: var(--v2-muted); margin-top: 0.25rem; }
+    .hist-error { color: #b91c1c; margin-top: 0.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mgr-root">
+
+    <nav aria-label="breadcrumb" class="mgr-breadcrumb">
+        <a href="{% url 'core:dashboard' %}"><i class="bi bi-house"></i> Главная</a>
+        <span class="sep">/</span>
+        <a href="{% url 'policies:payments' %}"><i class="bi bi-calendar-check"></i> Платежи</a>
+        <span class="sep">/</span>
+        <span class="current">Пролонгация</span>
+    </nav>
+
+    <div class="mgr-page-header">
+        <div class="mgr-page-kicker"><i class="bi bi-arrow-repeat"></i> Платежи</div>
+        <h1 class="mgr-page-title">Пролонгация</h1>
+        <div class="mgr-page-subtitle">Договоры с окончанием срока страхования по месяцам. Проверьте список и отправьте таблицу одним письмом с приложенным Excel-файлом.</div>
+    </div>
+
+    <!-- Месяцы -->
+    <div class="bil-periods" aria-label="Месяцы пролонгации">
+        {% for option in month_options %}
+        <a class="bil-period{% if option.selected %} active{% endif %}"
+           href="{% url 'policies:prolongation' %}?period={{ option.code }}{{ period_query_suffix }}">
+            <div class="bil-period-name">{{ option.label }}</div>
+            <span class="bil-chip">
+                <span class="bil-chip-label">Договоров</span>
+                <span class="bil-chip-num">{{ option.total }}</span>
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Фильтры -->
+    <div class="mgr-section mgr-section--filters">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры просмотра</span>
+        </div>
+        <div class="mgr-section-body">
+            <form method="get" class="pl-filter-form">
+                <input type="hidden" name="period" value="{{ selected_code }}">
+                <div class="pl-filter-item pl-filter-item--insurer">
+                    <label class="pl-filter-label" for="insurer">Страховщик</label>
+                    <select id="insurer" name="insurer">
+                        <option value="">Все страховщики</option>
+                        {% for insurer in insurers %}
+                        <option value="{{ insurer.id }}"{% if selected_insurer == insurer.id|stringformat:"s" %} selected{% endif %}>{{ insurer.insurer_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pl-filter-item">
+                    <span class="pl-filter-label">Филиал</span>
+                    <details class="pl-multiselect" id="branchMultiselect">
+                        <summary class="pl-multiselect__summary" id="branchMultiselectSummary">
+                            <span class="pl-multiselect__summary-text" data-default-label="Все филиалы">Все филиалы</span>
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </summary>
+                        <div class="pl-multiselect__menu">
+                            <div class="pl-multiselect__actions">
+                                <button type="button" class="pl-multiselect__action" data-branch-action="all">Выбрать все</button>
+                                <button type="button" class="pl-multiselect__action" data-branch-action="none">Снять все</button>
+                            </div>
+                            <div class="pl-multiselect__options">
+                                {% for branch in branches %}
+                                <label class="pl-multiselect__option">
+                                    <input type="checkbox" name="branch" value="{{ branch.id }}"{% if branch.id|stringformat:"s" in selected_branches %} checked{% endif %}>
+                                    <span>{{ branch.branch_name }}</span>
+                                </label>
+                                {% empty %}
+                                <div class="pl-multiselect__empty">Филиалы не найдены.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </details>
+                </div>
+                <div class="pl-filter-item pl-filter-item--search">
+                    <label class="pl-filter-label" for="q">Поиск</label>
+                    <input id="q" type="search" name="q" value="{{ search_query }}" placeholder="ДФА, полис, клиент, объект">
+                </div>
+                <div class="pl-filter-actions">
+                    <div class="pl-filter-result">
+                        <i class="bi bi-list-check"></i>
+                        Показано: <strong>{{ total_filtered }}</strong>
+                    </div>
+                    <button type="submit" class="btn-pl-apply"><i class="bi bi-funnel"></i> Применить</button>
+                    <a class="btn-pl-reset" href="{% url 'policies:prolongation' %}?period={{ selected_code }}"><i class="bi bi-x-circle"></i> Сбросить</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Таблица договоров -->
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-table"></i> {{ selected_label }}</span>
+            <span style="display:flex; align-items:center; gap:0.6rem;">
+                <a class="btn-pl-reset" style="background:#eaf3ff; border-color:#bcd6f5;"
+                   href="{% url 'reports:export_policy_expiration' %}?date_from={{ month_start|date:'Y-m-d' }}&date_to={{ month_end|date:'Y-m-d' }}">
+                    <i class="bi bi-file-earmark-excel"></i> Скачать Excel
+                </a>
+                <span class="mgr-section-head-badge">{{ total_filtered }}</span>
+            </span>
+        </div>
+        <div class="mgr-section-body" style="padding: 0 0 0.6rem;">
+            <div class="table-responsive">
+                <table class="mgr-table">
+                    <thead>
+                        <tr>
+                            <th>Дата окончания</th>
+                            <th>Филиал</th>
+                            <th>ДФА / полис</th>
+                            <th>Страховщик</th>
+                            <th>Лизингополучатель</th>
+                            <th>Страхователь</th>
+                            <th>Объект страхования</th>
+                            <th>Примечания</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for policy in policies %}
+                        <tr class="{% if not policy.dfa_active %}row-dfa-closed{% elif not policy.broker_participation %}row-nobroker{% endif %}">
+                            <td>{{ policy.end_date|date:"d.m.Y" }}</td>
+                            <td>{{ policy.branch.branch_name|default:"—" }}</td>
+                            <td class="bil-policy-line">
+                                <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
+                                <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                            </td>
+                            <td>{{ policy.insurer.insurer_name }}</td>
+                            <td>{{ policy.client.client_name }}</td>
+                            <td>{{ policy.policyholder.client_name|default:"—" }}</td>
+                            <td>{{ policy.property_description|default:"—" }}</td>
+                            <td>
+                                {% if not policy.broker_participation %}<span class="tbl-badge tbl-badge--nobroker">без брокера</span>{% endif %}
+                                {% if not policy.dfa_active %}<span class="tbl-badge tbl-badge--dfa">ДФА закрыт</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="pl-empty">
+                                <i class="bi bi-inbox"></i>
+                                Нет договоров с окончанием страхования за этот месяц по выбранным фильтрам.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Страницы" class="pl-pagination">
+        {% if page_obj.has_previous %}
+        <a class="pl-page-btn" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}"><i class="bi bi-chevron-left"></i> Назад</a>
+        {% else %}
+        <span class="pl-page-btn disabled"><i class="bi bi-chevron-left"></i> Назад</span>
+        {% endif %}
+        <span class="pl-page-btn active">{{ page_obj.number }} / {{ paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="pl-page-btn" href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">Вперед <i class="bi bi-chevron-right"></i></a>
+        {% else %}
+        <span class="pl-page-btn disabled">Вперед <i class="bi bi-chevron-right"></i></span>
+        {% endif %}
+    </nav>
+    {% endif %}
+
+    <!-- Письмо и отправка -->
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-envelope"></i> Письмо пролонгации</span>
+            <span class="mgr-section-head-badge">{{ full_month_count }} договоров за {{ selected_label }}</span>
+        </div>
+        <div class="mgr-section-body">
+            <div class="send-warn">
+                <i class="bi bi-info-circle"></i>
+                В письмо попадают <strong>все {{ full_month_count }}</strong> договоров за {{ selected_label }} (фильтры выше — только для просмотра). Excel-таблица формируется автоматически; при необходимости можно приложить свой файл.
+            </div>
+
+            {% if outbound_emails %}
+            <div class="send-warn">
+                <i class="bi bi-clock-history"></i>
+                По этому месяцу письмо уже отправлялось ({{ outbound_emails|length }}). Повторная отправка разрешена — проверьте получателя и вложение.
+            </div>
+            {% endif %}
+
+            <div style="margin-bottom: 0.75rem;">
+                <label class="letter-label">Тема письма</label>
+                <input type="text" class="letter-input" value="{{ letter_subject }}" readonly>
+            </div>
+            <div>
+                <label class="letter-label">Текст письма (черновой шаблон)</label>
+                <div class="letter-rendered">{{ letter_html }}</div>
+            </div>
+
+            {% if can_send_outbound_email %}
+            <form method="post" action="{% url 'policies:prolongation_send_email' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="period" value="{{ selected_code }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <div class="send-row">
+                    <div>
+                        <label class="letter-label" for="prolRecipient">Email получателя</label>
+                        <input type="text" inputmode="email" autocomplete="email" id="prolRecipient" name="recipient_email" class="letter-input" placeholder="addr1@example.com, addr2@example.com" value="{{ default_recipient_email }}" required>
+                        {% if backup_manager and default_recipient_email %}
+                        <div class="send-hint">По умолчанию — резервный менеджер{% if backup_manager.full_name or backup_manager.name %} ({{ backup_manager.full_name|default:backup_manager.name }}){% endif %}. Можно изменить.</div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="letter-label" for="prolFile">Заменить Excel (необязательно)</label>
+                        <input type="file" id="prolFile" name="attachment_file" class="letter-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" multiple>
+                    </div>
+                    <div style="flex: 0 0 auto;">
+                        <button type="submit" class="btn-pl-apply"><i class="bi bi-send"></i> Отправить</button>
+                    </div>
+                </div>
+                <div class="send-hint">Несколько адресов — через запятую или точку с запятой. Если файл не приложить, система сформирует таблицу автоматически за {{ selected_label }}. Отправка доступна только пользователям с правом отправки писем.</div>
+            </form>
+            {% else %}
+            <div class="send-hint"><i class="bi bi-lock"></i> Отправка писем доступна только пользователям с правом отправки.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- История отправок -->
+    {% if outbound_emails %}
+    <div class="mgr-section">
+        <div class="mgr-section-head">
+            <span class="mgr-section-head-title"><i class="bi bi-clock-history"></i> История отправок</span>
+            <span class="mgr-section-head-badge">{{ outbound_emails|length }}</span>
+        </div>
+        <div class="mgr-section-body">
+            {% for email in outbound_emails %}
+            <div class="hist-item">
+                <div class="hist-head">
+                    <span><strong>{{ email.created_at|date:"d.m.Y H:i" }}</strong> — {{ email.to_addresses|join:", " }}</span>
+                    <span class="hist-status hist-status--{{ email.status }}">{{ email.get_status_display }}</span>
+                </div>
+                <div class="hist-meta">
+                    {% for attachment in email.attachments.all %}
+                    <span><i class="bi bi-paperclip"></i> {{ attachment.original_filename }}</span>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                    {% if email.sent_by %} · отправил: {{ email.sent_by.get_full_name|default:email.sent_by.username }}{% elif email.created_by %} · создал: {{ email.created_by.get_full_name|default:email.created_by.username }}{% endif %}
+                </div>
+                {% if email.status == outbound_failed_status and email.last_error %}
+                <div class="hist-error"><i class="bi bi-exclamation-triangle"></i> {{ email.last_error }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const branchMultiselect = document.getElementById('branchMultiselect');
+        if (branchMultiselect) {
+            const summaryText = branchMultiselect.querySelector('.pl-multiselect__summary-text');
+            const branchCheckboxes = Array.from(branchMultiselect.querySelectorAll('input[name="branch"]'));
+            const selectAll = branchMultiselect.querySelector('[data-branch-action="all"]');
+            const clearAll = branchMultiselect.querySelector('[data-branch-action="none"]');
+
+            const updateSummary = function () {
+                if (!summaryText) return;
+                const checked = branchCheckboxes.filter(function (c) { return c.checked; });
+                const fallback = summaryText.dataset.defaultLabel || 'Все филиалы';
+                if (!checked.length) { summaryText.textContent = fallback; return; }
+                const labels = checked.map(function (c) {
+                    const span = c.closest('label') ? c.closest('label').querySelector('span') : null;
+                    return span ? span.textContent.trim() : '';
+                }).filter(Boolean);
+                if (checked.length <= 2 && labels.length === checked.length) {
+                    summaryText.textContent = labels.join(', ');
+                } else {
+                    summaryText.textContent = 'Выбрано: ' + checked.length;
+                }
+            };
+
+            branchCheckboxes.forEach(function (c) { c.addEventListener('change', updateSummary); });
+            if (selectAll) { selectAll.addEventListener('click', function (e) { e.preventDefault(); branchCheckboxes.forEach(function (c) { c.checked = true; }); updateSummary(); }); }
+            if (clearAll) { clearAll.addEventListener('click', function (e) { e.preventDefault(); branchCheckboxes.forEach(function (c) { c.checked = false; }); updateSummary(); }); }
+            document.addEventListener('click', function (e) { if (!branchMultiselect.contains(e.target)) { branchMultiselect.removeAttribute('open'); } });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { branchMultiselect.removeAttribute('open'); } });
+            updateSummary();
+        }
+    });
+</script>
+{% endblock %}

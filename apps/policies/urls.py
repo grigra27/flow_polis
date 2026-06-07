@@ -15,8 +15,13 @@ urlpatterns = [
     ),
     path(
         "payments/prolongation/",
-        billing_views.BillingProlongationPlaceholderView.as_view(),
+        billing_views.ProlongationListView.as_view(),
         name="prolongation",
+    ),
+    path(
+        "payments/prolongation/send-email/",
+        billing_views.ProlongationSendEmailView.as_view(),
+        name="prolongation_send_email",
     ),
     path(
         "payments/scheduled/tasks/<int:pk>/",

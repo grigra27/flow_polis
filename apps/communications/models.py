@@ -56,10 +56,12 @@ class OutboundEmail(TimeStampedModel):
 
     KIND_BILLING_INSURER_REQUEST = "billing_insurer_request"
     KIND_BILLING_ALLIANCE_FORWARD = "billing_alliance_forward"
+    KIND_PROLONGATION_FORWARD = "prolongation_forward"
 
     KIND_CHOICES = [
         (KIND_BILLING_INSURER_REQUEST, "Запрос счета в СК"),
         (KIND_BILLING_ALLIANCE_FORWARD, "Передача счета в Альянс"),
+        (KIND_PROLONGATION_FORWARD, "Пролонгация — таблица договоров"),
     ]
 
     STATUS_DRAFT = "draft"

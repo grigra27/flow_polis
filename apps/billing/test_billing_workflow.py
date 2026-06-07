@@ -286,7 +286,7 @@ def test_scheduled_payments_pages_require_login(client, billing_payment):
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "Пролонгация" in content
-    assert "Страница находится в разработке." in content
+    assert "Письмо пролонгации" in content
     assert (
         f'class="nav-link submenu-tab active" href="{reverse("policies:payments")}"'
         in content

@@ -405,6 +405,95 @@ class BillingTaskEvent(TimeStampedModel):
         return dict(BillingTask.STATUS_CHOICES).get(self.new_status, self.new_status)
 
 
+MONTH_NAMES_RU = {
+    1: "Январь",
+    2: "Февраль",
+    3: "Март",
+    4: "Апрель",
+    5: "Май",
+    6: "Июнь",
+    7: "Июль",
+    8: "Август",
+    9: "Сентябрь",
+    10: "Октябрь",
+    11: "Ноябрь",
+    12: "Декабрь",
+}
+
+
+class ProlongationBatch(TimeStampedModel):
+    """Партия пролонгации за месяц.
+
+    В отличие от BillingTask, отдельных задач по договорам здесь нет:
+    сотрудник визуально проверяет таблицу договоров с окончанием срока
+    страхования в выбранном месяце и отправляет её одним письмом с
+    Excel-вложением (та же таблица, что и в экспорте «Пролонгация»).
+
+    Сама запись нужна как content_object для OutboundEmail и как якорь
+    истории отправок (OutboundEmail.for_object(batch)). Создаётся лениво —
+    только в момент первой отправки за месяц.
+    """
+
+    year = models.PositiveSmallIntegerField("Год")
+    month = models.PositiveSmallIntegerField("Месяц")
+
+    class Meta:
+        verbose_name = "Партия пролонгации"
+        verbose_name_plural = "Партии пролонгации"
+        unique_together = ["year", "month"]
+        ordering = ["year", "month"]
+        indexes = [
+            models.Index(fields=["year", "month"]),
+        ]
+
+    def __str__(self):
+        return self.label
+
+    @property
+    def starts_on(self):
+        return date(self.year, self.month, 1)
+
+    @property
+    def ends_on(self):
+        _, last_day = calendar.monthrange(self.year, self.month)
+        return date(self.year, self.month, last_day)
+
+    @property
+    def label(self):
+        return f"{MONTH_NAMES_RU.get(self.month, self.month)} {self.year}"
+
+    @property
+    def code(self):
+        return f"{self.year:04d}-{self.month:02d}"
+
+    # --- Шаблон письма (временный текст-заглушка, заменяется позже) ---
+
+    def build_letter_subject(self):
+        return f"Пролонгация — договоры с окончанием страхования — {self.label}"
+
+    def build_letter_text(self, policies_count=None):
+        intro = (
+            "Во вложении — таблица договоров страхования с окончанием срока "
+            f"страхования в период {self.label} для проработки пролонгации."
+        )
+        blocks = [
+            ["Добрый день."],
+            [intro],
+        ]
+        if policies_count is not None:
+            blocks.append([f"Количество договоров в таблице: {policies_count}."])
+        blocks.extend(
+            [
+                ["Спасибо."],
+                ["С Уважением,", 'ООО "Он-лайн брокер"'],
+            ]
+        )
+        return "\n\n".join("\n".join(block) for block in blocks)
+
+    def build_letter_html(self, policies_count=None):
+        return BillingTask._wrap_letter_html(self.build_letter_text(policies_count))
+
+
 def format_money(value):
     if value is None:
         value = Decimal("0")

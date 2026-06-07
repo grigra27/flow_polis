@@ -1498,8 +1498,11 @@ class PolicyExpirationExporter(BaseExporter):
             "Примечания",
         ]
 
-    def export(self):
-        """Генерирует Excel файл с форматированием"""
+    def build_workbook(self):
+        """Строит и возвращает openpyxl Workbook без обёртки в HttpResponse.
+
+        Выделено из export(), чтобы ту же таблицу можно было приложить файлом
+        к письму пролонгации (см. apps.billing.prolongation_services)."""
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
         wb = Workbook()
@@ -1732,7 +1735,11 @@ class PolicyExpirationExporter(BaseExporter):
         # Форматирование
         self.apply_formatting(ws)
 
-        return self.create_response(wb)
+        return wb
+
+    def export(self):
+        """Генерирует Excel-файл и оборачивает его в HttpResponse для скачивания."""
+        return self.create_response(self.build_workbook())
 
     def get_row_data(self, policy):
         """Возвращает данные строки для полиса"""

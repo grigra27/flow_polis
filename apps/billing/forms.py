@@ -115,3 +115,25 @@ class AllianceEmailForm(ManualRecipientEmailForm):
         for uploaded in files:
             validate_outbound_attachment(uploaded)
         return files
+
+
+class ProlongationEmailForm(ManualRecipientEmailForm):
+    """Письмо пролонгации: получатель + опциональная замена авто-Excel.
+
+    Если файл не приложен, таблица генерируется системой автоматически
+    (та же таблица, что видна на странице). Загруженный файл — замена
+    авто-генерации (например, после ручной правки таблицы)."""
+
+    MAX_FILES = 2
+
+    attachment_file = _MultipleFileField(
+        label="Таблица (необязательно)", required=False
+    )
+
+    def clean_attachment_file(self):
+        files = self.cleaned_data.get("attachment_file") or []
+        if len(files) > self.MAX_FILES:
+            raise ValidationError(f"Можно прикрепить не более {self.MAX_FILES} файлов")
+        for uploaded in files:
+            validate_outbound_attachment(uploaded)
+        return files

@@ -100,3 +100,17 @@ def build_alliance_forward_email_payload(task, recipient_emails):
         "to": recipient_emails,
         "metadata": {"manager_emails_snapshot": snapshot},
     }
+
+
+def build_prolongation_forward_email_payload(
+    batch, recipient_emails, policies_count=None
+):
+    return {
+        "kind": OutboundEmail.KIND_PROLONGATION_FORWARD,
+        "content_object": batch,
+        "subject": batch.build_letter_subject(),
+        "body_text": batch.build_letter_text(policies_count),
+        "body_html": batch.build_letter_html(policies_count),
+        "to": recipient_emails,
+        "metadata": {"period": batch.code, "policies_count": policies_count or 0},
+    }

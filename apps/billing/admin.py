@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.db import transaction
 
-from .models import BillingPeriod, BillingTask, BillingTaskEvent
+from .models import BillingPeriod, BillingTask, BillingTaskEvent, ProlongationBatch
 from .services import update_task
 
 
@@ -10,6 +10,14 @@ class BillingPeriodAdmin(admin.ModelAdmin):
     list_display = ["label", "status", "created_at", "updated_at"]
     list_filter = ["status", "year", "month"]
     ordering = ["-year", "-month"]
+
+
+@admin.register(ProlongationBatch)
+class ProlongationBatchAdmin(admin.ModelAdmin):
+    list_display = ["label", "year", "month", "created_at", "updated_at"]
+    list_filter = ["year", "month"]
+    ordering = ["-year", "-month"]
+    readonly_fields = ["created_at", "updated_at"]
 
 
 @admin.register(BillingTask)

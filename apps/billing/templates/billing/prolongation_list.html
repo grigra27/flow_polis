@@ -244,6 +244,7 @@
                             <th>Лизингополучатель</th>
                             <th>Страхователь</th>
                             <th>Объект страхования</th>
+                            <th>Инфо 4</th>
                             <th>Примечания</th>
                         </tr>
                     </thead>
@@ -260,6 +261,7 @@
                             <td>{{ policy.client.client_name }}</td>
                             <td>{{ policy.policyholder.client_name|default:"—" }}</td>
                             <td>{{ policy.property_description|default:"—" }}</td>
+                            <td>{{ policy.info4|default:"—" }}</td>
                             <td>
                                 {% if not policy.broker_participation %}<span class="tbl-badge tbl-badge--nobroker">без брокера</span>{% endif %}
                                 {% if not policy.dfa_active %}<span class="tbl-badge tbl-badge--dfa">ДФА закрыт</span>{% endif %}
@@ -267,7 +269,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="pl-empty">
+                            <td colspan="9" class="pl-empty">
                                 <i class="bi bi-inbox"></i>
                                 Нет договоров с окончанием страхования за этот месяц по выбранным фильтрам.
                             </td>

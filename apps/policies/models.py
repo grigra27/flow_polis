@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import OuterRef, Subquery, Sum
+from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from decimal import Decimal
 from apps.core.models import TimeStampedModel
@@ -98,6 +98,16 @@ class Policy(TimeStampedModel):
 
     policy_active = models.BooleanField("Полис активен", default=True)
     dfa_active = models.BooleanField("ДФА активен", default=True)
+    dfa_deactivation_date = models.DateField(
+        "Дата деактивации ДФА",
+        blank=True,
+        null=True,
+        help_text=(
+            "Дата, с которой ДФА перестал быть активным. Очередные взносы с "
+            "датой платежа после этой даты не попадают на страницу и в экспорт "
+            "«Очередные взносы»."
+        ),
+    )
     policy_uploaded = models.BooleanField("Полис подгружен", default=False)
     broker_participation = models.BooleanField("Участие брокера", default=True)
     renewal_to_old_dfa = models.BooleanField(
@@ -491,4 +501,23 @@ def policy_premium_subquery():
         .values("policy")
         .annotate(total=Sum("amount"))
         .values("total")
+    )
+
+
+def dfa_deactivated_payments_q(prefix=""):
+    """Q-фильтр взносов, отсечённых деактивацией ДФА.
+
+    Взнос считается отсечённым, если у полиса снят флаг «ДФА активен»,
+    задана «Дата деактивации ДФА» и дата платежа (due_date) позже неё.
+    Аналог отсечения по расторжению полиса (termination_date), но для ДФА.
+
+    Используется через `.exclude(dfa_deactivated_payments_q(...))`.
+
+    prefix — путь до PaymentSchedule от модели запроса: "" для самого
+    PaymentSchedule, "payment_schedule__" для BillingTask.
+    """
+    return (
+        Q(**{f"{prefix}policy__dfa_active": False})
+        & Q(**{f"{prefix}policy__dfa_deactivation_date__isnull": False})
+        & Q(**{f"{prefix}due_date__gt": F(f"{prefix}policy__dfa_deactivation_date")})
     )

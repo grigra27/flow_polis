@@ -52,6 +52,19 @@
         margin: 0;
         line-height: 1.25;
     }
+    .mgr-faq-btn {
+        border: none;
+        background: transparent;
+        color: var(--v2-muted);
+        font-size: 1.05rem;
+        line-height: 1;
+        padding: 0;
+        margin-left: 0.4rem;
+        vertical-align: middle;
+        cursor: pointer;
+        transition: color 0.15s ease;
+    }
+    .mgr-faq-btn:hover { color: var(--v2-accent, #0d6efd); }
     .mgr-page-subtitle {
         font-size: 0.85rem;
         color: var(--v2-muted);
@@ -620,7 +633,13 @@
         <div class="mgr-page-header-row">
             <div>
                 <div class="mgr-page-kicker"><i class="bi bi-receipt-cutoff"></i> Платежи</div>
-                <h1 class="mgr-page-title">Очередные взносы</h1>
+                <h1 class="mgr-page-title">
+                    Очередные взносы
+                    <button type="button" class="mgr-faq-btn" data-bs-toggle="modal"
+                            data-bs-target="#scheduledPaymentsFaqModal" title="FAQ: как формируется список">
+                        <i class="bi bi-question-circle"></i>
+                    </button>
+                </h1>
                 <div class="mgr-page-subtitle">Периоды создаются автоматически из графика платежей: два месяца назад, текущий месяц и будущие месяцы с платежами.</div>
             </div>
             <div class="mgr-page-actions">
@@ -844,6 +863,38 @@
         {% endif %}
     </nav>
     {% endif %}
+
+    <!-- FAQ: Очередные взносы -->
+    <div class="modal fade" id="scheduledPaymentsFaqModal" tabindex="-1" aria-labelledby="scheduledPaymentsFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scheduledPaymentsFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: Очередные взносы
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Что попадает в список:</strong> неоплаченные взносы (<code>paid_date</code> пусто) по активным полисам с участием брокера, у которых дата платежа (<code>due_date</code>) попадает в выбранный период, кроме первого платежа первого года (<code>1.1</code>).</p>
+                    <p><strong>Деактивация ДФА:</strong> если у полиса снят флаг «ДФА активен» и заполнена «Дата деактивации ДФА», все взносы с датой платежа <em>позже</em> этой даты в список не попадают. Взносы до даты деактивации остаются. Если дата деактивации не заполнена, отсечение по ДФА не применяется.</p>
+                    <p class="mb-2"><strong>Почему взнос может не попасть:</strong></p>
+                    <ul>
+                        <li>взнос уже оплачен;</li>
+                        <li>полис неактивен;</li>
+                        <li>у полиса снято «Участие брокера»;</li>
+                        <li>ДФА деактивирован, и дата платежа позже «Даты деактивации ДФА»;</li>
+                        <li>это первый платеж первого года (<code>1.1</code>);</li>
+                        <li>дата платежа вне выбранного периода;</li>
+                        <li>заданы фильтры по филиалу, страховщику или поиску.</li>
+                    </ul>
+                    <p class="mb-0">Те же правила применяются к экспорту «Очередные взносы» на странице экспортов.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

@@ -183,6 +183,7 @@ class PolicyAdmin(admin.ModelAdmin):
                     "policy_active",
                     "termination_date",
                     "dfa_active",
+                    "dfa_deactivation_date",
                     "policy_uploaded",
                     "broker_participation",
                     "renewal_to_old_dfa",

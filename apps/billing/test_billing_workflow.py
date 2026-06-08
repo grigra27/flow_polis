@@ -8,9 +8,12 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from django.http import QueryDict
+
 from apps.billing.models import BillingPeriod, BillingTask, BillingTaskEvent
 from apps.billing.services import (
     build_period_options,
+    get_tasks_queryset,
     preload_periods,
     sync_period,
     update_task,
@@ -1190,6 +1193,67 @@ def test_inactive_policy_removes_billing_tasks(billing_payment):
     policy.save(update_fields=["policy_active"])
 
     assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_sync_period_excludes_payment_after_dfa_deactivation(billing_payment):
+    # ДФА деактивирован с даты раньше срока платежа → взнос отсекается.
+    policy = billing_payment.policy
+    policy.dfa_active = False
+    policy.dfa_deactivation_date = billing_payment.due_date - timedelta(days=1)
+    policy.save(update_fields=["dfa_active", "dfa_deactivation_date"])
+
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_sync_period_keeps_payment_on_or_before_dfa_deactivation(billing_payment):
+    # Дата платежа не позже даты деактивации → взнос остаётся.
+    policy = billing_payment.policy
+    policy.dfa_active = False
+    policy.dfa_deactivation_date = billing_payment.due_date
+    policy.save(update_fields=["dfa_active", "dfa_deactivation_date"])
+
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_sync_period_keeps_payment_when_dfa_inactive_without_date(billing_payment):
+    # Флаг снят, но дата деактивации не указана → отсечение не применяется
+    # (правило «флаг + дата», как согласовано).
+    policy = billing_payment.policy
+    policy.dfa_active = False
+    policy.save(update_fields=["dfa_active"])
+
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+
+@pytest.mark.django_db
+def test_dfa_deactivation_removes_existing_task_and_counts(billing_payment):
+    # Задача создана до деактивации; после деактивации повторный sync её удаляет,
+    # а счётчики и список перестают её показывать.
+    sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+    assert BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+
+    policy = billing_payment.policy
+    policy.dfa_active = False
+    policy.dfa_deactivation_date = billing_payment.due_date - timedelta(days=1)
+    policy.save(update_fields=["dfa_active", "dfa_deactivation_date"])
+
+    period = sync_period(billing_payment.due_date.year, billing_payment.due_date.month)
+
+    assert not BillingTask.objects.filter(payment_schedule=billing_payment).exists()
+    assert get_tasks_queryset(period, QueryDict("")).count() == 0
+
+    options = build_period_options([period], period)
+    option = next(opt for opt in options if opt.period.id == period.id)
+    assert option.total == 0
 
 
 @pytest.mark.django_db

@@ -9,7 +9,11 @@ from django.utils import timezone
 from django.db import DatabaseError
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
-from apps.policies.models import Policy, PaymentSchedule
+from apps.policies.models import (
+    Policy,
+    PaymentSchedule,
+    dfa_deactivated_payments_q,
+)
 from apps.insurers.models import Insurer
 from .models import CustomExportTemplate
 from .forms import CustomExportForm
@@ -316,6 +320,9 @@ def export_payments_excel(request):
                 paid_date__isnull=True,  # Исключаем все платежи с датой фактической оплаты
             )
             .exclude(year_number=1, installment_number=1)
+            # Взносы, отсечённые деактивацией ДФА (флаг + дата деактивации),
+            # не попадают в экспорт — так же, как на странице «Очередные взносы».
+            .exclude(dfa_deactivated_payments_q())
             .order_by("due_date", "policy__policy_number")
         )
 

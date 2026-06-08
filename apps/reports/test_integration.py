@@ -503,6 +503,73 @@ class ReadyExportsTest(TestCase):
         self.assertIn("READY-001", exported_policy_numbers)
         self.assertNotIn("READY-EXCLUDED-001", exported_policy_numbers)
 
+    def test_ready_export_payments_excludes_payments_after_dfa_deactivation(self):
+        """Взнос с датой платежа после деактивации ДФА не попадает в экспорт.
+
+        Тот же взнос остаётся, если деактивация наступает позже даты платежа.
+        """
+        self.test_client.login(username="testuser", password="testpass123")
+        PaymentSchedule.objects.filter(pk=self.payment.pk).update(paid_date=None)
+
+        # Якорный полис с активным ДФА — всегда остаётся в экспорте,
+        # чтобы выгрузка не была пустой (иначе вью делает redirect).
+        keeper_policy = Policy.objects.create(
+            policy_number="READY-KEEP-001",
+            dfa_number="DFA-READY-KEEP-001",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Якорное имущество",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            policy_active=True,
+        )
+        PaymentSchedule.objects.create(
+            policy=keeper_policy,
+            year_number=2,
+            installment_number=1,
+            due_date=date(2024, 5, 1),
+            amount=Decimal("30000.00"),
+            insurance_sum=Decimal("700000.00"),
+            commission_rate=self.commission_rate,
+            kv_rub=Decimal("6000.00"),
+            paid_date=None,
+        )
+
+        def exported_policy_numbers():
+            response = self.test_client.get(
+                "/reports/export/payments/?date_from=2024-01-01&date_to=2024-12-31"
+            )
+            self.assertEqual(response.status_code, 200)
+            wb = load_workbook(BytesIO(response.content))
+            ws = wb.active
+            numbers = []
+            for row_num in range(5, ws.max_row + 1):
+                row_data = [cell.value for cell in ws[row_num]]
+                if row_data[0] and row_data[1]:
+                    numbers.append(row_data[0])
+            return numbers
+
+        # self.payment.due_date == 2024-03-01.
+        # Деактивация раньше даты платежа → взнос отсекается.
+        Policy.objects.filter(pk=self.policy.pk).update(
+            dfa_active=False, dfa_deactivation_date=date(2024, 2, 1)
+        )
+        self.assertNotIn("READY-001", exported_policy_numbers())
+
+        # Деактивация позже даты платежа → взнос остаётся.
+        Policy.objects.filter(pk=self.policy.pk).update(
+            dfa_active=False, dfa_deactivation_date=date(2024, 4, 1)
+        )
+        self.assertIn("READY-001", exported_policy_numbers())
+
+        # Флаг снят, но дата деактивации не указана → отсечение не применяется.
+        Policy.objects.filter(pk=self.policy.pk).update(
+            dfa_active=False, dfa_deactivation_date=None
+        )
+        self.assertIn("READY-001", exported_policy_numbers())
+
     def test_ready_export_date_formatting(self):
         """Тест форматирования дат в готовых экспортах"""
         self.test_client.login(username="testuser", password="testpass123")

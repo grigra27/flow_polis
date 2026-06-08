@@ -7,7 +7,7 @@ from django.db.models.functions import ExtractMonth, ExtractYear
 from django.utils import timezone
 
 from apps.insurers.models import Branch, Insurer
-from apps.policies.models import PaymentSchedule
+from apps.policies.models import PaymentSchedule, dfa_deactivated_payments_q
 
 from .models import (
     BillingPeriod,
@@ -185,6 +185,7 @@ def sync_period(year, month):
             policy__broker_participation=True,
         )
         .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
+        .exclude(dfa_deactivated_payments_q())
         .values("id", "due_date")
     )
     payment_ids = [payment["id"] for payment in payments]
@@ -290,6 +291,7 @@ def build_period_options(periods, selected_period):
             payment_schedule__year_number=1,
             payment_schedule__installment_number=1,
         )
+        .exclude(dfa_deactivated_payments_q("payment_schedule__"))
         .values("period_id", "status")
         .annotate(total=Count("id"))
     )
@@ -310,6 +312,7 @@ def build_period_options(periods, selected_period):
                 billing_task__isnull=True,
             )
             .exclude(FIRST_YEAR_FIRST_INSTALLMENT_FILTER)
+            .exclude(dfa_deactivated_payments_q())
             .annotate(
                 period_year=ExtractYear("due_date"),
                 period_month=ExtractMonth("due_date"),
@@ -364,6 +367,7 @@ def get_tasks_queryset(period, request_get, branch_ids_filter=None):
         payment_schedule__year_number=1,
         payment_schedule__installment_number=1,
     )
+    tasks = tasks.exclude(dfa_deactivated_payments_q("payment_schedule__"))
 
     selected_status = request_get.get("status")
     if selected_status and selected_status != "all":

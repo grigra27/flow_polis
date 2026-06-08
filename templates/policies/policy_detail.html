@@ -308,7 +308,10 @@
                 {% if policy.dfa_active %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
-                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
+                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Нет</span>
+                    {% if policy.dfa_deactivation_date %}
+                        <br><small class="text-muted">Дата деактивации ДФА: {{ policy.dfa_deactivation_date|date:"d.m.Y" }}</small>
+                    {% endif %}
                 {% endif %}
                 </p>
 

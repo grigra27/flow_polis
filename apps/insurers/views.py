@@ -8,7 +8,7 @@ from django.views.decorators.http import require_GET
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Avg, Count, DecimalField, Q, Subquery
 from apps.clients.models import Client as LeasingClient
-from apps.policies.models import Policy, policy_premium_subquery
+from apps.policies.models import Policy, policy_premium_subquery, in_force_q
 from .models import (
     Insurer,
     CommissionRate,
@@ -35,6 +35,7 @@ class InsurerListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
+        in_force = in_force_q(date.today(), prefix="policies__")
         queryset = (
             super()
             .get_queryset()
@@ -43,15 +44,12 @@ class InsurerListView(LoginRequiredMixin, ListView):
                 total_policies=Count("policies", distinct=True),
                 active_policies=Count(
                     "policies",
-                    filter=Q(policies__policy_active=True),
+                    filter=in_force,
                     distinct=True,
                 ),
                 broker_participation=Count(
                     "policies",
-                    filter=Q(
-                        policies__policy_active=True,
-                        policies__broker_participation=True,
-                    ),
+                    filter=in_force & Q(policies__broker_participation=True),
                     distinct=True,
                 ),
             )
@@ -114,7 +112,8 @@ class InsurerListView(LoginRequiredMixin, ListView):
             return {}
 
         type_stats = (
-            Policy.objects.filter(insurer_id__in=insurer_ids, policy_active=True)
+            Policy.objects.filter(insurer_id__in=insurer_ids)
+            .filter(in_force_q(date.today()))
             .values("insurer_id", "insurance_type__name")
             .annotate(count=Count("id"))
             .order_by("insurer_id", "-count", "insurance_type__name")
@@ -168,10 +167,11 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
 
         context["policies"] = policies_qs.order_by("-start_date", "-id")
         context["policies_count"] = policies_qs.count()
+        in_force = in_force_q(date.today())
         overview_data = policies_qs.aggregate(
             total_policies=Count("id"),
-            active_policies=Count("id", filter=Q(policy_active=True)),
-            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            active_policies=Count("id", filter=in_force),
+            terminated_policies=Count("id", filter=~in_force),
             avg_premium=Avg(
                 Subquery(policy_premium_subquery(), output_field=DecimalField()),
             ),
@@ -232,6 +232,7 @@ class BranchListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
+        in_force = in_force_q(date.today(), prefix="policies__")
         queryset = (
             super()
             .get_queryset()
@@ -239,15 +240,12 @@ class BranchListView(LoginRequiredMixin, ListView):
                 total_policies=Count("policies", distinct=True),
                 active_policies=Count(
                     "policies",
-                    filter=Q(policies__policy_active=True),
+                    filter=in_force,
                     distinct=True,
                 ),
                 broker_participation=Count(
                     "policies",
-                    filter=Q(
-                        policies__policy_active=True,
-                        policies__broker_participation=True,
-                    ),
+                    filter=in_force & Q(policies__broker_participation=True),
                     distinct=True,
                 ),
             )
@@ -328,7 +326,8 @@ class BranchListView(LoginRequiredMixin, ListView):
             return {}
 
         type_stats = (
-            Policy.objects.filter(branch_id__in=branch_ids, policy_active=True)
+            Policy.objects.filter(branch_id__in=branch_ids)
+            .filter(in_force_q(date.today()))
             .values("branch_id", "insurance_type__name")
             .annotate(count=Count("id"))
             .order_by("branch_id", "-count", "insurance_type__name")
@@ -384,10 +383,11 @@ class BranchDetailView(LoginRequiredMixin, DetailView):
 
         context["policies"] = policies_qs.order_by("-start_date", "-id")
         context["policies_count"] = policies_qs.count()
+        in_force = in_force_q(date.today())
         overview_data = policies_qs.aggregate(
             total_policies=Count("id"),
-            active_policies=Count("id", filter=Q(policy_active=True)),
-            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            active_policies=Count("id", filter=in_force),
+            terminated_policies=Count("id", filter=~in_force),
             avg_premium=Avg(
                 Subquery(policy_premium_subquery(), output_field=DecimalField()),
             ),
@@ -417,10 +417,8 @@ class BranchDetailView(LoginRequiredMixin, DetailView):
                 ),
                 active_policies=Count(
                     "policies",
-                    filter=Q(
-                        policies__branch=self.object,
-                        policies__policy_active=True,
-                    ),
+                    filter=Q(policies__branch=self.object)
+                    & in_force_q(date.today(), prefix="policies__"),
                 ),
             )
             .distinct()
@@ -455,7 +453,7 @@ class LeasingManagerListView(LoginRequiredMixin, ListView):
             .annotate(
                 total_policies=Count("policies"),
                 active_policies=Count(
-                    "policies", filter=Q(policies__policy_active=True)
+                    "policies", filter=in_force_q(date.today(), prefix="policies__")
                 ),
             )
         )
@@ -494,24 +492,20 @@ class LeasingManagerDetailView(LoginRequiredMixin, DetailView):
         context["policies_count"] = policies_qs.count()
         context["branches"] = branches
 
+        in_force = in_force_q(date.today())
         overview_data = policies_qs.aggregate(
             total_policies=Count("id"),
-            active_policies=Count("id", filter=Q(policy_active=True)),
-            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            active_policies=Count("id", filter=in_force),
+            terminated_policies=Count("id", filter=~in_force),
         )
+        # Ближайшая дата окончания среди действующих полисов (in-force уже
+        # гарантирует end_date >= сегодня).
         nearest_end_date = (
-            policies_qs.filter(policy_active=True, end_date__gte=date.today())
+            policies_qs.filter(in_force)
             .order_by("end_date")
             .values_list("end_date", flat=True)
             .first()
         )
-        if nearest_end_date is None:
-            nearest_end_date = (
-                policies_qs.filter(policy_active=True)
-                .order_by("end_date")
-                .values_list("end_date", flat=True)
-                .first()
-            )
 
         context["manager_overview"] = {
             "total_policies": overview_data["total_policies"],

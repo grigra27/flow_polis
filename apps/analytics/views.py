@@ -615,6 +615,10 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if policy_status in ["active", "inactive"]:
                 filter_data["policy_active"] = policy_status == "active"
 
+            # Дата среза «в силе» (опционально; по умолчанию — сегодня)
+            if self.request.GET.get("as_of"):
+                filter_data["as_of"] = self.request.GET.get("as_of")
+
             # Multi-select filters
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
@@ -893,6 +897,10 @@ class BranchPortfolioAnalyticsV2View(SuperuserRequiredMixin, TemplateView):
             policy_status = self.request.GET.get("policy_status", "active")
             if policy_status in ["active", "inactive"]:
                 filter_data["policy_active"] = policy_status == "active"
+
+            # Дата среза «в силе» (опционально; по умолчанию — сегодня)
+            if self.request.GET.get("as_of"):
+                filter_data["as_of"] = self.request.GET.get("as_of")
 
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
@@ -1323,6 +1331,10 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
             if policy_status in ["active", "inactive"]:
                 filter_data["policy_active"] = policy_status == "active"
 
+            # Дата среза «в силе» (опционально; по умолчанию — сегодня)
+            if self.request.GET.get("as_of"):
+                filter_data["as_of"] = self.request.GET.get("as_of")
+
             # Multi-select filters
             if self.request.GET.getlist("branches"):
                 filter_data["branch_ids"] = self.request.GET.getlist("branches")
@@ -1619,6 +1631,10 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
             policy_status = self.request.GET.get("policy_status", "active")
             if policy_status in ["active", "inactive"]:
                 filter_data["policy_active"] = policy_status == "active"
+
+            # Дата среза «в силе» (опционально; по умолчанию — сегодня)
+            if self.request.GET.get("as_of"):
+                filter_data["as_of"] = self.request.GET.get("as_of")
 
             # Always create filter if we have policy_status or other data
             if filter_data or policy_status != "all":

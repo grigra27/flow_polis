@@ -13,6 +13,7 @@ from apps.policies.models import (
     Policy,
     PaymentSchedule,
     dfa_deactivated_payments_q,
+    in_force_q,
 )
 from apps.insurers.models import Insurer
 from .models import CustomExportTemplate
@@ -449,7 +450,11 @@ def export_policy_expiration(request):
             messages.error(request, "Дата начала не может быть позже даты окончания")
             return redirect("reports:index")
 
-        # Получаем активные полисы с окончанием страхования в заданном диапазоне.
+        # Получаем действующие («в силе») полисы с окончанием страхования в
+        # заданном диапазоне. Срез in-force берём на начало периода (date_from):
+        # на эту дату полис ещё действует (end_date >= date_from по условию окна),
+        # а досрочно расторгнутые/закрытые вручную отсекаются. Это позволяет
+        # строить отчёт и за прошлые периоды.
         # Статус ДФА не фильтруем: такие строки нужны в отчете и подсвечиваются.
         # Сортируем по филиалу (алфавитно), затем по дате окончания
         policies = (
@@ -461,7 +466,8 @@ def export_policy_expiration(request):
                 "policyholder",
                 "leasing_manager",
             )
-            .filter(end_date__gte=date_from, end_date__lte=date_to, policy_active=True)
+            .filter(end_date__gte=date_from, end_date__lte=date_to)
+            .filter(in_force_q(date_from))
             .order_by("branch__branch_name", "end_date", "policy_number")
         )
 
@@ -937,8 +943,10 @@ def property_snapshot_report(request):
         return redirect("reports:index")
 
     from .services.property_snapshot import build_property_snapshot
+    from django.utils.dateparse import parse_date
 
-    context = build_property_snapshot()
+    as_of = parse_date(request.GET.get("as_of") or "")
+    context = build_property_snapshot(as_of=as_of)
     return render(request, "reports/property_snapshot.html", context)
 
 

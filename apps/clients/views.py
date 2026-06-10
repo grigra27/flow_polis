@@ -1,9 +1,10 @@
 from datetime import date
 
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Client
+from apps.policies.models import in_force_q
 
 
 class ClientListView(LoginRequiredMixin, ListView):
@@ -36,24 +37,20 @@ class ClientDetailView(LoginRequiredMixin, DetailView):
         )
         context["policies"] = policies_qs.order_by("-start_date")
 
+        in_force = in_force_q(date.today())
         overview_data = policies_qs.aggregate(
             total_policies=Count("id"),
-            active_policies=Count("id", filter=Q(policy_active=True)),
-            terminated_policies=Count("id", filter=Q(policy_active=False)),
+            active_policies=Count("id", filter=in_force),
+            terminated_policies=Count("id", filter=~in_force),
         )
+        # Ближайшая дата окончания среди действующих полисов (in-force уже
+        # гарантирует end_date >= сегодня, поэтому первый по возрастанию — ближайший).
         nearest_end_date = (
-            policies_qs.filter(policy_active=True, end_date__gte=date.today())
+            policies_qs.filter(in_force)
             .order_by("end_date")
             .values_list("end_date", flat=True)
             .first()
         )
-        if nearest_end_date is None:
-            nearest_end_date = (
-                policies_qs.filter(policy_active=True)
-                .order_by("end_date")
-                .values_list("end_date", flat=True)
-                .first()
-            )
 
         context["client_overview"] = {
             "total_policies": overview_data["total_policies"],

@@ -887,6 +887,17 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2 mb-0">Дашборд версия 2.0</h1>
     <div class="d-flex gap-2 align-items-center mt-2 mt-md-0">
+        <form method="get" class="d-flex align-items-center" style="margin:0;">
+            {% if dashboard_v2_structure_scope and dashboard_v2_structure_scope != "all" %}
+            <input type="hidden" name="structure_scope" value="{{ dashboard_v2_structure_scope }}">
+            {% endif %}
+            <label class="v2-pill" style="margin:0; cursor:pointer;">Срез на&nbsp;
+                <input type="date" name="as_of"
+                       value="{{ dashboard_v2_meta.today|date:'Y-m-d' }}"
+                       onchange="this.form.submit()"
+                       style="border:none; background:transparent; font:inherit; color:inherit; cursor:pointer;">
+            </label>
+        </form>
         <span class="v2-pill">{{ dashboard_v2_meta.period_label }}</span>
         <span class="v2-pill">Обновлено: {{ dashboard_v2_meta.generated_at|date:"d.m.Y H:i" }}</span>
     </div>

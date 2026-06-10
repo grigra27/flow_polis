@@ -14,6 +14,55 @@ from apps.insurers.models import (
 )
 
 
+def in_force_q(as_of, prefix=""):
+    """Q-фильтр полисов, действующих («в силе») на дату as_of.
+
+    Полис считается действующим на дату D, если:
+    - плановое окно покрывает дату: start_date <= D <= end_date
+      (ещё не начавшиеся полисы не считаются действующими);
+    - полис не расторгнут досрочно к этой дате: termination_date пуста
+      или позже D (до даты расторжения полис ещё в силе);
+    - полис не закрыт вручную «без даты»: снятый флаг policy_active без
+      termination_date трактуется как закрытый — такие записи нельзя
+      восстановить во времени для исторического среза.
+
+    Для D = сегодня определение совпадает с «активен сейчас».
+
+    prefix — путь до Policy от модели запроса: "" для самого Policy,
+    "policy__" для PaymentSchedule и т.п.
+    """
+    return (
+        Q(**{f"{prefix}start_date__lte": as_of})
+        & Q(**{f"{prefix}end_date__gte": as_of})
+        & (
+            Q(**{f"{prefix}termination_date__isnull": True})
+            | Q(**{f"{prefix}termination_date__gt": as_of})
+        )
+        & (
+            Q(**{f"{prefix}policy_active": True})
+            | Q(**{f"{prefix}termination_date__isnull": False})
+        )
+    )
+
+
+class PolicyQuerySet(models.QuerySet):
+    def in_force(self, as_of=None):
+        """Полисы, действующие на дату as_of (по умолчанию — сегодня)."""
+        if as_of is None:
+            from django.utils import timezone
+
+            as_of = timezone.localdate()
+        return self.filter(in_force_q(as_of))
+
+
+class PolicyManager(models.Manager):
+    def get_queryset(self):
+        return PolicyQuerySet(self.model, using=self._db)
+
+    def in_force(self, as_of=None):
+        return self.get_queryset().in_force(as_of)
+
+
 class Policy(TimeStampedModel):
     """
     Insurance Policy - Страховой полис
@@ -120,6 +169,8 @@ class Policy(TimeStampedModel):
         help_text="Дата досрочного расторжения полиса",
     )
 
+    objects = PolicyManager()
+
     class Meta:
         verbose_name = "Полис"
         verbose_name_plural = "Полисы"
@@ -147,6 +198,23 @@ class Policy(TimeStampedModel):
         """
         total = self.payment_schedule.aggregate(total=models.Sum("amount"))["total"]
         return total or Decimal("0")
+
+    @property
+    def is_in_force(self):
+        """Действует ли полис «в силе» сегодня.
+
+        Учитывает плановое окончание (end_date), досрочное расторжение
+        (termination_date) и ручной флаг policy_active. Семантика совпадает
+        с фильтром `in_force_q` / `Policy.objects.in_force()`.
+        """
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        if not (self.start_date <= today <= self.end_date):
+            return False
+        if self.termination_date is not None:
+            return self.termination_date > today
+        return self.policy_active
 
     def get_rates_by_year(self):
         """

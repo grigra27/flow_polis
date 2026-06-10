@@ -168,17 +168,24 @@ class DashboardV2Service:
     level totals (no policy numbers or client-level sensitive data).
     """
 
-    def get_dashboard_context(self, *, structure_scope: str = "all") -> Dict[str, Any]:
-        from apps.policies.models import Policy, PaymentSchedule
+    def get_dashboard_context(
+        self, *, structure_scope: str = "all", as_of: date | None = None
+    ) -> Dict[str, Any]:
+        from apps.policies.models import Policy, PaymentSchedule, in_force_q
 
-        today = timezone.localdate()
+        today = as_of or timezone.localdate()
         prev_date = today - timedelta(days=30)
         current_month_start = today.replace(day=1)
         normalized_structure_scope = self._normalize_structure_scope(structure_scope)
 
+        # «Действующие» полисы/платежи считаются по правилу in-force на дату среза
+        # (плановое окончание, досрочное расторжение и ручной флаг), а не по голому
+        # policy_active — иначе истёкшие полисы попадали бы в активные.
         policies_qs = Policy.objects.all()
-        active_policies_qs = policies_qs.filter(policy_active=True)
-        active_payments_qs = PaymentSchedule.objects.filter(policy__policy_active=True)
+        active_policies_qs = policies_qs.filter(in_force_q(today))
+        active_payments_qs = PaymentSchedule.objects.filter(
+            in_force_q(today, prefix="policy__")
+        )
 
         health = self._build_health_index(
             policies_qs=policies_qs,
@@ -226,6 +233,7 @@ class DashboardV2Service:
             active_payments_qs=active_payments_qs,
             current_month_start=current_month_start,
             broker_only=normalized_structure_scope == "broker",
+            today=today,
         )
 
         concentration = self._build_concentration_risk(structure=structure)
@@ -322,8 +330,10 @@ class DashboardV2Service:
     def _health_snapshot(
         self, *, policies_qs, active_payments_qs, as_of: date
     ) -> Dict[str, Any]:
+        from apps.policies.models import in_force_q
+
         scoped_policies = policies_qs.filter(created_at__date__lte=as_of)
-        scoped_active_policies = scoped_policies.filter(policy_active=True)
+        scoped_active_policies = scoped_policies.filter(in_force_q(as_of))
         scoped_active_payments = active_payments_qs.filter(
             policy__created_at__date__lte=as_of
         )
@@ -838,9 +848,14 @@ class DashboardV2Service:
         active_payments_qs,
         current_month_start: date,
         broker_only: bool = False,
+        today: date,
     ) -> Dict[str, Any]:
-        # Safety filter: block 7 must always be based only on active policies.
-        scoped_payments_qs = active_payments_qs.filter(policy__policy_active=True)
+        from apps.policies.models import in_force_q
+
+        # Safety filter: block 7 must always be based only on in-force policies.
+        scoped_payments_qs = active_payments_qs.filter(
+            in_force_q(today, prefix="policy__")
+        )
         if broker_only:
             scoped_payments_qs = scoped_payments_qs.filter(
                 policy__broker_participation=True

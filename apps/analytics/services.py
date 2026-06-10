@@ -272,6 +272,7 @@ class AnalyticsFilter:
         client_ids: Optional[list] = None,
         policy_active: Optional[bool] = None,
         target_month: Optional[str] = None,
+        as_of: Optional[date] = None,
     ):
         self.date_from = date_from
         self.date_to = date_to
@@ -281,6 +282,28 @@ class AnalyticsFilter:
         self.client_ids = client_ids or []
         self.policy_active = policy_active
         self.target_month = target_month
+        # Дата среза «в силе»: по умолчанию — сегодня.
+        self.as_of = as_of
+
+    def policy_status_q(self, prefix: str = ""):
+        """Q-фильтр статуса полиса для аналитики.
+
+        Семантика «активные» переопределена как «в силе» (in-force) на дату
+        среза as_of: учитываются плановое окончание (end_date), досрочное
+        расторжение (termination_date) и ручной флаг policy_active. «Неактивные»
+        — отрицание этого условия. Возвращает None, если фильтр не задан.
+
+        prefix — путь до Policy от модели запроса ("" для Policy,
+        "policy__" для PaymentSchedule).
+        """
+        if self.policy_active is None:
+            return None
+        from apps.policies.models import in_force_q
+        from django.utils import timezone
+
+        as_of = self.as_of or timezone.localdate()
+        q = in_force_q(as_of, prefix=prefix)
+        return q if self.policy_active else ~q
 
     def apply_to_policies(self, queryset: QuerySet) -> QuerySet:
         """
@@ -314,9 +337,10 @@ class AnalyticsFilter:
         if self.client_ids:
             queryset = queryset.filter(client_id__in=self.client_ids)
 
-        # Policy active filtering
-        if self.policy_active is not None:
-            queryset = queryset.filter(policy_active=self.policy_active)
+        # Policy active filtering (переопределено как in-force на дату среза)
+        status_q = self.policy_status_q()
+        if status_q is not None:
+            queryset = queryset.filter(status_q)
 
         return queryset
 
@@ -354,9 +378,10 @@ class AnalyticsFilter:
         if self.client_ids:
             queryset = queryset.filter(policy__client_id__in=self.client_ids)
 
-        # Policy active filtering through policy relationship
-        if self.policy_active is not None:
-            queryset = queryset.filter(policy__policy_active=self.policy_active)
+        # Policy active filtering through policy relationship (in-force на дату среза)
+        status_q = self.policy_status_q(prefix="policy__")
+        if status_q is not None:
+            queryset = queryset.filter(status_q)
 
         return queryset
 
@@ -611,8 +636,14 @@ class AnalyticsService:
             else:
                 average_commission_rate = Decimal("0")
 
-            # Count active policies
-            active_policies_count = policies_qs.filter(policy_active=True).count()
+            # Count active policies (in-force на дату среза)
+            from apps.policies.models import in_force_q
+            from django.utils import timezone
+
+            as_of = (analytics_filter.as_of if analytics_filter else None) or (
+                timezone.localdate()
+            )
+            active_policies_count = policies_qs.filter(in_force_q(as_of)).count()
 
             return {
                 # Month-based bridge components
@@ -2424,10 +2455,9 @@ class AnalyticsService:
                     payments_qs = payments_qs.filter(
                         policy__client_id__in=analytics_filter.client_ids
                     )
-                if analytics_filter.policy_active is not None:
-                    payments_qs = payments_qs.filter(
-                        policy__policy_active=analytics_filter.policy_active
-                    )
+                status_q = analytics_filter.policy_status_q(prefix="policy__")
+                if status_q is not None:
+                    payments_qs = payments_qs.filter(status_q)
 
             # Group by month number (1-12) and calculate averages
             monthly_totals = defaultdict(list)
@@ -2577,12 +2607,11 @@ class AnalyticsService:
                     payments_qs = payments_qs.filter(
                         policy__client_id__in=analytics_filter.client_ids
                     )
-                if analytics_filter.policy_active is not None:
-                    policies_qs = policies_qs.filter(
-                        policy_active=analytics_filter.policy_active
-                    )
+                status_q = analytics_filter.policy_status_q()
+                if status_q is not None:
+                    policies_qs = policies_qs.filter(status_q)
                     payments_qs = payments_qs.filter(
-                        policy__policy_active=analytics_filter.policy_active
+                        analytics_filter.policy_status_q(prefix="policy__")
                     )
 
             # Calculate current year metrics
@@ -2776,12 +2805,11 @@ class AnalyticsService:
                     payments_qs = payments_qs.filter(
                         policy__client_id__in=analytics_filter.client_ids
                     )
-                if analytics_filter.policy_active is not None:
-                    policies_qs = policies_qs.filter(
-                        policy_active=analytics_filter.policy_active
-                    )
+                status_q = analytics_filter.policy_status_q()
+                if status_q is not None:
+                    policies_qs = policies_qs.filter(status_q)
                     payments_qs = payments_qs.filter(
-                        policy__policy_active=analytics_filter.policy_active
+                        analytics_filter.policy_status_q(prefix="policy__")
                     )
 
             # Filter to our date range
@@ -3897,6 +3925,16 @@ class AnalyticsService:
             if target_month == "":
                 target_month = None
 
+            # Parse as_of (дата среза «в силе»)
+            as_of = filter_data.get("as_of")
+            if as_of:
+                if not isinstance(as_of, date):
+                    from datetime import datetime
+
+                    as_of = datetime.strptime(as_of, "%Y-%m-%d").date()
+            else:
+                as_of = None
+
             return AnalyticsFilter(
                 date_from=date_from,
                 date_to=date_to,
@@ -3906,6 +3944,7 @@ class AnalyticsService:
                 client_ids=client_ids,
                 policy_active=policy_active,
                 target_month=target_month,
+                as_of=as_of,
             )
 
         except (ValueError, TypeError) as e:

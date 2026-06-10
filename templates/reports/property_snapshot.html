@@ -28,8 +28,23 @@
     .ps-toolbar {
         display: flex;
         justify-content: flex-end;
+        align-items: center;
         gap: 0.5rem;
         margin-bottom: 1rem;
+    }
+    .ps-asof-form {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--ps-muted, #6b7280);
+        display: inline-flex;
+        align-items: center;
+    }
+    .ps-asof-form input[type="date"] {
+        margin-left: 0.35rem;
+        padding: 0.45rem 0.6rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.45rem;
+        font: inherit;
     }
     .ps-btn {
         display: inline-flex;
@@ -389,6 +404,13 @@
         <button type="button" class="ps-btn" onclick="window.print()">
             <i class="bi bi-printer"></i> Печать / Сохранить как PDF
         </button>
+        <form method="get" class="ps-asof-form">
+            <label>Срез на дату:
+                <input type="date" name="as_of"
+                       value="{{ as_of|date:'Y-m-d' }}"
+                       onchange="this.form.submit()">
+            </label>
+        </form>
     </div>
 
     <section class="ps-cover">

@@ -11,7 +11,7 @@ from django.db.models import Count, DecimalField, Max, QuerySet, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils.dateparse import parse_date
 
-from apps.policies.models import policy_premium_subquery
+from apps.policies.models import policy_premium_subquery, in_force_q
 
 
 BRANCH_COLORS = [
@@ -104,7 +104,7 @@ class InsurerStatisticsService:
         scoped_queryset = self._build_policy_scope_queryset(base_queryset, filters)
 
         total_policies = base_queryset.count()
-        active_policies = base_queryset.filter(policy_active=True).count()
+        active_policies = base_queryset.filter(in_force_q(date.today())).count()
         inactive_policies = max(total_policies - active_policies, 0)
 
         scoped_policies = scoped_queryset.count()
@@ -178,7 +178,7 @@ class InsurerStatisticsService:
         self, base_queryset: QuerySet, filters: StatisticsFilters
     ) -> QuerySet:
         if filters.policy_scope == "active":
-            return base_queryset.filter(policy_active=True)
+            return base_queryset.filter(in_force_q(date.today()))
         return base_queryset
 
     def _build_branch_distribution(
@@ -392,7 +392,7 @@ class BranchStatisticsService:
         scoped_queryset = self._build_policy_scope_queryset(base_queryset, filters)
 
         total_policies = base_queryset.count()
-        active_policies = base_queryset.filter(policy_active=True).count()
+        active_policies = base_queryset.filter(in_force_q(date.today())).count()
         inactive_policies = max(total_policies - active_policies, 0)
 
         scoped_policies = scoped_queryset.count()
@@ -468,7 +468,7 @@ class BranchStatisticsService:
         self, base_queryset: QuerySet, filters: BranchStatisticsFilters
     ) -> QuerySet:
         if filters.policy_scope == "active":
-            return base_queryset.filter(policy_active=True)
+            return base_queryset.filter(in_force_q(date.today()))
         return base_queryset
 
     def _build_insurer_distribution(

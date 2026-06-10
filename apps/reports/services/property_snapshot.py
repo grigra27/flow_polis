@@ -18,7 +18,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.insurers.models import Insurer
-from apps.policies.models import PaymentSchedule, Policy
+from apps.policies.models import PaymentSchedule, Policy, in_force_q
 
 
 DECIMAL_ZERO = Decimal("0")
@@ -78,12 +78,15 @@ PIE_LABEL_RADIUS_PCT = 32.5
 def _aggregate_dimension(
     label_field: str,
     id_field: Optional[str] = None,
+    as_of=None,
 ) -> Tuple[List[Dict[str, Any]], Decimal]:
     """
-    Сгруппировать активные полисы по `label_field` и сложить MAX(insurance_sum)
-    по каждому полису внутри группы.
+    Сгруппировать действующие («в силе») полисы по `label_field` и сложить
+    MAX(insurance_sum) по каждому полису внутри группы на дату среза as_of.
     """
-    payments_qs = PaymentSchedule.objects.filter(policy__policy_active=True)
+    if as_of is None:
+        as_of = timezone.localdate()
+    payments_qs = PaymentSchedule.objects.filter(in_force_q(as_of, prefix="policy__"))
 
     value_fields = [label_field, "policy_id"]
     if id_field:
@@ -180,27 +183,36 @@ def _attach_insurer_logos(items: List[Dict[str, Any]]) -> None:
         item["logo_url"] = logos.get(item.get("id"), "")
 
 
-def build_property_snapshot() -> Dict[str, Any]:
-    """Сформировать данные для отчёта-снимка распределения портфеля."""
+def build_property_snapshot(as_of=None) -> Dict[str, Any]:
+    """Сформировать данные для отчёта-снимка распределения портфеля.
+
+    as_of — дата среза «в силе» (по умолчанию сегодня): полисы учитываются по
+    правилу in-force на эту дату.
+    """
+    if as_of is None:
+        as_of = timezone.localdate()
     by_branch, total = _aggregate_dimension(
         label_field="policy__branch__branch_name",
         id_field="policy__branch_id",
+        as_of=as_of,
     )
     by_insurer, _ = _aggregate_dimension(
         label_field="policy__insurer__insurer_name",
         id_field="policy__insurer_id",
+        as_of=as_of,
     )
     by_type, _ = _aggregate_dimension(
         label_field="policy__insurance_type__name",
         id_field="policy__insurance_type_id",
+        as_of=as_of,
     )
 
     _attach_insurer_logos(by_insurer)
 
-    active_policies_count = Policy.objects.filter(policy_active=True).count()
+    active_policies_count = Policy.objects.in_force(as_of).count()
 
     return {
-        "as_of": timezone.localdate(),
+        "as_of": as_of,
         "total_insurance_sum": total,
         "active_policies_count": active_policies_count,
         "sections": [

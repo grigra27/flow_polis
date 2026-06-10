@@ -55,11 +55,15 @@ def dashboard(request):
     Dashboard 2.0
     """
     requested_structure_scope = request.GET.get("structure_scope")
+    from django.utils.dateparse import parse_date
+
+    requested_as_of = parse_date(request.GET.get("as_of") or "")
     try:
         from apps.core.services.dashboard_v2_service import DashboardV2Service
 
         context = DashboardV2Service().get_dashboard_context(
-            structure_scope=requested_structure_scope or "all"
+            structure_scope=requested_structure_scope or "all",
+            as_of=requested_as_of,
         )
     except Exception as exc:
         logger.error("Error building Dashboard 2.0 context: %s", exc, exc_info=True)

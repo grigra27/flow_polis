@@ -26,13 +26,14 @@ class PolicyListView(LoginRequiredMixin, FilterView):
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
 
-        # Universal text search across policy number / DFA number / client.
+        # Universal text search across policy number / DFA number / client / VIN.
         search_query = (self.request.GET.get("search") or "").strip()
         if search_query:
             queryset = queryset.filter(
                 Q(policy_number__icontains=search_query)
                 | Q(dfa_number__icontains=search_query)
                 | Q(client__client_name__icontains=search_query)
+                | Q(vin_number__icontains=search_query)
             )
 
         return queryset

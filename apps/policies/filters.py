@@ -24,6 +24,18 @@ class PolicyFilter(django_filters.FilterSet):
         label="Дата начала до",
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
+    end_date_from = django_filters.DateFilter(
+        field_name="end_date",
+        lookup_expr="gte",
+        label="Дата окончания от",
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    end_date_to = django_filters.DateFilter(
+        field_name="end_date",
+        lookup_expr="lte",
+        label="Дата окончания до",
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
 
     # Булевые поля со стандартным виджетом
     policy_active = django_filters.BooleanFilter(label="Полис активен")
@@ -59,6 +71,8 @@ class PolicyFilter(django_filters.FilterSet):
             "insurance_type",
             "start_date_from",
             "start_date_to",
+            "end_date_from",
+            "end_date_to",
             "policy_active",
             "dfa_active",
             "policy_uploaded",

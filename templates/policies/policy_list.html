@@ -614,7 +614,7 @@
             <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
         </div>
         <div class="mgr-section-body">
-            {% if active_filters or request.GET.start_date_from or request.GET.start_date_to %}
+            {% if active_filters or request.GET.start_date_from or request.GET.start_date_to or request.GET.end_date_from or request.GET.end_date_to %}
             <div class="pl-active-filters">
                 <div class="pl-active-filters-head">
                     <div class="pl-active-filters-title">
@@ -641,6 +641,17 @@
                         <a class="pl-filter-chip-remove" href="?{% remove_query_params 'start_date_from' 'start_date_to' %}" title="Убрать фильтр">×</a>
                     </span>
                     {% endif %}
+                    {% if request.GET.end_date_from or request.GET.end_date_to %}
+                    <span class="pl-filter-chip">
+                        <span class="pl-filter-chip-label">Дата окончания страхования:</span>
+                        <span>
+                            {% if request.GET.end_date_from %}от {{ request.GET.end_date_from }}{% endif %}
+                            {% if request.GET.end_date_from and request.GET.end_date_to %} — {% endif %}
+                            {% if request.GET.end_date_to %}до {{ request.GET.end_date_to }}{% endif %}
+                        </span>
+                        <a class="pl-filter-chip-remove" href="?{% remove_query_params 'end_date_from' 'end_date_to' %}" title="Убрать фильтр">×</a>
+                    </span>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -650,7 +661,7 @@
                     <input type="text"
                            name="search"
                            value="{{ request.GET.search }}"
-                           placeholder="Номер полиса / Номер ДФА / Клиент">
+                           placeholder="Номер полиса / Номер ДФА / Клиент / VIN">
                 </div>
                 <div class="pl-filter-item">
                     <label class="pl-filter-label">Страховщик</label>
@@ -670,6 +681,14 @@
                         {{ filter.form.start_date_from }}
                         <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
                         {{ filter.form.start_date_to }}
+                    </div>
+                </div>
+                <div class="pl-filter-item pl-filter-item--date">
+                    <label class="pl-filter-label">Дата окончания</label>
+                    <div class="pl-date-range-box">
+                        {{ filter.form.end_date_from }}
+                        <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
+                        {{ filter.form.end_date_to }}
                     </div>
                 </div>
                 <div class="pl-filter-row-break"></div>

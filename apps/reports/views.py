@@ -390,11 +390,13 @@ def export_thursday_report(request):
                 logger.warning(f"Invalid payment_date format: {payment_date_str}")
                 payment_date = None
 
-        # Если дата не указана, используем текущую дату
+        # Если дата не указана, используем текущую дату в часовом поясе проекта
+        # (Europe/Moscow). Берём localdate(), а не now().date() (UTC) — иначе
+        # около полуночи дата среза и "сегодня" в заголовке расходятся на день.
         if not payment_date:
             from django.utils import timezone
 
-            payment_date = timezone.now().date()
+            payment_date = timezone.localdate()
 
         # Отсекаем полисы, чьё страхование ещё не началось на дату среза —
         # по ним требовать документы/оплату преждевременно.

@@ -116,6 +116,7 @@ def dashboard(request):
             "dashboard_v2_renewal": {"active_total": 0, "horizons": []},
             "dashboard_v2_data_quality": {"quality_score": 0, "problems": []},
             "dashboard_v2_structure": {
+                "policy_count": 0,
                 "by_branch": [],
                 "by_insurer": [],
                 "by_type": [],

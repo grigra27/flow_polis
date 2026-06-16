@@ -852,14 +852,18 @@ class DashboardV2Service:
     ) -> Dict[str, Any]:
         from apps.policies.models import in_force_q
 
-        # Safety filter: block 7 must always be based only on in-force policies.
+        # Safety filter: block 7 must always be based only on in-force policies
+        # with active DFA, matching the Property Snapshot report basis.
         scoped_payments_qs = active_payments_qs.filter(
-            in_force_q(today, prefix="policy__")
+            in_force_q(today, prefix="policy__"),
+            policy__dfa_active=True,
         )
         if broker_only:
             scoped_payments_qs = scoped_payments_qs.filter(
                 policy__broker_participation=True
             )
+
+        policy_count = scoped_payments_qs.values("policy_id").distinct().count()
 
         actual_qs = scoped_payments_qs.filter(
             due_date__lt=current_month_start, paid_date__isnull=False
@@ -914,6 +918,7 @@ class DashboardV2Service:
         )
 
         return {
+            "policy_count": policy_count,
             "by_branch": by_branch,
             "by_insurer": by_insurer,
             "by_type": by_type,

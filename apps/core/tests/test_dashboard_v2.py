@@ -236,6 +236,7 @@ class DashboardV2ServiceTests(TestCase):
         self.assertEqual(len(data_quality["problems"]), 3)
 
         structure = context["dashboard_v2_structure"]
+        self.assertEqual(structure["policy_count"], 2)
         self.assertIn("branch_breakdown", structure)
         self.assertIn("insurer_breakdown", structure)
         self.assertIn("type_breakdown", structure)
@@ -268,6 +269,9 @@ class DashboardV2ServiceTests(TestCase):
         all_structure = context_all["dashboard_v2_structure"]
         broker_structure = context_broker["dashboard_v2_structure"]
 
+        self.assertEqual(all_structure["policy_count"], 2)
+        self.assertEqual(broker_structure["policy_count"], 1)
+
         all_sum = all_structure["by_branch"][0]["bridge_insurance_sum"]
         broker_sum = broker_structure["by_branch"][0]["bridge_insurance_sum"]
 
@@ -294,6 +298,62 @@ class DashboardV2ServiceTests(TestCase):
             | Q(due_date__gte=current_month_start)
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"]
         self.assertEqual(all_premium - broker_premium, expected_non_broker_premium)
+
+    def test_structure_filters_inactive_dfa_policies(self):
+        today = timezone.localdate()
+        current_month_start = today.replace(day=1)
+        client = Client.objects.create(
+            client_name="ООО Неактивный ДФА",
+            client_inn="1122334455",
+        )
+        insurer = Insurer.objects.get(insurer_name="СК Тест")
+        branch = Branch.objects.create(branch_name="Филиал неактивного ДФА")
+        insurance_type = InsuranceType.objects.get(name="КАСКО")
+        commission_rate = CommissionRate.objects.get(
+            insurer=insurer,
+            insurance_type=insurance_type,
+        )
+        policy = Policy.objects.create(
+            policy_number="P-INACTIVE-DFA",
+            dfa_number="DFA-INACTIVE",
+            client=client,
+            insurer=insurer,
+            branch=branch,
+            insurance_type=insurance_type,
+            property_description="Объект с неактивным ДФА",
+            start_date=today - timedelta(days=10),
+            end_date=today + timedelta(days=300),
+            franchise=Decimal("0"),
+            policy_active=True,
+            policy_uploaded=True,
+            broker_participation=True,
+            dfa_active=False,
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=current_month_start + timedelta(days=1),
+            amount=Decimal("999999.00"),
+            insurance_sum=Decimal("9999999.00"),
+            commission_rate=commission_rate,
+            kv_rub=Decimal("99999.00"),
+            paid_date=None,
+        )
+
+        context = DashboardV2Service().get_dashboard_context()
+        structure = context["dashboard_v2_structure"]
+
+        self.assertEqual(context["dashboard_v2_snapshot"]["active_policies_count"], 3)
+        self.assertEqual(structure["policy_count"], 2)
+        self.assertNotIn(
+            branch.branch_name,
+            [row["name"] for row in structure["by_branch"]],
+        )
+        self.assertNotIn(
+            branch.branch_name,
+            [row["name"] for row in structure["branch_breakdown_premium"]["chart"]],
+        )
 
     def test_structure_counts_one_max_insurance_sum_per_policy(self):
         today = timezone.localdate()

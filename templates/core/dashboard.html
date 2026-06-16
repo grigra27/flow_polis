@@ -1022,12 +1022,13 @@
             <section class="v2-card">
                 <div class="v2-structure-head">
                     <div>
-                        <h5 class="v2-title mb-1">Структура портфеля</h5>
+                        <h5 class="v2-title mb-1">Структура портфеля (только по активным ДФА)</h5>
                         {% if dashboard_v2_structure_scope == "broker" %}
-                        <p class="v2-subtitle mb-0">Режим: только активные полисы с участием брокера.</p>
+                        <p class="v2-subtitle mb-1">Режим: только активные полисы с участием брокера.</p>
                         {% else %}
-                        <p class="v2-subtitle mb-0">Режим: все активные полисы (с участием брокера и без участия брокера).</p>
+                        <p class="v2-subtitle mb-1">Режим: все активные полисы (с участием брокера и без участия брокера).</p>
                         {% endif %}
+                        <p class="v2-subtitle mb-0">Количество полисов в расчете: {{ dashboard_v2_structure.policy_count }}</p>
                     </div>
                     <div class="v2-structure-switch" role="tablist" aria-label="Режим структуры портфеля">
                         {% for option in dashboard_v2_structure_scope_options %}

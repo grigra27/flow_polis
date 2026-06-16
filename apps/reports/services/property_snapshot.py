@@ -1,11 +1,12 @@
 """
 Снимок распределения портфеля действующих полисов по страховой сумме.
 
-Считает то же, что блок Portfolio Structure в Dashboard V2, но возвращает
-полный список без отсечения «топ-5 + Прочие». Используется для отчёта-
-презентации руководству лизинговой компании.
+Близок к блоку Portfolio Structure в Dashboard V2, но дополнительно
+ограничивает портфель активными ДФА и возвращает полный список без отсечения
+«топ-5 + Прочие». Используется для отчёта-презентации руководству лизинговой
+компании.
 
-Логика «страховой суммы полиса» воспроизводит dashboard V2:
+Логика «страховой суммы полиса»:
 для каждого полиса берётся MAX(insurance_sum) из его графика платежей,
 эти значения суммируются по группам (филиал / страховщик / вид страхования).
 """
@@ -86,7 +87,10 @@ def _aggregate_dimension(
     """
     if as_of is None:
         as_of = timezone.localdate()
-    payments_qs = PaymentSchedule.objects.filter(in_force_q(as_of, prefix="policy__"))
+    payments_qs = PaymentSchedule.objects.filter(
+        in_force_q(as_of, prefix="policy__"),
+        policy__dfa_active=True,
+    )
 
     value_fields = [label_field, "policy_id"]
     if id_field:
@@ -209,10 +213,13 @@ def build_property_snapshot(as_of=None) -> Dict[str, Any]:
 
     _attach_insurer_logos(by_insurer)
 
-    active_policies_count = Policy.objects.in_force(as_of).count()
+    active_policies_count = (
+        Policy.objects.in_force(as_of).filter(dfa_active=True).count()
+    )
 
     return {
         "as_of": as_of,
+        "dfa_active_only": True,
         "total_insurance_sum": total,
         "active_policies_count": active_policies_count,
         "sections": [

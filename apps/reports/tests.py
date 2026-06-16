@@ -1317,3 +1317,109 @@ class BackupExportViewTest(TestCase):
         self.assertIn("media_backup_info", response.context)
         self.assertTrue(response.context["database_backup_info"]["available"])
         self.assertTrue(response.context["media_backup_info"]["available"])
+
+
+class PropertySnapshotReportTest(TestCase):
+    """Тесты страницы «Снапшот СС»."""
+
+    def setUp(self):
+        from datetime import date
+
+        from apps.clients.models import Client
+        from apps.insurers.models import Branch, Insurer, InsuranceType
+
+        self.user = User.objects.create_user(
+            username="snapshot_user", password="testpass123"
+        )
+        self.as_of = date(2026, 6, 16)
+        self.client_obj = Client.objects.create(
+            client_name="Клиент снапшота", client_inn="7700000001"
+        )
+        self.insurer = Insurer.objects.create(insurer_name="СК снапшота")
+        self.branch = Branch.objects.create(branch_name="Филиал снапшота")
+        self.insurance_type = InsuranceType.objects.create(name="КАСКО снапшота")
+
+    def _create_policy_with_payment(self, *, policy_number, dfa_active, insurance_sum):
+        from datetime import date
+        from decimal import Decimal
+
+        from apps.policies.models import PaymentSchedule, Policy
+
+        policy = Policy.objects.create(
+            policy_number=policy_number,
+            dfa_number=f"DFA-{policy_number}",
+            client=self.client_obj,
+            insurer=self.insurer,
+            branch=self.branch,
+            insurance_type=self.insurance_type,
+            property_description="Имущество для снапшота",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+            policy_active=True,
+            dfa_active=dfa_active,
+        )
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=date(2026, 1, 1),
+            insurance_sum=Decimal(insurance_sum),
+            amount=Decimal("100.00"),
+        )
+        return policy
+
+    def test_build_property_snapshot_filters_inactive_dfa(self):
+        """В Снапшот СС попадают только действующие полисы с активным ДФА."""
+        from decimal import Decimal
+
+        from apps.reports.services.property_snapshot import build_property_snapshot
+
+        self._create_policy_with_payment(
+            policy_number="SNAP-ACTIVE-DFA",
+            dfa_active=True,
+            insurance_sum="1000.00",
+        )
+        self._create_policy_with_payment(
+            policy_number="SNAP-INACTIVE-DFA",
+            dfa_active=False,
+            insurance_sum="5000.00",
+        )
+
+        context = build_property_snapshot(as_of=self.as_of)
+
+        self.assertTrue(context["dfa_active_only"])
+        self.assertEqual(context["active_policies_count"], 1)
+        self.assertEqual(context["total_insurance_sum"], Decimal("1000"))
+        self.assertEqual(context["sections"][0]["items"][0]["policy_count"], 1)
+        self.assertEqual(
+            context["sections"][0]["items"][0]["insurance_sum"], Decimal("1000")
+        )
+
+    def test_regular_user_can_open_property_snapshot_report(self):
+        """Обычный авторизованный пользователь может открыть страницу снапшота."""
+        self._create_policy_with_payment(
+            policy_number="SNAP-REGULAR-USER",
+            dfa_active=True,
+            insurance_sum="1000.00",
+        )
+        self.client.login(username="snapshot_user", password="testpass123")
+
+        response = self.client.get(
+            reverse("reports:property_snapshot_report"),
+            {"as_of": self.as_of.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Как формируется Снапшот СС")
+        self.assertContains(response, "dfa_active = True")
+        self.assertTrue(response.context["dfa_active_only"])
+
+    def test_exports_page_shows_snapshot_card_to_regular_user(self):
+        """Карточка Снапшота СС доступна в общем блоке экспортов."""
+        self.client.login(username="snapshot_user", password="testpass123")
+
+        response = self.client.get(reverse("reports:index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Снэпшот по СС распределения имущества")
+        self.assertContains(response, "Только активные ДФА")

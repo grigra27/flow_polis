@@ -306,7 +306,7 @@
             -webkit-print-color-adjust: exact;
         }
         body { background: #fff; color: #000; }
-        .ps-toolbar, .navbar, nav, footer, .messages, .alert { display: none !important; }
+        .ps-toolbar, .ps-modal, .modal, .modal-backdrop, .navbar, nav, footer, .messages, .alert { display: none !important; }
         .ps-root { padding: 0; max-width: none; }
         .ps-cover, .ps-section {
             border: 1px solid #888;
@@ -401,6 +401,9 @@
         <a href="{% url 'reports:index' %}" class="ps-btn ps-btn--ghost">
             <i class="bi bi-arrow-left"></i> К экспортам
         </a>
+        <button type="button" class="ps-btn ps-btn--ghost" data-bs-toggle="modal" data-bs-target="#propertySnapshotInfoModal">
+            <i class="bi bi-question-circle"></i> Как считается
+        </button>
         <button type="button" class="ps-btn" onclick="window.print()">
             <i class="bi bi-printer"></i> Печать / Сохранить как PDF
         </button>
@@ -418,7 +421,7 @@
         <h1 class="ps-cover-title">Распределение страховой стоимости имущества</h1>
         <p class="ps-cover-sub">
             По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>.
-            Учитываются только действующие полисы.
+            Учитываются только действующие полисы с активным ДФА.
         </p>
 
         <div class="ps-summary">
@@ -502,5 +505,29 @@
         {% endif %}
     </section>
     {% endfor %}
+</div>
+
+<div class="modal fade ps-modal" id="propertySnapshotInfoModal" tabindex="-1" aria-labelledby="propertySnapshotInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="propertySnapshotInfoModalLabel">
+                    <i class="bi bi-question-circle"></i> Как формируется Снапшот СС
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Что попадает в срез:</strong> только полисы, которые действуют на выбранную дату и у которых <code>dfa_active = True</code>.</p>
+                <p><strong>Правило действующего полиса:</strong> дата среза входит в период страхования (<code>start_date &lt;= дата &lt;= end_date</code>), полис не расторгнут к этой дате, и он не закрыт вручную без даты расторжения.</p>
+                <p><strong>Как считается СС полиса:</strong> для каждого попавшего полиса берётся максимальное значение <code>insurance_sum</code> из его графика платежей.</p>
+                <p><strong>Как строятся таблицы:</strong> рассчитанные СС полисов суммируются по филиалам, страховщикам и видам страхования. В строке группы показываются количество полисов, сумма СС и доля группы в общем портфеле.</p>
+                <p><strong>Дата среза:</strong> по умолчанию используется текущая дата открытия страницы. Дату можно поменять в верхней панели отчёта.</p>
+                <p class="mb-0"><strong>Печать/PDF:</strong> эта справка и верхняя панель управления скрываются при печати.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

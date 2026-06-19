@@ -710,6 +710,49 @@
         color: #fff;
     }
 
+    /* Payment note pulled from the policy — standalone highlighted card */
+    .pay-note-card {
+        background: linear-gradient(180deg, #f0fdfa 0%, #cffafe 100%);
+        border: 1px solid #5eead4;
+        border-left: 4px solid #0f766e;
+        border-radius: 12px;
+        padding: 1rem 1.15rem 1.1rem;
+        box-shadow: 0 1px 3px rgba(15, 118, 110, 0.1);
+    }
+    .pay-note-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.55rem;
+    }
+    .pay-note-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #0f766e;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+    .pay-note-title i {
+        font-size: 1rem;
+    }
+    .pay-note-body {
+        color: #134e4a;
+        line-height: 1.6;
+        font-size: 1.05rem;
+        font-weight: 500;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .pay-note-body--empty {
+        color: #5b8a86;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
     /* Current status row (read-only) */
     .task-status-row {
         display: flex;
@@ -987,6 +1030,17 @@
                 </div>
             </div>
 
+            <div class="pay-note-card">
+                <div class="pay-note-head">
+                    <span class="pay-note-title"><i class="bi bi-chat-square-quote"></i> Примечание к платежу (из полиса)</span>
+                </div>
+                {% if task.payment_schedule.payment_info %}
+                <div class="pay-note-body">{{ task.payment_schedule.payment_info|linebreaksbr }}</div>
+                {% else %}
+                <div class="pay-note-body pay-note-body--empty">Не указано</div>
+                {% endif %}
+            </div>
+
             <div class="mgr-section">
                 <div class="mgr-section-head">
                     <span class="mgr-section-head-title"><i class="bi bi-info-circle"></i> Данные платежа</span>
@@ -1102,14 +1156,6 @@
                         <div class="task-prose-value">{{ policy.property_description }}</div>
                     </div>
 
-                    <div class="task-prose-block task-prose-block--note">
-                        <div class="task-prose-label"><i class="bi bi-chat-square-quote"></i> Примечание к платежу (из полиса)</div>
-                        {% if task.payment_schedule.payment_info %}
-                        <div class="task-prose-value">{{ task.payment_schedule.payment_info|linebreaksbr }}</div>
-                        {% else %}
-                        <div class="task-prose-value task-prose-value--empty">Не указано</div>
-                        {% endif %}
-                    </div>
                     {% if not task.is_actual %}
                     <div class="alert-warn">
                         <i class="bi bi-exclamation-triangle"></i>

@@ -27,16 +27,20 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Logging functions
+# Contract: stdout of this script's functions captured via command substitution
+# must contain only return values (e.g. the backup path from backup_database).
+# All status/diagnostic output — including log_* calls made from telegram-notify.sh
+# functions sourced above — goes to stderr.
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo -e "${YELLOW}[WARN]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
 }
 
 # Create backup directory

@@ -9,6 +9,7 @@ This guide explains how to backup and restore the Insurance Broker application d
 - [Database Backup](#database-backup)
 - [Database Restore](#database-restore)
 - [Media Files Backup](#media-files-backup)
+- [Deploying Backup Script Changes](#deploying-backup-script-changes)
 - [Automated Backups](#automated-backups)
 - [Backup Storage](#backup-storage)
 - [Disaster Recovery](#disaster-recovery)
@@ -211,6 +212,25 @@ docker run --rm \
 # Start the application
 docker-compose -f docker-compose.prod.yml up -d
 ```
+
+## Deploying Backup Script Changes
+
+The backup scripts are ordinary repository files — there is no separate delivery
+channel for them:
+
+- `scripts/backup-db-telegram.sh`
+- `scripts/backup-media-telegram.sh`
+- `scripts/telegram-notify.sh`
+
+Production deployment is performed by the existing GitHub Actions workflow
+(`.github/workflows/deploy.yml`), which runs on every push to `main`. The
+workflow rsyncs the repository into `~/insurance_broker/` on the server; the
+`scripts/` directory is not excluded from that sync, so changes to these files
+reach production the same way as the rest of the code.
+
+Deliver changes to the backup scripts through that CI/CD path. A manual `scp`
+deployment is not a supported process and must not be used as a second
+deployment path.
 
 ## Automated Backups
 

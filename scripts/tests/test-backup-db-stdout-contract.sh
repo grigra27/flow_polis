@@ -59,6 +59,9 @@ export BACKUP_DIR="$TMP/database"
 export RETENTION_DAYS=7
 export TELEGRAM_ENABLED=false
 export VK_ENABLED=false
+# P0-06 added a minimum-size check (default 10240 bytes); fixture dumps here are
+# ~100 bytes, so the threshold is lowered for this contract test only.
+export MIN_BACKUP_BYTES=10
 
 # shellcheck source=/dev/null
 source_backup_functions() {

@@ -87,7 +87,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Rollback:** не требуется — изменений на проде задача не вносит.
 - **Housekeeping:** от первоначальной (отменённой) попытки внедрить `scp`-доставку на сервере остался безвредный файл `/root/insurance_broker/scripts/backup-db-telegram.sh.bak-20260919_222023` — идентичная копия боевого скрипта. Удаляется в P2-06 вместе с прочим мусором в `scripts/`.
 
-### P0-04 — Исправить перехват stdout в `backup-db-telegram.sh`
+### P0-04 — Исправить перехват stdout в `backup-db-telegram.sh` — **PASS (2026-09-19, deployed 42f2769)**
 - **Проблема:** `backup_file=$(backup_database)` (:279) кладёт в переменную весь stdout функции, включая `log_info`-строки; путь теряется → верификация падает 267/271 раз.
 - **Почему P0:** корневая причина «сломанной проверки целостности».
 - **Тронутые файлы:** `scripts/backup-db-telegram.sh` (`backup_database` ~:60-120, вызов :279).
@@ -98,8 +98,9 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** `backup_file` = ровно один существующий путь; поведение при реальном провале дампа не изменилось (ненулевой exit).
 - **Как проверить:** изолированный запуск `BACKUP_DIR=/tmp/bktest ./scripts/backup-db-telegram.sh` → в логе `Verifying backup integrity... → Backup file integrity verified`, а не `Backup file not found`; `bash -n`, `shellcheck`.
 - **Rollback:** `git revert` правки + прогон того же workflow (deploy на push в `main`).
+- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`fc88d7b3…`), regression-набор `scripts/tests/test-backup-db-stdout-contract.sh` зелёный и локально, и на сервере. **Pending:** наблюдение ближайшего cron-прогона (02:00 MSK) — verification должна пройти без `Backup file not found`.
 
-### P0-05 — Исправить перехват stdout в `backup-media-telegram.sh`
+### P0-05 — Исправить перехват stdout в `backup-media-telegram.sh` — **PASS (2026-09-19, deployed 42f2769)**
 - **Проблема:** тот же дефект — `backup_file=$(backup_media)` (:343) при `echo "$backup_file"` (:138). Хуже: из-за guard'а :349 верификация молча пропускается, и в логе нет даже следа проверки.
 - **Почему P0:** media-бэкапы не проверяются вообще и никогда.
 - **Тронутые файлы:** `scripts/backup-media-telegram.sh` (:70-146, :343, :349).
@@ -110,6 +111,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** лог содержит `Verifying backup integrity...` и строку результата вида `Backup file integrity verified (N files)`, где **N берётся динамически из `file_count=` в `.meta` этого же прогона** (никаких констант вроде 227 в коде или в критериях) и N > 0.
 - **Как проверить:** `BACKUP_DIR=/tmp/bktest_media ./scripts/backup-media-telegram.sh`, затем `grep file_count /tmp/bktest_media/*.meta` и сверка с N в логе; `bash -n`.
 - **Rollback:** `git revert` правки + прогон того же workflow.
+- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`7abeb4b6…`), regression-набор `scripts/tests/test-backup-media-stdout-contract.sh` зелёный и локально, и на сервере; доп. правка P0-02 (mount `:/media:ro` в `count_media_files`) включена. **Pending:** наблюдение ближайшего cron-прогона (вс, 03:00 MSK) — в логе должна появиться строка `Verifying backup integrity...`, а не молчаливый пропуск.
 
 ### P0-06 — Минимальная, устойчивая автоматическая integrity verification
 - **Проблема:** после P0-04/05 проверка заработает, но означает лишь «архив не битый». Нужен обязательный минимум, который при этом не рассыпется при будущих изменениях версии PostgreSQL, числа таблиц или состава media.
@@ -196,7 +198,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   5. **restore drill DB-дампа, созданного уже исправленным кодом**, по методике P0-01 (scratch-БД `polis_restore_test`, затем удаление).
 
   Отдельно, как **неблокирующий communication smoke test**: фактическая отправка `mirror` и `notify` в VK. Фактический результат (включая отказ) записывается в отчёт задачи.
-- **Post-deploy observation (не блокирует закрытие задачи):** следующие плановые cron-прогоны — DB 02:00 ежедневно и media понедельник 03:00 — проверяются на отсутствие строк `Backup verification failed`, `Backup file not found`, `delivery failed on all enabled channels` и на presence `result=ok`. Фиксируется отдельным пунктом наблюдения после P0-09, к закрытию P1-08.
+- **Post-deploy observation (не блокирует закрытие задачи):** следующие плановые cron-прогоны — DB 02:00 ежедневно и media воскресенье 03:00 — проверяются на отсутствие строк `Backup verification failed`, `Backup file not found`, `delivery failed on all enabled channels` и на presence `result=ok`. Фиксируется отдельным пунктом наблюдения после P0-09, к закрытию P1-08.
 - **Не входит:** требования `offsite=1`, а также `mirror=1` / `notify=1` в качестве условий приёмки (см. P0-08: на этапе P0 эти стадии не обязательны); новые каналы хранения, мониторинг, алерты, ожидание календарных суток как условие закрытия.
 - **Зависимости:** P0-04, P0-05, P0-06, P0-07, P0-08; методика — P0-01.
 - **Риск:** Low. **Downtime:** нет.
@@ -235,14 +237,14 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 
 ### P1-03 — Реализовать выгрузку media-архива в настоящее offsite-хранилище
 - **Проблема:** то же для weekly media (50 MB).
-- **Почему P1:** отдельный объект и отдельный цикл (понедельник).
+- **Почему P1:** отдельный объект и отдельный цикл (воскресенье).
 - **Тронутые файлы:** `scripts/backup-media-telegram.sh`, upload-скрипт из P1-02.
 - **Scope:** переиспользование P1-02 через параметризацию; контроль размера архива (защита от случайного разрастания media и удара по бюджету); `offsite=` в статусе media-прогона; перевод `MEDIA_REQUIRED_STAGES` в `created,verified,offsite` — только здесь, после успешного прогона.
 - **Не входит:** retention, DB.
 - **Зависимости:** P1-02.
 - **Риск:** Low-Medium. **Downtime:** нет.
 - **Acceptance:** архив в хранилище, `offsite=1` в статусе media-прогона.
-- **Как проверить:** ближайший понедельник 03:00 + листинг хранилища.
+- **Как проверить:** ближайшее воскресенье 03:00 + листинг хранилища.
 - **Rollback:** отключение вызова, как в P1-02.
 
 ### P1-04 — Обеспечить проверяемость offsite-копий

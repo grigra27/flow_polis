@@ -18,6 +18,8 @@ CONTAINER_NAME="${DB_CONTAINER:-insurance_broker_db}"
 DB_NAME="${DB_NAME:-insurance_broker_prod}"
 DB_USER="${DB_USER:-postgres}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
+# Lower bound for a credible gzip'd pg_dump; validated again in verify_backup.
+MIN_BACKUP_BYTES="${MIN_BACKUP_BYTES:-10240}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -123,26 +125,90 @@ backup_database() {
     fi
 }
 
-# Verify backup integrity
+# Verify backup integrity — minimal content checks (P0-06), not a restore drill:
+#   DB-1  regular file exists and is bigger than MIN_BACKUP_BYTES
+#   DB-2  gzip stream is physically intact
+#   DB-3  decompressed content starts with the PostgreSQL dump header marker
+#   DB-4  the dump ends with the "dump complete" marker (not necessarily the
+#         literal last line — pg_dump >= 15.18 appends \unrestrict after it)
+# Full decompression into a temp file avoids early-close SIGPIPE failures
+# under `set -o pipefail`.
 verify_backup() {
     local backup_file=$1
 
     log_info "Verifying backup integrity..."
+
+    local min_bytes="${MIN_BACKUP_BYTES:-10240}"
+    case "$min_bytes" in
+        ''|*[!0-9]*)
+            log_warn "MIN_BACKUP_BYTES='$min_bytes' is not a non-negative integer, using 10240"
+            min_bytes=10240
+            ;;
+    esac
 
     if [ ! -f "$backup_file" ]; then
         log_error "Backup file not found: $backup_file"
         return 1
     fi
 
-    # Check if file is a valid gzip file
-    if gzip -t "$backup_file" 2>/dev/null; then
-        log_info "Backup file integrity verified"
-        return 0
-    else
+    local file_bytes
+    file_bytes=$(( $(wc -c < "$backup_file") ))
+    if [ "$file_bytes" -le "$min_bytes" ]; then
+        log_error "Backup file too small: $file_bytes bytes (MIN_BACKUP_BYTES=$min_bytes)"
+        return 1
+    fi
+
+    # DB-2: valid gzip
+    if ! gzip -t "$backup_file" 2>/dev/null; then
         log_error "Backup file is corrupted"
         notify_backup_error "Database Backup" "Backup file integrity check failed - file may be corrupted"
         return 1
     fi
+
+    # DB-3/DB-4: markers in the decompressed stream
+    local rc=0
+    local dump_file
+    dump_file=$(mktemp "${TMPDIR:-/tmp}/verify_pgdump_XXXXXX") || {
+        log_error "Cannot create temporary file for verification"
+        return 1
+    }
+
+    if ! gzip -dc "$backup_file" > "$dump_file"; then
+        log_error "Backup file could not be decompressed"
+        rm -f "$dump_file"
+        return 1
+    fi
+
+    # awk (not grep|head pipelines) so no early-close SIGPIPE can fail pipefail,
+    # and matching does not depend on the caller's grep aliases/functions
+    local header_found
+    header_found=$(awk '$0 == "-- PostgreSQL database dump" { print "1"; exit } NR > 10 { exit }' "$dump_file")
+    if [ -z "$header_found" ]; then
+        log_error "Content is not a PostgreSQL dump: header marker '-- PostgreSQL database dump' missing in the first lines"
+        rc=1
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+        local complete_found
+        complete_found=$(awk '
+            { buf[NR % 20] = $0 }
+            END {
+                start = (NR < 20) ? 1 : NR - 19
+                for (i = start; i <= NR; i++)
+                    if (buf[i % 20] == "-- PostgreSQL database dump complete") { print "1"; exit }
+            }' "$dump_file")
+        if [ -z "$complete_found" ]; then
+            log_error "Dump is incomplete: '-- PostgreSQL database dump complete' marker not found near the end"
+            rc=1
+        fi
+    fi
+
+    rm -f "$dump_file"
+
+    if [ "$rc" -eq 0 ]; then
+        log_info "Backup file integrity verified"
+    fi
+    return $rc
 }
 
 # Clean up old backups
@@ -217,6 +283,7 @@ usage() {
     echo "  DB_NAME                 Database name (default: insurance_broker_prod)"
     echo "  DB_USER                 Database user (default: postgres)"
     echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
+    echo "  MIN_BACKUP_BYTES        Minimum backup size for verification (default: 10240)"
     echo ""
     echo "Examples:"
     echo "  $0                      Create a new backup"
@@ -286,9 +353,14 @@ main() {
         exit 1
     }
 
-    # Verify the backup
+    # Verify the backup.
+    # P0-07: a backup that was created but fails integrity verification exits 2
+    # (creation failure exits 1 above). The file is deliberately preserved for
+    # investigation — no rm, retention/cleanup of it is a separate concern.
     verify_backup "$backup_file" || {
-        log_warn "Backup verification failed"
+        log_error "Backup verification failed"
+        notify_backup_error "Database Backup" "Integrity verification failed for $(basename "$backup_file") - file preserved for investigation"
+        exit 2
     }
 
     # Clean up old backups

@@ -147,7 +147,14 @@ backup_media() {
     fi
 }
 
-# Verify backup integrity
+# Verify backup integrity — minimal content checks (P0-06), not a restore drill:
+#   MEDIA-1  tar.gz reads through without errors (full listing into a temp
+#            file — no early-close pipelines under `set -o pipefail`)
+#   MEDIA-2  the archive contains at least one regular file
+#            (directories/symlinks/hardlinks do not count)
+#   MEDIA-3  regular-file count equals `file_count=` in this archive's own
+#            backup_<timestamp>.meta (same directory as the archive);
+#            missing/ambiguous/malformed metadata is a failure
 verify_backup() {
     local backup_file=$1
 
@@ -158,16 +165,83 @@ verify_backup() {
         return 1
     fi
 
-    # Check if file is a valid tar.gz file
-    if tar tzf "$backup_file" > /dev/null 2>&1; then
-        local file_count=$(tar tzf "$backup_file" 2>/dev/null | wc -l)
-        log_info "Backup file integrity verified ($file_count files)"
-        return 0
-    else
+    # MEDIA-1
+    local list_file
+    list_file=$(mktemp "${TMPDIR:-/tmp}/verify_tarlist_XXXXXX") || {
+        log_error "Cannot create temporary file for verification"
+        return 1
+    }
+
+    if ! tar -tvzf "$backup_file" > "$list_file" 2>/dev/null; then
         log_error "Backup file is corrupted"
         notify_backup_error "Media Backup" "Backup file integrity check failed - file may be corrupted"
+        rm -f "$list_file"
         return 1
     fi
+
+    # MEDIA-2: count regular files only ("-" as the leading type character)
+    local regular_count
+    regular_count=$(awk 'length($0) >= 10 && substr($0, 1, 1) == "-" { c++ } END { print c + 0 }' "$list_file")
+    rm -f "$list_file"
+
+    if [ "$regular_count" -eq 0 ]; then
+        log_error "Backup archive contains no regular files"
+        return 1
+    fi
+
+    # MEDIA-3: cross-check with this backup's own metadata
+    local base
+    base=$(basename "$backup_file")
+    case "$base" in
+        media_backup_*.tar.gz)
+            local ts="${base#media_backup_}"
+            ts="${ts%.tar.gz}"
+            ;;
+        *)
+            log_error "Cannot derive metadata file name from archive name: $base"
+            return 1
+            ;;
+    esac
+    local meta_file="$(dirname "$backup_file")/backup_${ts}.meta"
+
+    if [ ! -f "$meta_file" ]; then
+        log_error "Metadata file not found: $meta_file"
+        return 1
+    fi
+
+    local declared declared_n declared_value
+    declared=$(awk '/^file_count=/ { print }' "$meta_file")
+    declared_n=$(printf '%s\n' "$declared" | awk 'length($0) > 0 { c++ } END { print c + 0 }')
+
+    if [ "$declared_n" -eq 0 ]; then
+        log_error "Metadata $meta_file has no file_count= entry"
+        return 1
+    fi
+    if [ "$declared_n" -gt 1 ]; then
+        log_error "Metadata $meta_file has $declared_n file_count= entries (ambiguous)"
+        return 1
+    fi
+
+    declared_value=$(printf '%s' "$declared" | sed -e 's/^file_count=//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    case "$declared_value" in
+        ''|*[!0-9]*)
+            log_error "Metadata file_count is not a non-negative integer: '$declared_value'"
+            return 1
+            ;;
+    esac
+
+    if [ "$declared_value" -eq 0 ]; then
+        log_error "Metadata file_count=0 for a real .tar.gz archive (empty volumes use the .empty marker path and are not verified here)"
+        return 1
+    fi
+
+    if [ "$regular_count" -ne "$declared_value" ]; then
+        log_error "Regular file count mismatch: archive has $regular_count, metadata file_count=$declared_value"
+        return 1
+    fi
+
+    log_info "Backup file integrity verified ($regular_count files)"
+    return 0
 }
 
 # Clean up old backups
@@ -347,10 +421,16 @@ main() {
         exit 1
     }
 
-    # Verify the backup (skip if empty)
+    # Verify the backup (skipped for the .empty marker path — an empty volume
+    # is a normal success scenario, not a verification failure).
+    # P0-07: a backup that was created but fails integrity verification exits 2
+    # (creation failure exits 1 above). The archive is deliberately preserved
+    # for investigation — no rm, retention/cleanup of it is a separate concern.
     if [ -f "$backup_file" ] && [[ "$backup_file" == *.tar.gz ]]; then
         verify_backup "$backup_file" || {
-            log_warn "Backup verification failed"
+            log_error "Backup verification failed"
+            notify_backup_error "Media Backup" "Integrity verification failed for $(basename "$backup_file") - archive preserved for investigation"
+            exit 2
         }
     fi
 

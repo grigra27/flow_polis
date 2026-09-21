@@ -10,12 +10,15 @@ set -o pipefail  # Exit on pipe failure
 # Get script directory and load Telegram functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/telegram-notify.sh"
+source "$SCRIPT_DIR/backup-status.sh"
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/insurance_broker_backups/media}"
 MEDIA_VOLUME="${MEDIA_VOLUME:-insurance_broker_media_volume}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
+# P0-08 status contract: required stages for media backups.
+# Fallback chain: MEDIA_REQUIRED_STAGES > REQUIRED_STAGES > "created,verified".
 
 # Colors for output
 RED='\033[0;31m'
@@ -49,13 +52,13 @@ create_backup_dir() {
     fi
 }
 
-# Check if media volume exists
+# Check if media volume exists.
+# P0-08: pure check — the single final error notification is sent by main().
 check_volume() {
     if ! docker volume ls --format '{{.Name}}' | grep -q "^${MEDIA_VOLUME}$"; then
         log_error "Media volume '$MEDIA_VOLUME' does not exist"
         log_error "Please ensure the application is deployed and volumes are created"
-        notify_backup_error "Media Backup" "Media volume '$MEDIA_VOLUME' does not exist"
-        exit 1
+        return 1
     fi
     log_info "Media volume exists"
 }
@@ -68,7 +71,10 @@ count_media_files() {
     echo "$file_count"
 }
 
-# Backup media files
+# Backup media files.
+# P0-08: no notifications here — the success notification moved to main() and
+# fires only after integrity verification; the empty-volume path now echoes
+# its .empty marker path (it is the backup artifact for that run).
 backup_media() {
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/media_backup_${timestamp}.tar.gz"
@@ -86,17 +92,12 @@ backup_media() {
         log_warn "No media files found in volume"
         log_warn "Creating empty backup marker..."
 
-        # Create empty backup marker
+        # Create empty backup marker — the P0-08 contract treats a .empty
+        # marker written after a confirmed file_count=0 as a correctly created
+        # AND correctly verified empty snapshot (no tar verification).
         echo "Empty backup - no media files" > "$BACKUP_DIR/media_backup_${timestamp}.empty"
 
-        # Calculate duration
-        local end_time=$(date +%s)
-        local duration=$((end_time - start_time))
-        local duration_formatted=$(printf "%02d:%02d" $((duration/60)) $((duration%60)))
-
-        # Send notification for empty backup
-        notify_backup_success "Media Backup" "$BACKUP_DIR/media_backup_${timestamp}.empty" "0 MB (empty)" "$duration_formatted"
-
+        echo "$BACKUP_DIR/media_backup_${timestamp}.empty"  # Return marker path
         return 0
     fi
 
@@ -132,17 +133,13 @@ backup_media() {
         echo "file=$(basename "$backup_file")" >> "$BACKUP_DIR/backup_${timestamp}.meta"
         echo "duration=$duration_formatted" >> "$BACKUP_DIR/backup_${timestamp}.meta"
 
-        log_info "Backup completed successfully: $backup_file"
-
-        # Send success notification
-        notify_backup_success "Media Backup" "$backup_file" "$file_size ($file_count files)" "$duration_formatted"
+        log_info "Backup artifact created: $backup_file"
 
         echo "$backup_file"  # Return backup file path
         return 0
     else
         log_error "Backup creation failed"
         rm -f "$backup_file"
-        notify_backup_error "Media Backup" "Failed to create backup archive"
         return 1
     fi
 }
@@ -174,7 +171,6 @@ verify_backup() {
 
     if ! tar -tvzf "$backup_file" > "$list_file" 2>/dev/null; then
         log_error "Backup file is corrupted"
-        notify_backup_error "Media Backup" "Backup file integrity check failed - file may be corrupted"
         rm -f "$list_file"
         return 1
     fi
@@ -352,6 +348,9 @@ usage() {
     echo "  BACKUP_DIR              Backup directory (default: $HOME/insurance_broker_backups/media)"
     echo "  MEDIA_VOLUME            Media volume name (default: insurance_broker_media_volume)"
     echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
+    echo "  MEDIA_REQUIRED_STAGES   Stages that decide result/exit for media backups"
+    echo "                          (fallback: REQUIRED_STAGES; default: created,verified;"
+    echo "                          allowed: created,verified,offsite,notify)"
     echo ""
     echo "Examples:"
     echo "  $0                      Create a new backup"
@@ -362,6 +361,18 @@ usage() {
 }
 
 # Main function
+#
+# P0-08 full-run flow (conceptual state machine):
+#   config validation (unknown required stage -> configuration error, exit 1,
+#     run aborts before anything is created)
+#   → start notification (best effort, never defines status fields)
+#   → create            (failure: final error notification, exit 1;
+#                        empty-volume path: .empty marker = created+verified)
+#   → verify            (failure: archive preserved, final error notification, exit 2)
+#   → offsite stage placeholder (P0: offsite=- / null)
+#   → cleanup/list
+#   → final success notification + optional file mirror
+#   → evaluate result over required stages → last_status.json → BACKUP_RESULT → exit
 main() {
     # Parse command line arguments
     case "${1:-}" in
@@ -400,38 +411,80 @@ main() {
             ;;
     esac
 
+    # Configuration errors abort the run before any backup work (exit 1).
+    init_backup_status "media" || exit 1
+
     log_info "========================================="
     log_info "  Media Files Backup Process with Telegram"
     log_info "========================================="
     echo ""
 
-    # Send start notification
-    notify_backup_start "Media Backup"
+    # Send start notification (best effort; outcome not part of status fields)
+    notify_backup_start "Media Backup" || true
+
+    local run_start_time=$(date +%s)
 
     # Create backup directory
     create_backup_dir
 
-    # Check if volume exists
-    check_volume
+    # Create stage
+    local backup_file=""
+    local create_ok=0
+    if check_volume; then
+        if backup_file=$(backup_media); then
+            create_ok=1
+        fi
+    fi
 
-    # Perform backup
-    local backup_file
-    backup_file=$(backup_media) || {
-        log_error "Backup failed"
-        exit 1
-    }
+    if [ "$create_ok" -ne 1 ]; then
+        STATUS_WORKFLOW_FAIL=1
+        notify_backup_error "Media Backup" "Media backup creation failed - check volume and logs"
+        STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+        STATUS_MIRROR="-"
+        finalize_backup_run
+        exit $?
+    fi
 
-    # Verify the backup (skipped for the .empty marker path — an empty volume
-    # is a normal success scenario, not a verification failure).
-    # P0-07: a backup that was created but fails integrity verification exits 2
-    # (creation failure exits 1 above). The archive is deliberately preserved
-    # for investigation — no rm, retention/cleanup of it is a separate concern.
-    if [ -f "$backup_file" ] && [[ "$backup_file" == *.tar.gz ]]; then
-        verify_backup "$backup_file" || {
+    STATUS_CREATED=1
+    STATUS_FILE="$backup_file"
+
+    # Verify stage. Empty-volume flow (P0-08): a .empty marker written after a
+    # confirmed file_count=0 is a correctly handled empty snapshot —
+    # created=1, verified=1, and it must NOT go through tar verification.
+    local is_empty_marker=0
+    if [[ "$backup_file" == *.empty ]]; then
+        is_empty_marker=1
+        STATUS_VERIFIED=1
+        log_info "Empty-volume snapshot accepted without tar verification"
+    else
+        # P0-07 semantics preserved: verification failure exits 2, the archive
+        # is deliberately preserved for investigation.
+        if ! verify_backup "$backup_file"; then
+            STATUS_WORKFLOW_FAIL=1
             log_error "Backup verification failed"
             notify_backup_error "Media Backup" "Integrity verification failed for $(basename "$backup_file") - archive preserved for investigation"
-            exit 2
-        }
+            STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+            STATUS_MIRROR="-"
+            finalize_backup_run
+            exit $?
+        fi
+        STATUS_VERIFIED=1
+    fi
+
+    # Offsite stage placeholder: P0 has no real offsite storage.
+    # STATUS_OFFSITE stays "-" (JSON null); messenger delivery must never set it.
+
+    # Provisional core outcome (required stages minus 'notify') is known here,
+    # so the FINAL notification can match it: on a core failure (e.g. required
+    # offsite, absent at P0) send one error notification instead of
+    # "Completed Successfully" + file mirror, keep mirror=- and let the
+    # evaluator keep the precedence exit (3 here).
+    if ! evaluate_core_result; then
+        STATUS_MIRROR="-"
+        notify_backup_error "Media Backup" "$(core_failure_reason) for $(basename "$backup_file")"
+        STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+        finalize_backup_run
+        exit $?
     fi
 
     # Clean up old backups
@@ -440,11 +493,34 @@ main() {
     # List current backups
     list_backups
 
-    log_info "========================================="
-    log_info "  Backup Process Completed"
-    log_info "========================================="
+    # Final success notification + optional file mirror — only after the
+    # backup outcome is known-good (P0-08 sequencing fix).
+    local run_end_time=$(date +%s)
+    local run_duration=$((run_end_time - run_start_time))
+    local duration_formatted=$(printf "%02d:%02d" $((run_duration/60)) $((run_duration%60)))
 
-    exit 0
+    local size_desc
+    if [ "$is_empty_marker" -eq 1 ]; then
+        size_desc="0 MB (empty)"
+    else
+        size_desc=$(du -h "$backup_file" | cut -f1)
+        local meta_ts=$(basename "$backup_file" .tar.gz)
+        meta_ts="${meta_ts#media_backup_}"
+        local meta_count=""
+        if [ -f "$BACKUP_DIR/backup_${meta_ts}.meta" ]; then
+            meta_count=$(awk -F= '$1=="file_count"{print $2}' "$BACKUP_DIR/backup_${meta_ts}.meta")
+        fi
+        if [ -n "$meta_count" ]; then
+            size_desc="$size_desc ($meta_count files)"
+        fi
+    fi
+
+    notify_backup_success "Media Backup" "$backup_file" "$size_desc" "$duration_formatted"
+    STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+    STATUS_MIRROR=$(map_delivery_tri "${NOTIFY_FILE_RC:-2}")
+
+    finalize_backup_run
+    exit $?
 }
 
 # Run main function

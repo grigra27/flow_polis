@@ -10,6 +10,7 @@ set -o pipefail  # Exit on pipe failure
 # Get script directory and load Telegram functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/telegram-notify.sh"
+source "$SCRIPT_DIR/backup-status.sh"
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
@@ -20,6 +21,8 @@ DB_USER="${DB_USER:-postgres}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 # Lower bound for a credible gzip'd pg_dump; validated again in verify_backup.
 MIN_BACKUP_BYTES="${MIN_BACKUP_BYTES:-10240}"
+# P0-08 status contract: required stages for DB backups.
+# Fallback chain: DB_REQUIRED_STAGES > REQUIRED_STAGES > "created,verified".
 
 # Colors for output
 RED='\033[0;31m'
@@ -53,18 +56,21 @@ create_backup_dir() {
     fi
 }
 
-# Check if database container is running
+# Check if database container is running.
+# P0-08: pure check — the single final error notification is sent by main().
 check_container() {
     if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         log_error "Database container '$CONTAINER_NAME' is not running"
         log_error "Please start the container first: docker-compose -f $COMPOSE_FILE up -d db"
-        notify_backup_error "Database Backup" "Database container '$CONTAINER_NAME' is not running"
-        exit 1
+        return 1
     fi
     log_info "Database container is running"
 }
 
-# Perform database backup
+# Perform database backup.
+# P0-08: no notifications here — success notification was moved to main() and
+# happens only AFTER integrity verification (fixes "Completed Successfully →
+# Failed" sequencing defect); failure notification likewise belongs to main().
 backup_database() {
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/db_backup_${timestamp}.sql"
@@ -104,23 +110,18 @@ backup_database() {
             echo "file=$(basename "$backup_file_gz")" >> "$BACKUP_DIR/backup_${timestamp}.meta"
             echo "duration=$duration_formatted" >> "$BACKUP_DIR/backup_${timestamp}.meta"
 
-            log_info "Backup completed successfully: $backup_file_gz"
-
-            # Send success notification
-            notify_backup_success "Database Backup" "$backup_file_gz" "$file_size" "$duration_formatted"
+            log_info "Backup artifact created: $backup_file_gz"
 
             echo "$backup_file_gz"  # Return backup file path
             return 0
         else
             log_error "Failed to compress backup"
             rm -f "$backup_file"
-            notify_backup_error "Database Backup" "Failed to compress backup file"
             return 1
         fi
     else
         log_error "Database dump failed"
         rm -f "$backup_file"
-        notify_backup_error "Database Backup" "Database dump failed - check database connectivity"
         return 1
     fi
 }
@@ -161,7 +162,6 @@ verify_backup() {
     # DB-2: valid gzip
     if ! gzip -t "$backup_file" 2>/dev/null; then
         log_error "Backup file is corrupted"
-        notify_backup_error "Database Backup" "Backup file integrity check failed - file may be corrupted"
         return 1
     fi
 
@@ -284,6 +284,9 @@ usage() {
     echo "  DB_USER                 Database user (default: postgres)"
     echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
     echo "  MIN_BACKUP_BYTES        Minimum backup size for verification (default: 10240)"
+    echo "  DB_REQUIRED_STAGES      Stages that decide result/exit for DB backups"
+    echo "                          (fallback: REQUIRED_STAGES; default: created,verified;"
+    echo "                          allowed: created,verified,offsite,notify)"
     echo ""
     echo "Examples:"
     echo "  $0                      Create a new backup"
@@ -294,6 +297,17 @@ usage() {
 }
 
 # Main function
+#
+# P0-08 full-run flow (conceptual state machine):
+#   config validation (unknown required stage -> configuration error, exit 1,
+#     run aborts before anything is created)
+#   → start notification (best effort, never defines status fields)
+#   → create            (failure: final error notification, exit 1)
+#   → verify            (failure: file preserved, final error notification, exit 2)
+#   → offsite stage placeholder (P0: offsite=- / null)
+#   → cleanup/list
+#   → final success notification + optional file mirror
+#   → evaluate result over required stages → last_status.json → BACKUP_RESULT → exit
 main() {
     # Parse command line arguments
     case "${1:-}" in
@@ -332,36 +346,72 @@ main() {
             ;;
     esac
 
+    # Configuration errors abort the run before any backup work (exit 1).
+    init_backup_status "db" || exit 1
+
     log_info "========================================="
     log_info "  Database Backup Process with Telegram"
     log_info "========================================="
     echo ""
 
-    # Send start notification
-    notify_backup_start "Database Backup"
+    # Send start notification (best effort; outcome not part of status fields)
+    notify_backup_start "Database Backup" || true
 
     # Create backup directory
     create_backup_dir
 
-    # Check if container is running
-    check_container
+    # Create stage
+    local backup_file=""
+    local create_ok=0
+    if check_container; then
+        if backup_file=$(backup_database); then
+            create_ok=1
+        fi
+    fi
 
-    # Perform backup
-    local backup_file
-    backup_file=$(backup_database) || {
-        log_error "Backup failed"
-        exit 1
-    }
+    if [ "$create_ok" -ne 1 ]; then
+        STATUS_WORKFLOW_FAIL=1
+        notify_backup_error "Database Backup" "Database backup creation failed - check database connectivity and logs"
+        STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+        STATUS_MIRROR="-"
+        finalize_backup_run
+        exit $?
+    fi
 
-    # Verify the backup.
-    # P0-07: a backup that was created but fails integrity verification exits 2
-    # (creation failure exits 1 above). The file is deliberately preserved for
-    # investigation — no rm, retention/cleanup of it is a separate concern.
-    verify_backup "$backup_file" || {
+    STATUS_CREATED=1
+    STATUS_FILE="$backup_file"
+
+    # Verify stage.
+    # P0-07 semantics preserved: a backup that was created but fails integrity
+    # verification exits 2 (creation failure exits 1 above). The file is
+    # deliberately preserved for investigation — no rm, retention/cleanup of
+    # it is a separate concern.
+    if ! verify_backup "$backup_file"; then
+        STATUS_WORKFLOW_FAIL=1
         log_error "Backup verification failed"
         notify_backup_error "Database Backup" "Integrity verification failed for $(basename "$backup_file") - file preserved for investigation"
-        exit 2
-    }
+        STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+        STATUS_MIRROR="-"
+        finalize_backup_run
+        exit $?
+    fi
+    STATUS_VERIFIED=1
+
+    # Offsite stage placeholder: P0 has no real offsite storage.
+    # STATUS_OFFSITE stays "-" (JSON null); messenger delivery must never set it.
+
+    # Provisional core outcome (required stages minus 'notify') is known here,
+    # so the FINAL notification can match it: on a core failure (e.g. required
+    # offsite, absent at P0) send one error notification instead of
+    # "Completed Successfully" + file mirror, keep mirror=- and let the
+    # evaluator keep the precedence exit (3 here).
+    if ! evaluate_core_result; then
+        STATUS_MIRROR="-"
+        notify_backup_error "Database Backup" "$(core_failure_reason) for $(basename "$backup_file")"
+        STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+        finalize_backup_run
+        exit $?
+    fi
 
     # Clean up old backups
     cleanup_old_backups
@@ -369,11 +419,22 @@ main() {
     # List current backups
     list_backups
 
-    log_info "========================================="
-    log_info "  Backup Process Completed"
-    log_info "========================================="
+    # Final success notification + optional file mirror — only after
+    # verification passed (P0-08 sequencing fix).
+    local file_size=$(du -h "$backup_file" | cut -f1)
+    local duration_formatted="n/a"
+    local meta_ts=$(basename "$backup_file" .sql.gz)
+    meta_ts="${meta_ts#db_backup_}"
+    if [ -f "$BACKUP_DIR/backup_${meta_ts}.meta" ]; then
+        duration_formatted=$(awk -F= '$1=="duration"{print $2}' "$BACKUP_DIR/backup_${meta_ts}.meta")
+        [ -n "$duration_formatted" ] || duration_formatted="n/a"
+    fi
+    notify_backup_success "Database Backup" "$backup_file" "$file_size" "$duration_formatted"
+    STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
+    STATUS_MIRROR=$(map_delivery_tri "${NOTIFY_FILE_RC:-2}")
 
-    exit 0
+    finalize_backup_run
+    exit $?
 }
 
 # Run main function

@@ -56,6 +56,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** 0 ошибок `psql`; создано 38 таблиц; sanity-сверка по справочным таблицам (`policies_policy`, `policies_paymentschedule`, `auth_user`) согласуется со снимком; scratch-БД удалена; результат зафиксирован в задаче.
 - **Как проверить:** `createdb` → `psql < dump` → `SELECT count(*) FROM pg_tables WHERE schemaname='public'` → выборочные `count(*)` → `dropdb`.
 - **Rollback:** `DROP DATABASE polis_restore_test` (больше ничего не создаётся).
+- **Статус:** **PASS (2026-09-19)** — baseline-restore выполнен: дамп `db_backup_20260919_020050.sql.gz` восстановлен в scratch-БД `polis_restore_test` (контейнер `insurance_broker_db`, решение D2); restore — 0 ошибок `psql`; создано 38 таблиц; sanity-сверка schema/таблиц/справочных row counts (`policies_policy`, `policies_paymentschedule`, `auth_user`) совпала с production-снимком; прод-БД не изменялась; scratch-БД удалена. Вывод: текущий `pg_dump` восстановим.
 
 ### P0-02 — Baseline: проверка restorability media-архива
 - **Проблема:** media-архивы проходят лишь `tar -tzf`; факт распаковки и разумности содержимого не проверялся.
@@ -70,6 +71,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** (1) архив 14.09 распаковывается без ошибок, структура и количество regular files согласованы с его metadata; (2) на свежем тестовом архиве — 100 % совпадение имён и checksum с live volume на момент создания; (3) временные артефакты удалены, `/tmp` чист.
 - **Как проверить:** `tar -tzvf` с разбором типов записей; `find … -type f | md5sum` с обеих сторон; `diff` списков; `ls /tmp/<workdir>` после cleanup.
 - **Rollback:** `rm -rf /tmp/<workdir>` (каталоги создаются задачей).
+- **Статус:** **PASS (2026-09-19)** — боевой архив `media_backup_20260914_030050.tar.gz` читается и распаковывается без ошибок tar; ожидаемые верхние каталоги на месте; regular files = 227, что совпадает с `file_count=227` в его `.meta`; строгая проверка на свежем read-only снапшоте: список имён и SHA256 live volume ↔ тестовый архив — 100 % совпадение; live volume не изменялся; временные артефакты удалены. Найденный при проверке дефект `count_media_files` (mount volume без `:/media:ro`) устранён в P0-05.
 
 ### P0-03 — Подтвердить, что существующий CI/CD доставляет backup-скрипты на production — **PASS (2026-09-19)**
 - **Проблема:** исходная формулировка задачи была неверной. Из отсутствия `.git` в `/root/insurance_broker` был сделан вывод, что канала доставки правок нет и его надо создать. Канал есть — это GitHub Actions.
@@ -85,7 +87,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   3. `scripts/` не входит в `--exclude` этого rsync (исключены только `.git`, `venv`, `black_venv`, `__pycache__`, `*.pyc`, `.env`, `.env.prod`, `db.sqlite3`, `certbot/`).
 - **Как проверить:** `sha256sum` трёх файлов с обеих сторон; список `--exclude` в `deploy.yml`.
 - **Rollback:** не требуется — изменений на проде задача не вносит.
-- **Housekeeping:** от первоначальной (отменённой) попытки внедрить `scp`-доставку на сервере остался безвредный файл `/root/insurance_broker/scripts/backup-db-telegram.sh.bak-20260919_222023` — идентичная копия боевого скрипта. Удаляется в P2-06 вместе с прочим мусором в `scripts/`.
+- **Housekeeping:** от отменённой попытки внедрить отдельный `scp`-доставщик на сервере остался безвредный файл `/root/insurance_broker/scripts/backup-db-telegram.sh.bak-20260919_222023` (идентичная копия боевого скрипта). Никакого отдельного deployment-механизма задача не вводила и не вводит: canonical deployment path — существующий `.github/workflows/deploy.yml`; файл удалается в P2-06 вместе с прочим мусором в `scripts/`.
 
 ### P0-04 — Исправить перехват stdout в `backup-db-telegram.sh` — **PASS (2026-09-19, deployed 42f2769)**
 - **Проблема:** `backup_file=$(backup_database)` (:279) кладёт в переменную весь stdout функции, включая `log_info`-строки; путь теряется → верификация падает 267/271 раз.
@@ -98,7 +100,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** `backup_file` = ровно один существующий путь; поведение при реальном провале дампа не изменилось (ненулевой exit).
 - **Как проверить:** изолированный запуск `BACKUP_DIR=/tmp/bktest ./scripts/backup-db-telegram.sh` → в логе `Verifying backup integrity... → Backup file integrity verified`, а не `Backup file not found`; `bash -n`, `shellcheck`.
 - **Rollback:** `git revert` правки + прогон того же workflow (deploy на push в `main`).
-- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`fc88d7b3…`), regression-набор `scripts/tests/test-backup-db-stdout-contract.sh` зелёный и локально, и на сервере. **Pending:** наблюдение ближайшего cron-прогона (02:00 MSK) — verification должна пройти без `Backup file not found`.
+- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`fc88d7b3…`), regression-набор `scripts/tests/test-backup-db-stdout-contract.sh` зелёный и локально, и на сервере. **Cron-наблюдение закрыто (2026-09-21):** прогоны 20.09 и 21.09 02:00 MSK — `Verifying backup integrity... → Backup file integrity verified`, без `Backup file not found` / `Backup verification failed` (последний сбой — 19.09 02:03, до деплоя).
 
 ### P0-05 — Исправить перехват stdout в `backup-media-telegram.sh` — **PASS (2026-09-19, deployed 42f2769)**
 - **Проблема:** тот же дефект — `backup_file=$(backup_media)` (:343) при `echo "$backup_file"` (:138). Хуже: из-за guard'а :349 верификация молча пропускается, и в логе нет даже следа проверки.
@@ -111,7 +113,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** лог содержит `Verifying backup integrity...` и строку результата вида `Backup file integrity verified (N files)`, где **N берётся динамически из `file_count=` в `.meta` этого же прогона** (никаких констант вроде 227 в коде или в критериях) и N > 0.
 - **Как проверить:** `BACKUP_DIR=/tmp/bktest_media ./scripts/backup-media-telegram.sh`, затем `grep file_count /tmp/bktest_media/*.meta` и сверка с N в логе; `bash -n`.
 - **Rollback:** `git revert` правки + прогон того же workflow.
-- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`7abeb4b6…`), regression-набор `scripts/tests/test-backup-media-stdout-contract.sh` зелёный и локально, и на сервере; доп. правка P0-02 (mount `:/media:ro` в `count_media_files`) включена. **Pending:** наблюдение ближайшего cron-прогона (вс, 03:00 MSK) — в логе должна появиться строка `Verifying backup integrity...`, а не молчаливый пропуск.
+- **Статус:** код в `main` (42f2769), доставлен на production штатным workflow (run 35465686132), sha256 проде = sha256 коммита (`7abeb4b6…`), regression-набор `scripts/tests/test-backup-media-stdout-contract.sh` зелёный и локально, и на сервере; доп. правки P0-02 в `count_media_files` (mount `:/media:ro`, удалён мёртвый `volume_path=$1`) включены. **Cron-наблюдение закрыто (2026-09-21):** плановый прогон пн 03:00 MSK (crontab `0 3 * * 1`; комментарий «Weekly on Sunday» в самом crontab — описка, выражение = понедельник; сам cron не менялся) дал `Verifying backup integrity... → Backup file integrity verified (227 files)` — верификация больше не пропускается молча.
 
 ### P0-06 — Минимальная, устойчивая автоматическая integrity verification
 - **Проблема:** после P0-04/05 проверка заработает, но означает лишь «архив не битый». Нужен обязательный минимум, который при этом не рассыпется при будущих изменениях версии PostgreSQL, числа таблиц или состава media.
@@ -133,6 +135,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** негативные тесты падают — усечённый на 50 % gzip; валидный gzip с произвольным текстом вместо дампа; дамп без терминатора завершения; tar без regular files; tar, где число файлов не совпадает с его `.meta`. Реальные вчерашние DB- и media-архивы проходят.
 - **Как проверить:** набор негативных fixture-файлов в `/tmp` + вызов `./scripts/backup-db-telegram.sh --verify <fixture>` (этот режим уже есть в скрипте) и проверка кода возврата; затем один реальный cron-прогон.
 - **Rollback:** `git revert` правки + прогон того же workflow.
+- **Статус:** **PASS (2026-09-20, deployed 504d178)** — код в `main`, доставлен штатным workflow (run 35468996152), sha256 проде = sha256 коммита (DB `1cc48bae…`, media `24850fdc…`). Набор `scripts/tests/test-backup-integrity-verification.sh` — 22/22 локально и на сервере, включая lifecycle-assertion временных файлов `verify_backup()` (изолированный TMPDIR, мутационный контроль). Read-only smoke на реальных артефактах проде: `--verify db_backup_20260919_020050.sql.gz` → exit 0 (все 4 проверки); `--verify media_backup_20260914_030050.tar.gz` → exit 0, 227 regular files == `file_count=227` в его `.meta`. Негативный read-only контроль (мусорный gzip в `/tmp`) → exit 1 «Content is not a PostgreSQL dump». **Cron-наблюдение закрыто (2026-09-21):** содержательная верификация подтверждена плановыми прогонами — DB 20.09 и 21.09 (`Backup file integrity verified`), media 21.09 (`integrity verified (227 files)`).
 
 ### P0-07 — Корректный exit code при провале integrity check
 - **Проблема:** `verify_backup … || { log_warn "Backup verification failed"; }` (DB :286, media :350) и финальный `exit 0` (:296/:365). Скрипт всегда успешен → cron, деплой и мониторинг слепы.
@@ -145,11 +148,12 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** подложенный битый файл → exit 2, ERROR в логе, текст-уведомление доходит в VK; корректный прогон → exit 0.
 - **Как проверить:** запуск с подменённым `BACKUP_DIR` и fixture-файлом, `echo $?`; ближайший ночной лог.
 - **Rollback:** `git revert` правки + прогон того же workflow.
+- **Статус:** **PASS (2026-09-20, deployed 504d178)** — workflow-контракт реализован: verification failure → `log_error "Backup verification failed"` + `notify_backup_error` + **exit 2**, файл сохранён для разбора, normal flow (cleanup/list) не продолжается; creation failure сохраняет прежний exit 1; media `.empty` — по-прежнему success (exit 0). Проверено полным main-flow набором `scripts/tests/test-backup-exit-codes.sh` — 35/35 локально и на production checkout (run 35468996152), control-прогон против HEAD ловит исходный дефект (7 FAIL). **Известное ограничение (закрыто в P0-08):** `notify_backup_success` исторически отправлялся внутри `backup_database`/`backup_media` до верификации — при verification failure порядок был «Started → Completed Successfully → Backup Failed». P0-08 перенёс единственное финальное уведомление в main после верификации и оценки обязательных стадий — ложный success больше невозможен (см. статус P0-08). **Pending:** фактическая доставка error-уведомления в живой канал (VK) подтверждается на P0-09/P1-10. Плановые cron-прогоны 20–21.09 завершились успешно (exit 0); негативного cron-прогона с exit 2 после деплоя пока не наблюдалось (провалов верификации не было) — контрольный негативный сценарий подтверждён regression-набором.
 
 ### P0-08 — Status contract: машинно-определяемый итог по стадиям (created / verified / offsite / mirror / notify / result / exit)
 - **Проблема:** `notify_backup_success` вызывает отправку с `|| true` (:507, :512), поэтому отказ всех каналов (событие `File delivery failed on all enabled channels`, 21 раз в логе) ни на что не влияет; а при отсутствии включённых каналов (:398, :449) возвращается 0, то есть ложный «успех». Кроме того, в текущем понимании «файл ушёл в VK/Telegram» приравнивается к наличию внешней копии, что неверно: мессенджер — это зеркало и канал уведомления, а не хранилище.
 - **Почему P0:** из-за этого 2026-09-10 и 2026-09-17 дамп не покинул сервер, и никто не узнал; и потому что на этом контракте построены P1-02…P1-10.
-- **Тронутые файлы:** `scripts/telegram-notify.sh` (:375-514), `scripts/backup-db-telegram.sh`, `scripts/backup-media-telegram.sh`.
+- **Тронутые файлы:** `scripts/telegram-notify.sh` (:375-514), `scripts/backup-db-telegram.sh`, `scripts/backup-media-telegram.sh`; общий слой статуса вынесен в новый общий library-файл `scripts/backup-status.sh` (по образцу sourcing-паттерна `telegram-notify.sh`).
 - **Scope — контракт, спроектированный так, чтобы после P1-02 значения полей не пришлось переопределять.**
 
   Поля и их неизменный смысл:
@@ -185,6 +189,16 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   Отсутствие настоящего offsite на этапе P0 (`offsite=-`) не трактуется ни как успех хранения, ни как ложный провал.
 - **Как проверить:** прогоны с подменёнными env-флагами в `/tmp` (пункты 1-5 acceptance, причём пункт 5 — обоими скриптами в одном окружении); `cat last_status.json`; `python3 -m json.tool` на файле статуса; реальный ночной прогон.
 - **Rollback:** `git revert` правок трёх файлов (доставляются одним набором) + прогон того же workflow.
+- **Статус:** **CODE PASS — deployment pending (2026-09-21)**. Реализовано в working copy (`scripts/backup-status.sh` — новый общий слой; `telegram-notify.sh`, `backup-db-telegram.sh`, `backup-media-telegram.sh`):
+  - status contract по всем семи полям (`created/verified/offsite/mirror/notify/result/exit`) — контракт реализован;
+  - машиночитаемый `last_status.json` (атомарная запись tmp+mv, валидный JSON) и ровно одна финальная строка `BACKUP_RESULT`;
+  - tri-state доставка (`1` — доставлено хотя бы в один канал, `0` — все включённые каналы отказали, `-` — каналов нет) вместо «нет каналов = успех»; WARNING `degraded communication` без порчи `result` при необязательных communication-стадиях;
+  - `DB_REQUIRED_STAGES` / `MEDIA_REQUIRED_STAGES` независимы (fallback `REQUIRED_STAGES`, дефолт `created,verified`); `mirror` обязательным не бывает; неизвестная стадия = конфигурационный отказ (exit 1, до начала работы);
+  - `notify_backup_success` перенесён после верификации и оценки обязательных стадий (дефект порядка из P0-07 закрыт);
+  - при required-offsite failure ложный success невозможен: до финального уведомления считается core outcome без `notify`, при провале — только error-путь, `mirror=-`, `exit=3` (D5);
+  - media `.empty` = `created=1 verified=1` без tar-верификации; semantics P0-07 (suspect-файл сохраняется, normal flow не продолжается) сохранены;
+  - regression-матрица S1–S12 зелёная: `scripts/tests/test-backup-status-contract.sh` 179/179, суммарно с P0-04/05/06/07 — 265/265 assertions.
+  Deployment — штатным GitHub Actions workflow после inclusion в commit; Production smoke — P0-09.
 
 ### P0-09 — End-to-end gate: немедленная проверка исправленного контура
 - **Проблема:** нужно подтвердить, что контур (create → verify → status → exit code) работает на настоящих скриптах до того, как ветка P0 считается закрытой.
@@ -198,7 +212,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   5. **restore drill DB-дампа, созданного уже исправленным кодом**, по методике P0-01 (scratch-БД `polis_restore_test`, затем удаление).
 
   Отдельно, как **неблокирующий communication smoke test**: фактическая отправка `mirror` и `notify` в VK. Фактический результат (включая отказ) записывается в отчёт задачи.
-- **Post-deploy observation (не блокирует закрытие задачи):** следующие плановые cron-прогоны — DB 02:00 ежедневно и media воскресенье 03:00 — проверяются на отсутствие строк `Backup verification failed`, `Backup file not found`, `delivery failed on all enabled channels` и на presence `result=ok`. Фиксируется отдельным пунктом наблюдения после P0-09, к закрытию P1-08.
+- **Post-deploy observation (не блокирует закрытие задачи):** следующие плановые cron-прогоны — DB 02:00 ежедневно и media понедельник 03:00 — проверяются на отсутствие строк `Backup verification failed`, `Backup file not found`, `delivery failed on all enabled channels` и на presence `result=ok`. Фиксируется отдельным пунктом наблюдения после P0-09, к закрытию P1-08.
 - **Не входит:** требования `offsite=1`, а также `mirror=1` / `notify=1` в качестве условий приёмки (см. P0-08: на этапе P0 эти стадии не обязательны); новые каналы хранения, мониторинг, алерты, ожидание календарных суток как условие закрытия.
 - **Зависимости:** P0-04, P0-05, P0-06, P0-07, P0-08; методика — P0-01.
 - **Риск:** Low. **Downtime:** нет.
@@ -237,14 +251,14 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 
 ### P1-03 — Реализовать выгрузку media-архива в настоящее offsite-хранилище
 - **Проблема:** то же для weekly media (50 MB).
-- **Почему P1:** отдельный объект и отдельный цикл (воскресенье).
+- **Почему P1:** отдельный объект и отдельный цикл (понедельник).
 - **Тронутые файлы:** `scripts/backup-media-telegram.sh`, upload-скрипт из P1-02.
 - **Scope:** переиспользование P1-02 через параметризацию; контроль размера архива (защита от случайного разрастания media и удара по бюджету); `offsite=` в статусе media-прогона; перевод `MEDIA_REQUIRED_STAGES` в `created,verified,offsite` — только здесь, после успешного прогона.
 - **Не входит:** retention, DB.
 - **Зависимости:** P1-02.
 - **Риск:** Low-Medium. **Downtime:** нет.
 - **Acceptance:** архив в хранилище, `offsite=1` в статусе media-прогона.
-- **Как проверить:** ближайшее воскресенье 03:00 + листинг хранилища.
+- **Как проверить:** ближайший понедельник 03:00 + листинг хранилища.
 - **Rollback:** отключение вызова, как в P1-02.
 
 ### P1-04 — Обеспечить проверяемость offsite-копий
@@ -534,4 +548,19 @@ Downtime ни здесь, ни в задачах не согласуется з�
 
 # 6. Статус выполнения
 
-Все 25 задач — `pending`. Ни сервер, ни репозиторий в рамках составления и уточнения этого плана не изменялись: правки касались только содержимого данного файла. Следующий шаг: согласование backlog и выдача задач по одной.
+По состоянию на 2026-09-21 (актуализировано перед deployment P0-08):
+
+| ID | Статус |
+|---|---|
+| P0-01 | PASS (baseline restore, 2026-09-19) |
+| P0-02 | PASS (baseline restorability, 2026-09-19) |
+| P0-03 | PASS (CI/CD-канал подтверждён, 2026-09-19) |
+| P0-04 | PASS / deployed (`42f2769`), cron-наблюдение закрыто 21.09 |
+| P0-05 | PASS / deployed (`42f2769`), cron-наблюдение закрыто 21.09 |
+| P0-06 | PASS / deployed (`504d178`), cron-наблюдение закрыто 21.09 |
+| P0-07 | PASS / deployed (`504d178`) |
+| P0-08 | CODE PASS — deployment pending (доставляется штатным workflow) |
+| P0-09 | pending |
+| P1 / P2 | pending |
+
+Следующий шаг: deployment P0-08 и E2E-проверка P0-09.

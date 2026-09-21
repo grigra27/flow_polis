@@ -32,6 +32,7 @@ mkdir -p "$TMP/bin" "$TMP/repo/scripts" "$TMP/vol"
 cp "$REPO_ROOT/scripts/backup-media-telegram.sh" \
    "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
+   "$REPO_ROOT/scripts/backup-status.sh" \
    "$TMP/repo/scripts/"
 
 # fake media volume content (host dir; stub docker "mounts" it via FAKE_VOL_DIR)
@@ -97,7 +98,13 @@ source_backup_functions() {
 # --- Test A: stdout contract + notification interaction ------------------------
 #
 # Notification stubs log via log_info/log_warn (like the real telegram-notify.sh
-# layer) and return success. Before the fix this polluted the captured stdout.
+# layer) and return success.
+#
+# P0-08 test-expectation update (intentional): the success notification was
+# moved OUT of backup_media() to main(), after integrity verification — the
+# old expectation "STUB notify_backup_success appears while backup_media
+# runs" pinned exactly the sequencing defect P0-08 removes. Now asserted
+# inverted: backup_media must not fire it at all.
 
 OUT_A="$TMP/testA"
 (
@@ -109,6 +116,7 @@ OUT_A="$TMP/testA"
     notify_backup_success() {
         log_info "STUB notify_backup_success for $2"
         log_warn "STUB channel warning"
+        touch "${OUT_A}.success.called"
     }
     send_telegram_message() { log_info "STUB send_telegram_message: $1"; return 0; }
     send_telegram_file()    { log_warn "STUB send_telegram_file: $1";    return 0; }
@@ -146,12 +154,16 @@ case "$path_A" in
         bad "Test A: captured value is not a bare .tar.gz path: [$path_A]" ;;
 esac
 
-if strip_colors < "$OUT_A.err" | grep -q '\[INFO\].*Starting media files backup' \
-   && strip_colors < "$OUT_A.err" | grep -q 'STUB notify_backup_success' \
-   && strip_colors < "$OUT_A.err" | grep -q 'STUB channel warning'; then
-    ok "Test A: INFO/WARN and notification-layer logs remain visible via stderr"
+if strip_colors < "$OUT_A.err" | grep -q '\[INFO\].*Starting media files backup'; then
+    ok "Test A: INFO logs remain visible via stderr"
 else
-    bad "Test A: stderr is missing expected INFO/WARN/stub log lines"
+    bad "Test A: stderr is missing expected INFO log lines"
+fi
+
+if [ ! -e "${OUT_A}.success.called" ]; then
+    ok "Test A (P0-08): notify_backup_success is NOT called inside backup_media (success notification moved after verification)"
+else
+    bad "Test A (P0-08): backup_media still fires the success notification before verification"
 fi
 
 # --- Test B: main-loop verification guard now fires -----------------------------

@@ -29,6 +29,7 @@ mkdir -p "$TMP/bin" "$TMP/repo/scripts"
 cp "$REPO_ROOT/scripts/backup-db-telegram.sh" \
    "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
+   "$REPO_ROOT/scripts/backup-status.sh" \
    "$TMP/repo/scripts/"
 
 # stub docker: `ps` lists the container; `exec ... pg_dump` depends on DOCKER_EXEC_RC
@@ -76,8 +77,14 @@ source_backup_functions() {
 # --- Test A: stdout contract + notification interaction -----------------------
 #
 # notify_* internals are replaced with stubs that LOG via log_info/log_warn
-# (i.e. they behave like the real telegram-notify.sh layer, which logs) and
-# return success. Before the fix this polluted the captured stdout.
+# (i.e. they behave like the real telegram-notify.sh layer, which logs).
+#
+# P0-08 test-expectation update (intentional): the success notification was
+# moved OUT of backup_database() to main(), after integrity verification —
+# the old expectation "STUB notify_backup_success appears while
+# backup_database runs" pinned exactly the sequencing defect P0-08 removes.
+# The stdout contract itself is unchanged and is now additionally enforced by
+# asserting notify_backup_success is NOT called here at all.
 
 OUT_A="$TMP/testA"
 (
@@ -89,6 +96,7 @@ OUT_A="$TMP/testA"
     notify_backup_success() {
         log_info "STUB notify_backup_success for $2"
         log_warn "STUB channel warning"
+        touch "${OUT_A}.success.called"
     }
     send_telegram_message() { log_info "STUB send_telegram_message: $1"; return 0; }
     send_telegram_file()    { log_warn "STUB send_telegram_file: $1";    return 0; }
@@ -125,12 +133,16 @@ case "$(cat "$OUT_A.out")" in
         bad "Test A: captured value is not a bare backup path: [$(cat "$OUT_A.out")]" ;;
 esac
 
-if strip_colors < "$OUT_A.err" | grep -q '\[INFO\].*Starting database backup' \
-   && strip_colors < "$OUT_A.err" | grep -q 'STUB notify_backup_success' \
-   && strip_colors < "$OUT_A.err" | grep -q 'STUB channel warning'; then
-    ok "Test A: INFO/WARN and notification-layer logs remain visible to the operator via stderr"
+if strip_colors < "$OUT_A.err" | grep -q '\[INFO\].*Starting database backup'; then
+    ok "Test A: INFO logs remain visible to the operator via stderr"
 else
-    bad "Test A: stderr is missing expected INFO/WARN/stub log lines"
+    bad "Test A: stderr is missing expected INFO log lines"
+fi
+
+if [ ! -e "${OUT_A}.success.called" ]; then
+    ok "Test A (P0-08): notify_backup_success is NOT called inside backup_database (success notification moved after verification)"
+else
+    bad "Test A (P0-08): backup_database still fires the success notification before verification"
 fi
 
 # --- Test B: failure behaviour -------------------------------------------------

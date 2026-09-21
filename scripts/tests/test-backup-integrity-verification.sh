@@ -41,6 +41,7 @@ bad() { echo "FAIL: $1"; fail=$((fail+1)); }
 mkdir -p "$TMP/bin" "$TMP/repo/scripts" "$TMP/fixtures" "$TMP/tmpdir"
 cp "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
+   "$REPO_ROOT/scripts/backup-status.sh" \
    "$TMP/repo/scripts/"
 
 make_driver() { # $1=source script, $2=driver path

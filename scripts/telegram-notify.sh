@@ -371,7 +371,12 @@ send_telegram_file_only() {
 }
 
 # Send text message to all configured channels in parallel.
-# Return 0 if at least one channel succeeded.
+# P0-08 return codes (tri-state delivery outcome):
+#   0 = delivered to at least one enabled channel
+#   1 = at least one channel enabled, but delivery failed on all of them
+#   2 = no enabled/applicable channels (NOT a delivery success)
+# Best-effort callers (monitor-logs-telegram.sh, start notifications) keep
+# working via `|| true`.
 send_telegram_message() {
     local message="$1"
     local tg_pid=""
@@ -395,7 +400,7 @@ send_telegram_message() {
 
     if [ "$tg_enabled" -eq 0 ] && [ "$vk_enabled" -eq 0 ]; then
         log_warn "No enabled notification channels for message send"
-        return 0
+        return 2
     fi
 
     if [ -n "$tg_pid" ]; then
@@ -421,7 +426,8 @@ send_telegram_message() {
 }
 
 # Send file to all configured channels in parallel.
-# Return 0 if at least one channel succeeded.
+# P0-08 return codes: see send_telegram_message (0 delivered / 1 all failed /
+# 2 no enabled file-delivery channels).
 send_telegram_file() {
     local file_path="$1"
     local caption="$2"
@@ -446,7 +452,7 @@ send_telegram_file() {
 
     if [ "$tg_enabled" -eq 0 ] && [ "$vk_enabled" -eq 0 ]; then
         log_warn "No enabled notification channels for file upload"
-        return 0
+        return 2
     fi
 
     if [ -n "$tg_pid" ]; then
@@ -471,7 +477,8 @@ send_telegram_file() {
     return 1
 }
 
-# Send backup start notification
+# Send backup start notification.
+# Start notifications never determine the P0-08 status fields.
 notify_backup_start() {
     local backup_type="$1"
     local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
@@ -487,7 +494,18 @@ Starting backup process..."
     send_telegram_message "$message" || true
 }
 
-# Send backup success notification
+# Delivery outcome of the most recent notify_backup_success /
+# notify_backup_error call (P0-08 status contract input):
+#   NOTIFY_TEXT_RC — result of send_telegram_message (0|1|2)
+#   NOTIFY_FILE_RC — result of send_telegram_file (0|1|2; 2 when no file mirror
+#                    was attempted)
+NOTIFY_TEXT_RC=2
+NOTIFY_FILE_RC=2
+
+# Send backup success notification (text + optional file mirror).
+# Always returns 0; the delivery outcome is exposed via NOTIFY_TEXT_RC /
+# NOTIFY_FILE_RC so the calling backup script can map it to the status
+# contract instead of swallowing it.
 notify_backup_success() {
     local backup_type="$1"
     local file_path="$2"
@@ -504,16 +522,22 @@ notify_backup_success() {
 ⏱ Duration: $duration
 🖥 Server: $(hostname)"
 
-    send_telegram_message "$message" || true
+    NOTIFY_TEXT_RC=0
+    send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
 
     # Upload file if enabled
+    NOTIFY_FILE_RC=2
     if [ -n "$file_path" ] && [ -f "$file_path" ]; then
         local caption="$backup_type backup - $(basename "$file_path") - $file_size"
-        send_telegram_file "$file_path" "$caption" || true
+        NOTIFY_FILE_RC=0
+        send_telegram_file "$file_path" "$caption" || NOTIFY_FILE_RC=$?
     fi
+
+    return 0
 }
 
-# Send backup error notification
+# Send backup error notification (final outcome text).
+# Same NOTIFY_TEXT_RC contract as notify_backup_success.
 notify_backup_error() {
     local backup_type="$1"
     local error_message="$2"
@@ -528,7 +552,10 @@ notify_backup_error() {
 
 Please check the logs for more details."
 
-    send_telegram_message "$message" || true
+    NOTIFY_TEXT_RC=0
+    send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
+
+    return 0
 }
 
 # Send cleanup notification

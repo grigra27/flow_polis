@@ -377,7 +377,28 @@ class PaymentSchedule(TimeStampedModel):
 
         logger = logging.getLogger(__name__)
 
-        if not self.policy_id:
+        # P2-01 (2026-09-23): year_number/installment_number обязательны на
+        # уровне поля (PositiveSmallIntegerField, null=False) — их
+        # отсутствием уже занимается clean_fields() внутри full_clean(),
+        # которая выполняется ДО этого метода и отдаст понятную
+        # ValidationError независимо от того, что делает clean() (Django
+        # собирает ошибки со всех трёх этапов full_clean() в один
+        # ValidationError). Ранний выход здесь нужен только для того, чтобы
+        # не строить Q(year_number__lt=None) — это ValueError, а не
+        # ValidationError, и он маскировал полезную ошибку вторичным
+        # traceback'ом (см. policy 526, 2026-09-14). Проверено на проде:
+        # NULL в этих колонках не бывает (NOT NULL на уровне БД, 0 строк).
+        #
+        # `pk` в этой проверке намеренно не участвует: у нового
+        # несохранённого объекта pk законно равен None, а последовательность
+        # дат обязана проверяться и при создании, не только при
+        # редактировании — не путать «нет pk» с «не заполнены обязательные
+        # поля».
+        if (
+            not self.policy_id
+            or self.year_number is None
+            or self.installment_number is None
+        ):
             return
 
         try:

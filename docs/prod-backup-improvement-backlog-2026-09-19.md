@@ -148,7 +148,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** подложенный битый файл → exit 2, ERROR в логе, текст-уведомление доходит в VK; корректный прогон → exit 0.
 - **Как проверить:** запуск с подменённым `BACKUP_DIR` и fixture-файлом, `echo $?`; ближайший ночной лог.
 - **Rollback:** `git revert` правки + прогон того же workflow.
-- **Статус:** **PASS (2026-09-20, deployed 504d178)** — workflow-контракт реализован: verification failure → `log_error "Backup verification failed"` + `notify_backup_error` + **exit 2**, файл сохранён для разбора, normal flow (cleanup/list) не продолжается; creation failure сохраняет прежний exit 1; media `.empty` — по-прежнему success (exit 0). Проверено полным main-flow набором `scripts/tests/test-backup-exit-codes.sh` — 35/35 локально и на production checkout (run 35468996152), control-прогон против HEAD ловит исходный дефект (7 FAIL). **Известное ограничение (закрыто в P0-08):** `notify_backup_success` исторически отправлялся внутри `backup_database`/`backup_media` до верификации — при verification failure порядок был «Started → Completed Successfully → Backup Failed». P0-08 перенёс единственное финальное уведомление в main после верификации и оценки обязательных стадий — ложный success больше невозможен (см. статус P0-08). **Pending:** фактическая доставка error-уведомления в живой канал (VK) подтверждается на P0-09/P1-10. Плановые cron-прогоны 20–21.09 завершились успешно (exit 0); негативного cron-прогона с exit 2 после деплоя пока не наблюдалось (провалов верификации не было) — контрольный негативный сценарий подтверждён regression-набором.
+- **Статус:** **PASS (2026-09-20, deployed 504d178)** — workflow-контракт реализован: verification failure → `log_error "Backup verification failed"` + `notify_backup_error` + **exit 2**, файл сохранён для разбора, normal flow (cleanup/list) не продолжается; creation failure сохраняет прежний exit 1; media `.empty` — по-прежнему success (exit 0). Проверено полным main-flow набором `scripts/tests/test-backup-exit-codes.sh` — 35/35 локально и на production checkout (run 35468996152), control-прогон против HEAD ловит исходный дефект (7 FAIL). **Известное ограничение (закрыто в P0-08):** `notify_backup_success` исторически отправлялся внутри `backup_database`/`backup_media` до верификации — при verification failure порядок был «Started → Completed Successfully → Backup Failed». P0-08 перенёс единственное финальное уведомление в main после верификации и оценки обязательных стадий — ложный success больше невозможен (см. статус P0-08). **Доставка в живой канал (закрыто на baseline P0-09):** cron-прогон 22.09 02:00 под кодом `f7376b6` — финальное уведомление фактически доставлено в VK (`mirror=1 notify=1` в `BACKUP_RESULT`, см. статус P0-09); error-путь и exit 2 подтверждены изолированным harness S7 на production checkout. Наблюдение за натуральным негативным cron-прогоном (verification failure в бою) остаётся operational-наблюдением P1-08/P1-10. Плановые cron-прогоны 20–21.09 завершились успешно (exit 0); негативного cron-прогона с exit 2 после деплоя пока не наблюдалось (провалов верификации не было) — контрольный негативный сценарий подтверждён regression-набором.
 
 ### P0-08 — Status contract: машинно-определяемый итог по стадиям (created / verified / offsite / mirror / notify / result / exit)
 - **Проблема:** `notify_backup_success` вызывает отправку с `|| true` (:507, :512), поэтому отказ всех каналов (событие `File delivery failed on all enabled channels`, 21 раз в логе) ни на что не влияет; а при отсутствии включённых каналов (:398, :449) возвращается 0, то есть ложный «успех». Кроме того, в текущем понимании «файл ушёл в VK/Telegram» приравнивается к наличию внешней копии, что неверно: мессенджер — это зеркало и канал уведомления, а не хранилище.
@@ -188,8 +188,8 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   5. Развязка по типам в одном окружении: `DB_REQUIRED_STAGES=created,verified,offsite` + `MEDIA_REQUIRED_STAGES=created,verified` → DB-прогон даёт `exit=3`, media-прогон — `result=ok`, `exit=0`.
   Отсутствие настоящего offsite на этапе P0 (`offsite=-`) не трактуется ни как успех хранения, ни как ложный провал.
 - **Как проверить:** прогоны с подменёнными env-флагами в `/tmp` (пункты 1-5 acceptance, причём пункт 5 — обоими скриптами в одном окружении); `cat last_status.json`; `python3 -m json.tool` на файле статуса; реальный ночной прогон.
-- **Rollback:** `git revert` правок трёх файлов (доставляются одним набором) + прогон того же workflow.
-- **Статус:** **CODE PASS — deployment pending (2026-09-21)**. Реализовано в working copy (`scripts/backup-status.sh` — новый общий слой; `telegram-notify.sh`, `backup-db-telegram.sh`, `backup-media-telegram.sh`):
+- **Rollback:** `git revert` правок четырёх файлов (три из scope + новый `backup-status.sh`; доставляются одним набором) + прогон того же workflow.
+- **Статус:** **PASS — deployed (2026-09-21, commit `f7376b6`, workflow run 35643934361)**. Реализовано и доставлено штатным GitHub Actions (`scripts/backup-status.sh` — новый общий слой; `telegram-notify.sh`, `backup-db-telegram.sh`, `backup-media-telegram.sh`):
   - status contract по всем семи полям (`created/verified/offsite/mirror/notify/result/exit`) — контракт реализован;
   - машиночитаемый `last_status.json` (атомарная запись tmp+mv, валидный JSON) и ровно одна финальная строка `BACKUP_RESULT`;
   - tri-state доставка (`1` — доставлено хотя бы в один канал, `0` — все включённые каналы отказали, `-` — каналов нет) вместо «нет каналов = успех»; WARNING `degraded communication` без порчи `result` при необязательных communication-стадиях;
@@ -198,7 +198,8 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
   - при required-offsite failure ложный success невозможен: до финального уведомления считается core outcome без `notify`, при провале — только error-путь, `mirror=-`, `exit=3` (D5);
   - media `.empty` = `created=1 verified=1` без tar-верификации; semantics P0-07 (suspect-файл сохраняется, normal flow не продолжается) сохранены;
   - regression-матрица S1–S12 зелёная: `scripts/tests/test-backup-status-contract.sh` 179/179, суммарно с P0-04/05/06/07 — 265/265 assertions.
-  Deployment — штатным GitHub Actions workflow после inclusion в commit; Production smoke — P0-09.
+  Deployment: коммит `f7376b6` (`fix: add backup status contract`), workflow run **35643934361** — все стадии success (Validate Configuration / Run Tests / Build Docker Image / Copy files (rsync) / Deploy on server / Run migrations / Health check / Notify Deployment Status).
+  Production verification (2026-09-21, read-only + sandboxed): sha256 четырёх скриптов проде = sha256 коммита; `bash -n` OK; owner/mode штатные; контейнеры Up; cron не менялся; все 5 изолированных наборов на production checkout зелёные (13/16/22/35/179 = 265); smoke статуса-контракта A–E (S1/S3/S4/S5/S7 на прод-коде) — PASS; notification-compat без реальной сети (tri-state 0/1/2, `set -e`-совместимость обёрток, сохранение `NOTIFY_TEXT_RC`/`NOTIFY_FILE_RC`, best-effort старых callers) — PASS; read-only `--verify` свежих боевых артефактов `db_backup_20260921_020050.sql.gz` и `media_backup_20260921_030051.tar.gz` — exit 0. E2E-подтверждение на живом прогоне с настоящим каналом (VK) — закрыто в P0-09: изолированный E2E-гейт 22.09 (notification-слой — stub, без реальной сети) плюс фактический cron-прогон 22.09 02:00 с живым VK-каналом (`mirror=1 notify=1` в `BACKUP_RESULT`).
 
 ### P0-09 — End-to-end gate: немедленная проверка исправленного контура
 - **Проблема:** нужно подтвердить, что контур (create → verify → status → exit code) работает на настоящих скриптах до того, как ветка P0 считается закрытой.
@@ -220,6 +221,17 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Не блокирует закрытие:** фактические значения `mirror` и `notify`. Временный отказ внешнего communication-канала (упавший VK, недоступный Telegram) не мешает закрыть core P0 gate, поскольку эти стадии не входят в `DB_REQUIRED_STAGES` / `MEDIA_REQUIRED_STAGES` — ровно по контракту P0-08. Результат smoke test фиксируется в отчёте и используется в P1-10.
 - **Как проверить:** вывод прогонов + `last_status.json` + отчёт drill; чек-лист по пяти пунктам core scope плюс отдельно — smoke test каналов.
 - **Rollback:** не требуется (задача проверочная; тестовые каталоги и scratch-БД удаляются).
+- **Статус:** **PASS (2026-09-22, E2E-гейт на production-инфраструктуре, код `f7376b6`)**. Все прогоны — побайтовыми копиями production-скриптов (sha256 совпали с прод checkout и коммитом) из изолированного runner `/tmp/p0-09-e2e-20260922_160732` со stub-слоем `telegram-notify.sh` (без `telegram-config.sh`, без network-вызовов — гарантированная невозможность реальной Telegram/VK-отправки):
+  - **real DB isolated backup — PASS:** живой `pg_dump` из `insurance_broker_db`, `db_backup_20260922_161216.sql.gz` (1 547 298 байт, sha256 `d12393ed…`), exit 0, ровно один `BACKUP_RESULT`, `created=1 verified=1 offsite=- mirror=- notify=- required=created,verified result=ok exit=0`, parser-valid `last_status.json` (file/bytes соответствуют факту), standalone `--verify` по реальному имени — exit 0; degraded-communication WARNING допустим по контракту;
+  - **status contract нового run — PASS** (см. выше, все семь полей + D5-код 0);
+  - **fresh dump restore drill — PASS:** scratch `polis_p009_restore_20260922_161216` (создана с проверкой отсутствия), restore через `gunzip | psql -v ON_ERROR_STOP=1 --no-psqlrc`, PIPESTATUS=`0 0`, stderr пуст; 38 таблиц / 38 PK / 41 FK / 160 индексов / md5 списка таблиц = боевым; per-table counts идентичны снапшоту прода; все FK `convalidated=true`; orphan-проверки (payments→policy, policyinfo→policy, emailrecipients→email, permissions→content_type, adminlog→user) — нули; scratch удалена, состав `pg_database` восстановлен;
+  - **real media isolated backup — PASS:** live volume только `:ro`, `media_backup_20260922_162042.tar.gz` (51 889 021 байт, sha256 `51919170…`), exit 0, `.meta` (`file_count=227`), `created=1 verified=1 result=ok exit=0`, один `BACKUP_RESULT`, `tar -tzf` OK, regular files 227 = meta, standalone `--verify` по реальному имени — exit 0;
+  - **extraction/manifest sanity — PASS:** распаковка 227 файлов, sample-файлы читаются (JPEG), SHA256-манифест live volume (`:ro`, дважды — стабильность подтверждена) побайтово совпал с манифестом архива по path+checksum;
+  - **negative fixture — PASS:** корректный gzip 120 КБ (не дамп) → `--verify` exit 1 (DB-3 header marker отсутствует); полный verification-failure flow — существующим изолированным harness S7 на production checkout (`DOCKER_DB_MODE=garbage`): created=1, verified=0, result=fail, exit=2, suspect-файл сохранён, success-уведомление/mirror отсутствуют, error-путь использован, один `BACKUP_RESULT`, валидный failure `last_status.json` — 24/24 assertions; все 5 наборов на прод checkout зелёные (13/16/22/35/179 = 265), трипваир «curl never called» — PASS;
+  - **production unchanged — PASS:** `dirs_before/after` и `hashes_before/after` боевых каталогов идентичны (diff пуст), artifacts P0-09 создавались только в изолированном каталоге; cron/env/скрипты боевого checkout не менялись;
+  - **cleanup — PASS:** scratch-БД, extracted tree, stub-runner, изолированные artifacts, harness-логи удалены; `polis_p009%` БД — 0, `/tmp` без P0-09-файлов, протёкших `verify_*` temp нет.
+  - **Communication smoke (неблокирующий):** в этом гейте notification-слой намеренно изолирован stub'ом («нет каналов», rc=2 → `notify=-`/`mirror=-`); фактическая доставка проверена отдельно cron-прогоном 22.09 02:00 под кодом `f7376b6`: `mirror=1 notify=1` (текст в VK доставлен; VK file-upload первой попытки отвалился с `no_free_space/var/www/pi`, файл всё же ушёл). Telegram по-прежнему мёртв (curl 28). Результат учитывается в P1-10.
+  - **Post-deploy cron observation (собрано, не блокирует):** плановый DB-прогон 22.09 02:00 — `BACKUP_RESULT … result=ok exit=0`, реальный `last_status.json` в боевом каталоге валиден; media под новым кодом ещё не запускалась (следующий понедельник, 28.09 03:00) — observational, к закрытию P1-08.
 
 ---
 
@@ -353,6 +365,7 @@ P0-02 (restorability вместо 100 % checksum старого архива), P
 - **Acceptance:** тестовое уведомление уходит выбранным каналом, и его получает владелец; `test_telegram_connection` (или эквивалент выбранного канала) зелёный с прод-сервера; `notify=1` проставляется только при фактической доставке, при отказе канала — `notify=0` + WARNING `degraded communication`, и `result`/`exit` не меняются, пока `notify` вне обязательных стадий (контракт P0-08); P1-08 после этой задачи имеет рабочий канал алерта.
 - **Как проверить:** ручной запуск `scripts/telegram-notify.sh --test` (или эквивалент) и `python manage.py system_health_check --check-all --notify-vk` с принудительной порчей `last_status.json`; факт получения подтверждает владелец.
 - **Rollback:** вернуть прежние строки скриптов/cron (реверт коммита); канал при этом откатывается к «уведомления не доходят», что не ломает бэкап.
+- **Side finding из P0-09 (включить в scope):** комментарий в `telegram-config.sh` заявляет приоритет `Environment variables > .env.prod > .env`, но код сначала `source`'ит `.env.prod` / `.env`, поэтому переменные из файлов перезаписывают внешние env. Наружно выставленный `TELEGRAM_ENABLED=false` / `VK_ENABLED=false` нельзя считать безопасным способом отключить отправку — для тестов на прод-машине нужна изоляция notification-слоя (как в P0-09: отдельный runner со stub вместо `telegram-notify.sh`). При реализации P1-10 привести фактический приоритет в соответствие документированному (внешний env побеждает) или явно переформулировать контракт.
 
 ---
 
@@ -548,7 +561,7 @@ Downtime ни здесь, ни в задачах не согласуется з�
 
 # 6. Статус выполнения
 
-По состоянию на 2026-09-21 (актуализировано перед deployment P0-08):
+По состоянию на 2026-09-22 (закрытие ветки P0 после E2E-гейта P0-09):
 
 | ID | Статус |
 |---|---|
@@ -559,8 +572,39 @@ Downtime ни здесь, ни в задачах не согласуется з�
 | P0-05 | PASS / deployed (`42f2769`), cron-наблюдение закрыто 21.09 |
 | P0-06 | PASS / deployed (`504d178`), cron-наблюдение закрыто 21.09 |
 | P0-07 | PASS / deployed (`504d178`) |
-| P0-08 | CODE PASS — deployment pending (доставляется штатным workflow) |
-| P0-09 | pending |
+| P0-08 | PASS / deployed (`f7376b6`, run 35643934361, production smoke 2026-09-21) |
+| P0-09 | PASS / final E2E gate completed 2026-09-22 (на коде `f7376b6`: real DB/media isolated backup, status contract, fresh dump restore drill, extraction/manifest sanity, negative fixture + full-flow exit 2, production unchanged, cleanup) |
 | P1 / P2 | pending |
 
-Следующий шаг: deployment P0-08 и E2E-проверка P0-09.
+## P0 — CLOSED (2026-09-22)
+
+**P0 closure baseline: production commit `f7376b6`** (P0-09 — validation-only, production code не изменял).
+
+Ветка P0 достигла цели: локальный production backup-контур (`insurance_broker`) теперь имеет:
+
+- воспроизводимое создание DB/media backup (stdout-контракты P0-04/P0-05, cron-циклы работают);
+- содержательную nightly integrity verification (P0-06: gzip/tar, PostgreSQL header/completion marker, cross-check с `.meta`);
+- machine-readable exit semantics (P0-07: `0/1/2/3/4` по таблице D5, suspect-артефакт сохраняется);
+- атомарный `last_status.json` и ровно одну финальную строку `BACKUP_RESULT` (P0-08);
+- корректный порядок outcome-уведомлений (P0-08: success — только после верификации; ложный success невозможен);
+- независимые required-stage контракты для DB и media (`DB_REQUIRED_STAGES` / `MEDIA_REQUIRED_STAGES`);
+- подтверждённый restore DB-дампа, созданного исправленным кодом (P0-09 restore drill в scratch-БД: схема/PK/FK/индексы/counts/orphan-sanity — чисто);
+- подтверждённую extraction media-архива (P0-09: 227 файлов, exact SHA256 manifest live volume ↔ архив).
+
+E2E-гейт P0-09 проходил на production-инфраструктуре изолированно (stub notification-слой, отдельные `BACKUP_DIR`): реальной notification-сетевой активности не было, боевые каталоги и хеши существующих backups не изменились, scratch/temp ресурсы удалены.
+
+### Что сознательно остаётся за P0 (переход в P1)
+
+- Независимое durable offsite-хранение backup-артефактов отсутствует: `offsite=null` на текущем baseline — **ожидаемое состояние**, а не дефект; мессенджер-зеркало (VK/Telegram file delivery) offsite **не** является и никогда не установит `offsite=1`.
+- Выбор провайдера, upload, верификация и retention offsite-копии → **P1-01…P1-05** (переключение `DB_REQUIRED_STAGES` в `created,verified,offsite` — только в P1-02/P1-03).
+- Периодический scheduled restore drill с артефактом давности → **P1-09**.
+- Мониторинг и hardening доставки уведомлений (Telegram мёртв, VK — единственный живой канал; finding приоритета env-переменных в `telegram-config.sh`, зафиксированный в P0-09) → **P1-10** / соответствующая notification-задача (диагностика — P1-07).
+- Контроль свежести `last_status.json`, статусов и drill-артефактов (dead man's switch), а также post-deploy cron-наблюдение (первый плановый media-прогон под `f7376b6` — понедельник 28.09 03:00 MSK) → **P1-08**.
+
+### Фактическое cron-расписание (на момент закрытия P0, не менялось)
+
+- DB backup — ежедневно **02:00 MSK**;
+- media backup — понедельник **03:00 MSK** (`0 3 * * 1`; комментарий «Weekly on Sunday» в crontab — известная описка, выражение = понедельник);
+- cleanup — понедельник 04:00 MSK.
+
+Следующий шаг: старт P1 по согласованию. Этот docs-only коммит (`P0 closure`) не пушится в `origin/main` намеренно: push docs-only коммита в `main` запускает полный production deployment; он уйдёт вместе со следующим согласованным functional push.

@@ -120,10 +120,17 @@ Imports a PostgreSQL database backup to the new server (Timeweb Cloud). This scr
 
 #### Safety Features
 
-- Creates automatic backup before import
+- Creates automatic backup before import (`current_db_backup_<timestamp>.sql`
+  in the directory you ran it from, not `~/insurance_broker_backups/`)
 - Verifies data integrity after import
 - Checks for required environment files
 - Validates backup file before import
+
+⚠️ **No confirmation prompt.** Unlike a typical destructive-action script,
+this one does not ask "are you sure?" — it drops the target database as
+soon as it starts step 7. There is no `--interactive`/`--dry-run` mode.
+See [docs/BACKUP_RESTORE.md#database-restore](../docs/BACKUP_RESTORE.md#database-restore)
+before running it against production.
 
 #### Examples
 
@@ -553,48 +560,6 @@ docker-compose -f docker-compose.prod.yml exec web python manage.py collectstati
 # Check status
 docker-compose -f docker-compose.prod.yml ps
 ```
-
-### restore-db.sh
-
-Automated PostgreSQL database restore script.
-
-#### Purpose
-
-Restores the database from backup files with automatic pre-restore backup, service management, and rollback on failure.
-
-#### Usage
-
-**Interactive restore (recommended):**
-```bash
-./scripts/restore-db.sh --interactive
-```
-
-**Restore from latest backup:**
-```bash
-./scripts/restore-db.sh --latest
-```
-
-**Restore from specific file:**
-```bash
-./scripts/restore-db.sh --file ~/insurance_broker_backups/database/db_backup_20240115_020000.sql.gz
-```
-
-**List available backups:**
-```bash
-./scripts/restore-db.sh --list
-```
-
-#### Safety Features
-
-- Creates pre-restore backup automatically
-- Stops application services before restore
-- Verifies database after restore
-- Automatic rollback on failure
-- Restarts services after completion
-
-#### Related Documentation
-
-See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and restore guide.
 
 ### setup-backup-cron.sh
 

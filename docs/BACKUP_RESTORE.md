@@ -114,56 +114,93 @@ RETENTION_DAYS=14 ./scripts/backup-db-telegram.sh
 
 ## Database Restore
 
-### Interactive Restore
+> **Reality check (P2-06, 2026-09-23):** earlier revisions of this section
+> documented a polished `restore-db.sh` with `--interactive`/`--latest`/
+> `--file`/`--list` flags and automatic rollback. **That script has never
+> existed in this repository.** What follows describes the actual tool —
+> `scripts/import-database.sh` — as it really behaves, warts included. It
+> is a **destructive, one-shot script with no confirmation prompt**: once
+> you run it, it drops the target database immediately. There is no
+> `--interactive` mode to talk you out of a mistake — you are the
+> confirmation step. Read this whole section before running it.
 
-The easiest way to restore is using interactive mode:
+### Full Database Restore
+
+`scripts/import-database.sh` takes a single positional argument — a
+**decompressed** `.sql` file (it pipes the file straight into `psql`, so a
+`.sql.gz` will not work as-is):
 
 ```bash
 cd /path/to/insurance_broker
-./scripts/restore-db.sh --interactive
+
+# Nightly backups are gzipped — decompress a copy first (-k keeps the .gz)
+gunzip -k ~/insurance_broker_backups/database/db_backup_20260115_020000.sql.gz
+
+# Compose reads POSTGRES_* from the shell environment for interpolation
+# (see docker-compose.prod.yml) — export .env.prod first, the same way
+# deploy.yml and cron do
+set -a; source .env.prod; set +a
+
+./scripts/import-database.sh ~/insurance_broker_backups/database/db_backup_20260115_020000.sql
 ```
 
-This will:
-1. Display a list of available backups
-2. Prompt you to select a backup
-3. Ask for confirmation
-4. Create a pre-restore backup of the current database
-5. Stop application services
-6. Drop and recreate the database
-7. Restore from the selected backup
-8. Verify the restored database
-9. Restart application services
+What it actually does, in order (`[1/9]`..`[9/9]` in its own output):
+1. Verifies a `.md5` checksum sidecar if one exists next to the backup file
+   (nightly backups don't currently produce one, so this step is normally
+   skipped, not failed).
+2. Checks `docker-compose` (v1) is installed.
+3. Checks `docker-compose.prod.yml` exists in the current directory — run
+   it from the project root.
+4. Checks `.env.prod` (and, as a legacy leftover from before the `POSTGRES_*`
+   consolidation, `.env.prod.db` — currently still present on production;
+   if it's ever cleaned up this check will need updating) exist.
+5. Starts the `db` container if it isn't already running.
+6. **Automatically backs up the current database** with `pg_dump` to
+   `current_db_backup_<timestamp>.sql` **in the current working directory**
+   (not `~/insurance_broker_backups/`) — this is your rollback copy, see
+   below.
+7. **Drops and recreates** `insurance_broker_prod`, then imports the
+   provided file.
+8. Verifies the result: table count, `django_migrations` count, and row
+   counts for `auth_user`, `policies_policy`, `clients_client`,
+   `insurers_insurer`.
+9. Starts the `web` container if needed and runs `python manage.py migrate`.
 
-### Restore from Latest Backup
+**What it does NOT do:** restart `celery_worker`, `celery_beat`, or `nginx`
+— do that yourself afterward:
 
 ```bash
-./scripts/restore-db.sh --latest
+docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml ps
 ```
 
-### Restore from Specific File
+Then verify the application manually (log in, open a policy) before
+considering the restore complete.
 
-```bash
-./scripts/restore-db.sh --file ~/insurance_broker_backups/database/db_backup_20240115_020000.sql.gz
-```
+### Restoring a Single Table or a Few Rows
 
-### List Available Backups
-
-```bash
-./scripts/restore-db.sh --list
-```
+For anything short of "replace the whole database", skip
+`import-database.sh` entirely — see
+[Recover Single Table](#recover-single-table) under Disaster Recovery,
+which extracts just the relevant `CREATE TABLE` block from the dump and
+applies it with plain `psql`, without touching anything else.
 
 ### Important Notes
 
-⚠️ **Warning**: Restoring a database will:
-- Stop the web application and Celery workers
-- Drop the existing database
+⚠️ **Warning** — `import-database.sh` will, without asking:
+- Drop the existing `insurance_broker_prod` database
 - Replace it with the backup data
-- Restart all services
+- Run Django migrations against the restored data
 
-✅ **Safety**: The restore script automatically:
-- Creates a pre-restore backup before making changes
-- Allows rollback if the restore fails
-- Verifies the database after restore
+It does **not** stop the web/Celery containers first, and does **not**
+restart them afterward — plan for a short window where the app may error
+while the database is being replaced, and restart services yourself once
+it's done.
+
+✅ **What actually protects you:**
+- It **does** create a pre-restore backup automatically — `current_db_backup_<timestamp>.sql` in the directory you ran it from (steps above).
+- It **does** verify table/migration/row counts after import and fails loudly if the table count is zero.
+- It does **not** have an automatic rollback — if something looks wrong after restore, you re-run the same import flow pointing at `current_db_backup_<timestamp>.sql` (see [Restore Issues](#restore-issues)).
 
 ## Media Files Backup
 
@@ -441,8 +478,12 @@ sleep 10
 # Copy backup file to server
 scp backup.sql.gz user@new-server:~/
 
-# Restore database
-./scripts/restore-db.sh --file ~/backup.sql.gz
+# Decompress, export env, then restore — see Database Restore above for
+# what import-database.sh actually does (no confirmation prompt, destructive)
+gunzip ~/backup.sql.gz
+cd insurance_broker
+set -a; source .env.prod; set +a
+./scripts/import-database.sh ~/backup.sql
 ```
 
 #### 6. Restore Media Files
@@ -543,14 +584,18 @@ docker image prune -a
 
 #### "Restore failed"
 
-The restore script automatically creates a pre-restore backup. To rollback:
+`import-database.sh` automatically saved a pre-restore backup **in the
+directory you ran it from** before it dropped the database (see
+[Database Restore](#database-restore)) — it is not moved into
+`~/insurance_broker_backups/`, so look where you invoked the script:
 
 ```bash
-# Find pre-restore backup
-ls -la ~/insurance_broker_backups/database/pre_restore_*
+# Find the pre-restore backup import-database.sh made for you
+ls -la current_db_backup_*.sql
 
-# Restore from pre-restore backup
-./scripts/restore-db.sh --file ~/insurance_broker_backups/database/pre_restore_backup_20240115_100000.sql.gz
+# Restore from it the same way — decompressed .sql, env sourced first
+set -a; source .env.prod; set +a
+./scripts/import-database.sh current_db_backup_20260115_100000.sql
 ```
 
 #### "Database verification failed"

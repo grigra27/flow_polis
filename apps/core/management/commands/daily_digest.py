@@ -39,8 +39,33 @@ class Command(BaseCommand):
             action="store_true",
             help="Не зеркалировать дайджест в VK",
         )
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help=(
+                "Подробный лог: построчная трассировка обработки логинов, "
+                "полисов и платежей (DEBUG). По умолчанию тихо — только "
+                "итоговые строки, чтобы не забивать daily-digest.log."
+            ),
+        )
 
     def handle(self, *args, **options):
+        # P2-04 (2026-09-23): DEBUG-трассировка теперь идёт через logger, а
+        # не print() — по умолчанию её не видно (root logger в проде
+        # настроен на INFO, см. config/settings.py). --verbose поднимает
+        # уровень именно для этой команды и именно на время её выполнения:
+        # без восстановления в finally мутация логгера пережила бы вызов
+        # (logging.getLogger кэширует объект по имени) и просочилась бы в
+        # последующие вызовы в этом же процессе.
+        previous_level = logger.level
+        if options.get("verbose"):
+            logger.setLevel(logging.DEBUG)
+        try:
+            self._run_digest(options)
+        finally:
+            logger.setLevel(previous_level)
+
+    def _run_digest(self, options):
         self.stdout.write(self.style.SUCCESS("📊 Генерация ежедневного дайджеста"))
 
         # Определяем период для анализа
@@ -95,8 +120,8 @@ class Command(BaseCommand):
                 full_message, max_length=3900
             )
 
-            print(
-                f"DEBUG: Message parts for Telegram/VK mirroring: {len(message_parts)}"
+            logger.debug(
+                f"Message parts for Telegram/VK mirroring: {len(message_parts)}"
             )
 
             send_telegram = not options.get("no_telegram")
@@ -318,8 +343,8 @@ class Command(BaseCommand):
                     else:
                         changes_dict = change.changes
 
-                    print(
-                        f"DEBUG: Processing changes for policy: {changes_dict.keys()}"
+                    logger.debug(
+                        f"Processing changes for policy: {changes_dict.keys()}"
                     )
 
                     for field_name, (old_value, new_value) in changes_dict.items():
@@ -345,13 +370,13 @@ class Command(BaseCommand):
 
                         if formatted_change:
                             all_changes.append(formatted_change)
-                            print(f"DEBUG: Added change: {formatted_change}")
+                            logger.debug(f"Added change: {formatted_change}")
 
                 except (json.JSONDecodeError, TypeError, ValueError) as e:
-                    print(f"DEBUG: Error parsing changes: {e}")
+                    logger.debug(f"Error parsing changes: {e}")
                     continue
 
-        print(f"DEBUG: Total changes found: {len(all_changes)}")
+        logger.debug(f"Total changes found: {len(all_changes)}")
         return all_changes
 
     def _format_unknown_field_change(self, field_name, old_value, new_value):
@@ -495,7 +520,7 @@ class Command(BaseCommand):
 
     def _get_logins_data(self, start_time, end_time):
         """Получает данные о логинах пользователей"""
-        print(f"DEBUG: Getting logins from {start_time} to {end_time}")
+        logger.debug(f"Getting logins from {start_time} to {end_time}")
 
         # Успешные логины за период
         successful_logins = (
@@ -506,12 +531,12 @@ class Command(BaseCommand):
             .order_by("attempt_time")
         )
 
-        print(f"DEBUG: Found {successful_logins.count()} successful logins")
+        logger.debug(f"Found {successful_logins.count()} successful logins")
 
         logins_list = []
         for i, login in enumerate(successful_logins):
-            print(
-                f"DEBUG: Raw login {i+1}: username='{login.username}', time={login.attempt_time}"
+            logger.debug(
+                f"Raw login {i+1}: username='{login.username}', time={login.attempt_time}"
             )
 
             # Конвертируем в московское время
@@ -524,7 +549,7 @@ class Command(BaseCommand):
                 "ip": login.ip_address,
             }
 
-            print(f"DEBUG: Processed login {i+1}: {login_data}")
+            logger.debug(f"Processed login {i+1}: {login_data}")
             logins_list.append(login_data)
 
         return logins_list
@@ -739,11 +764,11 @@ class Command(BaseCommand):
 
     def _format_message(self, period_name, logins_data, policies_data, payments_data):
         """Форматирует сообщение для отправки с расширенной статистикой и улучшенным форматированием"""
-        print(f"DEBUG: Formatting message for period: {period_name}")
-        print(f"DEBUG: Logins count: {len(logins_data)}")
-        print(f"DEBUG: Policies created: {len(policies_data['created'])}")
-        print(f"DEBUG: Policies updated: {len(policies_data['updated'])}")
-        print(f"DEBUG: Payment changes: {len(policies_data['payment_changes'])}")
+        logger.debug(f"Formatting message for period: {period_name}")
+        logger.debug(f"Logins count: {len(logins_data)}")
+        logger.debug(f"Policies created: {len(policies_data['created'])}")
+        logger.debug(f"Policies updated: {len(policies_data['updated'])}")
+        logger.debug(f"Payment changes: {len(policies_data['payment_changes'])}")
 
         message_parts = []
         stats = policies_data["statistics"]
@@ -933,7 +958,7 @@ class Command(BaseCommand):
             message_parts.append("🆕 СОЗДАНЫ:")
             for i, item in enumerate(policies_data["created"]):
                 policy = item["policy"]
-                print(f"DEBUG: Processing created policy {i+1}: ID={policy.pk}")
+                logger.debug(f"Processing created policy {i+1}: ID={policy.pk}")
 
                 # Используем номер ДФА если есть, иначе номер полиса
                 policy_number = (
@@ -966,7 +991,7 @@ class Command(BaseCommand):
             message_parts.append("✏️ ИЗМЕНЕНЫ:")
             for i, item in enumerate(policies_data["updated"]):
                 policy = item["policy"]
-                print(f"DEBUG: Processing updated policy {i+1}: ID={policy.pk}")
+                logger.debug(f"Processing updated policy {i+1}: ID={policy.pk}")
 
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
@@ -1001,7 +1026,7 @@ class Command(BaseCommand):
             message_parts.append("💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:")
             for i, item in enumerate(policies_data["payment_changes"]):
                 policy = item["policy"]
-                print(f"DEBUG: Processing payment change {i+1}: ID={policy.pk}")
+                logger.debug(f"Processing payment change {i+1}: ID={policy.pk}")
 
                 policy_number = (
                     policy.dfa_number if policy.dfa_number else policy.policy_number
@@ -1054,8 +1079,8 @@ class Command(BaseCommand):
             message_parts.append("📭 Изменений полисов не было")
 
         final_message = "\n".join(message_parts)
-        print(f"DEBUG: Final message length: {len(final_message)}")
-        print(f"DEBUG: Final message preview: {repr(final_message[:300])}")
+        logger.debug(f"Final message length: {len(final_message)}")
+        logger.debug(f"Final message preview: {repr(final_message[:300])}")
 
         return final_message
 
@@ -1190,7 +1215,7 @@ class Command(BaseCommand):
 
         for i, base_message in enumerate(messages):
             message = self._format_part_message(base_message, i, total_messages)
-            print(f"DEBUG: Part {i + 1}/{total_messages}, len={len(message)}")
+            logger.debug(f"Part {i + 1}/{total_messages}, len={len(message)}")
 
             # Telegram (может не пройти — РФ блокировка, это ОК)
             if send_telegram(message):
@@ -1209,8 +1234,8 @@ class Command(BaseCommand):
             if i < total_messages - 1:
                 time.sleep(1)
 
-        print(
-            f"DEBUG: Telegram sent {telegram_success_count}/{total_messages}, "
+        logger.debug(
+            f"Telegram sent {telegram_success_count}/{total_messages}, "
             f"VK mirror sent {vk_success_count}/{total_messages}"
         )
         return {
@@ -1228,18 +1253,18 @@ class Command(BaseCommand):
         for i, base_message in enumerate(messages):
             message = self._format_part_message(base_message, i, total)
 
-            print(f"DEBUG: Sending VK message {i + 1}/{total} (length: {len(message)})")
+            logger.debug(f"Sending VK message {i + 1}/{total} (length: {len(message)})")
             ok = self._send_single_vk_message(message)
 
             if ok:
                 success_count += 1
-                print(f"DEBUG: VK message {i + 1}/{total} sent successfully")
+                logger.debug(f"VK message {i + 1}/{total} sent successfully")
                 if i < total - 1:
                     time.sleep(1)
             else:
                 print(f"ERROR: Failed to send VK message {i + 1}/{total}")
 
-        print(f"DEBUG: VK sent {success_count}/{total} messages")
+        logger.debug(f"VK sent {success_count}/{total} messages")
         return success_count > 0
 
     def _send_single_vk_message(self, message):

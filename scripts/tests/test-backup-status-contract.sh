@@ -138,11 +138,14 @@ send_telegram_message() {
     local head
     head=$(printf '%s' "$1" | awk 'NR==1{print; exit}')
     case "$head" in
-        *"Backup Started"*)                echo "EV:text:start" >&2 ;;
-        *"Backup Completed Successfully"*) echo "EV:text:success" >&2 ;;
-        *"Backup Failed"*)                 echo "EV:text:error" >&2
-                                           printf '%s' "$1" | awk '/Error:/{sub(/.*Error: /,""); print "EV:text:error_reason: " $0; exit}' >&2 ;;
-        *)                                 echo "EV:text:other" >&2 ;;
+        *"Бэкап начат"*)     echo "EV:text:start" >&2 ;;
+        *"Бэкап готов"*)     echo "EV:text:success" >&2 ;;
+        *"Бэкап не прошёл"*) echo "EV:text:error" >&2
+                             # Wording review (2026-09-23): the reason is its
+                             # own paragraph now (line 4 — header, subheader,
+                             # blank, reason), not an inline "Error: ..." field.
+                             printf '%s' "$1" | awk 'NR==4{print "EV:text:error_reason: " $0; exit}' >&2 ;;
+        *)                   echo "EV:text:other" >&2 ;;
     esac
     return "${FORCE_TEXT_RC:-0}"
 }
@@ -325,7 +328,7 @@ unset DB_REQUIRED_STAGES
 # S5 — offsite required before implementation
 # (review fix: the provisional core outcome is evaluated BEFORE the final
 #  notification — a known core failure must produce one error notification,
-#  never "Backup Completed Successfully" + file mirror)
+#  never "Бэкап готов" + file mirror)
 # =============================================================================
 reset_required; delivery_ok
 export DB_REQUIRED_STAGES="created,verified,offsite"
@@ -342,7 +345,7 @@ a_br "S5" exit 3
 a_errno  "S5" "EV:text:success"
 a_errno  "S5" "EV:file:"
 a_errhas "S5" "EV:text:error"
-a_errhas "S5" "Required stage offsite is not satisfied"
+a_errhas "S5" "Не выполнена обязательная стадия offsite"
 a_json "S5"
 a_jsonfield "S5" offsite null
 a_jsonfield "S5" mirror null

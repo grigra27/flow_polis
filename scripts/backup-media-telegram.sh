@@ -293,7 +293,7 @@ cleanup_old_backups() {
     if [ "${PRINT_ONLY:-false}" = "true" ]; then
         log_info "PRINT_ONLY=true — skipping cleanup notification"
     else
-        notify_cleanup_result "Media Backup" "$deleted_count" "$retention_days"
+        notify_cleanup_result "Медиафайлы" "$deleted_count" "$retention_days"
     fi
 }
 
@@ -443,7 +443,7 @@ main() {
     echo ""
 
     # Send start notification (best effort; outcome not part of status fields)
-    notify_backup_start "Media Backup" || true
+    notify_backup_start "Медиафайлы" || true
 
     local run_start_time=$(date +%s)
 
@@ -461,7 +461,7 @@ main() {
 
     if [ "$create_ok" -ne 1 ]; then
         STATUS_WORKFLOW_FAIL=1
-        notify_backup_error "Media Backup" "Media backup creation failed - check volume and logs"
+        notify_backup_error "Медиафайлы" "Не удалось создать бэкап — проверьте volume и логи на сервере"
         STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
         STATUS_MIRROR="-"
         finalize_backup_run
@@ -485,7 +485,7 @@ main() {
         if ! verify_backup "$backup_file"; then
             STATUS_WORKFLOW_FAIL=1
             log_error "Backup verification failed"
-            notify_backup_error "Media Backup" "Integrity verification failed for $(basename "$backup_file") - archive preserved for investigation"
+            notify_backup_error "Медиафайлы" "Проверка целостности не пройдена: $(basename "$backup_file") — архив сохранён на сервере для разбора"
             STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
             STATUS_MIRROR="-"
             finalize_backup_run
@@ -504,7 +504,7 @@ main() {
     # evaluator keep the precedence exit (3 here).
     if ! evaluate_core_result; then
         STATUS_MIRROR="-"
-        notify_backup_error "Media Backup" "$(core_failure_reason) for $(basename "$backup_file")"
+        notify_backup_error "Медиафайлы" "$(core_failure_reason): $(basename "$backup_file")"
         STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
         finalize_backup_run
         exit $?
@@ -524,9 +524,9 @@ main() {
 
     local size_desc
     if [ "$is_empty_marker" -eq 1 ]; then
-        size_desc="0 MB (empty)"
+        size_desc="0 МБ (пусто)"
     else
-        size_desc=$(du -h "$backup_file" | cut -f1)
+        size_desc=$(format_size_ru "$(du -h "$backup_file" | cut -f1)")
         local meta_ts=$(basename "$backup_file" .tar.gz)
         meta_ts="${meta_ts#media_backup_}"
         local meta_count=""
@@ -534,11 +534,11 @@ main() {
             meta_count=$(awk -F= '$1=="file_count"{print $2}' "$BACKUP_DIR/backup_${meta_ts}.meta")
         fi
         if [ -n "$meta_count" ]; then
-            size_desc="$size_desc ($meta_count files)"
+            size_desc="$size_desc ($meta_count файлов)"
         fi
     fi
 
-    notify_backup_success "Media Backup" "$backup_file" "$size_desc" "$duration_formatted"
+    notify_backup_success "Медиафайлы" "$backup_file" "$size_desc" "$duration_formatted"
     STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
     STATUS_MIRROR=$(map_delivery_tri "${NOTIFY_FILE_RC:-2}")
 

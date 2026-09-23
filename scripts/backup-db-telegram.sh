@@ -264,7 +264,7 @@ cleanup_old_backups() {
     if [ "${PRINT_ONLY:-false}" = "true" ]; then
         log_info "PRINT_ONLY=true — skipping cleanup notification"
     else
-        notify_cleanup_result "Database Backup" "$deleted_count" "$retention_days"
+        notify_cleanup_result "База данных" "$deleted_count" "$retention_days"
     fi
 }
 
@@ -388,7 +388,7 @@ main() {
     echo ""
 
     # Send start notification (best effort; outcome not part of status fields)
-    notify_backup_start "Database Backup" || true
+    notify_backup_start "База данных" || true
 
     # Create backup directory
     create_backup_dir
@@ -404,7 +404,7 @@ main() {
 
     if [ "$create_ok" -ne 1 ]; then
         STATUS_WORKFLOW_FAIL=1
-        notify_backup_error "Database Backup" "Database backup creation failed - check database connectivity and logs"
+        notify_backup_error "База данных" "Не удалось создать бэкап — проверьте подключение к БД и логи на сервере"
         STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
         STATUS_MIRROR="-"
         finalize_backup_run
@@ -422,7 +422,7 @@ main() {
     if ! verify_backup "$backup_file"; then
         STATUS_WORKFLOW_FAIL=1
         log_error "Backup verification failed"
-        notify_backup_error "Database Backup" "Integrity verification failed for $(basename "$backup_file") - file preserved for investigation"
+        notify_backup_error "База данных" "Проверка целостности не пройдена: $(basename "$backup_file") — файл сохранён на сервере для разбора"
         STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
         STATUS_MIRROR="-"
         finalize_backup_run
@@ -440,7 +440,7 @@ main() {
     # evaluator keep the precedence exit (3 here).
     if ! evaluate_core_result; then
         STATUS_MIRROR="-"
-        notify_backup_error "Database Backup" "$(core_failure_reason) for $(basename "$backup_file")"
+        notify_backup_error "База данных" "$(core_failure_reason): $(basename "$backup_file")"
         STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
         finalize_backup_run
         exit $?
@@ -454,15 +454,15 @@ main() {
 
     # Final success notification + optional file mirror — only after
     # verification passed (P0-08 sequencing fix).
-    local file_size=$(du -h "$backup_file" | cut -f1)
-    local duration_formatted="n/a"
+    local file_size=$(format_size_ru "$(du -h "$backup_file" | cut -f1)")
+    local duration_formatted="н/д"
     local meta_ts=$(basename "$backup_file" .sql.gz)
     meta_ts="${meta_ts#db_backup_}"
     if [ -f "$BACKUP_DIR/backup_${meta_ts}.meta" ]; then
         duration_formatted=$(awk -F= '$1=="duration"{print $2}' "$BACKUP_DIR/backup_${meta_ts}.meta")
-        [ -n "$duration_formatted" ] || duration_formatted="n/a"
+        [ -n "$duration_formatted" ] || duration_formatted="н/д"
     fi
-    notify_backup_success "Database Backup" "$backup_file" "$file_size" "$duration_formatted"
+    notify_backup_success "База данных" "$backup_file" "$file_size" "$duration_formatted"
     STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
     STATUS_MIRROR=$(map_delivery_tri "${NOTIFY_FILE_RC:-2}")
 

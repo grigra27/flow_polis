@@ -763,7 +763,15 @@ class Command(BaseCommand):
         }
 
     def _format_message(self, period_name, logins_data, policies_data, payments_data):
-        """Форматирует сообщение для отправки с расширенной статистикой и улучшенным форматированием"""
+        """Форматирует сообщение для отправки с расширенной статистикой и улучшенным форматированием
+
+        Wording/formatting review (2026-09-23): headers de-shouted (no more
+        ALL CAPS — VK/Telegram get plain text, there's no bold to lean on
+        instead), sub-item nesting shown with a visible "↳" marker instead
+        of leading spaces (some clients don't preserve those), and
+        pipe-separated one-liners replaced with two-line cards so a long
+        policy/client/insurer combo doesn't wrap mid-field on a phone.
+        """
         logger.debug(f"Formatting message for period: {period_name}")
         logger.debug(f"Logins count: {len(logins_data)}")
         logger.debug(f"Policies created: {len(policies_data['created'])}")
@@ -771,13 +779,22 @@ class Command(BaseCommand):
         logger.debug(f"Payment changes: {len(policies_data['payment_changes'])}")
 
         message_parts = []
+
+        def add_section(title):
+            """Ровно одна пустая строка перед заголовком раздела/подраздела,
+            независимо от того, что было (или не было) выше — раньше отступы
+            расставлялись вручную по месту и терялись, если предыдущий блок
+            оказывался пустым."""
+            if message_parts and message_parts[-1] != "":
+                message_parts.append("")
+            message_parts.append(title)
+
         stats = policies_data["statistics"]
         payment_stats = payments_data["statistics"]
 
-        # 📊 СВОДНАЯ СТАТИСТИКА (новое!)
-        message_parts.append("📊 СВОДНАЯ СТАТИСТИКА:")
+        # 📊 Сводка
+        add_section("📊 Сводка")
 
-        # Общие цифры по полисам
         total_policies = stats["total_created"] + stats["total_updated"]
         message_parts.append(
             f"📋 Всего полисов: {total_policies} (создано: {stats['total_created']}, изменено: {stats['total_updated']})"
@@ -788,7 +805,6 @@ class Command(BaseCommand):
                 f"💳 Изменений платежей: {stats['total_payment_changes']}"
             )
 
-        # Суммы по новым полисам
         if stats["premium_sum_created"] > 0:
             message_parts.append(
                 f"💰 Премии по новым полисам: {stats['premium_sum_created']:,.0f}₽"
@@ -799,7 +815,6 @@ class Command(BaseCommand):
                 f"🤝 КВ по новым полисам: {stats['kv_sum_created']:,.0f}₽"
             )
 
-        # Суммы по новым платежам
         if stats["premium_sum_payments"] > 0:
             message_parts.append(
                 f"💸 Премии по новым платежам: {stats['premium_sum_payments']:,.0f}₽"
@@ -810,7 +825,6 @@ class Command(BaseCommand):
                 f"💼 КВ по новым платежам: {stats['kv_sum_payments']:,.0f}₽"
             )
 
-        # Статистика по платежам (новое!)
         if payment_stats["paid_count"] > 0:
             message_parts.append(
                 f"✅ Оплачено платежей: {payment_stats['paid_count']} на сумму {payment_stats['paid_sum']:,.0f}₽"
@@ -820,7 +834,6 @@ class Command(BaseCommand):
                     f"💼 КВ с оплаченных: {payment_stats['paid_kv_sum']:,.0f}₽"
                 )
 
-        # Предупреждения о просрочке и завтрашних платежах
         if payment_stats["overdue_count"] > 0:
             message_parts.append(
                 f"⚠️ Просрочено: {payment_stats['overdue_count']} платежей на {payment_stats['overdue_sum']:,.0f}₽"
@@ -831,7 +844,6 @@ class Command(BaseCommand):
                 f"📅 Завтра к оплате: {payment_stats['tomorrow_count']} платежей на {payment_stats['tomorrow_sum']:,.0f}₽"
             )
 
-        # Если никакой активности не было
         if (
             total_policies == 0
             and stats["total_payment_changes"] == 0
@@ -839,12 +851,9 @@ class Command(BaseCommand):
         ):
             message_parts.append("📭 Активности не было")
 
-        message_parts.append("")  # Разделитель
-
-        # 👥 ЛОГИНЫ ПОЛЬЗОВАТЕЛЕЙ (улучшенное форматирование)
-        message_parts.append("👥 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ:")
+        # 👥 Входы
+        add_section("👥 Входы")
         if logins_data:
-            # Группируем логины по пользователям
             user_logins = {}
             for login in logins_data:
                 username = login["username"]
@@ -852,10 +861,9 @@ class Command(BaseCommand):
                     user_logins[username] = []
                 user_logins[username].append(login["time"])
 
-            # Показываем сгруппированно
             for username, times in user_logins.items():
                 if len(times) == 1:
-                    message_parts.append(f"• {times[0]} - {username}")
+                    message_parts.append(f"• {times[0]} — {username}")
                 else:
                     times_str = ", ".join(times)
                     message_parts.append(
@@ -864,20 +872,17 @@ class Command(BaseCommand):
         else:
             message_parts.append("• Входов не было")
 
-        message_parts.append("")  # Разделитель
-
-        # 💰 ИНФОРМАЦИЯ О ПЛАТЕЖАХ (новое!)
+        # 💳 Платежи
         if (
             payment_stats["paid_count"] > 0
             or payment_stats["overdue_count"] > 0
             or payment_stats["tomorrow_count"] > 0
         ):
-            message_parts.append("💰 ДЕТАЛИ ПО ПЛАТЕЖАМ:")
+            add_section("💳 Платежи")
 
             # Оплаченные платежи
             if payment_stats["paid_count"] > 0:
-                message_parts.append("")
-                message_parts.append("✅ ОПЛАЧЕНО:")
+                add_section("✅ Оплачено:")
                 # Показываем только первые 5 оплаченных платежей, чтобы не перегружать
                 for payment in payments_data["paid_payments"][:5]:
                     policy_number = (
@@ -889,20 +894,19 @@ class Command(BaseCommand):
                         payment.policy.client.client_name or "Неизвестный клиент"
                     )
                     message_parts.append(
-                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽"
+                        f"• {policy_number} — {client_name} · {payment.amount:,.0f}₽"
                     )
 
                 if len(payments_data["paid_payments"]) > 5:
                     remaining = len(payments_data["paid_payments"]) - 5
-                    message_parts.append(f"• ... и еще {remaining} платежей")
+                    message_parts.append(f"• ...и ещё {remaining} платежей")
 
             # Просроченные платежи (показываем только если их немного)
             if (
                 payment_stats["overdue_count"] > 0
                 and payment_stats["overdue_count"] <= 10
             ):
-                message_parts.append("")
-                message_parts.append("⚠️ ПРОСРОЧЕНО:")
+                add_section("⚠️ Просрочено:")
                 for payment in payments_data["overdue_payments"]:
                     policy_number = (
                         payment.policy.dfa_number
@@ -914,12 +918,11 @@ class Command(BaseCommand):
                     )
                     days_overdue = (date.today() - payment.due_date).days
                     message_parts.append(
-                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽ ({days_overdue} дн.)"
+                        f"• {policy_number} — {client_name} · {payment.amount:,.0f}₽ · просрочка {days_overdue} дн."
                     )
             elif payment_stats["overdue_count"] > 10:
-                message_parts.append("")
-                message_parts.append(
-                    f"⚠️ ПРОСРОЧЕНО: {payment_stats['overdue_count']} платежей (слишком много для детального отображения)"
+                add_section(
+                    f"⚠️ Просрочено: {payment_stats['overdue_count']} платежей (слишком много для детального отображения)"
                 )
 
             # Завтрашние платежи (показываем только если их немного)
@@ -927,8 +930,7 @@ class Command(BaseCommand):
                 payment_stats["tomorrow_count"] > 0
                 and payment_stats["tomorrow_count"] <= 10
             ):
-                message_parts.append("")
-                message_parts.append("📅 ЗАВТРА К ОПЛАТЕ:")
+                add_section("📅 Завтра к оплате:")
                 for payment in payments_data["tomorrow_payments"]:
                     policy_number = (
                         payment.policy.dfa_number
@@ -939,23 +941,19 @@ class Command(BaseCommand):
                         payment.policy.client.client_name or "Неизвестный клиент"
                     )
                     message_parts.append(
-                        f"• {policy_number} | {client_name} | {payment.amount:,.0f}₽"
+                        f"• {policy_number} — {client_name} · {payment.amount:,.0f}₽"
                     )
             elif payment_stats["tomorrow_count"] > 10:
-                message_parts.append("")
-                message_parts.append(
-                    f"📅 ЗАВТРА К ОПЛАТЕ: {payment_stats['tomorrow_count']} платежей (слишком много для детального отображения)"
+                add_section(
+                    f"📅 Завтра к оплате: {payment_stats['tomorrow_count']} платежей (слишком много для детального отображения)"
                 )
 
-            message_parts.append("")  # Разделитель
+        # 📋 Полисы
+        add_section("📋 Полисы")
 
-        # 📋 ДЕТАЛЬНАЯ ИНФОРМАЦИЯ ПО ПОЛИСАМ
-        message_parts.append("📋 ДЕТАЛИ ПО ПОЛИСАМ:")
-
-        # Созданные полисы (улучшенное форматирование)
+        # Созданные полисы — карточка в 2-3 строки вместо строки с "|"
         if policies_data["created"]:
-            message_parts.append("")
-            message_parts.append("🆕 СОЗДАНЫ:")
+            add_section("🆕 Созданы:")
             for i, item in enumerate(policies_data["created"]):
                 policy = item["policy"]
                 logger.debug(f"Processing created policy {i+1}: ID={policy.pk}")
@@ -968,27 +966,23 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                # Основная информация
-                line = f"• {policy_number} | {client_name} | {insurer_name}"
-                message_parts.append(line)
+                message_parts.append(f"• {policy_number} — {client_name}")
 
-                # Дополнительная информация о новом полисе
-                if policy.premium_total:
-                    message_parts.append(f"  💰 Премия: {policy.premium_total:,.0f}₽")
-
-                # КВ по полису
                 kv_sum = policy.payment_schedule.aggregate(
                     total_kv=models.Sum("kv_rub")
                 )["total_kv"]
+
+                info_bits = [insurer_name]
+                if policy.premium_total:
+                    info_bits.append(f"премия {policy.premium_total:,.0f}₽")
                 if kv_sum:
-                    message_parts.append(f"  🤝 КВ: {kv_sum:,.0f}₽")
+                    info_bits.append(f"КВ {kv_sum:,.0f}₽")
+                message_parts.append(f"↳ {' · '.join(info_bits)}")
+                message_parts.append(f"↳ 🔗 {item['url']}")
 
-                message_parts.append(f"  🔗 {item['url']}")
-
-        # Обновленные полисы (с расширенной детализацией изменений!)
+        # Обновленные полисы
         if policies_data["updated"]:
-            message_parts.append("")
-            message_parts.append("✏️ ИЗМЕНЕНЫ:")
+            add_section("✏️ Изменены:")
             for i, item in enumerate(policies_data["updated"]):
                 policy = item["policy"]
                 logger.debug(f"Processing updated policy {i+1}: ID={policy.pk}")
@@ -1000,30 +994,26 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                # Основная информация
-                line = f"• {policy_number} | {client_name} | {insurer_name}"
-                message_parts.append(line)
+                message_parts.append(f"• {policy_number} — {client_name}")
 
-                # Показываем расширенную детализацию изменений
                 if item.get("change_details"):
-                    # Добавляем счетчик изменений
                     changes_count = len(item["change_details"])
-                    message_parts.append(f"  📝 Изменений: {changes_count}")
-
-                    # Показываем каждое изменение с отступом
+                    message_parts.append(
+                        f"↳ {insurer_name} · изменений: {changes_count}"
+                    )
                     for change_detail in item["change_details"]:
-                        message_parts.append(f"  {change_detail}")
+                        message_parts.append(f"↳ {change_detail}")
                 else:
-                    # Если нет детальной информации, показываем общее количество изменений
                     changes_count = len(item["changes"])
-                    message_parts.append(f"  📝 Изменений: {changes_count}")
+                    message_parts.append(
+                        f"↳ {insurer_name} · изменений: {changes_count}"
+                    )
 
-                message_parts.append(f"  🔗 {item['url']}")
+                message_parts.append(f"↳ 🔗 {item['url']}")
 
-        # Изменения платежей (улучшенное форматирование с расширенной детализацией)
+        # Изменения платежей
         if policies_data["payment_changes"]:
-            message_parts.append("")
-            message_parts.append("💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:")
+            add_section("💳 Изменены платежи:")
             for i, item in enumerate(policies_data["payment_changes"]):
                 policy = item["policy"]
                 logger.debug(f"Processing payment change {i+1}: ID={policy.pk}")
@@ -1035,20 +1025,16 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                line = f"• {policy_number} | {client_name} | {insurer_name}"
-                message_parts.append(line)
+                message_parts.append(f"• {policy_number} — {client_name}")
 
-                # Показываем расширенную детализацию изменений платежей
                 if item.get("change_details"):
-                    # Добавляем счетчик изменений платежей
                     changes_count = len(item["change_details"])
-                    message_parts.append(f"  📝 Изменений платежей: {changes_count}")
-
-                    # Показываем каждое изменение с отступом
+                    message_parts.append(
+                        f"↳ {insurer_name} · изменений платежей: {changes_count}"
+                    )
                     for change_detail in item["change_details"]:
-                        message_parts.append(f"  {change_detail}")
+                        message_parts.append(f"↳ {change_detail}")
                 else:
-                    # Если нет детальной информации, показываем количество изменений
                     changes_count = len(item["changes"])
                     created_count = sum(
                         1
@@ -1058,15 +1044,14 @@ class Command(BaseCommand):
                     updated_count = changes_count - created_count
 
                     if created_count > 0 and updated_count > 0:
-                        message_parts.append(
-                            f"  📝 Изменений: {changes_count} (создано: {created_count}, изменено: {updated_count})"
-                        )
+                        summary = f"создано: {created_count}, изменено: {updated_count}"
                     elif created_count > 0:
-                        message_parts.append(f"  📝 Создано платежей: {created_count}")
+                        summary = f"создано платежей: {created_count}"
                     else:
-                        message_parts.append(f"  📝 Изменено платежей: {updated_count}")
+                        summary = f"изменено платежей: {updated_count}"
+                    message_parts.append(f"↳ {insurer_name} · {summary}")
 
-                message_parts.append(f"  🔗 {item['url']}")
+                message_parts.append(f"↳ 🔗 {item['url']}")
 
         # Если никаких изменений полисов не было
         if not any(
@@ -1117,7 +1102,7 @@ class Command(BaseCommand):
 
             # Прерываем после сводной статистики и активности пользователей если места мало
             if (
-                line.startswith("📋 ДЕТАЛИ ПО ПОЛИСАМ:")
+                line.startswith("📋 Полисы")
                 and current_length > effective_max_length * 0.6
             ):  # Если уже использовано 60% места
                 remaining_lines = len(lines) - i - 1
@@ -1148,13 +1133,13 @@ class Command(BaseCommand):
 
         # Определяем разделители секций
         section_headers = [
-            "📊 СВОДНАЯ СТАТИСТИКА:",
-            "👥 АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЕЙ:",
-            "💰 ДЕТАЛИ ПО ПЛАТЕЖАМ:",
-            "📋 ДЕТАЛИ ПО ПОЛИСАМ:",
-            "🆕 СОЗДАНЫ:",
-            "✏️ ИЗМЕНЕНЫ:",
-            "💳 ИЗМЕНЕНЫ ПЛАТЕЖИ:",
+            "📊 Сводка",
+            "👥 Входы",
+            "💳 Платежи",
+            "📋 Полисы",
+            "🆕 Созданы:",
+            "✏️ Изменены:",
+            "💳 Изменены платежи:",
         ]
 
         for i, line in enumerate(lines):

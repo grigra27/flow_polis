@@ -485,17 +485,17 @@ send_telegram_file() {
 
 # Send backup start notification.
 # Start notifications never determine the P0-08 status fields.
+#
+# Wording (2026-09-23 notification review): Russian, no hostname (there is
+# one server, the field never told the reader anything), compact one-line
+# subheader instead of a field-per-line list — designed to read well as
+# plain text in VK, which has no bold/italic in regular messages.
 notify_backup_start() {
     local backup_type="$1"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
 
-    local message="🔄 Backup Started
-
-📋 Type: $backup_type
-🕐 Time: $timestamp
-🖥 Server: $(hostname)
-
-Starting backup process..."
+    local message="🔄 Бэкап начат
+$backup_type · $timestamp"
 
     send_telegram_message "$message" || true
 }
@@ -517,16 +517,13 @@ notify_backup_success() {
     local file_path="$2"
     local file_size="$3"
     local duration="$4"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
 
-    local message="✅ Backup Completed Successfully
+    local message="✅ Бэкап готов
+$backup_type · $timestamp
 
-📋 Type: $backup_type
-🕐 Completed: $timestamp
-📁 File: $(basename "$file_path")
-📊 Size: $file_size
-⏱ Duration: $duration
-🖥 Server: $(hostname)"
+Файл: $(basename "$file_path")
+Размер: $file_size · заняло $duration"
 
     NOTIFY_TEXT_RC=0
     send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
@@ -534,7 +531,7 @@ notify_backup_success() {
     # Upload file if enabled
     NOTIFY_FILE_RC=2
     if [ -n "$file_path" ] && [ -f "$file_path" ]; then
-        local caption="$backup_type backup - $(basename "$file_path") - $file_size"
+        local caption="$backup_type · $(basename "$file_path") · $file_size"
         NOTIFY_FILE_RC=0
         send_telegram_file "$file_path" "$caption" || NOTIFY_FILE_RC=$?
     fi
@@ -547,16 +544,14 @@ notify_backup_success() {
 notify_backup_error() {
     local backup_type="$1"
     local error_message="$2"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
+    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
 
-    local message="❌ Backup Failed
+    local message="❌ Бэкап не прошёл
+$backup_type · $timestamp
 
-📋 Type: $backup_type
-🕐 Time: $timestamp
-🖥 Server: $(hostname)
-❗ Error: $error_message
+$error_message
 
-Please check the logs for more details."
+Подробности — в логе на сервере."
 
     NOTIFY_TEXT_RC=0
     send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
@@ -569,15 +564,23 @@ notify_cleanup_result() {
     local backup_type="$1"
     local deleted_count="$2"
     local retention_days="$3"
-    local timestamp=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S MSK')
 
-    local message="🧹 Cleanup Completed
+    # Wording review (2026-09-23): with daily backups and a multi-week
+    # retention window, actual deletions happen roughly once a month —
+    # this used to fire every single night saying "Deleted: 0 old
+    # backup(s)". Skip the notification entirely when there's nothing to
+    # report; the cleanup itself still runs and logs either way.
+    if [ "${deleted_count:-0}" -eq 0 ] 2>/dev/null; then
+        log_info "Cleanup: нечего удалять, уведомление не отправляется"
+        return 0
+    fi
 
-📋 Type: $backup_type
-🕐 Time: $timestamp
-🗑 Deleted: $deleted_count old backup(s)
-📅 Retention: $retention_days days
-🖥 Server: $(hostname)"
+    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
+
+    local message="🧹 Старые бэкапы удалены
+$backup_type · $timestamp
+
+Удалено файлов: $deleted_count (старше $retention_days дн.)"
 
     send_telegram_message "$message" || true
 }

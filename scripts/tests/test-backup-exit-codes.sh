@@ -170,7 +170,7 @@ a_exit   "DB-1" 0
 a_file   "DB-1 backup preserved" "$(latest 'db_backup_*.sql.gz')"
 a_errhas "DB-1" "Backup file integrity verified"
 a_errno  "DB-1" "Backup verification failed"
-a_curlno "DB-1" "Backup Failed"
+a_curlno "DB-1" "Бэкап не прошёл"
 a_errhas "DB-1 normal flow continues" "Cleaning up backups"
 
 # --- DB-2: created backup fails integrity verification -----------------------------
@@ -181,7 +181,7 @@ a_exit   "DB-2" 2
 a_file   "DB-2 backup preserved on verification failure" "$db2_file"
 a_errhas "DB-2" "Backup verification failed"
 a_errhas "DB-2 verification reason" "Content is not a PostgreSQL dump"
-a_curlhas "DB-2 error notification" "Backup Failed"
+a_curlhas "DB-2 error notification" "Бэкап не прошёл"
 a_errno  "DB-2 normal flow stopped" "Cleaning up backups"
 
 # --- DB-3: creation failure keeps its own semantics ---------------------------------
@@ -198,7 +198,7 @@ run_main backup-media-telegram.sh
 a_exit   "MEDIA-1" 0
 a_file   "MEDIA-1 archive preserved" "$(latest 'media_backup_*.tar.gz')"
 a_errhas "MEDIA-1" "Backup file integrity verified"
-a_curlno "MEDIA-1" "Backup Failed"
+a_curlno "MEDIA-1" "Бэкап не прошёл"
 a_errhas "MEDIA-1 normal flow continues" "Cleaning up backups"
 
 # --- MEDIA-2: archive created but verification fails --------------------------------
@@ -209,7 +209,7 @@ a_exit   "MEDIA-2" 2
 a_file   "MEDIA-2 archive preserved on verification failure" "$m2_file"
 a_errhas "MEDIA-2" "Backup verification failed"
 a_errhas "MEDIA-2 verification reason" "Backup file is corrupted"
-a_curlhas "MEDIA-2 error notification" "Backup Failed"
+a_curlhas "MEDIA-2 error notification" "Бэкап не прошёл"
 a_errno  "MEDIA-2 normal flow stopped" "Cleaning up backups"
 a_file   "MEDIA-2 metadata not removed" "$(latest 'backup_*.meta')"
 
@@ -227,7 +227,7 @@ run_main backup-media-telegram.sh
 a_exit   "MEDIA-4" 0
 a_file   "MEDIA-4 empty marker created" "$(latest 'media_backup_*.empty')"
 a_errno  "MEDIA-4 tar.gz verification not called" "Verifying backup integrity"
-a_curlno "MEDIA-4" "Backup Failed"
+a_curlno "MEDIA-4" "Бэкап не прошёл"
 a_errhas "MEDIA-4 normal flow continues" "Cleaning up backups"
 
 # --- summary -------------------------------------------------------------------------

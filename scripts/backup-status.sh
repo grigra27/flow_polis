@@ -184,17 +184,43 @@ evaluate_core_result() {
 }
 
 # core_failure_reason — human-readable cause for the final error notification
-# on the core-failure path (mirrors the D5 precedence order).
+# on the core-failure path (mirrors the D5 precedence order). Text is in
+# Russian (2026-09-23 notification-wording review) — this string only ever
+# feeds notify_backup_error, never the BACKUP_RESULT log line or the JSON
+# status, so translating it doesn't affect anything machine-readable.
 core_failure_reason() {
     if [ "$STATUS_CREATED" != "1" ]; then
-        printf 'Backup creation failed'
+        printf 'Не удалось создать бэкап'
     elif [ "$STATUS_VERIFIED" != "1" ]; then
-        printf 'Backup integrity verification failed'
+        printf 'Бэкап не прошёл проверку целостности'
     elif required_has offsite && [ "$STATUS_OFFSITE" != "1" ]; then
-        printf 'Required stage offsite is not satisfied (no real offsite storage exists at P0; messenger mirrors never count as offsite)'
+        printf 'Не выполнена обязательная стадия offsite (настоящего внешнего хранилища нет; зеркало в мессенджер offsite не считается)'
     else
-        printf 'A required backup stage failed'
+        printf 'Не пройдена обязательная стадия бэкапа'
     fi
+}
+
+# format_size_ru <du -h style value, e.g. "1.5M", "227K", "50M">
+# Russian-friendly rendering: "." -> "," and the unit letter -> Cyrillic
+# abbreviation (K->КБ, M->МБ, G->ГБ, T->ТБ). Falls back to the input
+# unchanged for anything it doesn't recognize, so it never breaks a caller
+# on an unexpected du(1) output.
+format_size_ru() {
+    local input="$1"
+    local last_char="${input: -1}"
+    local number="${input%?}"
+    local unit
+    case "$last_char" in
+        K) unit="КБ" ;;
+        M) unit="МБ" ;;
+        G) unit="ГБ" ;;
+        T) unit="ТБ" ;;
+        *)
+            printf '%s' "$input"
+            return 0
+            ;;
+    esac
+    printf '%s %s' "${number//./,}" "$unit"
 }
 
 # WARNING per §7: communication degradation is recorded, not fatal, when the

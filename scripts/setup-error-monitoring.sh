@@ -92,7 +92,7 @@ fi
 # Step 4: Test system health check
 log_step "4. Тестирование проверки системы..."
 
-if docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram; then
+if docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram --notify-vk; then
     log_info "✅ Проверка системы работает"
 else
     log_warn "⚠️ Проблемы с проверкой системы (не критично)"
@@ -161,7 +161,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Add health check job if not exists
     if ! grep -q "system_health_check" "$TEMP_CRON"; then
         echo "# Insurance Broker - System Health Check (every 30 minutes)" >> "$TEMP_CRON"
-        echo "*/30 * * * * cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml exec -T web python manage.py system_health_check --check-all --notify-telegram >> $PROJECT_DIR/logs/health-check.log 2>&1" >> "$TEMP_CRON"
+        echo "*/30 * * * * cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml exec -T web python manage.py system_health_check --check-all --notify-telegram --notify-vk >> $PROJECT_DIR/logs/health-check.log 2>&1" >> "$TEMP_CRON"
         echo "" >> "$TEMP_CRON"
     fi
 
@@ -217,7 +217,7 @@ echo ""
 log_info "📋 Полезные команды:"
 echo "   # Тестирование"
 echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py test_telegram_errors --test-error"
-echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram"
+echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py system_health_check --check-all --notify-telegram --notify-vk"
 echo "   docker-compose -f docker-compose.prod.yml exec web python manage.py daily_digest --test"
 echo "   ./scripts/monitor-logs-telegram.sh --status"
 echo ""

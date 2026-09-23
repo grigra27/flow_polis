@@ -36,11 +36,18 @@ def calculate_commission(sender, instance, **kwargs):
                     f"insurance_type={policy.insurance_type.id}"
                 )
             except CommissionRate.DoesNotExist:
-                # No commission rate found - log warning but don't break save
-                logger.warning(
-                    f"Commission rate not found for policy {instance.policy_id}: "
-                    f"insurer={instance.policy.insurer.id}, "
-                    f"insurance_type={instance.policy.insurance_type.id}"
+                # No commission rate found. This is often a legitimate,
+                # permanent state (P2-02, 2026-09-23), not a system fault:
+                # some insurer/insurance_type combinations have no commission
+                # agreement at all (confirmed on production for
+                # insurer=15 "Чулпан" / insurance_type=1 "КАСКО" — no
+                # contract). INFO, not WARNING — a missing rate shouldn't
+                # read as an incident or trip log-based alerting.
+                logger.info(
+                    f"No commission rate configured for policy {instance.policy_id} "
+                    f"(insurer={instance.policy.insurer.id}, "
+                    f"insurance_type={instance.policy.insurance_type.id}) — "
+                    f"kv_rub left unchanged"
                 )
                 return  # Exit early if no commission rate
             except Exception as e:

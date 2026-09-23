@@ -718,6 +718,16 @@ See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and 
 
 ### Telegram Integration for Backups
 
+> **Storage vs. notification (P1-06, 2026-09-23):** everything below sends
+> messages and mirrors backup files to Telegram/VK — it is a
+> notification/convenience layer, **not** backup storage. There is currently
+> no independent offsite store (owner decision, `docs/prod-backup-improvement-backlog-2026-09-19.md`
+> P1-01…P1-04/P1-09, all `CANCELLED`); local retention is the actual safety
+> net. See [Backup Storage](../docs/BACKUP_RESTORE.md#backup-storage) for the
+> full picture, including known VK reliability. Telegram itself is currently
+> network-unreachable from the production host (P1-07) — VK is the channel
+> that actually delivers today.
+
 #### telegram-config.sh
 
 Configuration file for Telegram bot credentials and settings.
@@ -782,10 +792,11 @@ Same as backup-db.sh but with integrated Telegram notifications and file uploads
 ```
 
 **Notifications:**
-- 🔄 Backup start notification
-- ✅ Backup success with file upload
+- 🔄 Backup start notification (VK + Telegram, best effort)
+- ✅ Backup success with file mirror (delivered via VK today — Telegram is
+  network-unreachable from production, see P1-07)
 - ❌ Error notifications with details
-- 🧹 Cleanup results
+- 🧹 Cleanup results (skipped when `PRINT_ONLY=true`, see [Backup Retention](../docs/BACKUP_RESTORE.md#backup-retention))
 
 #### backup-media-telegram.sh
 
@@ -811,10 +822,11 @@ Same as backup-media.sh but with integrated Telegram notifications and file uplo
 ```
 
 **Notifications:**
-- 🔄 Backup start notification
-- ✅ Backup success with file upload
+- 🔄 Backup start notification (VK + Telegram, best effort)
+- ✅ Backup success with file mirror (delivered via VK today — Telegram is
+  network-unreachable from production, see P1-07)
 - ❌ Error notifications with details
-- 🧹 Cleanup results
+- 🧹 Cleanup results (skipped when `PRINT_ONLY=true`, see [Backup Retention](../docs/BACKUP_RESTORE.md#backup-retention))
 
 #### Setting Up Telegram Backups
 

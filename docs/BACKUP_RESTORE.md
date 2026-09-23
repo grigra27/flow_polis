@@ -28,9 +28,10 @@ All scripts are located in the `scripts/` directory and are designed to work wit
 ### Backup Strategy
 
 - **Database backups**: Daily at 2:00 AM (via cron)
-- **Media backups**: Daily at 3:00 AM (via cron)
-- **Retention period**: 7 days by default (configurable)
+- **Media backups**: Weekly, Monday at 3:00 AM (via cron)
+- **Retention period**: 30 days for database, 28 days for media by default (configurable) — see [Backup Storage](#backup-storage) for why this is the primary safety net
 - **Backup location**: `~/insurance_broker_backups/` by default
+- **External copy**: mirrored to VK (and Telegram, when reachable) as a notification/convenience channel — **not** an independent offsite store; see [Backup Storage](#backup-storage)
 
 ## Backup Scripts
 
@@ -48,7 +49,9 @@ All scripts support the following environment variables:
 |----------|---------|-------------|
 | `COMPOSE_FILE` | `docker-compose.prod.yml` | Docker Compose file to use |
 | `BACKUP_DIR` | `~/insurance_broker_backups/` | Directory for storing backups |
-| `RETENTION_DAYS` | `7` | Number of days to keep backups |
+| `RETENTION_DAYS` | `30` (DB) / `28` (media) | Days to keep backups — files older than this are pruned, but never below `MIN_RETAINED_BACKUPS` |
+| `MIN_RETAINED_BACKUPS` | `5` (DB) / `4` (media) | Floor: cleanup always keeps at least this many backups regardless of age |
+| `PRINT_ONLY` | `false` | `true` = dry-run cleanup (log what would be deleted, delete nothing) |
 | `DB_CONTAINER` | `insurance_broker_db` | Database container name |
 | `DB_NAME` | `insurance_broker_prod` | Database name |
 | `DB_USER` | `postgres` | Database user |
@@ -294,64 +297,92 @@ By default, backups are stored locally in `~/insurance_broker_backups/`:
 ├── database/
 │   ├── db_backup_20240115_020000.sql.gz
 │   ├── db_backup_20240114_020000.sql.gz
+│   ├── last_status.json
 │   └── latest_backup.sql.gz -> db_backup_20240115_020000.sql.gz
 └── media/
     ├── media_backup_20240115_030000.tar.gz
     ├── media_backup_20240114_030000.tar.gz
+    ├── last_status.json
     └── latest_backup.tar.gz -> media_backup_20240115_030000.tar.gz
 ```
 
-### Remote Storage (Recommended)
+`last_status.json` is the machine-readable result of the most recent run
+(created/verified/result/exit — see the backup status contract below); it is
+what `system_health_check --check-backups` reads to detect a stalled backup
+circuit.
 
-For production, it's recommended to copy backups to remote storage:
+### External copy: VK/Telegram mirror — accepted risk, no independent offsite store
 
-#### Using rsync to Remote Server
+**There is no independent offsite backup storage.** This is a conscious
+decision by the owner (2026-09-23), not an oversight or a temporary gap — see
+`docs/prod-backup-improvement-backlog-2026-09-19.md` (tasks P1-01…P1-04,
+P1-09, all `CANCELLED`, and P1-06 which this section implements). Anyone
+building on this backup circuit — including a future engineer or agent —
+should read the rest of this section before assuming a "real" offsite copy
+exists.
 
-```bash
-# Add to cron after backup jobs
-0 5 * * * rsync -avz ~/insurance_broker_backups/ user@backup-server:/backups/insurance_broker/
-```
+What actually happens after every successful backup: the archive is
+**mirrored** to VK (and to Telegram, when its network path is reachable —
+it currently is not; see P1-07) as a convenience/notification channel. This
+is deliberately **not** treated as storage by the backup status contract: a
+successful VK/Telegram delivery only ever sets `mirror=1` / `notify=1`, and
+**never** sets `offsite=1` — that field stays `null` permanently until an
+independent store is actually built (it is not, at this stage).
 
-#### Using Digital Ocean Spaces (S3-compatible)
+**Known reliability of the VK mirror:** the 2026-09-19 audit found the VK
+file upload failed on 2 of the last 8 observed nights (`no_free_space`,
+`not saved`). It has since succeeded consistently, but treat it as a
+best-effort convenience channel, not a guarantee — if the server is lost the
+same day a mirror upload silently failed, that day's backup has no copy
+anywhere.
 
-```bash
-# Install s3cmd
-apt-get install s3cmd
+**What actually mitigates the risk today:**
+- content-level integrity verification on every run (`gzip`/`tar` +
+  PostgreSQL dump markers + `file_count` cross-check — see `verify_backup()`
+  in both scripts);
+- a confirmed, real restore drill of a backup produced by the current code
+  (scratch database, full schema/FK/orphan checks — 2026-09-22);
+- local retention deep enough to survive more than a single bad night (30
+  days DB / 28 days media, with a hard floor of the most recent 5/4 backups
+  regardless of age — see [Backup Retention](#backup-retention) below).
 
-# Configure s3cmd
-s3cmd --configure
-
-# Sync backups to Spaces
-0 5 * * * s3cmd sync ~/insurance_broker_backups/ s3://your-bucket/insurance_broker_backups/
-```
-
-#### Using AWS S3
-
-```bash
-# Install AWS CLI
-pip install awscli
-
-# Configure AWS CLI
-aws configure
-
-# Sync backups to S3
-0 5 * * * aws s3 sync ~/insurance_broker_backups/ s3://your-bucket/insurance_broker_backups/
-```
+**What this does *not* mitigate:** total loss of the server (disk failure,
+account compromise, accidental deletion of `~/insurance_broker_backups/`)
+leaves you dependent entirely on whatever VK happens to still have, with no
+guaranteed retention or versioning on VK's side and no way to script a bulk
+recovery from it. If that risk profile changes (more data, compliance
+requirement, or the owner simply revisits the decision), reopen P1-01 in the
+backlog rather than bolting on an ad hoc `rsync`/`s3cmd` cron job — the
+engineering groundwork (status contract fields, required-stage wiring) is
+already in place for exactly that addition.
 
 ### Backup Retention
 
-The default retention period is 7 days. To change it:
+Local retention is the only guaranteed safety net (see above), so cleanup is
+built to never empty the backup directory outright:
+
+- `RETENTION_DAYS` controls the age cutoff — default **30 days** for the
+  database, **28 days** (~4 weekly runs) for media.
+- `MIN_RETAINED_BACKUPS` is a floor — cleanup always keeps at least this many
+  backups (default **5** DB / **4** media) regardless of how old they are.
+  A misconfigured `RETENTION_DAYS=0`, or a server clock jump, cannot wipe out
+  every backup in one run.
+- `PRINT_ONLY=true` runs cleanup as a dry run: it logs exactly what it would
+  delete without deleting anything, and skips the cleanup notification. Use
+  it before changing either variable in production:
 
 ```bash
-# Keep backups for 30 days
-RETENTION_DAYS=30 ./scripts/backup-db.sh
-RETENTION_DAYS=30 ./scripts/backup-media.sh
+# Preview what a new retention setting would delete — nothing is removed
+PRINT_ONLY=true RETENTION_DAYS=14 ./scripts/backup-db-telegram.sh --cleanup
+
+# Once satisfied, run for real
+RETENTION_DAYS=14 ./scripts/backup-db-telegram.sh --cleanup
 ```
 
 Or update the cron jobs:
 
 ```cron
-0 2 * * * cd /path/to/insurance_broker && RETENTION_DAYS=30 ./scripts/backup-db.sh >> logs/backup-db.log 2>&1
+0 2 * * * cd /path/to/insurance_broker && RETENTION_DAYS=14 ./scripts/backup-db-telegram.sh >> logs/backup-db.log 2>&1
 ```
 
 ## Disaster Recovery

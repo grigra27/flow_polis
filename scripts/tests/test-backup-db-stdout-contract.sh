@@ -30,6 +30,7 @@ cp "$REPO_ROOT/scripts/backup-db-telegram.sh" \
    "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
    "$REPO_ROOT/scripts/backup-status.sh" \
+   "$REPO_ROOT/scripts/backup-retention.sh" \
    "$TMP/repo/scripts/"
 
 # stub docker: `ps` lists the container; `exec ... pg_dump` depends on DOCKER_EXEC_RC

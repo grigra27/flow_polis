@@ -11,12 +11,19 @@ set -o pipefail  # Exit on pipe failure
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/telegram-notify.sh"
 source "$SCRIPT_DIR/backup-status.sh"
+source "$SCRIPT_DIR/backup-retention.sh"
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/insurance_broker_backups/media}"
 MEDIA_VOLUME="${MEDIA_VOLUME:-insurance_broker_media_volume}"
-RETENTION_DAYS="${RETENTION_DAYS:-7}"
+# P1-05 (2026-09-23): raised from 7 to 28 days (~4 weekly runs). With no
+# offsite store (see P1-01..04, CANCELLED) local retention is the only
+# guaranteed safety net.
+RETENTION_DAYS="${RETENTION_DAYS:-28}"
+# P1-05: floor — cleanup never drops below this many backups regardless
+# of age. See scripts/backup-retention.sh.
+MIN_RETAINED_BACKUPS="${MIN_RETAINED_BACKUPS:-4}"
 # P0-08 status contract: required stages for media backups.
 # Fallback chain: MEDIA_REQUIRED_STAGES > REQUIRED_STAGES > "created,verified".
 
@@ -242,40 +249,52 @@ verify_backup() {
 
 # Clean up old backups
 cleanup_old_backups() {
-    log_info "Cleaning up backups older than $RETENTION_DAYS days..."
+    local retention_days min_retained
+    retention_days=$(validate_retention_int "$RETENTION_DAYS" 28 "RETENTION_DAYS")
+    min_retained=$(validate_retention_int "$MIN_RETAINED_BACKUPS" 4 "MIN_RETAINED_BACKUPS")
 
-    local deleted_count=0
+    local dry_run_note=""
+    [ "${PRINT_ONLY:-false}" = "true" ] && dry_run_note=" [PRINT_ONLY=true, dry run]"
+    log_info "Cleaning up backups older than $retention_days days, keeping at least $min_retained most recent$dry_run_note..."
 
-    # Find and delete old backup files
-    while IFS= read -r file; do
-        if [ -f "$file" ]; then
-            rm -f "$file"
-            # Also remove metadata file
-            local base_name=$(basename "$file" .tar.gz)
-            local meta_file="$BACKUP_DIR/${base_name#media_}.meta"
-            rm -f "$meta_file"
-            deleted_count=$((deleted_count + 1))
-            log_info "Deleted old backup: $(basename "$file")"
-        fi
-    done < <(find "$BACKUP_DIR" -name "media_backup_*.tar.gz" -type f -mtime +$RETENTION_DAYS)
+    # Archives (.tar.gz) and empty-volume markers (.empty) are both backup
+    # *runs* for retention purposes — combined into one newest-first list
+    # (`ls -t` sorts multiple patterns together) so the floor protects the
+    # last N runs regardless of which kind each one is.
+    local -a files=()
+    while IFS= read -r f; do
+        files+=("$BACKUP_DIR/$f")
+    done < <(cd "$BACKUP_DIR" && ls -t -- media_backup_*.tar.gz media_backup_*.empty 2>/dev/null)
 
-    # Also clean up empty backup markers
-    while IFS= read -r file; do
-        if [ -f "$file" ]; then
-            rm -f "$file"
-            deleted_count=$((deleted_count + 1))
-            log_info "Deleted old empty backup marker: $(basename "$file")"
-        fi
-    done < <(find "$BACKUP_DIR" -name "media_backup_*.empty" -type f -mtime +$RETENTION_DAYS)
+    local deleted_count
+    deleted_count=$(prune_backups "backup" "$min_retained" "$retention_days" "${files[@]}")
 
-    if [ $deleted_count -eq 0 ]; then
+    # Sweep .meta sidecars orphaned by a deletion above (only .tar.gz runs
+    # have one — .empty markers never do, see backup_media()). Skipped in
+    # dry-run: nothing has actually been removed yet.
+    if [ "${PRINT_ONLY:-false}" != "true" ]; then
+        while IFS= read -r meta; do
+            local base_name
+            base_name=$(basename "$meta" .meta)
+            [ -e "$BACKUP_DIR/media_${base_name}.tar.gz" ] || rm -f "$meta"
+        done < <(find "$BACKUP_DIR" -maxdepth 1 -name "backup_*.meta" -type f 2>/dev/null)
+    fi
+
+    if [ "$deleted_count" -eq 0 ]; then
         log_info "No old backups to clean up"
+    elif [ "${PRINT_ONLY:-false}" = "true" ]; then
+        log_info "Would clean up $deleted_count old backup(s) (dry run, nothing deleted)"
     else
         log_info "Cleaned up $deleted_count old backup(s)"
     fi
 
-    # Send cleanup notification
-    notify_cleanup_result "Media Backup" "$deleted_count" "$RETENTION_DAYS"
+    # Dry runs are a manual pre-flight check (P1-05 acceptance) — they
+    # must not page anyone or touch the real notification channels.
+    if [ "${PRINT_ONLY:-false}" = "true" ]; then
+        log_info "PRINT_ONLY=true — skipping cleanup notification"
+    else
+        notify_cleanup_result "Media Backup" "$deleted_count" "$retention_days"
+    fi
 }
 
 # List existing backups
@@ -339,7 +358,9 @@ usage() {
     echo "Options:"
     echo "  -h, --help              Show this help message"
     echo "  -l, --list              List existing backups"
-    echo "  -c, --cleanup           Clean up old backups (older than RETENTION_DAYS)"
+    echo "  -c, --cleanup           Clean up old backups (older than RETENTION_DAYS,"
+    echo "                          always keeps at least MIN_RETAINED_BACKUPS;"
+    echo "                          PRINT_ONLY=true for a dry run)"
     echo "  -v, --verify FILE       Verify backup file integrity"
     echo "  -t, --test-telegram     Test Telegram connection"
     echo ""
@@ -347,7 +368,9 @@ usage() {
     echo "  COMPOSE_FILE            Docker compose file (default: docker-compose.prod.yml)"
     echo "  BACKUP_DIR              Backup directory (default: $HOME/insurance_broker_backups/media)"
     echo "  MEDIA_VOLUME            Media volume name (default: insurance_broker_media_volume)"
-    echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
+    echo "  RETENTION_DAYS          Days to keep backups (default: 28)"
+    echo "  MIN_RETAINED_BACKUPS    Minimum backups kept regardless of age (default: 4)"
+    echo "  PRINT_ONLY              true = dry-run cleanup, log only, delete nothing"
     echo "  MEDIA_REQUIRED_STAGES   Stages that decide result/exit for media backups"
     echo "                          (fallback: REQUIRED_STAGES; default: created,verified;"
     echo "                          allowed: created,verified,offsite,notify)"

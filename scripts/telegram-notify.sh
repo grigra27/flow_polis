@@ -1,8 +1,14 @@
 #!/bin/bash
 
 # telegram-notify.sh
-# Telegram notification functions for backup scripts
-# Provides functions to send messages and files to Telegram
+# Notification/mirror functions for backup scripts (Telegram + VK).
+# Sends text notifications and mirrors backup files to messenger channels.
+#
+# P1-06 (2026-09-23): this is a notification/convenience layer, NOT backup
+# storage. A successful send here sets `mirror`/`notify` in the P0-08 status
+# contract, never `offsite` — there is currently no independent offsite
+# store (owner decision; see docs/BACKUP_RESTORE.md#backup-storage and
+# docs/prod-backup-improvement-backlog-2026-09-19.md, P1-01..04/P1-09).
 
 # Load Telegram configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

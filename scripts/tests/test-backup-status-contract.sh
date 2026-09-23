@@ -36,6 +36,7 @@ cp "$REPO_ROOT/scripts/backup-db-telegram.sh" \
    "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
    "$REPO_ROOT/scripts/backup-status.sh" \
+   "$REPO_ROOT/scripts/backup-retention.sh" \
    "$TMP/repo/scripts/"
 
 echo "media-a" > "$TMP/vol/a.txt"

@@ -33,6 +33,7 @@ cp "$REPO_ROOT/scripts/backup-media-telegram.sh" \
    "$REPO_ROOT/scripts/telegram-notify.sh" \
    "$REPO_ROOT/scripts/telegram-config.sh" \
    "$REPO_ROOT/scripts/backup-status.sh" \
+   "$REPO_ROOT/scripts/backup-retention.sh" \
    "$TMP/repo/scripts/"
 
 # fake media volume content (host dir; stub docker "mounts" it via FAKE_VOL_DIR)

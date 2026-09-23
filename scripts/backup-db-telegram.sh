@@ -11,6 +11,7 @@ set -o pipefail  # Exit on pipe failure
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/telegram-notify.sh"
 source "$SCRIPT_DIR/backup-status.sh"
+source "$SCRIPT_DIR/backup-retention.sh"
 
 # Configuration
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
@@ -18,7 +19,14 @@ BACKUP_DIR="${BACKUP_DIR:-$HOME/insurance_broker_backups/database}"
 CONTAINER_NAME="${DB_CONTAINER:-insurance_broker_db}"
 DB_NAME="${DB_NAME:-insurance_broker_prod}"
 DB_USER="${DB_USER:-postgres}"
-RETENTION_DAYS="${RETENTION_DAYS:-7}"
+# P1-05 (2026-09-23): raised from 7 to 30 days. With no offsite store
+# (see P1-01..04, CANCELLED) local retention is the only guaranteed
+# safety net; a 1.5MB/day dump makes 30 days of headroom effectively free.
+RETENTION_DAYS="${RETENTION_DAYS:-30}"
+# P1-05: floor — cleanup never drops below this many backups regardless
+# of age, so a misconfigured RETENTION_DAYS (or a clock jump) can't empty
+# the directory outright. See scripts/backup-retention.sh.
+MIN_RETAINED_BACKUPS="${MIN_RETAINED_BACKUPS:-5}"
 # Lower bound for a credible gzip'd pg_dump; validated again in verify_backup.
 MIN_BACKUP_BYTES="${MIN_BACKUP_BYTES:-10240}"
 # P0-08 status contract: required stages for DB backups.
@@ -213,30 +221,51 @@ verify_backup() {
 
 # Clean up old backups
 cleanup_old_backups() {
-    log_info "Cleaning up backups older than $RETENTION_DAYS days..."
+    local retention_days min_retained
+    retention_days=$(validate_retention_int "$RETENTION_DAYS" 30 "RETENTION_DAYS")
+    min_retained=$(validate_retention_int "$MIN_RETAINED_BACKUPS" 5 "MIN_RETAINED_BACKUPS")
 
-    local deleted_count=0
+    local dry_run_note=""
+    [ "${PRINT_ONLY:-false}" = "true" ] && dry_run_note=" [PRINT_ONLY=true, dry run]"
+    log_info "Cleaning up backups older than $retention_days days, keeping at least $min_retained most recent$dry_run_note..."
 
-    # Find and delete old backup files
-    while IFS= read -r file; do
-        if [ -f "$file" ]; then
-            rm -f "$file"
-            # Also remove metadata file
-            local meta_file="${file%.sql.gz}.meta"
-            rm -f "$BACKUP_DIR/backup_$(basename "$meta_file")"
-            deleted_count=$((deleted_count + 1))
-            log_info "Deleted old backup: $(basename "$file")"
-        fi
-    done < <(find "$BACKUP_DIR" -name "db_backup_*.sql.gz" -type f -mtime +$RETENTION_DAYS)
+    # Newest-first; `ls -t` sorts by mtime the same way on GNU and BSD.
+    local -a files=()
+    while IFS= read -r f; do
+        files+=("$BACKUP_DIR/$f")
+    done < <(cd "$BACKUP_DIR" && ls -t -- db_backup_*.sql.gz 2>/dev/null)
 
-    if [ $deleted_count -eq 0 ]; then
+    local deleted_count
+    deleted_count=$(prune_backups "backup" "$min_retained" "$retention_days" "${files[@]}")
+
+    # Sweep .meta sidecars orphaned by a deletion above (or left behind by
+    # any older run) — a backup's metadata is `backup_<timestamp>.meta`,
+    # its archive `db_backup_<timestamp>.sql.gz`. Skipped in dry-run: the
+    # archives it would pair against haven't actually been removed yet.
+    if [ "${PRINT_ONLY:-false}" != "true" ]; then
+        while IFS= read -r meta; do
+            local ts
+            ts=$(basename "$meta" .meta)
+            ts="${ts#backup_}"
+            [ -e "$BACKUP_DIR/db_backup_${ts}.sql.gz" ] || rm -f "$meta"
+        done < <(find "$BACKUP_DIR" -maxdepth 1 -name "backup_*.meta" -type f 2>/dev/null)
+    fi
+
+    if [ "$deleted_count" -eq 0 ]; then
         log_info "No old backups to clean up"
+    elif [ "${PRINT_ONLY:-false}" = "true" ]; then
+        log_info "Would clean up $deleted_count old backup(s) (dry run, nothing deleted)"
     else
         log_info "Cleaned up $deleted_count old backup(s)"
     fi
 
-    # Send cleanup notification
-    notify_cleanup_result "Database Backup" "$deleted_count" "$RETENTION_DAYS"
+    # Dry runs are a manual pre-flight check (P1-05 acceptance) — they
+    # must not page anyone or touch the real notification channels.
+    if [ "${PRINT_ONLY:-false}" = "true" ]; then
+        log_info "PRINT_ONLY=true — skipping cleanup notification"
+    else
+        notify_cleanup_result "Database Backup" "$deleted_count" "$retention_days"
+    fi
 }
 
 # List existing backups
@@ -272,7 +301,9 @@ usage() {
     echo "Options:"
     echo "  -h, --help              Show this help message"
     echo "  -l, --list              List existing backups"
-    echo "  -c, --cleanup           Clean up old backups (older than RETENTION_DAYS)"
+    echo "  -c, --cleanup           Clean up old backups (older than RETENTION_DAYS,"
+    echo "                          always keeps at least MIN_RETAINED_BACKUPS;"
+    echo "                          PRINT_ONLY=true for a dry run)"
     echo "  -v, --verify FILE       Verify backup file integrity"
     echo "  -t, --test-telegram     Test Telegram connection"
     echo ""
@@ -282,7 +313,9 @@ usage() {
     echo "  DB_CONTAINER            Database container name (default: insurance_broker_db)"
     echo "  DB_NAME                 Database name (default: insurance_broker_prod)"
     echo "  DB_USER                 Database user (default: postgres)"
-    echo "  RETENTION_DAYS          Days to keep backups (default: 7)"
+    echo "  RETENTION_DAYS          Days to keep backups (default: 30)"
+    echo "  MIN_RETAINED_BACKUPS    Minimum backups kept regardless of age (default: 5)"
+    echo "  PRINT_ONLY              true = dry-run cleanup, log only, delete nothing"
     echo "  MIN_BACKUP_BYTES        Minimum backup size for verification (default: 10240)"
     echo "  DB_REQUIRED_STAGES      Stages that decide result/exit for DB backups"
     echo "                          (fallback: REQUIRED_STAGES; default: created,verified;"

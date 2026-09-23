@@ -1,10 +1,11 @@
 """
 Django management команда для проверки состояния системы и отправки уведомлений
 """
+import json
 import os
 import psutil
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.conf import settings
@@ -64,6 +65,16 @@ class Command(BaseCommand):
             action="store_true",
             help="Проверить использование памяти",
         )
+        parser.add_argument(
+            "--check-backups",
+            action="store_true",
+            help=(
+                "Проверить свежесть последнего backup-прогона (P1-08 dead man's "
+                "switch): читает last_status.json (контракт P0-08) для DB и media "
+                "и сигнализирует warning, если прогона нет, он протух или "
+                "result != ok."
+            ),
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS("🔍 Проверка состояния системы"))
@@ -73,7 +84,7 @@ class Command(BaseCommand):
         checks_to_run = []
 
         if options["check_all"]:
-            checks_to_run = ["db", "disk", "memory"]
+            checks_to_run = ["db", "disk", "memory", "backups"]
         else:
             if options["check_db"]:
                 checks_to_run.append("db")
@@ -81,9 +92,16 @@ class Command(BaseCommand):
                 checks_to_run.append("disk")
             if options["check_memory"]:
                 checks_to_run.append("memory")
+            if options["check_backups"]:
+                checks_to_run.append("backups")
 
         if not checks_to_run:
-            checks_to_run = ["db", "disk", "memory"]  # По умолчанию все проверки
+            checks_to_run = [
+                "db",
+                "disk",
+                "memory",
+                "backups",
+            ]  # По умолчанию все проверки
 
         # Выполняем проверки
         results = {}
@@ -96,6 +114,17 @@ class Command(BaseCommand):
                 results["disk"] = self._check_disk_usage()
             elif check == "memory":
                 results["memory"] = self._check_memory_usage()
+            elif check == "backups":
+                results["backup db"] = self._check_backup_freshness(
+                    label="DB backup",
+                    subdir="database",
+                    max_age_hours=26,
+                )
+                results["backup media"] = self._check_backup_freshness(
+                    label="Media backup",
+                    subdir="media",
+                    max_age_hours=192,  # 8 суток — недельный цикл + запас
+                )
 
         # Определяем общий статус
         for check_name, check_result in results.items():
@@ -232,6 +261,130 @@ class Command(BaseCommand):
                 "message": f"Memory check failed: {str(e)}",
                 "details": str(e),
             }
+
+    def _resolve_backup_status_dir(self, subdir):
+        """
+        Определяет каталог, где `scripts/backup-status.sh` (контракт P0-08)
+        пишет `last_status.json` для указанного типа бэкапа.
+
+        `subdir` — "database" или "media", как в `apps.reports.views`
+        (`_get_backup_search_dirs`), логику которой этот метод сознательно
+        не дублирует целиком — здесь не нужен glob-поиск файла бэкапа,
+        только каталог со статусом. Использует те же settings-переменные,
+        чтобы не завести второй источник правды по путям.
+        """
+        explicit_dir = (
+            settings.BACKUP_DB_DIR
+            if subdir == "database"
+            else settings.BACKUP_MEDIA_DIR
+        )
+
+        candidates = []
+        if explicit_dir:
+            candidates.append(explicit_dir)
+        if settings.BACKUP_BASE_DIR:
+            candidates.append(os.path.join(settings.BACKUP_BASE_DIR, subdir))
+        candidates.append(os.path.join("/app/server_backups", subdir))
+        candidates.append(
+            os.path.expanduser(os.path.join("~/insurance_broker_backups", subdir))
+        )
+
+        for candidate in candidates:
+            try:
+                if candidate and os.path.isdir(candidate):
+                    return candidate
+            except OSError:
+                continue
+        return None
+
+    def _check_backup_freshness(self, label, subdir, max_age_hours):
+        """
+        P1-08 dead man's switch: бэкап-скрипты (P0-08) сами пишут
+        `last_status.json` с итогом каждого прогона. Здесь мы его только
+        читаем — пересчитывать required-стадии не нужно, поле `result`
+        в файле уже вычислено `evaluate_backup_result()` в
+        `scripts/backup-status.sh` с учётом текущих
+        `DB_REQUIRED_STAGES`/`MEDIA_REQUIRED_STAGES`.
+
+        Возвращает "warning" (не "critical") при отсутствии/порче/протухании
+        файла или result != "ok" — сам сайт при этом не сломан, но
+        backup-контур мог замолчать никем не замеченным.
+        """
+        backup_dir = self._resolve_backup_status_dir(subdir)
+        if not backup_dir:
+            return {
+                "status": "warning",
+                "message": f"{label}: backup status directory not found",
+                "details": (
+                    "Ни один из известных путей (BACKUP_DB_DIR/BACKUP_MEDIA_DIR, "
+                    "BACKUP_BASE_DIR, /app/server_backups) не существует"
+                ),
+            }
+
+        status_path = os.path.join(backup_dir, "last_status.json")
+        if not os.path.isfile(status_path):
+            return {
+                "status": "warning",
+                "message": f"{label}: last_status.json not found",
+                "details": (
+                    f"Ожидался {status_path} (контракт P0-08) — "
+                    "nightly-бэкап этого типа мог ни разу не запуститься"
+                ),
+            }
+
+        try:
+            with open(status_path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as exc:
+            return {
+                "status": "warning",
+                "message": f"{label}: last_status.json unreadable/corrupt",
+                "details": str(exc),
+            }
+
+        ts_raw = data.get("ts")
+        try:
+            ts = datetime.strptime(ts_raw, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc
+            )
+        except (TypeError, ValueError):
+            return {
+                "status": "warning",
+                "message": f"{label}: last_status.json has invalid 'ts'",
+                "details": f"ts={ts_raw!r}",
+            }
+
+        age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
+        result = data.get("result")
+        file_name = data.get("file")
+
+        if result != "ok":
+            return {
+                "status": "warning",
+                "message": f"{label}: last run result={result!r} (exit={data.get('exit')})",
+                "details": f"file={file_name}, ts={ts_raw}",
+            }
+
+        if age_hours > max_age_hours:
+            return {
+                "status": "warning",
+                "message": (
+                    f"{label}: last successful run is {age_hours:.1f}h old "
+                    f"(> {max_age_hours}h)"
+                ),
+                "details": f"file={file_name}, ts={ts_raw}",
+            }
+
+        required = data.get("required")
+        required_display = (
+            ",".join(required) if isinstance(required, list) else str(required)
+        )
+
+        return {
+            "status": "healthy",
+            "message": f"{label}: fresh, result=ok ({age_hours:.1f}h ago)",
+            "details": f"file={file_name}, required={required_display}",
+        }
 
     def _display_results(self, results, overall_status):
         """Выводит результаты проверок в консоль"""

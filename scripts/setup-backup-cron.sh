@@ -40,13 +40,17 @@ log_info "Scripts directory: $SCRIPT_DIR"
 echo ""
 
 # Check if scripts exist
-if [ ! -f "$SCRIPT_DIR/backup-db.sh" ]; then
-    log_error "backup-db.sh not found in $SCRIPT_DIR"
+# P2-06 (2026-09-23): points at the VK/Telegram-integrated scripts, which
+# are what production cron actually runs — the plain backup-db.sh/
+# backup-media.sh (no status contract, no VK/Telegram delivery, predate
+# P0-06..P1-05) have been removed; see docs/BACKUP_RESTORE.md#overview.
+if [ ! -f "$SCRIPT_DIR/backup-db-telegram.sh" ]; then
+    log_error "backup-db-telegram.sh not found in $SCRIPT_DIR"
     exit 1
 fi
 
-if [ ! -f "$SCRIPT_DIR/backup-media.sh" ]; then
-    log_error "backup-media.sh not found in $SCRIPT_DIR"
+if [ ! -f "$SCRIPT_DIR/backup-media-telegram.sh" ]; then
+    log_error "backup-media-telegram.sh not found in $SCRIPT_DIR"
     exit 1
 fi
 
@@ -60,14 +64,14 @@ cat > "$CRON_FILE" << EOF
 # Generated on $(date)
 
 # Database backup - Daily at 2:00 AM
-0 2 * * * cd $APP_DIR && $SCRIPT_DIR/backup-db.sh >> $APP_DIR/logs/backup-db.log 2>&1
+0 2 * * * cd $APP_DIR && $SCRIPT_DIR/backup-db-telegram.sh >> $APP_DIR/logs/backup-db.log 2>&1
 
-# Media files backup - Daily at 3:00 AM
-0 3 * * * cd $APP_DIR && $SCRIPT_DIR/backup-media.sh >> $APP_DIR/logs/backup-media.log 2>&1
+# Media files backup - Weekly, Monday at 3:00 AM
+0 3 * * 1 cd $APP_DIR && $SCRIPT_DIR/backup-media-telegram.sh >> $APP_DIR/logs/backup-media.log 2>&1
 
-# Cleanup old backups - Weekly on Sunday at 4:00 AM
-0 4 * * 0 cd $APP_DIR && $SCRIPT_DIR/backup-db.sh --cleanup >> $APP_DIR/logs/backup-cleanup.log 2>&1
-0 4 * * 0 cd $APP_DIR && $SCRIPT_DIR/backup-media.sh --cleanup >> $APP_DIR/logs/backup-cleanup.log 2>&1
+# Cleanup old backups - Weekly, Monday at 4:00 AM
+0 4 * * 1 cd $APP_DIR && $SCRIPT_DIR/backup-db-telegram.sh --cleanup >> $APP_DIR/logs/backup-cleanup.log 2>&1
+0 4 * * 1 cd $APP_DIR && $SCRIPT_DIR/backup-media-telegram.sh --cleanup >> $APP_DIR/logs/backup-cleanup.log 2>&1
 
 EOF
 
@@ -97,8 +101,15 @@ crontab -l > /tmp/crontab_backup_$(date +%Y%m%d_%H%M%S).txt 2>/dev/null || true
 # Add new cron jobs
 log_info "Installing cron jobs..."
 
-# Get existing crontab and append new jobs
-(crontab -l 2>/dev/null | grep -v "Insurance Broker Application - Automated Backups" | grep -v "backup-db.sh" | grep -v "backup-media.sh"; cat "$CRON_FILE") | crontab -
+# Get existing crontab and append new jobs. Strips both the current
+# (-telegram) entries, so re-running this script is idempotent, and any
+# leftover pre-2026-09-23 entries pointing at the old bare-name scripts.
+(crontab -l 2>/dev/null \
+    | grep -v "Insurance Broker Application - Automated Backups" \
+    | grep -v "backup-db-telegram.sh" \
+    | grep -v "backup-media-telegram.sh" \
+    | grep -v "backup-db.sh" \
+    | grep -v "backup-media.sh"; cat "$CRON_FILE") | crontab -
 
 log_info "Cron jobs installed successfully"
 
@@ -118,8 +129,8 @@ log_info "========================================="
 echo ""
 log_info "Backup schedule:"
 log_info "  - Database backup: Daily at 2:00 AM"
-log_info "  - Media backup: Daily at 3:00 AM"
-log_info "  - Cleanup old backups: Weekly on Sunday at 4:00 AM"
+log_info "  - Media backup: Weekly, Monday at 3:00 AM"
+log_info "  - Cleanup old backups: Weekly, Monday at 4:00 AM"
 echo ""
 log_info "Logs will be saved to: $APP_DIR/logs/"
 echo ""

@@ -17,13 +17,18 @@ This guide explains how to backup and restore the Insurance Broker application d
 
 ## Overview
 
-The application provides three main backup scripts:
+The application's backup scripts are:
 
-1. **backup-db.sh** - Backs up the PostgreSQL database
-2. **restore-db.sh** - Restores the database from a backup
-3. **backup-media.sh** - Backs up user-uploaded media files
+1. **backup-db-telegram.sh** - Backs up the PostgreSQL database (with VK/Telegram delivery and the status contract described below)
+2. **backup-media-telegram.sh** - Backs up user-uploaded media files (same delivery/status contract)
 
 All scripts are located in the `scripts/` directory and are designed to work with the Docker-based production deployment.
+
+> Earlier versions of these scripts (`backup-db.sh` / `backup-media.sh`, no
+> `-telegram` suffix) predated the VK/Telegram integration and the P0-08 status
+> contract, were never used by production cron, and were removed (P2-06,
+> 2026-09-23) once nothing referenced them as current anymore — their content
+> is still available via `git log` if needed for reference.
 
 ### Backup Strategy
 
@@ -64,7 +69,7 @@ To create a manual database backup:
 
 ```bash
 cd /path/to/insurance_broker
-./scripts/backup-db.sh
+./scripts/backup-db-telegram.sh
 ```
 
 This will:
@@ -77,7 +82,7 @@ This will:
 ### List Existing Backups
 
 ```bash
-./scripts/backup-db.sh --list
+./scripts/backup-db-telegram.sh --list
 ```
 
 Output example:
@@ -92,19 +97,19 @@ db_backup_20240113_020000.sql.gz  2.3M            2024-01-13 02:00:00
 ### Verify Backup Integrity
 
 ```bash
-./scripts/backup-db.sh --verify ~/insurance_broker_backups/database/db_backup_20240115_020000.sql.gz
+./scripts/backup-db-telegram.sh --verify ~/insurance_broker_backups/database/db_backup_20240115_020000.sql.gz
 ```
 
 ### Custom Backup Location
 
 ```bash
-BACKUP_DIR=/mnt/external/backups ./scripts/backup-db.sh
+BACKUP_DIR=/mnt/external/backups ./scripts/backup-db-telegram.sh
 ```
 
 ### Custom Retention Period
 
 ```bash
-RETENTION_DAYS=14 ./scripts/backup-db.sh
+RETENTION_DAYS=14 ./scripts/backup-db-telegram.sh
 ```
 
 ## Database Restore
@@ -168,7 +173,7 @@ To create a manual media files backup:
 
 ```bash
 cd /path/to/insurance_broker
-./scripts/backup-media.sh
+./scripts/backup-media-telegram.sh
 ```
 
 This will:
@@ -180,7 +185,7 @@ This will:
 ### List Existing Backups
 
 ```bash
-./scripts/backup-media.sh --list
+./scripts/backup-media-telegram.sh --list
 ```
 
 Output example:
@@ -194,7 +199,7 @@ media_backup_20240114_030000.tar.gz 148M            2024-01-14 03:00:00 1220
 ### Verify Backup Integrity
 
 ```bash
-./scripts/backup-media.sh --verify ~/insurance_broker_backups/media/media_backup_20240115_030000.tar.gz
+./scripts/backup-media-telegram.sh --verify ~/insurance_broker_backups/media/media_backup_20240115_030000.tar.gz
 ```
 
 ### Restore Media Files
@@ -248,8 +253,8 @@ cd /path/to/insurance_broker
 
 This will configure cron to:
 - Backup database daily at 2:00 AM
-- Backup media files daily at 3:00 AM
-- Clean up old backups weekly on Sunday at 4:00 AM
+- Backup media files weekly, Monday at 3:00 AM
+- Clean up old backups weekly, Monday at 4:00 AM
 
 ### Verify Cron Jobs
 
@@ -276,14 +281,14 @@ If you prefer to configure cron manually, add these entries:
 
 ```cron
 # Database backup - Daily at 2:00 AM
-0 2 * * * cd /path/to/insurance_broker && ./scripts/backup-db.sh >> logs/backup-db.log 2>&1
+0 2 * * * cd /path/to/insurance_broker && ./scripts/backup-db-telegram.sh >> logs/backup-db.log 2>&1
 
-# Media files backup - Daily at 3:00 AM
-0 3 * * * cd /path/to/insurance_broker && ./scripts/backup-media.sh >> logs/backup-media.log 2>&1
+# Media files backup - Weekly, Monday at 3:00 AM
+0 3 * * 1 cd /path/to/insurance_broker && ./scripts/backup-media-telegram.sh >> logs/backup-media.log 2>&1
 
-# Cleanup old backups - Weekly on Sunday at 4:00 AM
-0 4 * * 0 cd /path/to/insurance_broker && ./scripts/backup-db.sh --cleanup >> logs/backup-cleanup.log 2>&1
-0 4 * * 0 cd /path/to/insurance_broker && ./scripts/backup-media.sh --cleanup >> logs/backup-cleanup.log 2>&1
+# Cleanup old backups - Weekly, Monday at 4:00 AM
+0 4 * * 1 cd /path/to/insurance_broker && ./scripts/backup-db-telegram.sh --cleanup >> logs/backup-cleanup.log 2>&1
+0 4 * * 1 cd /path/to/insurance_broker && ./scripts/backup-media-telegram.sh --cleanup >> logs/backup-cleanup.log 2>&1
 ```
 
 ## Backup Storage
@@ -527,8 +532,8 @@ ls -la ~/insurance_broker_backups/
 df -h
 
 # Clean up old backups manually
-./scripts/backup-db.sh --cleanup
-./scripts/backup-media.sh --cleanup
+./scripts/backup-db-telegram.sh --cleanup
+./scripts/backup-media-telegram.sh --cleanup
 
 # Remove old Docker images
 docker image prune -a
@@ -588,7 +593,7 @@ grep CRON /var/log/syslog
 
 # Test script manually
 cd /path/to/insurance_broker
-./scripts/backup-db.sh
+./scripts/backup-db-telegram.sh
 ```
 
 #### "Permission issues in cron"
@@ -606,7 +611,7 @@ chmod 755 ~/insurance_broker_backups
 
 1. **Test Restores Regularly**: Verify backups work by testing restores on a staging environment
 2. **Monitor Backup Logs**: Regularly check backup logs for errors
-3. **Use Remote Storage**: Always copy backups to remote storage for disaster recovery
+3. **Know Your Offsite Exposure**: no independent offsite store exists today (accepted risk, see [Backup Storage](#backup-storage)) — the VK/Telegram mirror is a convenience channel, not a guarantee
 4. **Document Recovery Procedures**: Keep this guide updated with your specific configuration
 5. **Encrypt Sensitive Backups**: Consider encrypting backups containing sensitive data
 6. **Monitor Disk Space**: Ensure sufficient disk space for backups

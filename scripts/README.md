@@ -554,54 +554,6 @@ docker-compose -f docker-compose.prod.yml exec web python manage.py collectstati
 docker-compose -f docker-compose.prod.yml ps
 ```
 
-### backup-db.sh
-
-Automated PostgreSQL database backup script.
-
-#### Purpose
-
-Creates timestamped backups of the PostgreSQL database with automatic compression, verification, and cleanup of old backups.
-
-#### Usage
-
-**Create a backup:**
-```bash
-./scripts/backup-db.sh
-```
-
-**List existing backups:**
-```bash
-./scripts/backup-db.sh --list
-```
-
-**Verify backup integrity:**
-```bash
-./scripts/backup-db.sh --verify ~/insurance_broker_backups/database/db_backup_20240115_020000.sql.gz
-```
-
-**Clean up old backups:**
-```bash
-./scripts/backup-db.sh --cleanup
-```
-
-**Custom retention period:**
-```bash
-RETENTION_DAYS=14 ./scripts/backup-db.sh
-```
-
-#### Environment Variables
-
-- `COMPOSE_FILE` - Docker compose file (default: `docker-compose.prod.yml`)
-- `BACKUP_DIR` - Backup directory (default: `~/insurance_broker_backups/database`)
-- `DB_CONTAINER` - Database container name (default: `insurance_broker_db`)
-- `DB_NAME` - Database name (default: `insurance_broker_prod`)
-- `DB_USER` - Database user (default: `postgres`)
-- `RETENTION_DAYS` - Days to keep backups (default: `7`)
-
-#### Related Documentation
-
-See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and restore guide.
-
 ### restore-db.sh
 
 Automated PostgreSQL database restore script.
@@ -644,47 +596,6 @@ Restores the database from backup files with automatic pre-restore backup, servi
 
 See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and restore guide.
 
-### backup-media.sh
-
-Automated media files backup script.
-
-#### Purpose
-
-Creates timestamped backups of user-uploaded media files with automatic compression and cleanup.
-
-#### Usage
-
-**Create a backup:**
-```bash
-./scripts/backup-media.sh
-```
-
-**List existing backups:**
-```bash
-./scripts/backup-media.sh --list
-```
-
-**Verify backup integrity:**
-```bash
-./scripts/backup-media.sh --verify ~/insurance_broker_backups/media/media_backup_20240115_030000.tar.gz
-```
-
-**Clean up old backups:**
-```bash
-./scripts/backup-media.sh --cleanup
-```
-
-#### Environment Variables
-
-- `COMPOSE_FILE` - Docker compose file (default: `docker-compose.prod.yml`)
-- `BACKUP_DIR` - Backup directory (default: `~/insurance_broker_backups/media`)
-- `MEDIA_VOLUME` - Media volume name (default: `insurance_broker_media_volume`)
-- `RETENTION_DAYS` - Days to keep backups (default: `7`)
-
-#### Related Documentation
-
-See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and restore guide.
-
 ### setup-backup-cron.sh
 
 Automated cron job setup for scheduled backups.
@@ -701,10 +612,11 @@ Configures cron jobs for automated daily backups of database and media files.
 
 #### What It Does
 
-Sets up the following cron jobs:
+Sets up the following cron jobs, using the VK/Telegram-integrated scripts
+(`backup-db-telegram.sh` / `backup-media-telegram.sh` — see below):
 - Database backup: Daily at 2:00 AM
-- Media backup: Daily at 3:00 AM
-- Cleanup old backups: Weekly on Sunday at 4:00 AM
+- Media backup: Weekly, Monday at 3:00 AM
+- Cleanup old backups: Weekly, Monday at 4:00 AM
 
 #### Prerequisites
 
@@ -773,7 +685,10 @@ Provides functions to send messages and files to Telegram.
 Database backup script with Telegram notifications.
 
 **Purpose:**
-Same as backup-db.sh but with integrated Telegram notifications and file uploads.
+Creates timestamped, verified PostgreSQL backups with VK/Telegram delivery
+and the P0-08 status contract. This is the script production cron actually
+runs — see [Environment Variables](../docs/BACKUP_RESTORE.md#environment-variables)
+for `BACKUP_DIR`, `RETENTION_DAYS`, `MIN_RETAINED_BACKUPS`, `PRINT_ONLY`, etc.
 
 **Usage:**
 
@@ -803,7 +718,10 @@ Same as backup-db.sh but with integrated Telegram notifications and file uploads
 Media files backup script with Telegram notifications.
 
 **Purpose:**
-Same as backup-media.sh but with integrated Telegram notifications and file uploads.
+Creates timestamped, verified media archives with VK/Telegram delivery and
+the P0-08 status contract. This is the script production cron actually
+runs — see [Environment Variables](../docs/BACKUP_RESTORE.md#environment-variables)
+for `BACKUP_DIR`, `RETENTION_DAYS`, `MIN_RETAINED_BACKUPS`, `PRINT_ONLY`, etc.
 
 **Usage:**
 
@@ -870,21 +788,9 @@ This script will:
 ./scripts/telegram-notify.sh test
 ```
 
-**Step 5: Update Cron Jobs**
-Replace backup scripts in crontab with Telegram versions:
+**Step 5: Set Up Cron Jobs**
 ```bash
-# Edit crontab
-crontab -e
-
-# Replace:
-# /path/to/backup-db.sh
-# With:
-# /path/to/backup-db-telegram.sh
-
-# Replace:
-# /path/to/backup-media.sh
-# With:
-# /path/to/backup-media-telegram.sh
+./scripts/setup-backup-cron.sh
 ```
 
 **Security Notes:**

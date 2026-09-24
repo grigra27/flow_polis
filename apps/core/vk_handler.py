@@ -18,6 +18,13 @@ VK_API_VERSION = "5.199"
 # Лимит VK на длину одного сообщения
 VK_MAX_MESSAGE_LENGTH = 4096
 
+# Атрибуция источника (2026-09-24): в этот же VK-диалог шлют сообщения и
+# другие проекты, поэтому без явной пометки непонятно, откуда пришло
+# конкретное сообщение. Проставляется только в VK — Telegram (см.
+# apps.core.notifications.send_telegram) для этого получателя выделен
+# под данный проект отдельно и в атрибуции не нуждается.
+VK_ATTRIBUTION_PREFIX = "🏢 polis.info"
+
 
 def send_vk_message(text: str) -> bool:
     """
@@ -40,6 +47,8 @@ def send_vk_message(text: str) -> bool:
     if not token or not user_id:
         logger.error("VK не настроен: отсутствует VK_COMMUNITY_TOKEN или VK_USER_ID")
         return False
+
+    text = f"{VK_ATTRIBUTION_PREFIX}\n\n{text}"
 
     if len(text) > VK_MAX_MESSAGE_LENGTH:
         logger.warning(

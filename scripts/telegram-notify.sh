@@ -14,6 +14,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/telegram-config.sh"
 
+# Атрибуция источника (2026-09-24): в этот же VK-диалог шлют сообщения и
+# другие проекты, поэтому без явной пометки непонятно, откуда пришло
+# конкретное сообщение. Проставляется только в VK — Telegram для этого
+# получателя выделен под данный проект отдельно и в атрибуции не нуждается.
+VK_ATTRIBUTION_PREFIX="🏢 polis.info"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -123,11 +129,15 @@ send_vk_mirror_message() {
         return 1
     fi
 
+    local tagged_message="$VK_ATTRIBUTION_PREFIX
+
+$message"
+
     # random_id is required by VK API to deduplicate messages
     local random_id="${RANDOM}$(date +%s)"
     local response=$(curl -s -X POST "https://api.vk.com/method/messages.send" \
         --data-urlencode "user_id=$VK_USER_ID" \
-        --data-urlencode "message=$message" \
+        --data-urlencode "message=$tagged_message" \
         --data-urlencode "random_id=$random_id" \
         --data-urlencode "access_token=$VK_COMMUNITY_TOKEN" \
         --data-urlencode "v=5.199")
@@ -159,6 +169,8 @@ send_vk_file() {
         log_error "VK file mirror requires python3 for JSON parsing"
         return 1
     fi
+
+    caption="$VK_ATTRIBUTION_PREFIX · $caption"
 
     local file_name
     file_name="$(basename "$file_path")"

@@ -24,7 +24,7 @@ from decouple import config
 
 # Reuse существующая VK-отправка — она содержит все нюансы (random_id,
 # обработка кода ошибок VK API, проверка enabled/token/user_id).
-from apps.core.vk_handler import VK_API_VERSION, send_vk_message
+from apps.core.vk_handler import VK_API_VERSION, VK_ATTRIBUTION_PREFIX, send_vk_message
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +312,12 @@ def send_vk_file(file_path: str, caption: str = "") -> bool:
     if not os.path.isfile(file_path):
         logger.error("VK file upload: файл не найден: %s", file_path)
         return False
+
+    # Та же атрибуция, что и в send_vk_message — файл приходит отдельным
+    # сообщением в том же общем диалоге.
+    caption = (
+        f"{VK_ATTRIBUTION_PREFIX} · {caption}" if caption else VK_ATTRIBUTION_PREFIX
+    )
 
     base_params = {"access_token": token, "v": VK_API_VERSION}
 

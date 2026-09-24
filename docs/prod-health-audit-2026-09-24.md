@@ -63,7 +63,8 @@
 - **Риск:** Medium (ошибка в nginx-конфиге = сайт недоступен; проверять `nginx -t` до reload). **Downtime:** нет (reload).
 - **Acceptance:** `curl -H 'Host: www.polis.insflow.ru' https://109.68.215.223/` — соединение закрыто; `https://polis.insflow.ru/` — 200; certbot renew `--dry-run` проходит; через неделю WARNING'ов `Forbidden (...)` в `django.log` на порядок меньше.
 - **Rollback:** вернуть `default.conf`, `nginx -s reload`.
-- **Статус:** **реализовано, не задеплоено (2026-09-24).** Q-1 решён по умолчанию: www остаётся в DNS и сертификате, отсекается на nginx (удалить DNS-запись можно позже отдельно — конфиг от этого не зависит).
+- **Статус:** **PASS / deployed (2026-09-24, `d573562`, run 36054233638).** Проверка на проде после деплоя: все контейнеры Up, nginx `healthy`; Django `ALLOWED_HOSTS=['polis.insflow.ru']`; apex login 200, apex `POST /` 403, статика 200; https www/IP — handshake отклонён; SNI apex + `Host: www` — 421; http apex 301; http www/IP — соединение закрыто; ACME www — 404 из webroot; `certbot renew --dry-run` для apex+www — success. Осталось: через неделю (~2026-10-01) сравнить число `Forbidden (` в `django.log`.
+- **История реализации:** Q-1 решён по умолчанию: www остаётся в DNS и сертификате, отсекается на nginx (удалить DNS-запись можно позже отдельно — конфиг от этого не зависит).
   - `nginx/default.conf`: два `default_server` (`server_name _`). 80 — `return 444`, но с `/.well-known/acme-challenge/` (продление www в SAN) и `location = /health/` (Docker healthcheck ходит с `Host: localhost`). 443 — `ssl_reject_handshake on` + `return 444`. Блоки `polis.insflow.ru` не менялись.
   - Проверено до коммита на временном `nginx:alpine` в сети `insurance_broker_frontend` с боевыми сертификатами, без публикации портов (прод не затронут; контейнер, образ curl и временный каталог удалены): `nginx -t` OK; apex `/accounts/login/` 200, apex `POST /` 403 (как раньше); SNI www и голый IP по https — handshake отклонён (curl exit 35); SNI apex + `Host: www` — 421; http www / IP — соединение закрыто (exit 52); http apex — 301; `/health/` с `Host: localhost` — 200; ACME для www и apex — 404 из webroot (т.е. доходит до certbot-каталога, не 444).
   - Тест `config/tests/test_nginx_host_filtering.py` — 5/5 (на старом конфиге 4 падают).
@@ -230,7 +231,7 @@
 
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
-| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | реализовано, `.env.prod` обновлён, ждёт push/деплоя |
+| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **PASS / deployed** (наблюдение до ~2026-10-01) |
 | H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | открыто |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |

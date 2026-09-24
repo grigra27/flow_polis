@@ -94,7 +94,7 @@
 **Как работает**: каждый раз создаёт **новый** `TelegramHandler()` (с заново прочитанным конфигом!), форматирует своё сообщение, запускает Thread на `_send_message_async`. То есть ⚠️ rate-limit/группировка из основного TelegramHandler **НЕ применяются** — это отдельная отправка.
 
 **Кто использует**:
-- `apps/core/management/commands/system_health_check.py` — `notify_system_health` после проверки docker/db/disk/memory
+- `apps/core/management/commands/system_health_check.py` — `notify_system_health` после проверки docker/db/disk/memory. Уведомляет TG/VK только при **смене** overall_status (healthy↔warning↔critical) относительно последнего уведомления — не на каждом cron-тике (каждые 30 минут), пока проблема не устранена (2026-09-24; раньше один незамеченный сбой на несколько часов давал десятки одинаковых сообщений). Последний уведомлённый статус хранится в Redis (`Command.HEALTH_STATUS_REDIS_KEY`); `--notify-always` отключает это сравнение.
 
 ### `apps/core/management/commands/daily_digest.py` (~1300 строк)
 
@@ -152,17 +152,15 @@
 
 **Функции отправки**:
 - `send_telegram_message_only(text)` — `curl -4` (форс IPv4 — обход IPv6-багов в Docker), retry 2, timeout 15+60s
-- `send_telegram_file_only(path, caption)` — sendDocument, проверка размера, **автокомпрессия gzip** если > `TELEGRAM_MAX_FILE_SIZE`
-- `send_vk_mirror_message(text)` — VK messages.send через curl
-- `send_vk_file(path, caption)` — **4-шаговая загрузка**: docs.getMessagesUploadServer → upload bytes → docs.save → messages.send (с attachment)
+- `send_telegram_file_only(path, caption)` — sendDocument, проверка размера, **автокомпрессия gzip** если > `TELEGRAM_MAX_FILE_SIZE`; если файл не влезает ни при какой компрессии — падает обратно на `send_telegram_message_only(caption)`, чтобы Telegram не остался вообще без уведомления (2026-09-24)
+- `send_vk_mirror_message(text)` — VK messages.send через curl; текст автоматически получает префикс атрибуции `🏢 polis.insflow` (в этот же диалог шлют сообщения и другие проекты, см. `VK_ATTRIBUTION_PREFIX`)
+- `send_vk_file(path, caption)` — **4-шаговая загрузка**: docs.getMessagesUploadServer → upload bytes → docs.save → messages.send (с attachment); caption получает тот же префикс атрибуции
 - `send_telegram_message(text)` — параллельная отправка в TG + VK через `&` и `wait`. **Возвращает 0 если хотя бы один канал успел.**
 - `send_telegram_file(path, caption)` — то же но для файлов
 
-**Wrapper-функции** для backup-скриптов:
-- `notify_backup_start(type)` — «🔄 Backup Started»
-- `notify_backup_success(type, file, size, duration)` — «✅ Backup Completed Successfully» + **загрузка файла**
-- `notify_backup_error(type, error)` — «❌ Backup Failed»
-- `notify_cleanup_result(type, count, retention)` — «🧹 Cleanup Completed»
+**Wrapper-функции** для backup-скриптов (тексты на русском; message-count review 2026-09-24 убрал start-уведомление и слил success+файл в одно сообщение — раньше один успешный бэкап порождал до 3 отдельных сообщений):
+- `notify_backup_success(type, file, size, duration, [deleted_count, retention_days])` — «✅ Бэкап готов» + **файл одним сообщением** (текст — подпись к файлу через `send_telegram_file`, а не отдельный `send_telegram_message`); если `deleted_count > 0`, в это же сообщение добавляется строка про очистку вместо отдельного уведомления
+- `notify_backup_error(type, error)` — «❌ Бэкап не прошёл»
 
 **JSON-парсинг**: для VK file upload используется `python3 -c '...'` чтобы вытащить поля из JSON ответа (нет jq).
 
@@ -171,12 +169,11 @@
 **Триггер**: cron на сервере (см. `scripts/setup-backup-cron.sh`).
 
 **Что делает**:
-1. `notify_backup_start("Database Backup")` — TG + VK
-2. `pg_dump` через docker exec
-3. `gzip` сжатие
-4. `notify_backup_success("Database Backup", file, size, duration)` — TG + VK + **загрузка файла в TG и VK параллельно**
-5. `cleanup_old_backups()` (старше `RETENTION_DAYS=7`)
-6. `notify_cleanup_result("Database Backup", count, retention)`
+1. `pg_dump` через docker exec
+2. `gzip` сжатие
+3. проверка целостности (`verify_backup`)
+4. `cleanup_old_backups()` (старше `RETENTION_DAYS=30`, не менее `MIN_RETAINED_BACKUPS=5`) — результат сохраняется в `CLEANUP_DELETED_COUNT`/`CLEANUP_RETENTION_DAYS`, отдельного уведомления не шлёт
+5. `notify_backup_success("База данных", file, size, duration, "$CLEANUP_DELETED_COUNT", "$CLEANUP_RETENTION_DAYS")` — TG + VK, **одно сообщение** (текст + файл вместе, плюс строка про очистку, если что-то удалено)
 
 При любой ошибке — `notify_backup_error(...)`.
 

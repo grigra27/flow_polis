@@ -18,15 +18,24 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Проверяет состояние системы и отправляет уведомления в Telegram"
 
+    # Ключ в Redis (тот же инстанс, что у Celery broker/rate-limit — см.
+    # apps.core.notifications._get_redis) для статуса, о котором уже
+    # отправлено уведомление. Cron дёргает эту команду новым процессом
+    # каждые 30 минут, поэтому in-memory состояние между тиками не
+    # переживает — нужно что-то внешнее и общее для всех воркеров.
+    HEALTH_STATUS_REDIS_KEY = "health_check:last_notified_status"
+
     def add_arguments(self, parser):
         parser.add_argument(
             "--notify-telegram",
             action="store_true",
             help=(
                 "Отправить результат в Telegram. По умолчанию шлёт ТОЛЬКО "
-                "при warning/critical статусе — чтобы не спамить «всё ок» "
-                "каждые 30 минут. Используй --notify-always чтобы слать "
-                "и при healthy."
+                "при смене статуса относительно прошлого уведомления "
+                "(healthy↔warning↔critical) — чтобы одна проблема не "
+                "превращалась в десятки одинаковых сообщений каждые "
+                "30 минут, пока её не починят. Используй --notify-always "
+                "чтобы слать в любом случае."
             ),
         )
         parser.add_argument(
@@ -34,7 +43,7 @@ class Command(BaseCommand):
             action="store_true",
             help=(
                 "Отправить результат в VK. По умолчанию шлёт только "
-                "при warning/critical (см. --notify-telegram)."
+                "при смене статуса (см. --notify-telegram)."
             ),
         )
         parser.add_argument(
@@ -137,17 +146,22 @@ class Command(BaseCommand):
         # Выводим результаты
         self._display_results(results, overall_status)
 
-        # Отправляем уведомления только если статус НЕ healthy,
-        # либо явно запрошено --notify-always.
-        # Раньше команда слала «✅ System Health Check» каждые 30 минут
-        # из cron — спам в TG/VK. Теперь по умолчанию тихо когда всё ок.
-        should_notify = options["notify_always"] or overall_status != "healthy"
+        # Уведомляем только при смене статуса относительно прошлого
+        # уведомления (2026-09-24) — раньше слали одно и то же предупреждение
+        # каждые 30 минут, пока проблему не устраняли: один незамеченный
+        # сбой на несколько часов превращался в десятки одинаковых сообщений
+        # (так и было с P0-08 last_status.json для media — 19 подряд).
+        notify_requested = options["notify_telegram"] or options["notify_vk"]
+        should_notify = self._resolve_notify_decision(
+            overall_status, notify_requested, options["notify_always"]
+        )
 
         if options["notify_telegram"] and should_notify:
             self._send_telegram_notification(results, overall_status)
         elif options["notify_telegram"]:
             self.stdout.write(
-                "ℹ️  Status=healthy, Telegram-уведомление пропущено "
+                f"ℹ️  Status={overall_status} не изменился с прошлого "
+                "уведомления, Telegram-уведомление пропущено "
                 "(используй --notify-always чтобы слать всегда)"
             )
 
@@ -155,9 +169,13 @@ class Command(BaseCommand):
             self._send_vk_notification(results, overall_status)
         elif options["notify_vk"]:
             self.stdout.write(
-                "ℹ️  Status=healthy, VK-уведомление пропущено "
+                f"ℹ️  Status={overall_status} не изменился с прошлого "
+                "уведомления, VK-уведомление пропущено "
                 "(используй --notify-always чтобы слать всегда)"
             )
+
+        if notify_requested and should_notify:
+            self._set_last_notified_status(overall_status)
 
         # Логируем критические проблемы
         if overall_status == "critical":
@@ -167,6 +185,55 @@ class Command(BaseCommand):
                 if result["status"] == "critical"
             ]
             logger.critical(f"System health check failed: {'; '.join(critical_issues)}")
+
+    def _resolve_notify_decision(self, overall_status, notify_requested, notify_always):
+        """
+        Решает, нужно ли слать уведомление в этом прогоне.
+
+        notify_always=True — всегда да (ручная диагностика/проверка канала).
+        Истории нет (первый прогон вообще, либо Redis недоступен — тот же
+        fail-open, что и в notifications.check_rate_limit) — прежнее
+        поведение по умолчанию: молчим на healthy, уведомляем один раз на
+        первую же проблему.
+        Иначе — только если overall_status реально отличается от того, о
+        котором уведомили в прошлый раз.
+        """
+        if notify_always:
+            return True
+        if not notify_requested:
+            return False
+
+        last_status = self._get_last_notified_status()
+        if last_status is None:
+            return overall_status != "healthy"
+        return overall_status != last_status
+
+    def _get_last_notified_status(self):
+        """Читает из Redis статус последнего отправленного уведомления.
+        None — истории нет или Redis недоступен (fail-open в handle())."""
+        from apps.core.notifications import _get_redis
+
+        r = _get_redis()
+        if r is None:
+            return None
+        try:
+            value = r.get(self.HEALTH_STATUS_REDIS_KEY)
+            return value.decode("utf-8") if value else None
+        except Exception as e:
+            logger.warning("Redis недоступен для чтения статуса health-check: %s", e)
+            return None
+
+    def _set_last_notified_status(self, status):
+        """Запоминает в Redis статус, о котором только что уведомили."""
+        from apps.core.notifications import _get_redis
+
+        r = _get_redis()
+        if r is None:
+            return
+        try:
+            r.set(self.HEALTH_STATUS_REDIS_KEY, status)
+        except Exception as e:
+            logger.warning("Redis недоступен для записи статуса health-check: %s", e)
 
     def _check_database(self):
         """Проверяет подключение к базе данных"""

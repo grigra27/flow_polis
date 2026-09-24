@@ -639,10 +639,10 @@ Provides functions to send messages and files to Telegram.
 **Functions:**
 - `send_telegram_message` - Send text messages with HTML formatting
 - `send_telegram_file` - Upload files to Telegram (up to 50MB)
-- `notify_backup_start` - Send backup start notification
-- `notify_backup_success` - Send backup success notification with file
+- `notify_backup_success` - Send backup success notification; the full
+  summary IS the file's caption (one message, not text+file separately),
+  optionally with a cleanup line folded in (2026-09-24 message-count review)
 - `notify_backup_error` - Send backup error notification
-- `notify_cleanup_result` - Send cleanup results notification
 - `test_telegram_connection` - Test Telegram bot connection
 
 #### backup-db-telegram.sh

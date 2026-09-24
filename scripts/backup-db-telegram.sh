@@ -219,6 +219,13 @@ verify_backup() {
     return $rc
 }
 
+# Итог последнего вызова cleanup_old_backups — сколько файлов реально
+# удалено и с каким retention. main() подмешивает это одной строкой в
+# сообщение об успехе вместо отдельного "🧹 Старые бэкапы удалены"
+# (2026-09-24: слияние сообщений, см. notify_backup_success).
+CLEANUP_DELETED_COUNT=0
+CLEANUP_RETENTION_DAYS=""
+
 # Clean up old backups
 cleanup_old_backups() {
     local retention_days min_retained
@@ -259,12 +266,11 @@ cleanup_old_backups() {
         log_info "Cleaned up $deleted_count old backup(s)"
     fi
 
-    # Dry runs are a manual pre-flight check (P1-05 acceptance) — they
-    # must not page anyone or touch the real notification channels.
-    if [ "${PRINT_ONLY:-false}" = "true" ]; then
-        log_info "PRINT_ONLY=true — skipping cleanup notification"
-    else
-        notify_cleanup_result "База данных" "$deleted_count" "$retention_days"
+    # Dry runs are a manual pre-flight check (P1-05 acceptance) — must not
+    # affect what main() reports as this run's outcome.
+    if [ "${PRINT_ONLY:-false}" != "true" ]; then
+        CLEANUP_DELETED_COUNT="$deleted_count"
+        CLEANUP_RETENTION_DAYS="$retention_days"
     fi
 }
 
@@ -334,7 +340,6 @@ usage() {
 # P0-08 full-run flow (conceptual state machine):
 #   config validation (unknown required stage -> configuration error, exit 1,
 #     run aborts before anything is created)
-#   → start notification (best effort, never defines status fields)
 #   → create            (failure: final error notification, exit 1)
 #   → verify            (failure: file preserved, final error notification, exit 2)
 #   → offsite stage placeholder (P0: offsite=- / null)
@@ -386,9 +391,6 @@ main() {
     log_info "  Database Backup Process with Telegram"
     log_info "========================================="
     echo ""
-
-    # Send start notification (best effort; outcome not part of status fields)
-    notify_backup_start "База данных" || true
 
     # Create backup directory
     create_backup_dir
@@ -462,7 +464,8 @@ main() {
         duration_formatted=$(awk -F= '$1=="duration"{print $2}' "$BACKUP_DIR/backup_${meta_ts}.meta")
         [ -n "$duration_formatted" ] || duration_formatted="н/д"
     fi
-    notify_backup_success "База данных" "$backup_file" "$file_size" "$duration_formatted"
+    notify_backup_success "База данных" "$backup_file" "$file_size" "$duration_formatted" \
+        "$CLEANUP_DELETED_COUNT" "$CLEANUP_RETENTION_DAYS"
     STATUS_NOTIFY=$(map_delivery_tri "${NOTIFY_TEXT_RC:-2}")
     STATUS_MIRROR=$(map_delivery_tri "${NOTIFY_FILE_RC:-2}")
 

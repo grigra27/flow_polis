@@ -334,14 +334,21 @@ send_telegram_file_only() {
                 else
                     log_error "Even compressed file is too large ($compressed_size_mb MB)"
                     rm -f "$compressed_file"
+                    # Файл не влезает ни при какой попытке — текст (caption)
+                    # сейчас единственный носитель уведомления (2026-09-24:
+                    # текст и файл объединены в одно сообщение), пусть хотя
+                    # бы он дойдёт до Telegram вместо полного молчания.
+                    send_telegram_message_only "$caption" || true
                     return 1
                 fi
             else
                 log_error "Failed to compress file"
+                send_telegram_message_only "$caption" || true
                 return 1
             fi
         else
             log_error "File is already compressed and too large"
+            send_telegram_message_only "$caption" || true
             return 1
         fi
     fi
@@ -495,23 +502,6 @@ send_telegram_file() {
     return 1
 }
 
-# Send backup start notification.
-# Start notifications never determine the P0-08 status fields.
-#
-# Wording (2026-09-23 notification review): Russian, no hostname (there is
-# one server, the field never told the reader anything), compact one-line
-# subheader instead of a field-per-line list — designed to read well as
-# plain text in VK, which has no bold/italic in regular messages.
-notify_backup_start() {
-    local backup_type="$1"
-    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
-
-    local message="🔄 Бэкап начат
-$backup_type · $timestamp"
-
-    send_telegram_message "$message" || true
-}
-
 # Delivery outcome of the most recent notify_backup_success /
 # notify_backup_error call (P0-08 status contract input):
 #   NOTIFY_TEXT_RC — result of send_telegram_message (0|1|2)
@@ -520,15 +510,31 @@ $backup_type · $timestamp"
 NOTIFY_TEXT_RC=2
 NOTIFY_FILE_RC=2
 
-# Send backup success notification (text + optional file mirror).
-# Always returns 0; the delivery outcome is exposed via NOTIFY_TEXT_RC /
-# NOTIFY_FILE_RC so the calling backup script can map it to the status
-# contract instead of swallowing it.
+# Send backup success notification.
+#
+# Message-count review (2026-09-24): this used to be up to THREE separate
+# messages per backup run — "🔄 Бэкап начат" at the start (removed: it
+# carried no actionable information, see git history), a text "✅ Бэкап
+# готов" summary, and the file as its own message with a one-line caption.
+# Now it's ONE message: the full summary IS the file's caption (VK and
+# Telegram sendDocument both support this). Falls back to a text-only
+# message on the rare case where there's no file to attach — should not
+# happen in practice, verify_backup() already ran by the time this is
+# called. send_telegram_file_only() separately falls back to a plain text
+# message if the file itself is too big for Telegram (routine for the
+# weekly media archive) — that keeps Telegram from going completely silent
+# in that case, even though it can't carry the file.
+#
+# deleted_count/retention_days (optional): when this same run's cleanup
+# actually deleted something, fold it into this message as one more line
+# instead of firing "🧹 Старые бэкапы удалены" as its own separate message.
 notify_backup_success() {
     local backup_type="$1"
     local file_path="$2"
     local file_size="$3"
     local duration="$4"
+    local deleted_count="${5:-0}"
+    local retention_days="${6:-}"
     local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
 
     local message="✅ Бэкап готов
@@ -537,15 +543,21 @@ $backup_type · $timestamp
 Файл: $(basename "$file_path")
 Размер: $file_size · заняло $duration"
 
-    NOTIFY_TEXT_RC=0
-    send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
+    if [ "${deleted_count:-0}" -gt 0 ] 2>/dev/null; then
+        message="$message
 
-    # Upload file if enabled
-    NOTIFY_FILE_RC=2
+🧹 Заодно удалено старых бэкапов: $deleted_count (старше $retention_days дн.)"
+    fi
+
     if [ -n "$file_path" ] && [ -f "$file_path" ]; then
-        local caption="$backup_type · $(basename "$file_path") · $file_size"
-        NOTIFY_FILE_RC=0
-        send_telegram_file "$file_path" "$caption" || NOTIFY_FILE_RC=$?
+        local rc=0
+        send_telegram_file "$file_path" "$message" || rc=$?
+        NOTIFY_TEXT_RC=$rc
+        NOTIFY_FILE_RC=$rc
+    else
+        NOTIFY_TEXT_RC=0
+        send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
+        NOTIFY_FILE_RC=2
     fi
 
     return 0
@@ -569,32 +581,6 @@ $error_message
     send_telegram_message "$message" || NOTIFY_TEXT_RC=$?
 
     return 0
-}
-
-# Send cleanup notification
-notify_cleanup_result() {
-    local backup_type="$1"
-    local deleted_count="$2"
-    local retention_days="$3"
-
-    # Wording review (2026-09-23): with daily backups and a multi-week
-    # retention window, actual deletions happen roughly once a month —
-    # this used to fire every single night saying "Deleted: 0 old
-    # backup(s)". Skip the notification entirely when there's nothing to
-    # report; the cleanup itself still runs and logs either way.
-    if [ "${deleted_count:-0}" -eq 0 ] 2>/dev/null; then
-        log_info "Cleanup: нечего удалять, уведомление не отправляется"
-        return 0
-    fi
-
-    local timestamp=$(TZ='Europe/Moscow' date '+%d.%m.%Y, %H:%M')
-
-    local message="🧹 Старые бэкапы удалены
-$backup_type · $timestamp
-
-Удалено файлов: $deleted_count (старше $retention_days дн.)"
-
-    send_telegram_message "$message" || true
 }
 
 # Test Telegram connection

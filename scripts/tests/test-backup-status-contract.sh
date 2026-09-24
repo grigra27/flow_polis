@@ -133,12 +133,17 @@ export MIN_BACKUP_BYTES=10
 export P008_HOOK_FILE="$TMP/hook.sh"
 
 # test hook: deterministic tri-state + call-event markers (stderr)
+#
+# Message-count review (2026-09-24): notify_backup_success() no longer calls
+# send_telegram_message() at all on the file-present path — the full summary
+# is now the file's caption, sent via send_telegram_file(). Both stubs below
+# classify on their own text (arg 1 for the text-only path, arg 2/caption for
+# the file path) so "EV:text:success" fires regardless of which one carried it.
 cat > "$TMP/hook.sh" <<'EOF'
-send_telegram_message() {
+classify_text() {
     local head
     head=$(printf '%s' "$1" | awk 'NR==1{print; exit}')
     case "$head" in
-        *"Бэкап начат"*)     echo "EV:text:start" >&2 ;;
         *"Бэкап готов"*)     echo "EV:text:success" >&2 ;;
         *"Бэкап не прошёл"*) echo "EV:text:error" >&2
                              # Wording review (2026-09-23): the reason is its
@@ -147,9 +152,13 @@ send_telegram_message() {
                              printf '%s' "$1" | awk 'NR==4{print "EV:text:error_reason: " $0; exit}' >&2 ;;
         *)                   echo "EV:text:other" >&2 ;;
     esac
+}
+send_telegram_message() {
+    classify_text "$1"
     return "${FORCE_TEXT_RC:-0}"
 }
 send_telegram_file() {
+    classify_text "$2"
     echo "EV:file:$(basename "$1")" >&2
     return "${FORCE_FILE_RC:-0}"
 }
@@ -502,52 +511,52 @@ a_exit "S9 notify-required/no-channels" 4
 unset MEDIA_REQUIRED_STAGES
 
 # =============================================================================
-# S10 — success sequencing (start → create → verify → final success)
+# S10 — success sequencing (create → verify → final success)
+#
+# Message-count review (2026-09-24): the "start" notification was removed
+# entirely (it carried no actionable information — see git history), so
+# there is no "start" leg left to order against here.
 # =============================================================================
 reset_required; delivery_ok
 export DOCKER_DB_MODE=valid FAKE_VOL_DIR="$TMP/vol"
 run_case db
-n_start=$(ev_line "EV:text:start")
 n_create=$(err | grep -nF "Starting database backup" | head -1 | cut -d: -f1)
 n_verify=$(err | grep -nF "Verifying backup integrity" | head -1 | cut -d: -f1)
 n_success=$(ev_line "EV:text:success")
 n_file=$(ev_line "EV:file:")
-if [ -n "$n_start" ] && [ -n "$n_create" ] && [ -n "$n_verify" ] && [ -n "$n_success" ] \
-   && [ "$n_start" -lt "$n_create" ] && [ "$n_create" -lt "$n_verify" ] && [ "$n_verify" -lt "$n_success" ]; then
-    ok "S10 DB: order start($n_start) < create($n_create) < verify($n_verify) < success($n_success)"
+if [ -n "$n_create" ] && [ -n "$n_verify" ] && [ -n "$n_success" ] \
+   && [ "$n_create" -lt "$n_verify" ] && [ "$n_verify" -lt "$n_success" ]; then
+    ok "S10 DB: order create($n_create) < verify($n_verify) < success($n_success)"
 else
-    bad "S10 DB: ordering violated start=$n_start create=$n_create verify=$n_verify success=$n_success"
+    bad "S10 DB: ordering violated create=$n_create verify=$n_verify success=$n_success"
 fi
 if [ -n "$n_file" ] && [ "$n_file" -gt "$n_verify" ]; then
     ok "S10 DB: file mirror($n_file) happens only after verification($n_verify)"
 else
     bad "S10 DB: file mirror missing or before verification (file=$n_file verify=$n_verify)"
 fi
-# verify-failure order: start → verify failure → final error; no success
+# verify-failure order: verify failure → final error; no success
 export DOCKER_DB_MODE=garbage
 run_case db
-n_start=$(ev_line "EV:text:start")
 n_verify=$(err | grep -nF "Verifying backup integrity" | head -1 | cut -d: -f1)
 n_error=$(ev_line "EV:text:error")
-if [ -n "$n_start" ] && [ -n "$n_verify" ] && [ -n "$n_error" ] \
-   && [ "$n_start" -lt "$n_verify" ] && [ "$n_verify" -lt "$n_error" ]; then
-    ok "S10 DB verify-fail: order start < verify < final error (no 'Completed Successfully')"
+if [ -n "$n_verify" ] && [ -n "$n_error" ] && [ "$n_verify" -lt "$n_error" ]; then
+    ok "S10 DB verify-fail: order verify < final error (no 'Бэкап готов')"
 else
-    bad "S10 DB verify-fail: ordering violated start=$n_start verify=$n_verify error=$n_error"
+    bad "S10 DB verify-fail: ordering violated verify=$n_verify error=$n_error"
 fi
 unset DOCKER_DB_MODE
-# required-offsite failure: start → create → verify → error, no success/mirror
+# required-offsite failure: create → verify → error, no success/mirror
 export DB_REQUIRED_STAGES="created,verified,offsite"; delivery_ok
 run_case db
-n_start=$(ev_line "EV:text:start")
 n_create=$(err | grep -nF "Starting database backup" | head -1 | cut -d: -f1)
 n_verify=$(err | grep -nF "Verifying backup integrity" | head -1 | cut -d: -f1)
 n_error=$(ev_line "EV:text:error")
-if [ -n "$n_start" ] && [ -n "$n_create" ] && [ -n "$n_verify" ] && [ -n "$n_error" ] \
-   && [ "$n_start" -lt "$n_create" ] && [ "$n_create" -lt "$n_verify" ] && [ "$n_verify" -lt "$n_error" ]; then
-    ok "S10 DB offsite-fail: order start < create < verify < final error"
+if [ -n "$n_create" ] && [ -n "$n_verify" ] && [ -n "$n_error" ] \
+   && [ "$n_create" -lt "$n_verify" ] && [ "$n_verify" -lt "$n_error" ]; then
+    ok "S10 DB offsite-fail: order create < verify < final error"
 else
-    bad "S10 DB offsite-fail: ordering violated start=$n_start create=$n_create verify=$n_verify error=$n_error"
+    bad "S10 DB offsite-fail: ordering violated create=$n_create verify=$n_verify error=$n_error"
 fi
 a_errno "S10 DB offsite-fail" "EV:text:success"
 a_errno "S10 DB offsite-fail" "EV:file:"

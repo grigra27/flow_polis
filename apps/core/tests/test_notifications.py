@@ -9,6 +9,8 @@
 """
 from unittest.mock import patch
 
+import requests
+
 import apps.core.notifications as notifications
 
 
@@ -100,6 +102,172 @@ def test_send_telegram_handles_network_error(monkeypatch):
 
     # Не должно бросать исключение — caller'у достаточно False
     assert notifications.send_telegram("hi") is False
+
+
+# ──────────────────────────────────────────────────────────────────
+# Тесты TELEGRAM_SOCKS5_PROXY (2026-09-24): сервер в РФ, api.telegram.org
+# заблокирован на уровне DPI — прямые urlopen-запросы уходят в таймаут.
+# Когда прокси настроен, send_telegram() идёт через requests+proxies
+# вместо urlopen; urlopen в этих тестах намеренно НЕ мокается — если бы
+# код по ошибке пошёл через него, тест бы упал на реальном сетевом вызове.
+# ──────────────────────────────────────────────────────────────────
+
+
+def _proxy_config(overrides=None):
+    values = {
+        "TELEGRAM_ENABLED": True,
+        "TELEGRAM_BOT_TOKEN": "x",
+        "TELEGRAM_CHAT_ID": "y",
+        "TELEGRAM_SOCKS5_PROXY": "127.0.0.1:1080",
+    }
+    if overrides:
+        values.update(overrides)
+
+    def fake(key, default=None, cast=None):
+        return values.get(key, default)
+
+    return fake
+
+
+class _FakeRequestsResponse:
+    def __init__(self, status_code=200, json_data=None, text="", headers=None):
+        self.status_code = status_code
+        self._json_data = json_data
+        self.text = text
+        self.headers = headers or {}
+
+    def json(self):
+        if self._json_data is None:
+            raise ValueError("no JSON body")
+        return self._json_data
+
+
+def test_send_telegram_uses_proxy_and_not_urlopen_when_configured(monkeypatch):
+    """TELEGRAM_SOCKS5_PROXY задан → requests.post с нужным proxies, urlopen
+    не трогается вообще (иначе тест упал бы на реальном сетевом вызове)."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+
+    def fail_urlopen(*args, **kwargs):
+        raise AssertionError("urlopen must not be called when a proxy is configured")
+
+    monkeypatch.setattr(notifications, "urlopen", fail_urlopen)
+
+    calls = []
+
+    def fake_post(url, data=None, proxies=None, timeout=None):
+        calls.append({"url": url, "data": data, "proxies": proxies})
+        return _FakeRequestsResponse(200, {"ok": True})
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+
+    assert notifications.send_telegram("hi") is True
+    assert len(calls) == 1
+    assert calls[0]["proxies"] == {"https": "socks5h://127.0.0.1:1080"}
+    assert calls[0]["url"] == "https://api.telegram.org/botx/sendMessage"
+    assert calls[0]["data"]["text"] == "hi"
+
+
+def test_send_telegram_via_proxy_returns_false_on_api_error(monkeypatch):
+    """Telegram отвечает {"ok": false} через прокси → False, не исключение."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+    monkeypatch.setattr(
+        notifications.requests,
+        "post",
+        lambda *a, **kw: _FakeRequestsResponse(200, {"ok": False, "error_code": 400}),
+    )
+
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_via_proxy_handles_network_error(monkeypatch):
+    """Туннель недоступен (прокси упал/не поднят) → False, без падения."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+
+    def fake_post(*args, **kwargs):
+        raise requests.exceptions.ConnectionError("SOCKS proxy unreachable")
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_via_proxy_handles_non_json_response(monkeypatch):
+    """Прокси/сервер вернул не-JSON (например, HTML страницу ошибки) → False."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+    monkeypatch.setattr(
+        notifications.requests,
+        "post",
+        lambda *a, **kw: _FakeRequestsResponse(200, None, text="<html>502</html>"),
+    )
+
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_via_proxy_429_returns_false_by_default(monkeypatch):
+    """429 через прокси, raise_on_rate_limit=False (default) → False."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+    monkeypatch.setattr(
+        notifications.requests,
+        "post",
+        lambda *a, **kw: _FakeRequestsResponse(
+            429, text='{"parameters":{"retry_after":5}}'
+        ),
+    )
+
+    assert notifications.send_telegram("hi") is False
+
+
+def test_send_telegram_via_proxy_429_raises_when_caller_asks(monkeypatch):
+    """429 через прокси, raise_on_rate_limit=True → TelegramRateLimitError
+    с retry_after из JSON body — тот же _parse_retry_after, что и в
+    прямом (urlopen) пути, просто на requests.Response вместо HTTPError."""
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+    monkeypatch.setattr(
+        notifications.requests,
+        "post",
+        lambda *a, **kw: _FakeRequestsResponse(
+            429, text='{"parameters":{"retry_after":42}}'
+        ),
+    )
+
+    import pytest
+
+    with pytest.raises(notifications.TelegramRateLimitError) as exc_info:
+        notifications.send_telegram("hi", raise_on_rate_limit=True)
+    assert exc_info.value.retry_after == 42
+
+
+def test_send_telegram_no_proxy_still_uses_urlopen(monkeypatch):
+    """TELEGRAM_SOCKS5_PROXY не задан (default) — прежнее поведение
+    неизменно, requests.post не вызывается вообще."""
+
+    def fake_config(key, default=None, cast=None):
+        return {
+            "TELEGRAM_ENABLED": True,
+            "TELEGRAM_BOT_TOKEN": "x",
+            "TELEGRAM_CHAT_ID": "y",
+        }.get(key, default)
+
+    monkeypatch.setattr(notifications, "config", fake_config)
+
+    def fail_post(*args, **kwargs):
+        raise AssertionError("requests.post must not be called without a proxy")
+
+    monkeypatch.setattr(notifications.requests, "post", fail_post)
+
+    class _FakeUrlopenCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b'{"ok": true}'
+
+    monkeypatch.setattr(notifications, "urlopen", lambda *a, **kw: _FakeUrlopenCtx())
+
+    assert notifications.send_telegram("hi") is True
 
 
 def test_trim_with_middle_ellipsis_keeps_tail():

@@ -142,9 +142,11 @@
 
 ### `scripts/telegram-config.sh`
 
-**Что**: загружает env через `source .env.prod`, потом `source .env` (если есть). Экспортирует `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ENABLED`, `TELEGRAM_UPLOAD_FILES`, `TELEGRAM_MAX_FILE_SIZE`, `TELEGRAM_API_URL`, `VK_ENABLED`, `VK_COMMUNITY_TOKEN`, `VK_USER_ID`. Подключается в начале каждого bash-скрипта.
+**Что**: загружает env через `source .env.prod`, потом `source .env` (если есть). Экспортирует `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ENABLED`, `TELEGRAM_UPLOAD_FILES`, `TELEGRAM_MAX_FILE_SIZE`, `TELEGRAM_API_URL`, `TELEGRAM_SOCKS5_PROXY`, `VK_ENABLED`, `VK_COMMUNITY_TOKEN`, `VK_USER_ID`. Подключается в начале каждого bash-скрипта.
 
-**Дефолты**: `TELEGRAM_ENABLED=false`, `TELEGRAM_UPLOAD_FILES=true`, `TELEGRAM_MAX_FILE_SIZE=45` (Telegram hard limit для ботов = 50 МБ), `VK_ENABLED=false`.
+**Дефолты**: `TELEGRAM_ENABLED=false`, `TELEGRAM_UPLOAD_FILES=true`, `TELEGRAM_MAX_FILE_SIZE=45` (Telegram hard limit для ботов = 50 МБ), `VK_ENABLED=false`, `TELEGRAM_SOCKS5_PROXY=""` (пусто = прямое соединение).
+
+**`TELEGRAM_SOCKS5_PROXY` (2026-09-24)**: сервер в РФ, `api.telegram.org` заблокирован на уровне DPI — прямые запросы уходят в таймаут. Если задано `host:port`, curl (bash) и `apps.core.notifications.send_telegram()` (Python, через `requests`+PySocks) идут через SOCKS5-прокси вместо прямого соединения — например, SSH `-D` туннель до сервера с чистой связью. Настройка и обоснование конкретной схемы (SSH-туннель до Амстердама, а не VPN или свой relay-сервис) — `scripts/setup-tg-relay-tunnel.md`.
 
 ### `scripts/telegram-notify.sh` (~700 строк)
 

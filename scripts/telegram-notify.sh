@@ -270,10 +270,19 @@ send_telegram_message_only() {
         return 1
     fi
 
+    # Route through TELEGRAM_SOCKS5_PROXY when set (2026-09-24: server is in
+    # Russia, api.telegram.org is blocked there — see telegram-config.sh).
+    # --socks5-hostname (not --socks5) resolves the hostname on the proxy
+    # side too, not just the connection.
+    local -a proxy_args=()
+    if [ -n "${TELEGRAM_SOCKS5_PROXY:-}" ]; then
+        proxy_args=(--socks5-hostname "$TELEGRAM_SOCKS5_PROXY")
+    fi
+
     # Use simple text format to avoid HTML parsing issues
     local response
     # Force IPv4 to avoid intermittent IPv6 routing issues in some Docker hosts.
-    response=$(curl -4 -sS --connect-timeout 15 --max-time 60 --retry 2 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendMessage" \
+    response=$(curl -4 -sS "${proxy_args[@]}" --connect-timeout 15 --max-time 60 --retry 2 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendMessage" \
         -d "chat_id=$TELEGRAM_CHAT_ID" \
         -d "text=$message" \
         -d "disable_web_page_preview=true" 2>&1)
@@ -355,9 +364,15 @@ send_telegram_file_only() {
 
     log_info "Uploading file: $(basename "$file_path") ($file_size_mb MB)"
 
+    # See send_telegram_message_only() for why/when this is set.
+    local -a proxy_args=()
+    if [ -n "${TELEGRAM_SOCKS5_PROXY:-}" ]; then
+        proxy_args=(--socks5-hostname "$TELEGRAM_SOCKS5_PROXY")
+    fi
+
     local response
     # Force IPv4 to avoid intermittent IPv6 routing issues in some Docker hosts.
-    response=$(curl -4 -sS --connect-timeout 20 --max-time 300 --retry 3 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendDocument" \
+    response=$(curl -4 -sS "${proxy_args[@]}" --connect-timeout 20 --max-time 300 --retry 3 --retry-delay 2 --retry-connrefused -X POST "$TELEGRAM_API_URL/sendDocument" \
         -F "chat_id=$TELEGRAM_CHAT_ID" \
         -F "document=@$file_path" \
         --form-string "caption=$caption" 2>&1)

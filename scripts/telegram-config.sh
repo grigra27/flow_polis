@@ -34,6 +34,15 @@ TELEGRAM_UPLOAD_FILES="${TELEGRAM_UPLOAD_FILES:-true}"
 # Telegram Bot API limit is 50MB
 TELEGRAM_MAX_FILE_SIZE="${TELEGRAM_MAX_FILE_SIZE:-45}"
 
+# SOCKS5 proxy for reaching api.telegram.org (2026-09-24): the production
+# server is in Russia, where api.telegram.org is blocked at the network
+# level (DPI/SNI) — direct curl calls time out. Set to "host:port" (e.g.
+# "127.0.0.1:1080") to route Telegram calls through a local SOCKS5 proxy,
+# e.g. an SSH -D tunnel to a server with clean connectivity. Empty (the
+# default) means "connect directly" — unaffected everywhere else (VK has
+# no such block, and dev/CI environments outside Russia don't need this).
+TELEGRAM_SOCKS5_PROXY="${TELEGRAM_SOCKS5_PROXY:-}"
+
 # Telegram API URL (constructed from bot token)
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
     TELEGRAM_API_URL="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
@@ -53,6 +62,7 @@ export TELEGRAM_ENABLED
 export TELEGRAM_UPLOAD_FILES
 export TELEGRAM_MAX_FILE_SIZE
 export TELEGRAM_API_URL
+export TELEGRAM_SOCKS5_PROXY
 export VK_ENABLED
 export VK_COMMUNITY_TOKEN
 export VK_USER_ID

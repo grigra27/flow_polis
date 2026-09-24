@@ -174,6 +174,10 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
     Конфигурация:
         TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID — обязательные
         TELEGRAM_ENABLED — true/false (по умолчанию false)
+        TELEGRAM_SOCKS5_PROXY — опционально, "host:port" (2026-09-24: сервер
+            в РФ, api.telegram.org заблокирован на уровне DPI — прямые
+            запросы уходят в таймаут). Пусто (по умолчанию) — прямое
+            соединение, как раньше; поведение вне продакшена не меняется.
 
     При TELEGRAM_ENABLED=false или отсутствии токена/чата возвращает False
     без попытки отправки. При сетевой ошибке логирует и возвращает False
@@ -191,6 +195,7 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
     bot_token = config("TELEGRAM_BOT_TOKEN", default="")
     chat_id = config("TELEGRAM_CHAT_ID", default="")
     enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
+    socks_proxy = config("TELEGRAM_SOCKS5_PROXY", default="")
 
     if not enabled:
         logger.debug("Telegram отправка отключена (TELEGRAM_ENABLED=false)")
@@ -208,8 +213,14 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
         "text": text,
         "disable_web_page_preview": True,
     }
-    encoded = urlencode(data).encode("utf-8")
     api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+    if socks_proxy:
+        return _send_telegram_via_socks_proxy(
+            api_url, data, socks_proxy, raise_on_rate_limit
+        )
+
+    encoded = urlencode(data).encode("utf-8")
     request = Request(
         api_url,
         data=encoded,
@@ -248,6 +259,52 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
     except Exception as e:
         logger.error("Telegram unexpected error: %s", e)
         return False
+
+
+def _send_telegram_via_socks_proxy(
+    api_url: str, data: dict, socks_proxy: str, raise_on_rate_limit: bool
+) -> bool:
+    """
+    Тот же sendMessage, но через SOCKS5-прокси (2026-09-24) — requests
+    вместо urlopen, потому что в stdlib нет поддержки SOCKS5 (нужен requests +
+    PySocks). Прокси ожидается локальным (SSH `-D` туннель до сервера с
+    чистой связью, поднятый systemd-юнитом на хосте) — socks5h:// (не
+    socks5://), чтобы имя api.telegram.org резолвилось на другом конце
+    туннеля, а не локально.
+    """
+    proxies = {"https": f"socks5h://{socks_proxy}"}
+    try:
+        response = requests.post(
+            api_url, data=data, proxies=proxies, timeout=TELEGRAM_TIMEOUT
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Telegram (через SOCKS5-прокси) network error: %s", e)
+        return False
+
+    if response.status_code == 429:
+        if raise_on_rate_limit:
+            retry_after = _parse_retry_after(response, response.text)
+            logger.warning(
+                "Telegram 429 (через прокси), will retry after %ss", retry_after
+            )
+            raise TelegramRateLimitError(retry_after, raw=response.text)
+        logger.error("Telegram HTTP 429 (через прокси): %s", response.text)
+        return False
+
+    try:
+        result = response.json()
+    except ValueError:
+        logger.error(
+            "Telegram (через прокси) вернул не-JSON ответ: %s", response.text[:200]
+        )
+        return False
+
+    if result.get("ok"):
+        logger.debug("Telegram (через SOCKS5-прокси): сообщение отправлено")
+        return True
+
+    logger.error("Telegram API вернул ошибку (через прокси): %s", result)
+    return False
 
 
 def send_vk(text: str) -> bool:

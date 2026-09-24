@@ -68,7 +68,7 @@
   - Проверено до коммита на временном `nginx:alpine` в сети `insurance_broker_frontend` с боевыми сертификатами, без публикации портов (прод не затронут; контейнер, образ curl и временный каталог удалены): `nginx -t` OK; apex `/accounts/login/` 200, apex `POST /` 403 (как раньше); SNI www и голый IP по https — handshake отклонён (curl exit 35); SNI apex + `Host: www` — 421; http www / IP — соединение закрыто (exit 52); http apex — 301; `/health/` с `Host: localhost` — 200; ACME для www и apex — 404 из webroot (т.е. доходит до certbot-каталога, не 444).
   - Тест `config/tests/test_nginx_host_filtering.py` — 5/5 (на старом конфиге 4 падают).
   - `.env.prod.example`: `ALLOWED_HOSTS=polis.insflow.ru`.
-  - **Не сделано (нужно владельцу):** (1) на сервере в `.env.prod` заменить строку на `ALLOWED_HOSTS=polis.insflow.ru` — сейчас `polis.insflow.ru,www.polis.insflow.ru,109.68.215.223`; безопасно в любом порядке относительно деплоя, т.к. из-за `X-Forwarded-Host $server_name` Django и так всегда видит `polis.insflow.ru`; (2) push → деплой; (3) после деплоя: `docker-compose -f docker-compose.prod.yml run --rm certbot renew --dry-run`, `curl -sI https://polis.insflow.ru/` = 200, `curl -skI --resolve www.polis.insflow.ru:443:109.68.215.223 https://www.polis.insflow.ru/` — ошибка handshake, `docker ps` — nginx `healthy`; через неделю сравнить число `Forbidden (` в `django.log`.
+  - **Не сделано (нужно владельцу):** (1) ~~`.env.prod` на сервере~~ — **сделано 2026-09-24**: `ALLOWED_HOSTS=polis.insflow.ru` (было `polis.insflow.ru,www.polis.insflow.ru,109.68.215.223`), бэкап `.env.prod.bak-h01-20260924`; вступит в силу при пересоздании контейнеров деплоем (порядок безопасен: из-за `X-Forwarded-Host $server_name` Django и так всегда видит `polis.insflow.ru`); (2) push → деплой; (3) после деплоя: `docker-compose -f docker-compose.prod.yml run --rm certbot renew --dry-run`, `curl -sI https://polis.insflow.ru/` = 200, `curl -skI --resolve www.polis.insflow.ru:443:109.68.215.223 https://www.polis.insflow.ru/` — ошибка handshake, `docker ps` — nginx `healthy`; через неделю сравнить число `Forbidden (` в `django.log`.
 
 ### H-02 — 500 в админке при сохранении графика платежей (ValidationError из `save()`)
 - **Проблема:** `PaymentSchedule.save()` (`apps/policies/models.py:479`) вызывает `full_clean()`, а `clean()` проверяет порядок дат относительно **уже сохранённых** платежей. В `PaymentScheduleInline` (`apps/policies/admin.py:68`) нет formset-валидации, поэтому:
@@ -230,7 +230,7 @@
 
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
-| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | реализовано, ждёт `.env.prod` + push/деплоя |
+| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | реализовано, `.env.prod` обновлён, ждёт push/деплоя |
 | H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | открыто |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |

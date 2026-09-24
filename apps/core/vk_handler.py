@@ -23,7 +23,7 @@ VK_MAX_MESSAGE_LENGTH = 4096
 # конкретное сообщение. Проставляется только в VK — Telegram (см.
 # apps.core.notifications.send_telegram) для этого получателя выделен
 # под данный проект отдельно и в атрибуции не нуждается.
-VK_ATTRIBUTION_PREFIX = "🏢 polis.info"
+VK_ATTRIBUTION_PREFIX = "🏢 polis.insflow"
 
 
 def send_vk_message(text: str) -> bool:

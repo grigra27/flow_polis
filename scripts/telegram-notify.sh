@@ -18,7 +18,7 @@ source "$SCRIPT_DIR/telegram-config.sh"
 # другие проекты, поэтому без явной пометки непонятно, откуда пришло
 # конкретное сообщение. Проставляется только в VK — Telegram для этого
 # получателя выделен под данный проект отдельно и в атрибуции не нуждается.
-VK_ATTRIBUTION_PREFIX="🏢 polis.info"
+VK_ATTRIBUTION_PREFIX="🏢 polis.insflow"
 
 # Colors for output
 RED='\033[0;31m'

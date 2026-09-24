@@ -63,6 +63,12 @@
 - **Риск:** Medium (ошибка в nginx-конфиге = сайт недоступен; проверять `nginx -t` до reload). **Downtime:** нет (reload).
 - **Acceptance:** `curl -H 'Host: www.polis.insflow.ru' https://109.68.215.223/` — соединение закрыто; `https://polis.insflow.ru/` — 200; certbot renew `--dry-run` проходит; через неделю WARNING'ов `Forbidden (...)` в `django.log` на порядок меньше.
 - **Rollback:** вернуть `default.conf`, `nginx -s reload`.
+- **Статус:** **реализовано, не задеплоено (2026-09-24).** Q-1 решён по умолчанию: www остаётся в DNS и сертификате, отсекается на nginx (удалить DNS-запись можно позже отдельно — конфиг от этого не зависит).
+  - `nginx/default.conf`: два `default_server` (`server_name _`). 80 — `return 444`, но с `/.well-known/acme-challenge/` (продление www в SAN) и `location = /health/` (Docker healthcheck ходит с `Host: localhost`). 443 — `ssl_reject_handshake on` + `return 444`. Блоки `polis.insflow.ru` не менялись.
+  - Проверено до коммита на временном `nginx:alpine` в сети `insurance_broker_frontend` с боевыми сертификатами, без публикации портов (прод не затронут; контейнер, образ curl и временный каталог удалены): `nginx -t` OK; apex `/accounts/login/` 200, apex `POST /` 403 (как раньше); SNI www и голый IP по https — handshake отклонён (curl exit 35); SNI apex + `Host: www` — 421; http www / IP — соединение закрыто (exit 52); http apex — 301; `/health/` с `Host: localhost` — 200; ACME для www и apex — 404 из webroot (т.е. доходит до certbot-каталога, не 444).
+  - Тест `config/tests/test_nginx_host_filtering.py` — 5/5 (на старом конфиге 4 падают).
+  - `.env.prod.example`: `ALLOWED_HOSTS=polis.insflow.ru`.
+  - **Не сделано (нужно владельцу):** (1) на сервере в `.env.prod` заменить строку на `ALLOWED_HOSTS=polis.insflow.ru` — сейчас `polis.insflow.ru,www.polis.insflow.ru,109.68.215.223`; безопасно в любом порядке относительно деплоя, т.к. из-за `X-Forwarded-Host $server_name` Django и так всегда видит `polis.insflow.ru`; (2) push → деплой; (3) после деплоя: `docker-compose -f docker-compose.prod.yml run --rm certbot renew --dry-run`, `curl -sI https://polis.insflow.ru/` = 200, `curl -skI --resolve www.polis.insflow.ru:443:109.68.215.223 https://www.polis.insflow.ru/` — ошибка handshake, `docker ps` — nginx `healthy`; через неделю сравнить число `Forbidden (` в `django.log`.
 
 ### H-02 — 500 в админке при сохранении графика платежей (ValidationError из `save()`)
 - **Проблема:** `PaymentSchedule.save()` (`apps/policies/models.py:479`) вызывает `full_clean()`, а `clean()` проверяет порядок дат относительно **уже сохранённых** платежей. В `PaymentScheduleInline` (`apps/policies/admin.py:68`) нет formset-валидации, поэтому:
@@ -215,7 +221,7 @@
 ## 4. Рекомендуемый порядок
 
 1. **Сразу, без окна:** H-04 п.1 (проверка 25.09 утром), H-02 (реальные 500 у пользователей), H-12, H-14, H-17, H-20.
-2. **После ответов владельца:** H-03, H-01, H-08.
+2. **После ответов владельца:** H-03, H-08. (H-01 — реализовано 2026-09-24.)
 3. **Окно обслуживания (одно):** свежий бэкап → H-10 → H-09 → H-16 → H-06 (reboot) → H-07 → проверка всего стека.
 4. **Инфраструктура деплоя:** H-11 (`--delete` с dry-run), H-13, H-15, H-05, H-04 п.2–3.
 5. **Фоном:** H-18, H-19, H-21; 2026-09-28 — закрыть P1-05/P1-08 backlog'а (H-20).
@@ -224,7 +230,7 @@
 
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
-| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | ждёт Q-1 |
+| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | реализовано, ждёт `.env.prod` + push/деплоя |
 | H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | открыто |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |

@@ -325,8 +325,14 @@ send_telegram_file_only() {
     # Check file size
     local file_size_mb=$(du -m "$file_path" | cut -f1)
 
+    # H-05 (2026-10-13): «не влезает в лимит Telegram» — штатная ситуация
+    # для еженедельного media-архива (~50 МБ), а не сбой: файл доставляет
+    # VK (send_vk_file, параллельно), в Telegram уходит caption текстом.
+    # Поэтому здесь INFO, а не WARN/ERROR — иначе каждую неделю в
+    # backup-media.log появлялся ложный ERROR. Реальные сбои (не удалось
+    # сжать, curl/API ошибки) остаются ERROR.
     if [ "$file_size_mb" -gt "$max_size_mb" ]; then
-        log_warn "File too large for Telegram ($file_size_mb MB > $max_size_mb MB)"
+        log_info "File too large for Telegram ($file_size_mb MB > $max_size_mb MB), Telegram gets text only; file goes to VK"
 
         # Try to compress if it's not already compressed
         if [[ "$file_path" != *.gz ]] && [[ "$file_path" != *.zip ]]; then
@@ -341,7 +347,7 @@ send_telegram_file_only() {
                     file_path="$compressed_file"
                     caption="$caption (compressed)"
                 else
-                    log_error "Even compressed file is too large ($compressed_size_mb MB)"
+                    log_info "Even compressed file is too large for Telegram ($compressed_size_mb MB), sending text only"
                     rm -f "$compressed_file"
                     # Файл не влезает ни при какой попытке — текст (caption)
                     # сейчас единственный носитель уведомления (2026-09-24:
@@ -356,7 +362,7 @@ send_telegram_file_only() {
                 return 1
             fi
         else
-            log_error "File is already compressed and too large"
+            log_info "File is already compressed, sending text only to Telegram"
             send_telegram_message_only "$caption" || true
             return 1
         fi

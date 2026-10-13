@@ -178,18 +178,47 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          rsync -avz -e "ssh -4 -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no" \
-            --exclude='.git' \
-            --exclude='venv' \
-            --exclude='black_venv' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='.env' \
-            --exclude='.env.prod' \
-            --exclude='db.sqlite3' \
-            --exclude='certbot/' \
+          # H-11: --delete — на сервере не остаётся файлов, удалённых из
+          # репозитория (иначе там копились старые скрипты/шаблоны, а
+          # удалённая из git миграция осталась бы и применилась).
+          # Исключения ЗАЩИЩАЮТ от удаления всё, что живёт только на сервере:
+          #   /.env, /.env.prod* — секреты (кроме .env.prod.example из репо);
+          #   /certbot/ — SSL-сертификаты; /logs/ — логи (cron, django, nginx);
+          #   /media/, /db.sqlite3 — данные. Новый серверный файл в корне
+          #   проекта — сначала добавить сюда, иначе следующий деплой его удалит.
+          # Пути с ведущим / привязаны к корню проекта.
+          RSYNC_ARGS=(
+            -avz --delete
+            -e "ssh -4 -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no"
+            --exclude='.git'
+            --exclude='venv'
+            --exclude='black_venv'
+            --exclude='__pycache__'
+            --exclude='*.pyc'
+            --exclude='/.env'
+            --include='/.env.prod.example'
+            --exclude='/.env.prod*'
+            --exclude='/db.sqlite3'
+            --exclude='/certbot/'
+            --exclude='/logs/'
+            --exclude='/media/'
             ./ "$DROPLET_USER@$DROPLET_HOST:~/insurance_broker/"
-          echo "✅ Files copied to server (preserving credentials and certificates)"
+          )
+
+          # Страховка от ошибки в исключениях: сначала dry-run, список
+          # удаляемого — в лог CI; если туда попали секреты/сертификаты/
+          # логи/данные — деплой останавливается, ничего не удалив.
+          echo "🔍 rsync --delete dry-run:"
+          rsync --dry-run "${RSYNC_ARGS[@]}" | grep '^deleting ' > /tmp/rsync-deletions.txt || true
+          echo "Will delete $(wc -l < /tmp/rsync-deletions.txt) path(s) on server:"
+          cat /tmp/rsync-deletions.txt
+          if grep -E '^deleting (\.env($|\.prod)|certbot/|logs/|media/|db\.sqlite3$)' /tmp/rsync-deletions.txt; then
+            echo "❌ rsync --delete would remove server-only data (see above) — aborting"
+            exit 1
+          fi
+
+          rsync "${RSYNC_ARGS[@]}"
+          echo "✅ Files copied to server (preserving credentials, certificates and logs)"
 
       - name: Verify env files on server
         env:

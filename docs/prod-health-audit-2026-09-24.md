@@ -270,7 +270,7 @@
 | H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | **PASS (код, 2026-10-13)** — сняты с учёта, добавлены в `.gitignore`/`.dockerignore` |
 | H-13 | Нет реального healthcheck web | P2 | Low | нет | **PASS (код, 2026-10-13)** — `/health/` + Docker healthcheck + проверка `web` в `system_health_check` (critical → VK/TG); ждёт деплоя |
 | H-14 | `ssl_stapling` warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — удалены `ssl_stapling*` и `ssl_trusted_certificate`; `nginx -t` в боевом контейнере OK; ждёт деплоя |
-| H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | открыто |
+| H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | **PASS (код, 2026-10-13)** — `nginx.conf` смонтирован, `$host`+`$request_time` в логе, access/error → `logs/nginx/` + stdout; `nginx -t` в боевом контейнере OK. **После деплоя вручную:** `bash scripts/setup-logrotate.sh` на сервере |
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — ждёт деплоя |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | открыто |

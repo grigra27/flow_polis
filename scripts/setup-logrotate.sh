@@ -34,6 +34,14 @@
 # same values as the original log file for the omitted attributes" — so
 # the freshly created file keeps 10001:10001 automatically, without
 # needing a UID that this logrotate build can't resolve.
+#
+# H-15 (2026-10-13): second stanza for nginx access/error logs written to
+# logs/nginx/ (bind-mounted into the nginx container). Unlike the cron
+# logs above, nginx holds these files open for its whole lifetime, so after
+# `create` it must be told to reopen them — `nginx -s reopen` via
+# `docker exec` in postrotate (the standard nginx rotation signal, USR1).
+# `|| true`: if the container is down at rotation time, rotation still
+# succeeds and nginx opens the fresh files on its next start.
 
 set -e
 
@@ -74,6 +82,23 @@ $app_dir/logs/cleanup-login-attempts.log
     missingok
     notifempty
     create 0644
+}
+
+$app_dir/logs/nginx/access.log
+$app_dir/logs/nginx/error.log
+{
+    daily
+    rotate 30
+    maxsize 50M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644
+    sharedscripts
+    postrotate
+        docker exec insurance_broker_nginx nginx -s reopen >/dev/null 2>&1 || true
+    endscript
 }
 EOF
 }

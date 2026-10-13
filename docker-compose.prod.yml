@@ -178,7 +178,10 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # H-15: access/error логи в файлы на хосте — не теряются при деплое.
+      - ./logs/nginx:/var/log/nginx/persist
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
       - static_volume:/app/staticfiles:ro

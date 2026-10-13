@@ -83,13 +83,30 @@ else
     bad "config did not follow a different app_dir argument"
 fi
 
-# --- generated block is a single logrotate stanza (one opening/closing brace) ---
-opens=$(echo "$CONFIG" | grep -c '{')
-closes=$(echo "$CONFIG" | grep -c '}')
-if [ "$opens" = "1" ] && [ "$closes" = "1" ]; then
-    ok "exactly one logrotate stanza ({ ... })"
+# --- two stanzas: cron logs (P2-03) + nginx logs (H-15) ---
+opens=$(echo "$CONFIG" | grep -c '^{$')
+closes=$(echo "$CONFIG" | grep -c '^}$')
+if [ "$opens" = "2" ] && [ "$closes" = "2" ]; then
+    ok "exactly two logrotate stanzas ({ ... })"
 else
-    bad "expected exactly one { and one }, got $opens/$closes"
+    bad "expected exactly two { and two }, got $opens/$closes"
+fi
+
+# --- H-15: nginx logs rotated, and nginx is told to reopen them ---
+NGINX_STANZA=$(echo "$CONFIG" | sed -n '/logs\/nginx\/access.log/,/^}$/p')
+for needle in "/root/insurance_broker/logs/nginx/access.log" \
+              "/root/insurance_broker/logs/nginx/error.log" \
+              "postrotate" "nginx -s reopen" "|| true" "sharedscripts"; do
+    if echo "$NGINX_STANZA" | grep -qF -- "$needle"; then
+        ok "nginx stanza: $needle"
+    else
+        bad "nginx stanza missing: $needle"
+    fi
+done
+if echo "$NGINX_STANZA" | grep -qF "backup-db.log"; then
+    bad "nginx stanza must not include cron logs"
+else
+    ok "nginx stanza is separate from cron logs"
 fi
 
 echo

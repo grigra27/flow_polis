@@ -264,7 +264,7 @@
 | H-06 | Обновления ОС, reboot | P1 | Medium | **да** | **PASS / done 2026-10-13** |
 | H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13** (CI-деплой — проверить при ближайшем пуше) |
 | H-08 | Zabbix 10050 открыт всем | P2 | Low | нет | ждёт Q-3 |
-| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **разовая чистка done 2026-10-13**; шаг в deploy.yml — открыто |
+| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **PASS**: разовая чистка done 2026-10-13; источник томов — анонимный `VOLUME /var/lib/letsencrypt` certbot при `down`/`up`; в deploy.yml добавлены `volume prune -f` + `builder prune --filter until=168h` (ждёт деплоя) |
 | H-10 | journald 3 ГБ | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-11 | rsync без `--delete`, лишние файлы на сервере | P2 | High | нет | открыто |
 | H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | **PASS (код, 2026-10-13)** — сняты с учёта, добавлены в `.gitignore`/`.dockerignore` |
@@ -273,7 +273,7 @@
 | H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | **PASS (код, 2026-10-13)** — `nginx.conf` смонтирован, `$host`+`$request_time` в логе, access/error → `logs/nginx/` + stdout; `nginx -t` в боевом контейнере OK. **После деплоя вручную:** `bash scripts/setup-logrotate.sh` на сервере |
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — ждёт деплоя |
-| H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | открыто |
+| H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | **PASS (код, 2026-10-13)** — источник: шаг «Fixing migration conflicts» в deploy.yml (`psql -U postgres -d insurance_broker`); заменено на `$POSTGRES_USER`/`$POSTGRES_DB`. Строки `0011_alter_paymentschedule_unique_together` в проде нет — DELETE остаётся no-op |
 | H-19 | Память 2 ГБ впритык | P3 | Low | нет | наблюдение |
 | H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **частично (2026-10-13)**: CLAUDE.md, триггер daily_digest, P1-05/P1-08 закрыты; комментарий в compose — вместе с H-13 |
 | H-21 | Контроль невозврата исторических ошибок | P3 | Low | нет | наблюдение |

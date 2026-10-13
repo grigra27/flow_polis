@@ -291,6 +291,17 @@ jobs:
             echo "⏳ Waiting for services to be ready..."
             sleep 15
 
+            # H-09: `down` оставляет сиротой анонимный том certbot
+            # (VOLUME /var/lib/letsencrypt в образе) — за год их накопилось
+            # 232. С Docker 23+ `volume prune` без --all удаляет только
+            # анонимные неиспользуемые тома; именованные (postgres_data,
+            # media_volume, ...) не трогает даже если они не подключены.
+            # Build cache старше недели не нужен — свежий остаётся для
+            # быстрых пересборок.
+            echo "🧹 Pruning dangling volumes and old build cache..."
+            docker volume prune -f || true
+            docker builder prune -f --filter until=168h || true
+
             echo "✅ Deployment completed"
           ENDSSH
 
@@ -337,7 +348,10 @@ jobs:
 
             echo "🔧 Fixing migration conflicts..."
             # Remove old conflicting migration from database if exists
-            docker-compose -f docker-compose.prod.yml exec -T db psql -U postgres -d insurance_broker -c "
+            # H-18: раньше здесь было -U postgres -d insurance_broker — такой БД
+            # на проде нет, psql падал с FATAL (виден в логе db) и DELETE не
+            # выполнялся. POSTGRES_* экспортированы из .env.prod выше.
+            docker-compose -f docker-compose.prod.yml exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
               DELETE FROM django_migrations
               WHERE app = 'policies'
                 AND name = '0011_alter_paymentschedule_unique_together';

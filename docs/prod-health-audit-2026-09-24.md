@@ -81,7 +81,7 @@
 - **Риск:** Medium (центральная модель). **Downtime:** нет (обычный деплой).
 - **Acceptance:** тесты: (a) новый полис с платежами в неверном порядке → ошибка формы, не 500; (b) перестановка дат двух существующих платежей в корректный итог → сохраняется; (c) некорректный итог → ошибка формы. В `django.log` нет новых `Internal Server Error: /admin/policies/policy/...`.
 - **Rollback:** revert коммита.
-- **Сделано 2026-10-13 (код, не задеплоено):**
+- **Сделано 2026-10-13 (задеплоено 2026-10-13, run 38440780543):**
   - Трейсбеки всех 5 случаев на проде подтверждают диагноз: `ValidationError` из `PaymentSchedule.save()` → `full_clean()` внутри `formset.save()`.
   - `apps/policies/admin.py`: `PaymentScheduleInlineFormSet` — в `clean()` сортирует итоговый набор строк (без удаляемых, плюс строки полиса из БД, не показанные в formset) по `(year_number, installment_number)` и проверяет соседние пары; ошибка — `form.add_error()` на конкретное поле строки. Экземплярам форм ставится флаг `_date_sequence_checked_by_formset`, и `PaymentSchedule.clean()` пропускает построчную сверку с БД.
   - `apps/policies/models.py`: сравнение дат вынесено в `PaymentSchedule.date_sequence_errors(previous_payment)`; правила и тексты ошибок не менялись. Вне админки (`save()` из кода/shell) проверка работает как раньше.
@@ -133,7 +133,7 @@
   - Проверено: вход по ключу работает; `ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no polis` → `Permission denied (publickey)`; `sshd -T` → `passwordauthentication no`, `permitrootlogin without-password`.
   - Ключи в `authorized_keys` не менялись (оба ноутбука + `github-actions-deploy`).
   - Запасной доступ: VNC-консоль Timeweb (вход root+пароль, sshd не затрагивает) или сброс пароля из панели. Пароль root владельцу неизвестен — при необходимости задать через `ssh -t polis passwd`. Откат: `rm /etc/ssh/sshd_config.d/00-hardening.conf && systemctl reload ssh`.
-  - Не проверено: деплой из CI — подтвердится при ближайшем пуше в `main`.
+  - Деплой из CI по ключу подтверждён 2026-10-13: run 38440780543 (`cb75cd3`) — все джобы success.
 
 ### H-08 — Порт 10050 (Zabbix agent) открыт для всего интернета
 - **Проблема:** `ufw`: `10050/tcp ALLOW Anywhere`, слушает `zabbix_agentd` на `0.0.0.0`. Вероятно, мониторинг хостера Timeweb.
@@ -257,22 +257,22 @@
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
 | H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **PASS / deployed** (наблюдение до ~2026-10-01) |
-| H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | **PASS (код, 2026-10-13)** — ждёт пуша/деплоя |
+| H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | **PASS (код, 2026-10-13)** — задеплоено 2026-10-13 |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | **п.1 PASS** (дайджест/бэкапы доходят в TG), **п.2 PASS (код, 2026-10-13)** — проверка `telegram proxy` в `system_health_check`; п.3 PASS (2026-10-13) — датированные пометки в backlog P1-07/P1-10/Q2, исправлены `scripts/README.md`, `docs/BACKUP_RESTORE.md` |
 | H-05 | Media-бэкап > лимита Telegram | P3 | Low | нет | **PASS (код, 2026-10-13)** — выбран вариант «осознанно media только в VK»: сообщение понижено до INFO (файл в VK доставляется — `File mirrored to VK successfully`, `result=ok` 2026-10-12; в TG уходит текст). Разбиение на части не делали |
 | H-06 | Обновления ОС, reboot | P1 | Medium | **да** | **PASS / done 2026-10-13** |
-| H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13** (CI-деплой — проверить при ближайшем пуше) |
+| H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13**, CI-деплой по ключу подтверждён (run 38440780543) |
 | H-08 | Zabbix 10050 открыт всем | P2 | Low | нет | ждёт Q-3 |
-| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **PASS**: разовая чистка done 2026-10-13; источник томов — анонимный `VOLUME /var/lib/letsencrypt` certbot при `down`/`up`; в deploy.yml добавлены `volume prune -f` + `builder prune --filter until=168h` (ждёт деплоя) |
+| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **PASS**: разовая чистка done 2026-10-13; источник томов — анонимный `VOLUME /var/lib/letsencrypt` certbot при `down`/`up`; в deploy.yml добавлены `volume prune -f` + `builder prune --filter until=168h` (задеплоено 2026-10-13) |
 | H-10 | journald 3 ГБ | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-11 | rsync без `--delete`, лишние файлы на сервере | P2 | High | нет | открыто |
 | H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | **PASS (код, 2026-10-13)** — сняты с учёта, добавлены в `.gitignore`/`.dockerignore` |
-| H-13 | Нет реального healthcheck web | P2 | Low | нет | **PASS (код, 2026-10-13)** — `/health/` + Docker healthcheck + проверка `web` в `system_health_check` (critical → VK/TG); ждёт деплоя |
-| H-14 | `ssl_stapling` warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — удалены `ssl_stapling*` и `ssl_trusted_certificate`; `nginx -t` в боевом контейнере OK; ждёт деплоя |
-| H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | **PASS (код, 2026-10-13)** — `nginx.conf` смонтирован, `$host`+`$request_time` в логе, access/error → `logs/nginx/` + stdout; `nginx -t` в боевом контейнере OK. **После деплоя вручную:** `bash scripts/setup-logrotate.sh` на сервере |
+| H-13 | Нет реального healthcheck web | P2 | Low | нет | **PASS (код, 2026-10-13)** — `/health/` + Docker healthcheck + проверка `web` в `system_health_check` (critical → VK/TG); задеплоено 2026-10-13 |
+| H-14 | `ssl_stapling` warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — удалены `ssl_stapling*` и `ssl_trusted_certificate`; `nginx -t` в боевом контейнере OK; задеплоено 2026-10-13 |
+| H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | **PASS (код, 2026-10-13)** — `nginx.conf` смонтирован, `$host`+`$request_time` в логе, access/error → `logs/nginx/` + stdout; `nginx -t` в боевом контейнере OK. Задеплоено 2026-10-13 (run 38440780543); `setup-logrotate.sh` выполнен на сервере; принудительная ротация только nginx-строфы проверена — `nginx -s reopen` сработал, новые запросы пишутся в свежий `access.log` |
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
-| H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — ждёт деплоя |
+| H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — задеплоено 2026-10-13 |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | **PASS (код, 2026-10-13)** — источник: шаг «Fixing migration conflicts» в deploy.yml (`psql -U postgres -d insurance_broker`); заменено на `$POSTGRES_USER`/`$POSTGRES_DB`. Строки `0011_alter_paymentschedule_unique_together` в проде нет — DELETE остаётся no-op |
 | H-19 | Память 2 ГБ впритык | P3 | Low | нет | наблюдение |
 | H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **частично (2026-10-13)**: CLAUDE.md, триггер daily_digest, P1-05/P1-08 закрыты; комментарий в compose — вместе с H-13 |

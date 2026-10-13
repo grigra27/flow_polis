@@ -114,6 +114,12 @@
 - **Scope:** окно обслуживания: свежий DB+media бэкап → `apt upgrade` → reboot → проверить автоподъём Docker-стека (`restart: unless-stopped`/`always` в compose), `tg-relay-tunnel.service`, cron, сайт, health-check. Затем удалить старые ядра (`apt autoremove`).
 - **Риск:** Medium. **Downtime:** да, ~2–5 мин — согласовать.
 - **Acceptance:** `uname -r` = последнее ядро; `reboot-required` отсутствует; все контейнеры `Up`; health-check `healthy`.
+- **Сделано 2026-10-13 (окно обслуживания 20:05–20:20 МСК, вместе с H-09/H-10/H-16):**
+  - Перед работами: `pg_dump -Fc` → `/root/maintenance-2026-10-13/db.dump` (1.7 МБ, 38 TABLE DATA; совпадает по размеру с ночным бэкапом), копии `sshd_config.d`, `sysctl.conf`, `journald.conf` там же.
+  - `apt-get upgrade` + `dist-upgrade` (через `systemd-run`, noninteractive, `--force-confold`): 72 пакета, в т.ч. Docker 29.1.2 → 29.9.0, containerd 2.4.1, ядро 6.8.0-147. Обновление Docker само перезапустило контейнеры (~1 мин простоя). Лог: `journalctl -u maint-upgrade`, `/root/maintenance-2026-10-13/apt.log`.
+  - Reboot 20:15:08 → SSH снова доступен в 20:15:46.
+  - Проверено после reboot: `uname -r` = `6.8.0-147-generic`; `reboot-required` нет; все 7 контейнеров `Up` (healthcheck'и `healthy`); `docker`, `tg-relay-tunnel`, `ssh`, `fail2ban`, `cron` — active; Telegram через SOCKS-туннель отвечает; `system_health_check --check-all` → HEALTHY; `/accounts/login/` → 200; SSH-hardening (H-07) сохранился.
+  - `apt autoremove`: удалено ядро 6.8.0-90; оставлены 146 (запасное) и 147.
 
 ### H-07 — SSH: вход под root по паролю
 - **Проблема:** `sshd -T`: `permitrootlogin yes`, `passwordauthentication yes`. fail2ban спасает от перебора, но не от утёкшего пароля. Порт 22 открыт для всех.
@@ -139,11 +145,14 @@
 - **Scope:** разово: `docker builder prune -af`, `docker image prune -af`, `docker volume prune -f` (перед этим убедиться, что именованные тома `insurance_broker_*` — `postgres_data`, `media_volume`, `static_volume`, redis — используются и не попадут под prune), `docker rm affectionate_matsumoto`. Постоянно: шаг очистки в `deploy.yml` после успешного деплоя (`docker image prune -f && docker builder prune -f --filter until=168h`) и выяснить, какой сервис порождает анонимные тома (вероятно `VOLUME` в образе без явного монтирования).
 - **Риск:** Medium (`volume prune` — только после сверки списка томов). **Downtime:** нет.
 - **Acceptance:** `docker system df` reclaimable < 2 ГБ; после следующего деплоя число dangling-томов не растёт.
+- **Сделано 2026-10-13 (разовая часть):** сверено — именованные тома `insurance_broker_{postgres_data,media_volume,redis_data,static_volume}` и анонимный том certbot подключены к работающим контейнерам. Удалены: контейнер `affectionate_matsumoto`; образы `insurance_broker-web:latest` (март), `alpine:3.19`, `hello-world`; build cache 9.9 ГБ (`builder prune -af`); анонимные тома (`volume prune -f`: 238 → 5). **`alpine:latest` намеренно оставлен** — его использует `scripts/backup-media-telegram.sh` (`docker run --rm alpine`), повторный pull с Docker Hub из РФ ненадёжен, поэтому `image prune -a` не применялся. Диск: 20 ГБ (51%) → 7.3 ГБ (20%).
+  - **Не сделано:** шаг очистки в `deploy.yml` и поиск источника анонимных томов — проверить число томов после ближайшего деплоя.
 
 ### H-10 — systemd journal 3 ГБ
 - **Проблема:** `journalctl --disk-usage` = 3.0 ГБ.
 - **Scope:** `journalctl --vacuum-size=500M`; в `/etc/systemd/journald.conf` — `SystemMaxUse=500M`, `systemctl restart systemd-journald`.
 - **Риск:** Low. **Downtime:** нет.
+- **Сделано 2026-10-13:** лимит вынесен в drop-in `/etc/systemd/journald.conf.d/00-size.conf` (`SystemMaxUse=500M`), основной `journald.conf` не трогали; после `restart systemd-journald` журнал 3.2 ГБ → 485 МБ.
 
 ### H-11 — Деплой не удаляет файлы, исчезнувшие из репозитория
 - **Проблема:** `deploy.yml` делает `rsync -avz` **без `--delete`**, поэтому на сервере копятся файлы, удалённые из git (включая удалённые в рамках P2-06):
@@ -184,6 +193,7 @@
 - **Проблема:** redis при старте: `WARNING Memory overcommit must be enabled!` — фоновое сохранение может падать при нехватке памяти (на хосте 2 ГБ RAM).
 - **Scope:** `/etc/sysctl.d/99-redis.conf`: `vm.overcommit_memory = 1`, `sysctl --system`. Удобно совместить с H-06.
 - **Риск:** Low. **Downtime:** нет.
+- **Сделано 2026-10-13:** `/etc/sysctl.d/99-redis.conf` создан, применён; после reboot `vm.overcommit_memory = 1`, в логе redis после рестарта предупреждения нет.
 
 ### H-17 — Celery: `CPendingDeprecationWarning` про `broker_connection_retry`
 - **Проблема:** worker при старте предупреждает, что в Celery 6 `broker_connection_retry` перестанет управлять повторами при старте.
@@ -251,17 +261,17 @@
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |
 | H-05 | Media-бэкап > лимита Telegram | P3 | Low | нет | открыто |
-| H-06 | Обновления ОС, reboot | P1 | Medium | **да** | открыто |
+| H-06 | Обновления ОС, reboot | P1 | Medium | **да** | **PASS / done 2026-10-13** |
 | H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13** (CI-деплой — проверить при ближайшем пуше) |
 | H-08 | Zabbix 10050 открыт всем | P2 | Low | нет | ждёт Q-3 |
-| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | открыто |
-| H-10 | journald 3 ГБ | P3 | Low | нет | открыто |
+| H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **разовая чистка done 2026-10-13**; шаг в deploy.yml — открыто |
+| H-10 | journald 3 ГБ | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-11 | rsync без `--delete`, лишние файлы на сервере | P2 | High | нет | открыто |
 | H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | открыто |
 | H-13 | Нет реального healthcheck web | P2 | Low | нет | открыто |
 | H-14 | `ssl_stapling` warning | P3 | Low | нет | открыто |
 | H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | открыто |
-| H-16 | Redis overcommit | P3 | Low | нет | открыто |
+| H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-17 | Celery deprecation warning | P3 | Low | нет | открыто |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | открыто |
 | H-19 | Память 2 ГБ впритык | P3 | Low | нет | наблюдение |

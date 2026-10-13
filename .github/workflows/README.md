@@ -187,4 +187,4 @@ If you encounter issues with the deployment workflow:
 1. Check the Actions logs for detailed error messages
 2. Verify all secrets are correctly configured
 3. Test SSH connection manually: `ssh -i ~/.ssh/deploy_key user@droplet-ip`
-4. Review the deployment documentation in `docs/DEPLOYMENT.md`
+4. Review the deployment documentation in `docs/DEPLOYMENT_QUICK_REFERENCE.md`

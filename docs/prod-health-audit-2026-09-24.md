@@ -63,7 +63,7 @@
 - **Риск:** Medium (ошибка в nginx-конфиге = сайт недоступен; проверять `nginx -t` до reload). **Downtime:** нет (reload).
 - **Acceptance:** `curl -H 'Host: www.polis.insflow.ru' https://109.68.215.223/` — соединение закрыто; `https://polis.insflow.ru/` — 200; certbot renew `--dry-run` проходит; через неделю WARNING'ов `Forbidden (...)` в `django.log` на порядок меньше.
 - **Rollback:** вернуть `default.conf`, `nginx -s reload`.
-- **Статус:** **PASS / deployed (2026-09-24, `d573562`, run 36054233638).** Проверка на проде после деплоя: все контейнеры Up, nginx `healthy`; Django `ALLOWED_HOSTS=['polis.insflow.ru']`; apex login 200, apex `POST /` 403, статика 200; https www/IP — handshake отклонён; SNI apex + `Host: www` — 421; http apex 301; http www/IP — соединение закрыто; ACME www — 404 из webroot; `certbot renew --dry-run` для apex+www — success. Осталось: через неделю (~2026-10-01) сравнить число `Forbidden (` в `django.log`.
+- **Статус:** **PASS / deployed (2026-09-24, `d573562`, run 36054233638).** Проверка на проде после деплоя: все контейнеры Up, nginx `healthy`; Django `ALLOWED_HOSTS=['polis.insflow.ru']`; apex login 200, apex `POST /` 403, статика 200; https www/IP — handshake отклонён; SNI apex + `Host: www` — 421; http apex 301; http www/IP — соединение закрыто; ACME www — 404 из webroot; `certbot renew --dry-run` для apex+www — success. **ЗАКРЫТО 2026-10-13:** строк `Forbidden (` в `django.log` до деплоя — 6–159 в сутки (2026-09-01…09-24, обычно 10–50), после — 4 за 19 дней (09-26: 2, 10-02: 1, 10-12: 1). Acceptance «на порядок меньше» выполнен.
 - **История реализации:** Q-1 решён по умолчанию: www остаётся в DNS и сертификате, отсекается на nginx (удалить DNS-запись можно позже отдельно — конфиг от этого не зависит).
   - `nginx/default.conf`: два `default_server` (`server_name _`). 80 — `return 444`, но с `/.well-known/acme-challenge/` (продление www в SAN) и `location = /health/` (Docker healthcheck ходит с `Host: localhost`). 443 — `ssl_reject_handshake on` + `return 444`. Блоки `polis.insflow.ru` не менялись.
   - Проверено до коммита на временном `nginx:alpine` в сети `insurance_broker_frontend` с боевыми сертификатами, без публикации портов (прод не затронут; контейнер, образ curl и временный каталог удалены): `nginx -t` OK; apex `/accounts/login/` 200, apex `POST /` 403 (как раньше); SNI www и голый IP по https — handshake отклонён (curl exit 35); SNI apex + `Host: www` — 421; http www / IP — соединение закрыто (exit 52); http apex — 301; `/health/` с `Host: localhost` — 200; ACME для www и apex — 404 из webroot (т.е. доходит до certbot-каталога, не 444).
@@ -230,6 +230,7 @@
   - `docs/prod-backup-improvement-backlog-2026-09-19.md`, реестр: P1-05 и P1-08 значатся «реализовано, не задеплоено», но на проде уже работают — `backup-retention.sh` подключён обоими backup-скриптами, `system_health_check` выводит `Backup Media: fresh, result=ok`. Первый боевой прогон retention — понедельник 2026-09-28 04:00: проверить `logs/backup-cleanup.log` и закрыть задачи.
   - `docker-compose.prod.yml:84-85`: комментарий про «monitored via nginx» вводит в заблуждение (H-13).
 - **Риск:** Low. **Downtime:** нет.
+- **Статус:** **ЗАКРЫТО 2026-10-13.** CLAUDE.md, NOTIFICATIONS_PIPELINE (триггер `daily_digest`), backlog P1-05/P1-08, комментарий в compose (с H-13) — сделано ранее. Добивка: `README.md` — стек (Django 5.1 / Python 3.12), дерево `apps/` без `notifications` и с `billing`/`communications`/`analytics`/`accounts`, список возможностей без email-напоминаний, `docker-compose.dev.yml` → `docker-compose.yml`, 15 битых ссылок на удалённые/перенесённые доки исправлены или убраны; `.github/workflows/README.md` — ссылка на `docs/DEPLOYMENT_QUICK_REFERENCE.md`. `VERSION.md` не трогали — это история релиза 1.0.0 (версии на тот момент верны).
 
 ### H-21 — Наблюдение: исторические ошибки, которые должны больше не повторяться
 Ошибки в `django.log`, последние вхождения которых старые; код, судя по всему, исправлен. Задача — раз в месяц убеждаться, что они не вернулись (например, отдельным пунктом в `daily_digest` или grep в health-check):
@@ -271,7 +272,7 @@
 
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
-| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **PASS / deployed** (наблюдение до ~2026-10-01) |
+| H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **ЗАКРЫТО 2026-10-13** — `Forbidden (` в `django.log`: было 10–50+/сутки, после деплоя 4 за 19 дней |
 | H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | **PASS (код, 2026-10-13)** — задеплоено 2026-10-13 |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | **ЗАКРЫТО — решение владельца 2026-10-13: модуль удалён** (`bc247ff`; вернуть — `git revert bc247ff`) |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | **п.1 PASS** (дайджест/бэкапы доходят в TG), **п.2 PASS (код, 2026-10-13)** — проверка `telegram proxy` в `system_health_check`; п.3 PASS (2026-10-13) — датированные пометки в backlog P1-07/P1-10/Q2, исправлены `scripts/README.md`, `docs/BACKUP_RESTORE.md` |
@@ -290,6 +291,6 @@
 | H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — задеплоено 2026-10-13 |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | **PASS (код, 2026-10-13)** — источник: шаг «Fixing migration conflicts» в deploy.yml (`psql -U postgres -d insurance_broker`); заменено на `$POSTGRES_USER`/`$POSTGRES_DB`. Строки `0011_alter_paymentschedule_unique_together` в проде нет — DELETE остаётся no-op |
 | H-19 | Память 2 ГБ впритык | P3 | Low | нет | **ЗАКРЫТО 2026-10-13** — RAM 1.1/1.9 ГБ, swap ~0 после reboot, OOM с 09-01 нет, PSI 0; swap добавлен в `system_health_check` (warning >50%, critical >80%) — наблюдение автоматическое |
-| H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **частично (2026-10-13)**: CLAUDE.md, триггер daily_digest, P1-05/P1-08 закрыты; комментарий в compose — вместе с H-13 |
+| H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **ЗАКРЫТО 2026-10-13** — CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose; README.md (стек, структура, битые ссылки), workflows/README |
 | H-21 | Контроль невозврата исторических ошибок | P3 | Low | нет | **ЗАКРЫТО 2026-10-13** — ни одна не повторилась; с 2026-09-24 в `django.log` ни одного ERROR (кроме собственного теста H-13); новые ERROR и так уходят в TG/VK/Sentry в реальном времени |
 | H-22 | Справка: КВ Югория, брутфорс, CSRF-шум | — | — | — | закрыто |

@@ -1,14 +1,14 @@
 # Система управления полисами для страхового брокера
 
-Веб-приложение для автоматизации работы страхового брокера - учет полисов, управление графиками платежей и уведомления о предстоящих оплатах.
+Веб-приложение для автоматизации работы страхового брокера - учет полисов, управление графиками платежей, комиссиями (КВ), задачами по очередным взносам и письмами страховщикам.
 
 ## Технологии
 
-- Django 4.2
-- PostgreSQL / SQLite
+- Django 5.1
+- PostgreSQL (prod) / SQLite (dev)
 - Bootstrap 5
 - Celery + Redis
-- Python 3.9+
+- Python 3.12
 
 ## Быстрый старт
 
@@ -76,12 +76,15 @@ python3 manage.py runserver
 ```
 insurance_broker/
 ├── apps/                   # Django приложения
+│   ├── accounts/          # Аутентификация и права
 │   ├── clients/           # Клиенты
 │   ├── insurers/          # Справочники
 │   ├── policies/          # Полисы (основной модуль)
-│   ├── notifications/     # Уведомления
+│   ├── billing/           # Очередные взносы, письма страховщикам
+│   ├── communications/    # Очередь исходящих писем
 │   ├── reports/           # Отчеты
-│   └── core/              # Общие компоненты
+│   ├── analytics/         # Дашборд аналитики
+│   └── core/              # Общие компоненты, health-check, дайджест
 ├── config/                # Настройки проекта
 ├── templates/             # HTML шаблоны
 ├── static/                # Статические файлы
@@ -98,7 +101,8 @@ insurance_broker/
   - Готовые экспорты (полисы, платежи, четверговый отчет)
   - Конструктор кастомных отчетов
   - Сохранение шаблонов экспорта
-- ✅ Уведомления о предстоящих платежах
+- ✅ Очередные взносы: задачи, письма страховщикам, пролонгация
+- ✅ Ежедневный дайджест и алерты в Telegram/VK
 - ✅ Дашборд с аналитикой
 - ✅ Система аутентификации и авторизации с разделением прав доступа
 
@@ -235,7 +239,7 @@ admin = User.objects.create_superuser(
 
 **Development:**
 ```bash
-docker compose -f docker-compose.dev.yml exec web python manage.py createsuperuser
+docker compose exec web python manage.py createsuperuser
 ```
 
 **Production:**
@@ -405,7 +409,7 @@ python manage.py test
 python manage.py makemigrations
 ```
 
-#### Запуск Celery (для уведомлений)
+#### Запуск Celery (фоновые задачи, отправка писем)
 
 ```bash
 celery -A config worker -l info
@@ -414,7 +418,7 @@ celery -A config beat -l info
 
 ### Локальная разработка (с Docker)
 
-Для разработки с использованием Docker используйте `docker-compose.dev.yml`:
+Для разработки с использованием Docker используйте `docker-compose.yml` (сервис `web` собирается из `Dockerfile.dev`):
 
 #### Первоначальная настройка
 
@@ -429,10 +433,10 @@ cp .env.dev.example .env
 
 ```bash
 # Сборка и запуск всех сервисов
-docker compose -f docker-compose.dev.yml up --build
+docker compose up --build
 
 # Или в фоновом режиме
-docker compose -f docker-compose.dev.yml up -d --build
+docker compose up -d --build
 ```
 
 #### Особенности development окружения
@@ -450,18 +454,18 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ```bash
 # Просмотр логов
-docker compose -f docker-compose.dev.yml logs -f
+docker compose logs -f
 
 # Выполнение команд Django
-docker compose -f docker-compose.dev.yml exec web python manage.py migrate
-docker compose -f docker-compose.dev.yml exec web python manage.py createsuperuser
-docker compose -f docker-compose.dev.yml exec web python manage.py shell
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py shell
 
 # Остановка сервисов
-docker compose -f docker-compose.dev.yml down
+docker compose down
 
 # Пересборка после изменения requirements.txt
-docker compose -f docker-compose.dev.yml up --build
+docker compose up --build
 ```
 
 #### Отладка в контейнере
@@ -470,7 +474,7 @@ docker compose -f docker-compose.dev.yml up --build
 
 ```bash
 # Запустите web сервис в интерактивном режиме
-docker compose -f docker-compose.dev.yml run --rm --service-ports web
+docker compose run --rm --service-ports web
 ```
 
 ## Production Deployment
@@ -543,7 +547,6 @@ python scripts/verify_docker_setup.py
 
 #### Ручная проверка
 
-Подробное руководство по тестированию: **[CHECKPOINT_16_GUIDE.md](CHECKPOINT_16_GUIDE.md)**
 
 ### Запуск в Production
 
@@ -642,7 +645,7 @@ python tests/validate_tests.py
 - ✅ **Property 1**: Персистентность данных при перезапуске
 - ✅ **Property 4**: Автоматический перезапуск упавших контейнеров
 
-Подробная документация: [DOCKER_TESTING.md](DOCKER_TESTING.md)
+Подробная документация: [docs/DOCKER_TESTING.md](docs/DOCKER_TESTING.md)
 
 ### Мониторинг и логирование
 
@@ -697,7 +700,6 @@ docker inspect --format='{{.State.Health.Status}}' insurance_broker_web
 ```
 
 Подробная документация: [docs/MONITORING.md](docs/MONITORING.md)
-Быстрый справочник: [MONITORING_QUICK_REFERENCE.md](MONITORING_QUICK_REFERENCE.md)
 
 ### Переменные окружения
 
@@ -1410,7 +1412,6 @@ git push origin main
 
 **Документация:**
 - [GitHub Secrets Setup Guide](docs/GITHUB_SECRETS_SETUP.md) - Полное руководство по настройке
-- [GitHub Secrets Quick Reference](GITHUB_SECRETS_QUICK_REFERENCE.md) - Быстрая справка
 
 #### Workflow файл
 
@@ -1425,33 +1426,28 @@ Workflow настроен в `.github/workflows/deploy.yml` и включает:
 ### Документация
 
 #### Основная документация
-- [Deployment Guide](docs/DEPLOYMENT.md) - Полное руководство по развертыванию на Digital Ocean
-- [Permissions Guide](docs/PERMISSIONS_GUIDE.md) - 🆕 Полное руководство по управлению правами пользователей
-- [Quick Permissions Setup](docs/QUICK_PERMISSIONS_SETUP.md) - 🆕 Быстрая настройка прав (5 минут)
-
-#### Система экспорта
-- [User Guide](.kiro/specs/export-system/USER_GUIDE.md) - Руководство пользователя по системе экспорта
-- [Developer Guide](.kiro/specs/export-system/DEVELOPER_GUIDE.md) - Руководство разработчика по расширению системы экспорта
+- [Architecture](docs/architecture.md) - Архитектура и модель данных
+- [Initial Deployment Guide](docs/INITIAL_DEPLOYMENT_GUIDE.md) - Первичное развертывание
+- [Deployment Quick Reference](docs/DEPLOYMENT_QUICK_REFERENCE.md) - Быстрая справка по деплою (Timeweb)
+- [Users & Permissions](docs/USERS_AND_PERMISSIONS.md) - Пользователи и права доступа
+- [Notifications Pipeline](docs/NOTIFICATIONS_PIPELINE.md) - Telegram/VK уведомления, дайджест, health-check
 
 #### CI/CD и GitHub
 - [GitHub Secrets Setup](docs/GITHUB_SECRETS_SETUP.md) - Настройка секретов для CI/CD
-- [GitHub Secrets Quick Reference](GITHUB_SECRETS_QUICK_REFERENCE.md) - Быстрая справка по секретам
 
 #### Инфраструктура
-- [DNS Setup Guide](docs/DNS_SETUP.md) - Полное руководство по настройке DNS
-- [DNS Quick Reference](docs/DNS_QUICK_REFERENCE.md) - Быстрый справочник по DNS
+- [DNS & SSL Setup](docs/DNS_SSL_SETUP.md) - Настройка DNS и SSL
 - [SSL Setup Guide](nginx/SSL_SETUP.md) - Настройка SSL сертификатов
-- [Docker Compose Reference](DOCKER_COMPOSE_REFERENCE.md) - Справка по Docker Compose
+- [Docker Compose Reference](docs/DOCKER_COMPOSE_REFERENCE.md) - Справка по Docker Compose
 - [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) - Переменные окружения
 - [Email Communications Setup](docs/EMAIL_COMMUNICATIONS_SETUP.md) - Настройка почтового контура на Яндекс.Почте
 
 #### Мониторинг и обслуживание
 - [Monitoring Guide](docs/MONITORING.md) - Полное руководство по мониторингу и логированию
-- [Monitoring Quick Reference](MONITORING_QUICK_REFERENCE.md) - Быстрый справочник команд
 - [Backup & Restore Guide](docs/BACKUP_RESTORE.md) - Руководство по резервному копированию
 
 #### Тестирование и скрипты
-- [Docker Testing Guide](DOCKER_TESTING.md) - Руководство по интеграционным тестам
+- [Docker Testing Guide](docs/DOCKER_TESTING.md) - Руководство по интеграционным тестам
 - [Scripts Documentation](scripts/README.md) - Документация по скриптам
 
 ## Лицензия

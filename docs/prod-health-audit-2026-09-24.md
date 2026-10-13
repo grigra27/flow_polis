@@ -113,6 +113,14 @@
 - **Scope:** убедиться, что вход по ключу работает для всех нужных ключей (включая `deploy_key` из GitHub Actions), затем `PasswordAuthentication no`, `PermitRootLogin prohibit-password`. Сохранить открытую сессию до проверки нового входа.
 - **Риск:** Medium (можно потерять доступ — держать консоль Timeweb под рукой). **Downtime:** нет.
 - **Acceptance:** `ssh -o PreferredAuthentications=password polis` отклоняется; деплой из CI проходит.
+- **Сделано 2026-10-13:**
+  - Перед изменением: за 30 дней все успешные входы — по ключу; за всю историю журнала (с 2026-01-25) — 2 входа по паролю: 2026-08-11 14:22 и 15:58 с `89.110.72.234` (VPS VDSina, Амстердам), сессии 13 с и 82 с. Предварительных неудачных попыток с этого адреса нет; изменённых файлов в `/etc`, `/root`, cron, `authorized_keys` в это окно нет. Владелец считает, что входил сам; секреты не ротируем.
+  - Создан `/etc/ssh/sshd_config.d/00-hardening.conf` (имеет приоритет над `50-cloud-init.conf`, где `PasswordAuthentication yes`): `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`, `MaxAuthTries 3`, `X11Forwarding no`. Бэкап исходной конфигурации — `/root/ssh-backup-2026-10-13/`.
+  - Применено `systemctl reload ssh` под защитой 5-минутного автоотката; после проверки автооткат отменён.
+  - Проверено: вход по ключу работает; `ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no polis` → `Permission denied (publickey)`; `sshd -T` → `passwordauthentication no`, `permitrootlogin without-password`.
+  - Ключи в `authorized_keys` не менялись (оба ноутбука + `github-actions-deploy`).
+  - Запасной доступ: VNC-консоль Timeweb (вход root+пароль, sshd не затрагивает) или сброс пароля из панели. Пароль root владельцу неизвестен — при необходимости задать через `ssh -t polis passwd`. Откат: `rm /etc/ssh/sshd_config.d/00-hardening.conf && systemctl reload ssh`.
+  - Не проверено: деплой из CI — подтвердится при ближайшем пуше в `main`.
 
 ### H-08 — Порт 10050 (Zabbix agent) открыт для всего интернета
 - **Проблема:** `ufw`: `10050/tcp ALLOW Anywhere`, слушает `zabbix_agentd` на `0.0.0.0`. Вероятно, мониторинг хостера Timeweb.
@@ -237,7 +245,7 @@
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |
 | H-05 | Media-бэкап > лимита Telegram | P3 | Low | нет | открыто |
 | H-06 | Обновления ОС, reboot | P1 | Medium | **да** | открыто |
-| H-07 | SSH root+пароль | P1 | Medium | нет | открыто |
+| H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13** (CI-деплой — проверить при ближайшем пуше) |
 | H-08 | Zabbix 10050 открыт всем | P2 | Low | нет | ждёт Q-3 |
 | H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | открыто |
 | H-10 | journald 3 ГБ | P3 | Low | нет | открыто |

@@ -364,8 +364,10 @@ should read the rest of this section before assuming a "real" offsite copy
 exists.
 
 What actually happens after every successful backup: the archive is
-**mirrored** to VK (and to Telegram, when its network path is reachable —
-it currently is not; see P1-07) as a convenience/notification channel. This
+**mirrored** to VK and to Telegram (Telegram via the SOCKS5 tunnel since
+2026-09-24 — the direct path is blocked, see P1-07; files over Telegram's
+~45 MB bot limit, e.g. the weekly media archive, go to VK only and Telegram
+gets the caption as text) as a convenience/notification channel. This
 is deliberately **not** treated as storage by the backup status contract: a
 successful VK/Telegram delivery only ever sets `mirror=1` / `notify=1`, and
 **never** sets `offsite=1` — that field stays `null` permanently until an

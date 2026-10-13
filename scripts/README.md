@@ -601,9 +601,12 @@ See [docs/BACKUP_RESTORE.md](../docs/BACKUP_RESTORE.md) for complete backup and 
 > no independent offsite store (owner decision, `docs/prod-backup-improvement-backlog-2026-09-19.md`
 > P1-01…P1-04/P1-09, all `CANCELLED`); local retention is the actual safety
 > net. See [Backup Storage](../docs/BACKUP_RESTORE.md#backup-storage) for the
-> full picture, including known VK reliability. Telegram itself is currently
-> network-unreachable from the production host (P1-07) — VK is the channel
-> that actually delivers today.
+> full picture, including known VK reliability. Telegram is blocked on the
+> direct path from the production host (P1-07) and works through the SOCKS5
+> tunnel (`TELEGRAM_SOCKS5_PROXY`, `tg-relay-tunnel.service`) since
+> 2026-09-24; `system_health_check` warns when the tunnel is down (H-04).
+> VK and Telegram both deliver; VK stays the channel for files over
+> Telegram's size limit.
 
 #### telegram-config.sh
 
@@ -673,8 +676,8 @@ for `BACKUP_DIR`, `RETENTION_DAYS`, `MIN_RETAINED_BACKUPS`, `PRINT_ONLY`, etc.
 
 **Notifications:**
 - 🔄 Backup start notification (VK + Telegram, best effort)
-- ✅ Backup success with file mirror (delivered via VK today — Telegram is
-  network-unreachable from production, see P1-07)
+- ✅ Backup success with file mirror (VK + Telegram via SOCKS5 tunnel; files
+  over Telegram's limit — VK only, Telegram gets text)
 - ❌ Error notifications with details
 - 🧹 Cleanup results (skipped when `PRINT_ONLY=true`, see [Backup Retention](../docs/BACKUP_RESTORE.md#backup-retention))
 
@@ -706,8 +709,8 @@ for `BACKUP_DIR`, `RETENTION_DAYS`, `MIN_RETAINED_BACKUPS`, `PRINT_ONLY`, etc.
 
 **Notifications:**
 - 🔄 Backup start notification (VK + Telegram, best effort)
-- ✅ Backup success with file mirror (delivered via VK today — Telegram is
-  network-unreachable from production, see P1-07)
+- ✅ Backup success with file mirror (VK + Telegram via SOCKS5 tunnel; files
+  over Telegram's limit — VK only, Telegram gets text)
 - ❌ Error notifications with details
 - 🧹 Cleanup results (skipped when `PRINT_ONLY=true`, see [Backup Retention](../docs/BACKUP_RESTORE.md#backup-retention))
 

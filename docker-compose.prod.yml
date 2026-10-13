@@ -81,8 +81,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Healthcheck disabled - web container has no curl/wget/pgrep
-    # Application is monitored via nginx healthcheck instead
+    # H-13: в образе нет curl/wget — проверка на stdlib Python, напрямую
+    # в gunicorn (nginx отвечает на /health/ сам и Django не проверяет).
+    healthcheck:
+      test: ["CMD", "python", "-m", "apps.core.health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       driver: "json-file"
       options:

@@ -5,5 +5,6 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("health/", views.health, name="health"),
     re_path(r"^media/(?P<path>.*)$", views.serve_media_file, name="serve_media"),
 ]

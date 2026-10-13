@@ -26,7 +26,9 @@ DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
 # Sentry Configuration for Error Monitoring
-SENTRY_DSN = config("SENTRY_DSN", default="")
+# В тестах Sentry не инициализируем: иначе ожидаемые logger.exception из
+# тестов ошибочных сценариев уходят в боевой проект Sentry (DSN из .env).
+SENTRY_DSN = "" if RUNNING_TESTS else config("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration

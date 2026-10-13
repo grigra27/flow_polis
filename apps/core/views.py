@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
@@ -289,3 +290,12 @@ def serve_media_file(request, path):
     response["X-Content-Type-Options"] = "nosniff"
 
     return response
+
+
+def health(request):
+    """
+    Живость Django/gunicorn для Docker healthcheck и system_health_check (H-13).
+    Без логина и без обращений к БД: проверяет только, что воркер отвечает.
+    Снаружи недоступен — nginx отвечает на /health/ сам.
+    """
+    return HttpResponse("ok", content_type="text/plain")

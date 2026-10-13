@@ -259,7 +259,7 @@
 | H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **PASS / deployed** (наблюдение до ~2026-10-01) |
 | H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | **PASS (код, 2026-10-13)** — ждёт пуша/деплоя |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
-| H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |
+| H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | **п.1 PASS** (дайджест/бэкапы доходят в TG), **п.2 PASS (код, 2026-10-13)** — проверка `telegram proxy` в `system_health_check`; п.3 (тексты P1-06/P1-10 «Telegram мёртв») — открыто |
 | H-05 | Media-бэкап > лимита Telegram | P3 | Low | нет | открыто |
 | H-06 | Обновления ОС, reboot | P1 | Medium | **да** | **PASS / done 2026-10-13** |
 | H-07 | SSH root+пароль | P1 | Medium | нет | **PASS / deployed 2026-10-13** (CI-деплой — проверить при ближайшем пуше) |
@@ -268,7 +268,7 @@
 | H-10 | journald 3 ГБ | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-11 | rsync без `--delete`, лишние файлы на сервере | P2 | High | нет | открыто |
 | H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | **PASS (код, 2026-10-13)** — сняты с учёта, добавлены в `.gitignore`/`.dockerignore` |
-| H-13 | Нет реального healthcheck web | P2 | Low | нет | открыто |
+| H-13 | Нет реального healthcheck web | P2 | Low | нет | **PASS (код, 2026-10-13)** — `/health/` + Docker healthcheck + проверка `web` в `system_health_check` (critical → VK/TG); ждёт деплоя |
 | H-14 | `ssl_stapling` warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — удалены `ssl_stapling*` и `ssl_trusted_certificate`; `nginx -t` в боевом контейнере OK; ждёт деплоя |
 | H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | открыто |
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |

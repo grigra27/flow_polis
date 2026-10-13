@@ -75,6 +75,24 @@ class Command(BaseCommand):
             help="Проверить использование памяти",
         )
         parser.add_argument(
+            "--check-web",
+            action="store_true",
+            help=(
+                "Проверить, что gunicorn/Django отвечает на /health/ (H-13). "
+                "Запрос идёт напрямую на 127.0.0.1:8000 — команда должна "
+                "выполняться в web-контейнере (так её и зовёт cron)."
+            ),
+        )
+        parser.add_argument(
+            "--check-telegram-proxy",
+            action="store_true",
+            help=(
+                "Проверить SOCKS5-туннель до Telegram (H-04), если задан "
+                "TELEGRAM_SOCKS5_PROXY: без него Telegram молча перестаёт "
+                "получать сообщения (VK при этом работает)."
+            ),
+        )
+        parser.add_argument(
             "--check-backups",
             action="store_true",
             help=(
@@ -93,7 +111,7 @@ class Command(BaseCommand):
         checks_to_run = []
 
         if options["check_all"]:
-            checks_to_run = ["db", "disk", "memory", "backups"]
+            checks_to_run = ["db", "disk", "memory", "web", "telegram_proxy", "backups"]
         else:
             if options["check_db"]:
                 checks_to_run.append("db")
@@ -101,6 +119,10 @@ class Command(BaseCommand):
                 checks_to_run.append("disk")
             if options["check_memory"]:
                 checks_to_run.append("memory")
+            if options["check_web"]:
+                checks_to_run.append("web")
+            if options["check_telegram_proxy"]:
+                checks_to_run.append("telegram_proxy")
             if options["check_backups"]:
                 checks_to_run.append("backups")
 
@@ -109,6 +131,8 @@ class Command(BaseCommand):
                 "db",
                 "disk",
                 "memory",
+                "web",
+                "telegram_proxy",
                 "backups",
             ]  # По умолчанию все проверки
 
@@ -123,6 +147,10 @@ class Command(BaseCommand):
                 results["disk"] = self._check_disk_usage()
             elif check == "memory":
                 results["memory"] = self._check_memory_usage()
+            elif check == "web":
+                results["web"] = self._check_web()
+            elif check == "telegram_proxy":
+                results["telegram proxy"] = self._check_telegram_proxy()
             elif check == "backups":
                 results["backup db"] = self._check_backup_freshness(
                     label="DB backup",
@@ -261,6 +289,60 @@ class Command(BaseCommand):
                 "message": f"Database connection failed: {str(e)}",
                 "details": str(e),
             }
+
+    def _check_web(self):
+        """Проверяет, что gunicorn/Django отвечает (H-13)."""
+        from apps.core.health import probe_web
+
+        ok, detail = probe_web(timeout=10)
+        if ok:
+            return {
+                "status": "healthy",
+                "message": "Web (gunicorn) отвечает",
+                "details": detail,
+            }
+        return {
+            "status": "critical",
+            "message": "Web (gunicorn) не отвечает на /health/",
+            "details": detail,
+        }
+
+    def _check_telegram_proxy(self):
+        """
+        Проверяет SOCKS5-туннель до api.telegram.org (H-04). С 2026-04 по
+        2026-09 Telegram был недоступен, и это заметили только по отсутствию
+        сообщений. Любой HTTP-ответ от api.telegram.org через прокси значит,
+        что туннель жив. Сбой — warning: сайт работает, VK доставляет.
+        """
+        from decouple import config
+        import requests
+
+        socks_proxy = config("TELEGRAM_SOCKS5_PROXY", default="")
+        if not socks_proxy:
+            return {
+                "status": "healthy",
+                "message": "SOCKS5-прокси для Telegram не настроен — проверка пропущена",
+                "details": "TELEGRAM_SOCKS5_PROXY пуст",
+            }
+
+        try:
+            response = requests.get(
+                "https://api.telegram.org/",
+                proxies={"https": f"socks5h://{socks_proxy}"},
+                timeout=15,
+                allow_redirects=False,
+            )
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "warning",
+                "message": "Туннель до Telegram недоступен — сообщения уходят только в VK",
+                "details": f"{socks_proxy}: {e}",
+            }
+        return {
+            "status": "healthy",
+            "message": "Туннель до Telegram работает",
+            "details": f"{socks_proxy}: api.telegram.org ответил HTTP {response.status_code}",
+        }
 
     def _check_disk_usage(self):
         """Проверяет использование диска"""

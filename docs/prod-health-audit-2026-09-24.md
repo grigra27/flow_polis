@@ -81,6 +81,13 @@
 - **Риск:** Medium (центральная модель). **Downtime:** нет (обычный деплой).
 - **Acceptance:** тесты: (a) новый полис с платежами в неверном порядке → ошибка формы, не 500; (b) перестановка дат двух существующих платежей в корректный итог → сохраняется; (c) некорректный итог → ошибка формы. В `django.log` нет новых `Internal Server Error: /admin/policies/policy/...`.
 - **Rollback:** revert коммита.
+- **Сделано 2026-10-13 (код, не задеплоено):**
+  - Трейсбеки всех 5 случаев на проде подтверждают диагноз: `ValidationError` из `PaymentSchedule.save()` → `full_clean()` внутри `formset.save()`.
+  - `apps/policies/admin.py`: `PaymentScheduleInlineFormSet` — в `clean()` сортирует итоговый набор строк (без удаляемых, плюс строки полиса из БД, не показанные в formset) по `(year_number, installment_number)` и проверяет соседние пары; ошибка — `form.add_error()` на конкретное поле строки. Экземплярам форм ставится флаг `_date_sequence_checked_by_formset`, и `PaymentSchedule.clean()` пропускает построчную сверку с БД.
+  - `apps/policies/models.py`: сравнение дат вынесено в `PaymentSchedule.date_sequence_errors(previous_payment)`; правила и тексты ошибок не менялись. Вне админки (`save()` из кода/shell) проверка работает как раньше.
+  - Тесты `apps/policies/tests/test_payment_inline_date_sequence.py` (6): acceptance (a), (b), (c) + удаляемая строка не мешает + paid/insurer даты + проверка в модели вне formset. Без фикса 5 из 6 падают. Полный прогон: 432 passed.
+  - Побочный эффект: раньше построчная сверка с БД ложно отклоняла корректные правки (сдвиг нескольких дат раньше, удаление строки + добавление новой между) — теперь они сохраняются.
+  - После деплоя: следить, что в `django.log` нет новых `Internal Server Error: /admin/policies/policy/...`.
 
 ### H-03 — Email-напоминания об оплатах не запускаются на проде
 - **Проблема:** `apps/notifications/tasks.py` — `check_upcoming_payments` (7/3/1 день до даты) и `check_overdue_payments`. В `django_celery_beat.PeriodicTask` на проде только `celery.backend_cleanup`; в root crontab этих задач тоже нет; `CELERY_BEAT_SCHEDULE` в коде нет. Функция, описанная в CLAUDE.md, фактически не работает. SMTP при этом настроен (`EmailBackend=smtp`, `EMAIL_HOST` задан).
@@ -240,7 +247,7 @@
 | ID | Тема | Приоритет | Риск | Downtime | Статус |
 |---|---|---|---|---|---|
 | H-01 | Отсечь www/IP на nginx | P2 | Medium | нет | **PASS / deployed** (наблюдение до ~2026-10-01) |
-| H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | открыто |
+| H-02 | 500 в админке при сохранении графика платежей | **P1** | Medium | нет | **PASS (код, 2026-10-13)** — ждёт пуша/деплоя |
 | H-03 | Email-напоминания не запланированы | P1 | Medium | нет | ждёт Q-2 |
 | H-04 | Подтвердить Telegram через прокси + мониторинг туннеля + доки | P1 | Low | нет | открыто (проверка 2026-09-25) |
 | H-05 | Media-бэкап > лимита Telegram | P3 | Low | нет | открыто |

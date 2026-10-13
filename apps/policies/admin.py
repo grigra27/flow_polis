@@ -3,6 +3,7 @@ from django.contrib.admin.options import IS_POPUP_VAR
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Sum
+from django.forms.models import BaseInlineFormSet
 from django.template.response import TemplateResponse
 from django.utils.html import format_html
 from django.contrib.admin import SimpleListFilter
@@ -65,8 +66,61 @@ class InsuranceSumRangeFilter(SimpleListFilter):
         return queryset
 
 
+class PaymentScheduleInlineFormSet(BaseInlineFormSet):
+    """
+    H-02 (2026-10-13): порядок дат графика проверяется по ИТОГОВОМУ набору
+    строк (сохраняемые формы + удаляемые исключены), а не построчно против БД.
+
+    Раньше PaymentSchedule.save() вызывал full_clean() для каждой строки по
+    очереди: при создании полиса проверка на этапе формы пропускалась
+    (policy_id ещё None), а при правке нескольких строк промежуточное
+    состояние в БД нарушало порядок — в обоих случаях ValidationError
+    вылетал из save() и пользователь получал HTTP 500.
+    """
+
+    def _construct_form(self, i, **kwargs):
+        form = super()._construct_form(i, **kwargs)
+        form.instance._date_sequence_checked_by_formset = True
+        return form
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        rows = []
+        form_by_row = {}
+        for form in self.forms:
+            if not form.cleaned_data or self._should_delete_form(form):
+                continue
+            rows.append(form.instance)
+            form_by_row[id(form.instance)] = form
+
+        # Строки полиса, которых нет в formset (на случай, если inline
+        # показывает не все платежи) — участвуют в проверке как есть.
+        if self.instance.pk:
+            shown_pks = [f.instance.pk for f in self.initial_forms]
+            rows.extend(
+                PaymentSchedule.objects.filter(policy=self.instance).exclude(
+                    pk__in=shown_pks
+                )
+            )
+
+        rows.sort(key=lambda p: (p.year_number, p.installment_number))
+        for previous_payment, payment in zip(rows, rows[1:]):
+            errors = payment.date_sequence_errors(previous_payment)
+            if not errors:
+                continue
+            form = form_by_row.get(id(payment))
+            if form is None:
+                raise ValidationError(list(errors.values()))
+            for field, message in errors.items():
+                form.add_error(field, message)
+
+
 class PaymentScheduleInline(admin.TabularInline):
     model = PaymentSchedule
+    formset = PaymentScheduleInlineFormSet
     extra = 1
     fields = [
         "year_number",

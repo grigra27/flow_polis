@@ -401,6 +401,14 @@ class PaymentSchedule(TimeStampedModel):
         ):
             return
 
+        # H-02 (2026-10-13): в админке полиса порядок дат проверяет
+        # PaymentScheduleInlineFormSet.clean() по итоговому набору строк.
+        # Здесь сравнение идёт с тем, что УЖЕ лежит в БД, а formset сохраняет
+        # строки по одной — промежуточное состояние ломало проверку и
+        # ValidationError из save() превращался в HTTP 500.
+        if getattr(self, "_date_sequence_checked_by_formset", False):
+            return
+
         try:
             # Находим предыдущий платеж с защитой от race conditions
             previous_payment = (
@@ -420,37 +428,7 @@ class PaymentSchedule(TimeStampedModel):
             if not previous_payment:
                 return  # Это первый платеж, валидация не нужна
 
-            errors = {}
-
-            # Проверяем дату по договору
-            if self.due_date and previous_payment.due_date:
-                if self.due_date <= previous_payment.due_date:
-                    errors["due_date"] = (
-                        f"Дата платежа по договору ({self.due_date}) не может быть раньше или равна "
-                        f"дате предыдущего платежа ({previous_payment.due_date}). "
-                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                        f"Платеж {previous_payment.installment_number}."
-                    )
-
-            # Проверяем фактическую дату оплаты (только если обе даты заполнены)
-            if self.paid_date and previous_payment.paid_date:
-                if self.paid_date <= previous_payment.paid_date:
-                    errors["paid_date"] = (
-                        f"Фактическая дата оплаты ({self.paid_date}) не может быть раньше или равна "
-                        f"дате оплаты предыдущего платежа ({previous_payment.paid_date}). "
-                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                        f"Платеж {previous_payment.installment_number}."
-                    )
-
-            # Проверяем дату согласования СК (только если обе даты заполнены)
-            if self.insurer_date and previous_payment.insurer_date:
-                if self.insurer_date <= previous_payment.insurer_date:
-                    errors["insurer_date"] = (
-                        f"Дата согласования акта с СК ({self.insurer_date}) не может быть раньше или равна "
-                        f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
-                        f"Предыдущий платеж: Год {previous_payment.year_number}, "
-                        f"Платеж {previous_payment.installment_number}."
-                    )
+            errors = self.date_sequence_errors(previous_payment)
 
             if errors:
                 logger.warning(
@@ -475,6 +453,45 @@ class PaymentSchedule(TimeStampedModel):
                 f"Skipping date validation for payment due to error. "
                 f"Manual review recommended for policy {self.policy_id}"
             )
+
+    def date_sequence_errors(self, previous_payment):
+        """
+        Сравнивает даты платежа с датами предыдущего платежа графика.
+        Возвращает словарь {поле: сообщение}; пустой — если порядок верный.
+        """
+        errors = {}
+
+        # Проверяем дату по договору
+        if self.due_date and previous_payment.due_date:
+            if self.due_date <= previous_payment.due_date:
+                errors["due_date"] = (
+                    f"Дата платежа по договору ({self.due_date}) не может быть раньше или равна "
+                    f"дате предыдущего платежа ({previous_payment.due_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        # Проверяем фактическую дату оплаты (только если обе даты заполнены)
+        if self.paid_date and previous_payment.paid_date:
+            if self.paid_date <= previous_payment.paid_date:
+                errors["paid_date"] = (
+                    f"Фактическая дата оплаты ({self.paid_date}) не может быть раньше или равна "
+                    f"дате оплаты предыдущего платежа ({previous_payment.paid_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        # Проверяем дату согласования СК (только если обе даты заполнены)
+        if self.insurer_date and previous_payment.insurer_date:
+            if self.insurer_date <= previous_payment.insurer_date:
+                errors["insurer_date"] = (
+                    f"Дата согласования акта с СК ({self.insurer_date}) не может быть раньше или равна "
+                    f"дате согласования предыдущего платежа ({previous_payment.insurer_date}). "
+                    f"Предыдущий платеж: Год {previous_payment.year_number}, "
+                    f"Платеж {previous_payment.installment_number}."
+                )
+
+        return errors
 
     def save(self, *args, **kwargs):
         """Переопределяем save для вызова валидации"""

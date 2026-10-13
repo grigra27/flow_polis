@@ -219,6 +219,8 @@
 ### H-19 — Память: 2 ГБ впритык
 - **Проблема:** used 1.3/1.9 ГБ, в swap 245 МБ. Нет проблем сейчас, но экспорт больших Excel-отчётов или сборка образа во время деплоя на этом же хосте могут вызвать OOM.
 - **Scope:** наблюдение: добавить в `system_health_check` порог по swap (если его нет); при росте — ограничить `--concurrency` celery worker и число gunicorn-воркеров либо расширить тариф.
+- **Проверено 2026-10-13 (через 1.5 ч после reboot H-06):** RAM занято 1.1 ГБ, доступно 870 МБ; swap 1 МБ / 2 ГБ (до reboot было 676 МБ — накопилось за 295 дней); по контейнерам: web 286 МБ (3 gunicorn), celery_worker 163 МБ, celery_beat 100 МБ, прочие < 30 МБ, dockerd 150 МБ. OOM в журнале ядра с 2026-09-01 — 0; `/proc/pressure/memory` — нули.
+- **Сделано 2026-10-13:** в `_check_memory_usage` добавлен swap (warning > 50%, critical > 80%; итог — худший из RAM и swap; без swap — пропуск). Проверено, что `psutil` в web-контейнере видит swap хоста (2047 МБ). Тесты: `apps/core/tests/test_system_health_check_memory.py`. **Закрыто** — дальнейшее наблюдение выполняет `system_health_check` (cron каждые 30 мин, уведомление при смене статуса).
 - **Риск:** Low. **Downtime:** нет.
 
 ### H-20 — Актуализировать документацию
@@ -241,6 +243,8 @@
 | `Internal Server Error: /accounts/login/` (`MultiValueDictKeyError: 'next'` и др.) | 44 | 2026-04-19 |
 | `Internal Server Error: /policies/payments/` (`Field 'id' expected a number but got '5?status=paid'`) | 1 | 2026-04-16 |
 | `PaymentSchedule.clean()`: `Cannot use None as a query value` | 4 | 2026-09-14 — **исправлено** `d48f1a8` (P2-01) |
+
+**Проверено 2026-10-13** (`logs/django.log`, 2025-12-22 … 2026-10-13, 14 933 строки): ни одна из ошибок таблицы не повторилась — последние вхождения те же, что выше (`Cannot use None…` — 12 вхождений, последнее 2026-09-14, до фикса). ERROR по месяцам: апрель 59, май 32, июнь 48, июль 39, август 37, сентябрь 31 (почти всё — `Telegram network error: Network is unreachable`), октябрь 1. С 2026-09-24 (SOCKS5-туннель) — ни одного ERROR, кроме `Invalid HTTP_HOST '127.0.0.1:8000'` 2026-10-13 20:30 — это собственный проверочный запрос при настройке H-13 (без заголовка Host). **Закрыто:** ручная ежемесячная проверка не нужна — новые ERROR уходят в TG/VK (`TelegramHandler`) и Sentry в реальном времени.
 
 ### H-22 — Справка: закрытые/проверенные пункты (без действий)
 - **Ставка КВ Югория × КАСКО:** предупреждения `Commission rate not found … insurer=17, insurance_type=1` (последнее 2026-09-17) — **уже закрыто** в P2-02 (ставка 30 % добавлена 2026-09-23, проверено на проде: у insurer 17 есть ставки для типов 1–4). Новых предупреждений быть не должно — сверить в рамках H-21.
@@ -285,7 +289,7 @@
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — задеплоено 2026-10-13 |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | **PASS (код, 2026-10-13)** — источник: шаг «Fixing migration conflicts» в deploy.yml (`psql -U postgres -d insurance_broker`); заменено на `$POSTGRES_USER`/`$POSTGRES_DB`. Строки `0011_alter_paymentschedule_unique_together` в проде нет — DELETE остаётся no-op |
-| H-19 | Память 2 ГБ впритык | P3 | Low | нет | наблюдение |
+| H-19 | Память 2 ГБ впритык | P3 | Low | нет | **ЗАКРЫТО 2026-10-13** — RAM 1.1/1.9 ГБ, swap ~0 после reboot, OOM с 09-01 нет, PSI 0; swap добавлен в `system_health_check` (warning >50%, critical >80%) — наблюдение автоматическое |
 | H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **частично (2026-10-13)**: CLAUDE.md, триггер daily_digest, P1-05/P1-08 закрыты; комментарий в compose — вместе с H-13 |
-| H-21 | Контроль невозврата исторических ошибок | P3 | Low | нет | наблюдение |
+| H-21 | Контроль невозврата исторических ошибок | P3 | Low | нет | **ЗАКРЫТО 2026-10-13** — ни одна не повторилась; с 2026-09-24 в `django.log` ни одного ERROR (кроме собственного теста H-13); новые ERROR и так уходят в TG/VK/Sentry в реальном времени |
 | H-22 | Справка: КВ Югория, брутфорс, CSRF-шум | — | — | — | закрыто |

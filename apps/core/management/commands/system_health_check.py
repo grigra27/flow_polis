@@ -398,10 +398,31 @@ class Command(BaseCommand):
                 status = "healthy"
                 message = f"Memory usage normal: {used_percent:.1f}% used"
 
+            details = f"{used_gb:.1f}GB used / {total_gb:.1f}GB total ({available_gb:.1f}GB available)"
+
+            # H-19 (2026-10-13): на хосте 2 ГБ RAM, swap медленно копится
+            # (676 МБ за 295 дней аптайма) — ранний признак утечки, который
+            # по одной RAM не виден. Итоговый статус — худший из двух.
+            swap = psutil.swap_memory()
+            if swap.total:
+                swap_used_mb = swap.used / (1024**2)
+                swap_total_mb = swap.total / (1024**2)
+                details += f"; swap {swap_used_mb:.0f}MB / {swap_total_mb:.0f}MB ({swap.percent:.0f}%)"
+                if swap.percent > 80:
+                    swap_status = "critical"
+                elif swap.percent > 50:
+                    swap_status = "warning"
+                else:
+                    swap_status = "healthy"
+                severity = {"healthy": 0, "warning": 1, "critical": 2}
+                if severity[swap_status] > severity[status]:
+                    status = swap_status
+                    message = f"Swap usage {'critical' if swap_status == 'critical' else 'high'}: {swap.percent:.0f}% used"
+
             return {
                 "status": status,
                 "message": message,
-                "details": f"{used_gb:.1f}GB used / {total_gb:.1f}GB total ({available_gb:.1f}GB available)",
+                "details": details,
             }
 
         except Exception as e:

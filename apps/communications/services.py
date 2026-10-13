@@ -16,6 +16,8 @@ from .models import (
     OutboundEmailAttachment,
     OutboundEmailRecipient,
 )
+from apps.core.notifications import send_to_all, trim_with_middle_ellipsis
+
 from .providers.smtp import SmtpEmailProvider
 from .validators import validate_outbound_attachment
 
@@ -302,6 +304,7 @@ def _mark_email_failed_after_enqueue(email_id, exc):
         failed_email.save(
             update_fields=["status", "failed_at", "last_error", "updated_at"]
         )
+        _notify_email_failed_on_commit(email_id)
 
 
 def send_outbound_email_now(email_id):
@@ -504,6 +507,7 @@ def _mark_email_failed_before_attempt(email_id, error_message):
             email.save(
                 update_fields=["status", "failed_at", "last_error", "updated_at"]
             )
+            _notify_email_failed_on_commit(email_id)
     except OutboundEmail.DoesNotExist:
         return
     except Exception:
@@ -531,6 +535,34 @@ def _mark_email_failed(email_id, attempt_id, error_message):
                 "updated_at",
             ]
         )
+        _notify_email_failed_on_commit(email_id)
+
+
+def _notify_email_failed_on_commit(email_id):
+    """Сообщить в VK/Telegram о письме, перешедшем в failed (после commit).
+
+    До 2026-10 о неотправленных письмах никто не узнавал: ошибки писались
+    только в лог Celery worker'а (он не попадает в django.log и теряется
+    при деплое), и сбой SMTP с 28.08 оставался незамеченным почти месяц.
+    """
+    transaction.on_commit(lambda: _notify_email_failed(email_id))
+
+
+def _notify_email_failed(email_id):
+    # Уведомление — побочный эффект: его сбой не должен влиять на отправку
+    # писем и на статус, который уже зафиксирован.
+    try:
+        email = OutboundEmail.objects.get(pk=email_id)
+        text = (
+            "📧❌ Письмо не отправлено\n"
+            f"#{email.id} · {email.get_kind_display()}\n"
+            f"Тема: {trim_with_middle_ellipsis(email.subject, 200)}\n"
+            f"Ошибка: {trim_with_middle_ellipsis(email.last_error, 400)}\n"
+            f"https://polis.insflow.ru/admin/communications/outboundemail/{email.id}/change/"
+        )
+        send_to_all(text)
+    except Exception:
+        logger.exception("Failed to notify about failed outbound email %s", email_id)
 
 
 def _settings_from_email():

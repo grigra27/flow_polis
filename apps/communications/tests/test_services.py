@@ -366,3 +366,84 @@ def test_retry_outbound_email_rejects_non_failed_email(billing_task, superuser):
 
     with pytest.raises(CommunicationsQueueError):
         retry_outbound_email(email, user=superuser)
+
+
+def _queued_email(billing_task, superuser):
+    email = _create_email(billing_task, superuser)
+    email.status = OutboundEmail.STATUS_QUEUED
+    email.sent_by = superuser
+    email.save(update_fields=["status", "sent_by", "updated_at"])
+    return email
+
+
+@pytest.mark.django_db
+def test_failed_send_notifies_vk_and_telegram_once(
+    billing_task, superuser, monkeypatch
+):
+    class Provider:
+        def send(self, outbound_email):
+            raise RuntimeError("smtp unavailable")
+
+    sent = []
+    monkeypatch.setattr(
+        "apps.communications.services.get_provider", lambda account: Provider()
+    )
+    monkeypatch.setattr(
+        "apps.communications.services.send_to_all", lambda text: sent.append(text)
+    )
+    email = _queued_email(billing_task, superuser)
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        with pytest.raises(CommunicationsSendError):
+            send_outbound_email_now(email.id)
+
+    assert len(sent) == 1
+    assert f"#{email.id}" in sent[0]
+    assert "smtp unavailable" in sent[0]
+    assert f"/admin/communications/outboundemail/{email.id}/change/" in sent[0]
+
+
+@pytest.mark.django_db
+def test_successful_send_does_not_notify(billing_task, superuser, monkeypatch):
+    class Provider:
+        def send(self, outbound_email):
+            return SendResult(success=True, provider_message_id="x", response="ok")
+
+    sent = []
+    monkeypatch.setattr(
+        "apps.communications.services.get_provider", lambda account: Provider()
+    )
+    monkeypatch.setattr(
+        "apps.communications.services.send_to_all", lambda text: sent.append(text)
+    )
+    email = _queued_email(billing_task, superuser)
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        send_outbound_email_now(email.id)
+
+    assert sent == []
+
+
+@pytest.mark.django_db
+def test_notification_failure_does_not_break_failed_status(
+    billing_task, superuser, monkeypatch
+):
+    class Provider:
+        def send(self, outbound_email):
+            raise RuntimeError("smtp unavailable")
+
+    def broken_send_to_all(text):
+        raise RuntimeError("vk down")
+
+    monkeypatch.setattr(
+        "apps.communications.services.get_provider", lambda account: Provider()
+    )
+    monkeypatch.setattr("apps.communications.services.send_to_all", broken_send_to_all)
+    email = _queued_email(billing_task, superuser)
+
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        with pytest.raises(CommunicationsSendError):
+            send_outbound_email_now(email.id)
+
+    email.refresh_from_db()
+    assert email.status == OutboundEmail.STATUS_FAILED

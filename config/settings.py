@@ -164,7 +164,6 @@ INSTALLED_APPS = [
     "apps.clients",
     "apps.insurers",
     "apps.policies",
-    "apps.notifications",
     "apps.communications",
     "apps.reports",
     "apps.analytics",

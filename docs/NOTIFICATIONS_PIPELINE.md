@@ -100,7 +100,7 @@
 
 **Триггер**: management command. Запускается через `python manage.py daily_digest`. Аргументы: `--date YYYY-MM-DD`, `--test` (последние 2 ч), `--no-telegram`, `--no-vk`.
 
-**Должна** запускаться через Celery beat ежедневно (но я не нашёл записи в `django_celery_beat.PeriodicTask` — либо через системный cron, либо вручную).
+Запускается системным cron на сервере (root crontab): ежедневно в 06:00 МСК, `docker-compose -f docker-compose.prod.yml exec -T web python manage.py daily_digest >> logs/daily-digest.log`. Через Celery beat не планируется.
 
 **Что собирает**:
 - `_get_logins_data()` — успешные/неуспешные логины из `LoginAttempt`

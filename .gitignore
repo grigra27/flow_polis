@@ -88,4 +88,8 @@ backups/
 # Hypothesis testing
 .hypothesis/
 
+# Coverage
+.coverage
+.coverage.*
+
 fixtures/

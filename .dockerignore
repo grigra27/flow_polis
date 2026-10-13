@@ -49,6 +49,7 @@ docs/
 # Tests
 .pytest_cache/
 .coverage
+.hypothesis/
 htmlcov/
 .tox/
 

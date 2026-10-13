@@ -298,6 +298,9 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+# Явно: повторять подключение к брокеру при старте worker'а (Celery 6
+# перестанет выводить это из broker_connection_retry — H-17).
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # Email Configuration
 EMAIL_BACKEND = config(

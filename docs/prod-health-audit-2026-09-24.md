@@ -267,14 +267,14 @@
 | H-09 | Мусор Docker ~19 ГБ, 232 dangling-тома | P2 | Medium | нет | **разовая чистка done 2026-10-13**; шаг в deploy.yml — открыто |
 | H-10 | journald 3 ГБ | P3 | Low | нет | **PASS / done 2026-10-13** |
 | H-11 | rsync без `--delete`, лишние файлы на сервере | P2 | High | нет | открыто |
-| H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | открыто |
+| H-12 | `.coverage`/`.hypothesis`/`Ожидается` в git | P3 | Low | нет | **PASS (код, 2026-10-13)** — сняты с учёта, добавлены в `.gitignore`/`.dockerignore` |
 | H-13 | Нет реального healthcheck web | P2 | Low | нет | открыто |
-| H-14 | `ssl_stapling` warning | P3 | Low | нет | открыто |
+| H-14 | `ssl_stapling` warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — удалены `ssl_stapling*` и `ssl_trusted_certificate`; `nginx -t` в боевом контейнере OK; ждёт деплоя |
 | H-15 | nginx-логи эфемерны, без `$host`; `nginx.conf` не смонтирован | P2 | Low | нет | открыто |
 | H-16 | Redis overcommit | P3 | Low | нет | **PASS / done 2026-10-13** |
-| H-17 | Celery deprecation warning | P3 | Low | нет | открыто |
+| H-17 | Celery deprecation warning | P3 | Low | нет | **PASS (код, 2026-10-13)** — ждёт деплоя |
 | H-18 | FATAL `database "insurance_broker" does not exist` | P3 | Low | нет | открыто |
 | H-19 | Память 2 ГБ впритык | P3 | Low | нет | наблюдение |
-| H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | открыто |
+| H-20 | Документация (CLAUDE.md, NOTIFICATIONS_PIPELINE, backlog, compose) | P2 | Low | нет | **частично (2026-10-13)**: CLAUDE.md, триггер daily_digest, P1-05/P1-08 закрыты; комментарий в compose — вместе с H-13 |
 | H-21 | Контроль невозврата исторических ошибок | P3 | Low | нет | наблюдение |
 | H-22 | Справка: КВ Югория, брутфорс, CSRF-шум | — | — | — | закрыто |

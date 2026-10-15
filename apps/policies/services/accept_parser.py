@@ -112,12 +112,24 @@ REQUIRED_FIELDS = {
 }
 
 
-def parse_accept_file(uploaded_file) -> AcceptParseResult:
-    parser = AcceptParser()
+# ОСАГО: вид страхования не берётся из акцепта (всегда «ОСАГО»), срок
+# считается от даты начала — окончание лизинга не обязательно.
+OSAGO_REQUIRED_FIELDS = {
+    key: label
+    for key, label in REQUIRED_FIELDS.items()
+    if key not in ("insurance_type_name", "end_date")
+}
+
+
+def parse_accept_file(uploaded_file, osago=False) -> AcceptParseResult:
+    parser = AcceptParser(osago=osago)
     return parser.parse(uploaded_file)
 
 
 class AcceptParser:
+    def __init__(self, osago=False):
+        self.osago = osago
+
     def parse(self, uploaded_file) -> AcceptParseResult:
         filename = getattr(uploaded_file, "name", "")
         suffix = Path(filename).suffix.lower()
@@ -176,7 +188,8 @@ class AcceptParser:
 
         warnings = list(sheet_warnings)
         warnings.extend(self._build_missing_field_warnings(data))
-        if data.purchase_price is None:
+        # У ОСАГО нет страховой суммы — стоимость по ДКП не нужна.
+        if data.purchase_price is None and not self.osago:
             warnings.append("Стоимость по ДКП не распознана как число.")
         if not data.start_date:
             warnings.append("Дата начала страхования в акцепте не заполнена.")
@@ -286,7 +299,8 @@ class AcceptParser:
     def _build_missing_field_warnings(self, data):
         warnings = []
         session_data = data.to_session_dict()
-        for field_name, label in REQUIRED_FIELDS.items():
+        required = OSAGO_REQUIRED_FIELDS if self.osago else REQUIRED_FIELDS
+        for field_name, label in required.items():
             if not session_data.get(field_name):
                 warnings.append(f"Обязательное поле акцепта не найдено: {label}.")
         return warnings

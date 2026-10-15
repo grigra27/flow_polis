@@ -1,11 +1,12 @@
 import re
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 
 from apps.clients.models import Client
-from apps.insurers.models import Branch, InsuranceType
-from apps.policies.models import Policy
+from apps.insurers.models import Branch, InsuranceType, get_osago_insurance_type
+from apps.policies.models import Policy, add_years
 
 
 ACCEPT_IMPORT_SESSION_KEY = "policy_accept_imports"
@@ -34,8 +35,12 @@ class AcceptResolvedData:
     warnings: list[str] = field(default_factory=list)
     resolved: dict = field(default_factory=dict)
 
+    osago: bool = False
+
     def to_session_payload(self, parsed_data):
         return {
+            # Признак раздела: акцепт ОСАГО не предзаполняет форму КАСКО и наоборот.
+            "osago": self.osago,
             "parsed": parsed_data.to_session_dict(),
             "policy_initial": self.policy_initial,
             "payment_initial": self.payment_initial,
@@ -44,12 +49,22 @@ class AcceptResolvedData:
         }
 
 
-def resolve_accept_data(parsed_data, parser_warnings=None):
-    resolver = AcceptResolver()
+def resolve_accept_data(parsed_data, parser_warnings=None, osago=False):
+    resolver = AcceptResolver(osago=osago)
     return resolver.resolve(parsed_data, parser_warnings=parser_warnings or [])
 
 
 class AcceptResolver:
+    """Сопоставляет акцепт со справочниками.
+
+    osago=True — полис ОСАГО из того же акцепта: вид страхования всегда
+    «ОСАГО» (форма раздела подставляет его сама), срок — год от даты начала,
+    но не дольше лизинга, платёж без страховой суммы.
+    """
+
+    def __init__(self, osago=False):
+        self.osago = osago
+
     def resolve(self, parsed_data, parser_warnings=None):
         warnings = list(parser_warnings or [])
         policy_initial = {}
@@ -64,7 +79,9 @@ class AcceptResolver:
             policy_initial["property_year"] = parsed_data.property_year
         if parsed_data.start_date:
             policy_initial["start_date"] = parsed_data.start_date.isoformat()
-        if parsed_data.end_date:
+        if self.osago:
+            self._resolve_osago_term(parsed_data, policy_initial, warnings, resolved)
+        elif parsed_data.end_date:
             policy_initial["end_date"] = parsed_data.end_date.isoformat()
 
         client = self._resolve_client(parsed_data, warnings, resolved)
@@ -82,9 +99,14 @@ class AcceptResolver:
                 "label": parsed_data.policyholder_text,
             }
 
-        insurance_type = self._resolve_insurance_type(parsed_data, warnings, resolved)
-        if insurance_type:
-            policy_initial["insurance_type"] = insurance_type.pk
+        if self.osago:
+            self._resolve_osago_kind(parsed_data, warnings, resolved)
+        else:
+            insurance_type = self._resolve_insurance_type(
+                parsed_data, warnings, resolved
+            )
+            if insurance_type:
+                policy_initial["insurance_type"] = insurance_type.pk
 
         branch = self._resolve_branch(parsed_data, warnings, resolved)
         if branch:
@@ -94,7 +116,9 @@ class AcceptResolver:
         if vin_number:
             policy_initial["vin_number"] = vin_number
 
-        if parsed_data.purchase_price is not None:
+        if self.osago:
+            self._resolve_osago_payment(parsed_data, payment_initial, resolved)
+        elif parsed_data.purchase_price is not None:
             payment_initial.update(
                 {
                     "year_number": 1,
@@ -118,7 +142,70 @@ class AcceptResolver:
             payment_initial=payment_initial,
             warnings=warnings,
             resolved=resolved,
+            osago=self.osago,
         )
+
+    def _resolve_osago_term(self, parsed_data, policy_initial, warnings, resolved):
+        start = parsed_data.start_date
+        if not start:
+            warnings.append(
+                "Срок полиса ОСАГО не рассчитан: в акцепте нет даты начала."
+            )
+            resolved["term"] = {"status": "manual", "label": ""}
+            return
+        # 21.10.2026 → 20.10.2027; с 29 февраля — до 28 февраля следующего года.
+        end = add_years(start, 1)
+        if (start.month, start.day) != (2, 29):
+            end -= timedelta(days=1)
+        lease_end = parsed_data.end_date
+        if lease_end and start <= lease_end < end:
+            end = lease_end
+            note = " (до окончания лизинга)"
+        else:
+            note = ""
+        policy_initial["end_date"] = end.isoformat()
+        resolved["term"] = {
+            "status": "matched",
+            "label": f"{start:%d.%m.%Y} – {end:%d.%m.%Y}{note}",
+        }
+
+    def _resolve_osago_kind(self, parsed_data, warnings, resolved):
+        osago_type = get_osago_insurance_type()
+        if osago_type is None:
+            warnings.append("В справочнике нет вида страхования с признаком «ОСАГО».")
+            resolved["insurance_type"] = {"status": "manual", "label": "ОСАГО"}
+        else:
+            resolved["insurance_type"] = {
+                "status": "matched",
+                "label": osago_type.name,
+            }
+
+        osago_flag = (parsed_data.osago or "").strip()
+        if osago_flag.lower() != "да":
+            warnings.append(
+                f"В акцепте в поле «ОСАГО» указано «{osago_flag or 'пусто'}», "
+                "а не «да». Проверьте, что ОСАГО действительно нужно."
+            )
+
+        if parsed_data.dfa_number:
+            existing = list(
+                Policy.objects.osago()
+                .filter(dfa_number__iexact=parsed_data.dfa_number)
+                .values_list("policy_number", flat=True)
+            )
+            if existing:
+                warnings.append(
+                    f"По ДФА {parsed_data.dfa_number} уже есть полис ОСАГО: "
+                    f"{', '.join(existing)}."
+                )
+
+    def _resolve_osago_payment(self, parsed_data, payment_initial, resolved):
+        if parsed_data.start_date:
+            payment_initial["due_date"] = parsed_data.start_date.isoformat()
+        resolved["payment_schedule"] = {
+            "status": "partial",
+            "label": "Один платёж с датой начала полиса; премию и КВ внесите вручную.",
+        }
 
     def _resolve_client(self, parsed_data, warnings, resolved):
         if not parsed_data.client_inn:

@@ -326,10 +326,17 @@ class PolicyAdmin(admin.ModelAdmin):
             path(
                 "import-accept/",
                 self.admin_site.admin_view(self.import_accept_view),
-                name="policies_policy_import_accept",
+                name=self._admin_url_name("import_accept"),
             ),
         ]
         return custom_urls + urls
+
+    def _admin_url_name(self, action):
+        """policies_policy_<action> / policies_osagopolicy_<action>."""
+        return f"{self.opts.app_label}_{self.opts.model_name}_{action}"
+
+    def _accept_title(self, title):
+        return f"{title} (ОСАГО)" if self.osago_section else title
 
     def import_accept_view(self, request):
         if not self.has_add_permission(request):
@@ -339,10 +346,13 @@ class PolicyAdmin(admin.ModelAdmin):
             form = AcceptUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 try:
-                    parse_result = parse_accept_file(form.cleaned_data["accept_file"])
+                    parse_result = parse_accept_file(
+                        form.cleaned_data["accept_file"], osago=self.osago_section
+                    )
                     resolved = resolve_accept_data(
                         parse_result.data,
                         parser_warnings=parse_result.warnings,
+                        osago=self.osago_section,
                     )
                 except ValidationError as exc:
                     form.add_error("accept_file", exc.messages[0])
@@ -351,13 +361,16 @@ class PolicyAdmin(admin.ModelAdmin):
                     token = self._store_accept_import_payload(request, payload)
                     context = {
                         **self.admin_site.each_context(request),
-                        "title": "Проверка акцепта",
+                        "title": self._accept_title("Проверка акцепта"),
                         "opts": self.model._meta,
                         "token": token,
                         "payload": payload,
                         "parsed_rows": self._build_accept_parsed_rows(payload),
                         "resolved_rows": self._build_accept_resolved_rows(payload),
-                        "add_url": f"{reverse('admin:policies_policy_add')}?accept_token={token}",
+                        "add_url": (
+                            f"{reverse('admin:' + self._admin_url_name('add'))}"
+                            f"?accept_token={token}"
+                        ),
                     }
                     return TemplateResponse(
                         request,
@@ -369,7 +382,7 @@ class PolicyAdmin(admin.ModelAdmin):
 
         context = {
             **self.admin_site.each_context(request),
-            "title": "Загрузить акцепт",
+            "title": self._accept_title("Загрузить акцепт"),
             "opts": self.model._meta,
             "form": form,
         }
@@ -451,11 +464,15 @@ class PolicyAdmin(admin.ModelAdmin):
         if not token:
             return None
         imports = request.session.get(ACCEPT_IMPORT_SESSION_KEY, {})
-        return imports.get(token)
+        payload = imports.get(token)
+        # Акцепт, разобранный для другого раздела, форму не предзаполняет.
+        if payload and bool(payload.get("osago")) != self.osago_section:
+            return None
+        return payload
 
     def _build_accept_parsed_rows(self, payload):
         parsed = payload.get("parsed", {})
-        return [
+        rows = [
             ("Файл", parsed.get("source_filename")),
             ("Номер ДФА", parsed.get("dfa_number")),
             ("Дата ДФА", parsed.get("dfa_date")),
@@ -472,6 +489,11 @@ class PolicyAdmin(admin.ModelAdmin):
             ("Стоимость по ДКП", parsed.get("purchase_price")),
             ("Банк-кредитор", parsed.get("bank")),
         ]
+        if payload.get("osago"):
+            # У ОСАГО нет страховой суммы, а «Вид страхования» акцепта — про КАСКО.
+            hidden = {"Стоимость по ДКП", "Вид страхования"}
+            rows = [row for row in rows if row[0] not in hidden]
+        return rows
 
     def _build_accept_resolved_rows(self, payload):
         resolved = payload.get("resolved", {})
@@ -484,6 +506,9 @@ class PolicyAdmin(admin.ModelAdmin):
             "vin_number": "VIN/ID",
             "payment_schedule": "График платежей",
         }
+        if payload.get("osago"):
+            labels["term"] = "Срок полиса"
+            labels["payment_schedule"] = "Платёж"
         for key, label in labels.items():
             item = resolved.get(key, {})
             rows.append(
@@ -742,8 +767,6 @@ class OsagoPolicyForm(forms.ModelForm):
 class OsagoPolicyAdmin(PolicyAdmin):
     osago_section = True
     form = OsagoPolicyForm
-    # Стандартный список: без кнопки «Загрузить акцепт» (импорт — для КАСКО).
-    change_list_template = None
 
     list_filter = [
         "policy_active",
@@ -813,10 +836,6 @@ class OsagoPolicyAdmin(PolicyAdmin):
         ("Страховщик", {"fields": ("insurer",)}),
     )
     inlines = [OsagoPaymentInline, PolicyInfoInline]
-
-    def get_urls(self):
-        # Без import-accept: импорт акцепта создаёт обычные полисы.
-        return admin.ModelAdmin.get_urls(self)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "insurance_type":

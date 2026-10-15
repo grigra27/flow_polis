@@ -380,3 +380,11 @@ class TestPermissions:
         client.force_login(self._staff("view_paymentschedule"))
 
         assert client.get(reverse(OSAGO_ADD_URL)).status_code == 403
+
+
+@pytest.mark.parametrize("url_name", [OSAGO_ADD_URL, POLICY_ADD_URL])
+def test_commission_script_url_is_versioned(admin_client, osago_type, url_name):
+    """Nginx кэширует статику на 30 дней: адрес скрипта КВ несёт версию."""
+    html = admin_client.get(reverse(url_name)).content.decode()
+
+    assert 'src="/static/policies/js/auto_commission_rate.js?v=' in html

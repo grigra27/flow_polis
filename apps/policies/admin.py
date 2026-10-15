@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.options import IS_POPUP_VAR
 from django.contrib import messages
@@ -143,6 +144,14 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
         return found
 
 
+# Nginx отдаёт статику с кэшем на 30 дней и без хэша в имени: при правке
+# скрипта меняйте версию, иначе браузеры сотрудников возьмут старый файл.
+# Полный путь: static() закодировал бы «?» в %3F.
+AUTO_COMMISSION_RATE_JS = (
+    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-10-15"
+)
+
+
 class OsagoPaymentInlineFormSet(PaymentScheduleInlineFormSet):
     """Единственный платёж ОСАГО: год 1, платёж 1, без страховой суммы."""
 
@@ -175,7 +184,7 @@ class PaymentScheduleInline(admin.TabularInline):
     class Media:
         js = (
             "policies/js/copy_payment_inline.js",
-            "policies/js/auto_commission_rate.js",
+            AUTO_COMMISSION_RATE_JS,
             "policies/js/validate_payment_dates.js",
         )
         css = {
@@ -206,7 +215,7 @@ class OsagoPaymentInline(admin.TabularInline):
     ]
 
     class Media:
-        js = ("policies/js/auto_commission_rate.js",)
+        js = (AUTO_COMMISSION_RATE_JS,)
         css = {"all": ("policies/css/auto_commission_rate.css",)}
 
 

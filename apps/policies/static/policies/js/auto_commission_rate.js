@@ -18,6 +18,10 @@
 
         var $ = django.jQuery;
 
+        // Последняя полученная ставка: по ней КВ пересчитывается и при вводе
+        // премии уже после выбора СК.
+        var currentKvPercent = null;
+
         $(document).ready(function() {
             initAutoCommissionRate();
         });
@@ -41,6 +45,14 @@
                 updateCommissionRates();
             });
 
+            // Премия введена или изменена после выбора СК — пересчитать КВ строки.
+            $(document).on('input change', '.dynamic-payment_schedule input[name$="-amount"]', function() {
+                if (currentKvPercent === null) {
+                    return;
+                }
+                recalculateKvRub($(this).closest('.dynamic-payment_schedule'), currentKvPercent);
+            });
+
             // Also handle when new payment rows are added
             $(document).on('formset:added', function(event, $row, formsetName) {
                 if (formsetName === 'payment_schedule') {
@@ -59,6 +71,7 @@
 
             // Both fields must be selected
             if (!insurerId || !insuranceTypeId) {
+                currentKvPercent = null;
                 console.log('Не выбран страховщик или вид страхования');
                 return;
             }
@@ -73,12 +86,14 @@
                 },
                 success: function(response) {
                     if (response.success) {
+                        currentKvPercent = response.kv_percent;
                         applyCommissionRateToAllRows(
                             response.commission_rate_id,
                             response.kv_percent,
                             response.display_name
                         );
                     } else {
+                        currentKvPercent = null;
                         console.warn('Ставка комиссии не найдена:', response.error);
                         showNotification('warning', response.error);
                     }
@@ -91,20 +106,11 @@
         }
 
         function applyCommissionRateToAllRows(commissionRateId, kvPercent, displayName) {
-            // Find all payment schedule rows
-            var $inlineGroup = $('.inline-group').filter(function() {
-                return $(this).find('h2').text().indexOf('График платежей') !== -1 ||
-                       $(this).find('h2').text().indexOf('Payment') !== -1;
-            });
-
-            if ($inlineGroup.length === 0) {
-                return;
-            }
-
+            // Строки платежей ищем по префиксу формсета, а не по заголовку блока:
+            // у ОСАГО он другой («Платёж по полису ОСАГО»).
             var updatedCount = 0;
 
-            // Update each row
-            $inlineGroup.find('.dynamic-payment_schedule').each(function() {
+            $('.dynamic-payment_schedule').each(function() {
                 var $row = $(this);
 
                 // Skip empty form template and deleted rows

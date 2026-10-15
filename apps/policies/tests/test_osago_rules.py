@@ -161,6 +161,18 @@ class TestPaymentClean:
             )
         assert "kv_rub" in exc.value.message_dict
 
+    @pytest.mark.parametrize("kv_rub", ["1234.57", "1234.56"])
+    def test_kv_rounded_from_ten_percent_is_valid(self, osago_policy, kv_rub):
+        """10% от 12 345,67 = 1 234,567: копеечное округление не блокирует."""
+        make_payment(osago_policy, amount=Decimal("12345.67"), kv_rub=Decimal(kv_rub))
+
+    def test_kv_above_rounded_limit_is_rejected(self, osago_policy):
+        with pytest.raises(ValidationError) as exc:
+            make_payment(
+                osago_policy, amount=Decimal("12345.67"), kv_rub=Decimal("1234.58")
+            )
+        assert "1234.57 руб." in exc.value.message_dict["kv_rub"][0]
+
     def test_rules_apply_on_admin_formset_path(self, osago_policy):
         """Флаг formset (H-02) отключает только проверку порядка дат."""
         payment = PaymentSchedule(

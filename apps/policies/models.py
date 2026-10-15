@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from apps.core.models import TimeStampedModel
 from apps.clients.models import Client
 from apps.insurers.models import (
@@ -560,15 +560,18 @@ class PaymentSchedule(TimeStampedModel):
             errors[
                 "insurance_sum"
             ] = "У ОСАГО нет страховой суммы — оставьте поле пустым."
-        if (
-            self.amount
-            and self.kv_rub
-            and self.kv_rub > self.amount * OSAGO_MAX_KV_PERCENT / Decimal("100")
-        ):
-            errors["kv_rub"] = (
-                f"КВ по ОСАГО не может превышать {OSAGO_MAX_KV_PERCENT:g}% "
-                f"от премии ({self.amount * OSAGO_MAX_KV_PERCENT / Decimal('100'):.2f} руб.)."
+        if self.amount and self.kv_rub:
+            # Предел округляем вверх до копейки: форма считает КВ как
+            # премия × % с обычным округлением, и ровно 10% не должны
+            # блокироваться из-за долей копейки.
+            kv_limit = (self.amount * OSAGO_MAX_KV_PERCENT / Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_CEILING
             )
+            if self.kv_rub > kv_limit:
+                errors["kv_rub"] = (
+                    f"КВ по ОСАГО не может превышать {OSAGO_MAX_KV_PERCENT:g}% "
+                    f"от премии ({kv_limit} руб.)."
+                )
         return errors
 
     def date_sequence_errors(self, previous_payment):

@@ -675,6 +675,10 @@
                     <label class="pl-filter-label">Вид страхования</label>
                     {{ filter.form.insurance_type }}
                 </div>
+                <div class="pl-filter-item">
+                    <label class="pl-filter-label">ОСАГО</label>
+                    {{ filter.form.osago }}
+                </div>
                 <div class="pl-filter-item pl-filter-item--date">
                     <label class="pl-filter-label">Дата начала</label>
                     <div class="pl-date-range-box">
@@ -765,7 +769,7 @@
                                 {% endif %}
                             </td>
                             <td style="padding-left:1rem;">
-                                {{ policy.policy_number }}
+                                {{ policy.policy_number }}{% include "policies/includes/osago_badge.html" %}
                                 {% if not policy.policy_active %}
                                     <span class="tbl-badge tbl-badge--closed" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
                                 {% endif %}

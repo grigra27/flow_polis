@@ -43,6 +43,21 @@ class PolicyFilter(django_filters.FilterSet):
     policy_uploaded = django_filters.BooleanFilter(label="Полис подгружен")
     broker_participation = django_filters.BooleanFilter(label="Участие брокера")
 
+    # Журнал полисов — общий список; ОСАГО можно скрыть или показать отдельно.
+    osago = django_filters.ChoiceFilter(
+        label="ОСАГО",
+        choices=(("exclude", "Без ОСАГО"), ("only", "Только ОСАГО")),
+        empty_label="Все полисы",
+        method="filter_osago",
+    )
+
+    def filter_osago(self, queryset, name, value):
+        if value == "exclude":
+            return queryset.without_osago()
+        if value == "only":
+            return queryset.osago()
+        return queryset
+
     # Фильтр по инфо1 тегам
     info1_tag = django_filters.ModelChoiceFilter(
         queryset=InfoTag.objects.all(),
@@ -77,5 +92,6 @@ class PolicyFilter(django_filters.FilterSet):
             "dfa_active",
             "policy_uploaded",
             "broker_participation",
+            "osago",
             "info1_tag",
         ]

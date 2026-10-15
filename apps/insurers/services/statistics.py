@@ -158,7 +158,9 @@ class InsurerStatisticsService:
         return statistics
 
     def _build_base_queryset(self, filters: StatisticsFilters) -> QuerySet:
-        queryset = self.insurer.policies.all()
+        queryset = (
+            self.insurer.policies.without_osago()
+        )  # статистика карточки — без ОСАГО
         if filters.date_from:
             queryset = queryset.filter(start_date__gte=filters.date_from)
         if filters.date_to:
@@ -448,7 +450,9 @@ class BranchStatisticsService:
         return statistics
 
     def _build_base_queryset(self, filters: BranchStatisticsFilters) -> QuerySet:
-        queryset = self.branch.policies.all()
+        queryset = (
+            self.branch.policies.without_osago()
+        )  # статистика карточки — без ОСАГО
         if filters.date_from:
             queryset = queryset.filter(start_date__gte=filters.date_from)
         if filters.date_to:

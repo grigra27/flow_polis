@@ -564,6 +564,7 @@
                         <div class="br-ov-cell">
                             <div class="br-ov-value">{{ insurer_overview.total_policies }}</div>
                             <div class="br-ov-label">Всего полисов</div>
+                            {% if insurer_overview.osago_policies %}<div class="br-ov-meta">без ОСАГО · ещё ОСАГО: {{ insurer_overview.osago_policies }}</div>{% endif %}
                         </div>
                         <div class="br-ov-cell">
                             <div class="br-ov-value br-ov-value--success">{{ insurer_overview.active_policies }}</div>
@@ -613,7 +614,7 @@
                                 <tr class="tbl-row-clickable {% if not policy.policy_active %}tbl-row-terminated{% elif not policy.broker_participation %}tbl-row-nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td>
-                                        <strong>{{ policy.policy_number }}</strong>
+                                        <strong>{{ policy.policy_number }}</strong>{% include "policies/includes/osago_badge.html" %}
                                         {% if not policy.policy_active %}
                                         <span class="tbl-badge tbl-badge--term" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
                                         {% endif %}

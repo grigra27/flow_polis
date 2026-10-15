@@ -445,6 +445,7 @@
                         <div class="mgr-stat-cell">
                             <span class="mgr-stat-value">{{ client_overview.total_policies }}</span>
                             <span class="mgr-stat-label">Всего полисов</span>
+                            {% if client_overview.osago_policies %}<span class="mgr-stat-meta">без ОСАГО · ещё ОСАГО: {{ client_overview.osago_policies }}</span>{% endif %}
                         </div>
                         <div class="mgr-stat-cell">
                             <span class="mgr-stat-value mgr-stat-value--success">{{ client_overview.active_policies }}</span>
@@ -486,7 +487,7 @@
                                 <tr class="tbl-row-clickable {% if not policy.policy_active %}tbl-row-terminated{% endif %} {% if not policy.broker_participation %}tbl-row-nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td>
-                                        <strong>{{ policy.policy_number }}</strong>
+                                        <strong>{{ policy.policy_number }}</strong>{% include "policies/includes/osago_badge.html" %}
                                     </td>
                                     <td style="color:var(--v2-muted);">{{ policy.dfa_number }}</td>
                                     <td>{% insurer_logo policy.insurer size='small' %}</td>

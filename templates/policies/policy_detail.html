@@ -9,6 +9,7 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         Полис {{ policy.policy_number }}
+        {% if policy.is_osago %}<span class="badge bg-primary-subtle text-primary-emphasis">ОСАГО</span>{% endif %}
         {% if not policy.policy_active %}
             <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
         {% endif %}
@@ -153,7 +154,7 @@
                                     <i class="bi bi-chevron-right toggle-icon"></i>
                                 </td>
                                 <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
-                                <td>{{ payment.insurance_sum|rub }}</td>
+                                <td>{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub }}{% else %}—{% endif %}</td>
                                 <td><strong>{{ payment.amount|rub }}</strong></td>
                                 <td>
                                     {% if payment.amount and payment.amount > 0 %}
@@ -347,8 +348,10 @@
                 <h5 class="mb-0">Финансовая информация</h5>
             </div>
             <div class="card-body">
+                {% if not policy.is_osago %}
                 <p><strong>Франшиза:</strong><br>
                 {{ policy.franchise|rub }}</p>
+                {% endif %}
 
                 <p><strong>Общая премия:</strong><br>
                 <span class="text-primary fs-5">{{ policy.premium_total|rub }}</span></p>

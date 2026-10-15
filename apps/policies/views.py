@@ -93,6 +93,9 @@ class PolicyListView(LoginRequiredMixin, FilterView):
                 insurance_type_name or insurance_type_id,
             )
 
+        osago_labels = {"exclude": "Без ОСАГО", "only": "Только ОСАГО"}
+        add_filter("osago", "ОСАГО", osago_labels.get(query_params.get("osago")))
+
         # Булевые фильтры
         bool_mapping = {
             "true": "Да",
@@ -189,6 +192,7 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                 "policy__client",
                 "policy__insurer",
                 "policy__branch",
+                "policy__insurance_type",
                 "commission_rate",
             )
         )

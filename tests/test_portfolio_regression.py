@@ -139,7 +139,49 @@ def portfolio(db):
         "insurers": (insurer_a, insurer_b),
         "branches": (branch_x, branch_y),
         "types": (kasko, special),
+        "clients": (c1, c2, c3),
     }
+
+
+def add_osago_policy(portfolio):
+    """Добавляет действующий полис ОСАГО к тем же СК, филиалу и клиенту, что у P1.
+
+    Если ОСАГО просочится в раздел «без ОСАГО», изменятся цифры по
+    «СК Альфа», «Москва» и «ООО Первый».
+    """
+    from apps.insurers.models import CommissionRate, InsuranceType
+    from apps.policies.models import PaymentSchedule, Policy
+
+    insurer_a = portfolio["insurers"][0]
+    osago_type = InsuranceType.objects.create(name="ОСАГО (регрессия)", is_osago=True)
+    rate = CommissionRate.objects.create(
+        insurer=insurer_a, insurance_type=osago_type, kv_percent=Decimal("10")
+    )
+    start = portfolio["today"] - timedelta(days=10)
+    policy = Policy.objects.create(
+        policy_number="OSAGO-R1",
+        dfa_number="ДФА-P1",
+        client=portfolio["clients"][0],
+        insurer=insurer_a,
+        branch=portfolio["branches"][0],
+        insurance_type=osago_type,
+        property_description="Имущество P1",
+        start_date=start,
+        end_date=start + timedelta(days=364),
+        franchise=Decimal("0"),
+    )
+    PaymentSchedule.objects.create(
+        policy=policy,
+        year_number=1,
+        installment_number=1,
+        due_date=start,
+        insurance_sum=None,
+        amount=Decimal("15000"),
+        commission_rate=rate,
+        kv_rub=Decimal("1500"),
+        paid_date=start,
+    )
+    return policy
 
 
 def _normalize(value):
@@ -261,3 +303,20 @@ def test_snapshot_services_return_real_data(portfolio):
 def test_snapshot_is_deterministic(portfolio):
     """Два слепка подряд совпадают — основа для сравнения «до/после ОСАГО»."""
     assert portfolio_snapshot(portfolio) == portfolio_snapshot(portfolio)
+
+
+# Разделы слепка, уже переведённые на портфель без ОСАГО (растёт по этапам;
+# после этапа 5 — весь слепок).
+OSAGO_FREE_KEYS = [
+    "insurer_statistics",
+    "branch_statistics",
+]
+
+
+def test_osago_policy_does_not_change_osago_free_sections(portfolio):
+    before = portfolio_snapshot(portfolio)
+    add_osago_policy(portfolio)
+    after = portfolio_snapshot(portfolio)
+
+    for key in OSAGO_FREE_KEYS:
+        assert after[key] == before[key], key

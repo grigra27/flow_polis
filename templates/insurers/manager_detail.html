@@ -372,6 +372,7 @@
                         <div class="mgr-stat-cell">
                             <div class="mgr-stat-value">{{ manager_overview.total_policies }}</div>
                             <div class="mgr-stat-label">Всего полисов</div>
+                            {% if manager_overview.osago_policies %}<div class="mgr-stat-meta">без ОСАГО · ещё ОСАГО: {{ manager_overview.osago_policies }}</div>{% endif %}
                         </div>
                         <div class="mgr-stat-cell">
                             <div class="mgr-stat-value mgr-stat-value--success">{{ manager_overview.active_policies }}</div>
@@ -415,7 +416,7 @@
                                 <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %} {% if not policy.broker_participation %}row--nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td>
-                                        <strong>{{ policy.policy_number }}</strong>
+                                        <strong>{{ policy.policy_number }}</strong>{% include "policies/includes/osago_badge.html" %}
                                         {% if not policy.policy_active %}
                                         <span class="tbl-badge tbl-badge--term ms-1"
                                               title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">

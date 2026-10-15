@@ -799,7 +799,7 @@
                         <tr class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
                             data-href="{% url 'policies:detail' payment.policy.pk %}">
                             <td style="padding-left:1rem;">
-                                {{ payment.policy.policy_number }}
+                                {{ payment.policy.policy_number }}{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
                                 {% if not payment.policy.broker_participation %}
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}

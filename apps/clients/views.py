@@ -38,7 +38,9 @@ class ClientDetailView(LoginRequiredMixin, DetailView):
         context["policies"] = policies_qs.order_by("-start_date")
 
         in_force = in_force_q(date.today())
-        overview_data = policies_qs.aggregate(
+        # Счётчики и средняя премия — по портфелю без ОСАГО (решение владельца:
+        # ОСАГО в списке карточки, но не в счётчиках и средних), ОСАГО — отдельно.
+        overview_data = policies_qs.without_osago().aggregate(
             total_policies=Count("id"),
             active_policies=Count("id", filter=in_force),
             terminated_policies=Count("id", filter=~in_force),
@@ -54,6 +56,7 @@ class ClientDetailView(LoginRequiredMixin, DetailView):
 
         context["client_overview"] = {
             "total_policies": overview_data["total_policies"],
+            "osago_policies": policies_qs.osago().count(),
             "active_policies": overview_data["active_policies"],
             "terminated_policies": overview_data["terminated_policies"],
             "nearest_end_date": nearest_end_date,

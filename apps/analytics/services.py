@@ -574,8 +574,9 @@ class AnalyticsService:
             from apps.policies.models import Policy, PaymentSchedule
 
             # Get base querysets
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             # Apply filters if provided
             if analytics_filter:
@@ -710,8 +711,9 @@ class AnalyticsService:
             from apps.insurers.models import Branch
 
             # Get base querysets
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             # Apply filters if provided
             if analytics_filter:
@@ -826,8 +828,9 @@ class AnalyticsService:
 
             # Base querysets for portfolio analytics.
             # The default "active only" behavior is controlled by AnalyticsFilter in view.
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             # Apply optional segment filters
             if analytics_filter:
@@ -1286,8 +1289,9 @@ class AnalyticsService:
             from apps.insurers.models import Insurer
 
             # Get base querysets
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             # Apply filters if provided
             if analytics_filter:
@@ -1463,8 +1467,9 @@ class AnalyticsService:
             from apps.policies.models import Policy, PaymentSchedule
             from apps.insurers.models import Insurer
 
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)
@@ -1563,8 +1568,9 @@ class AnalyticsService:
             from apps.clients.models import Client
 
             # Get base querysets
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             # Apply filters if provided
             if analytics_filter:
@@ -4014,8 +4020,9 @@ class AnalyticsService:
             from apps.policies.models import Policy, PaymentSchedule
             from apps.insurers.models import Branch
 
-            policies_qs = Policy.objects.all()
-            payments_qs = PaymentSchedule.objects.all()
+            # Портфель без ОСАГО (карта влияния: эта аналитика — без ОСАГО).
+            policies_qs = Policy.objects.without_osago()
+            payments_qs = PaymentSchedule.objects.without_osago()
 
             if analytics_filter:
                 policies_qs = analytics_filter.apply_to_policies(policies_qs)

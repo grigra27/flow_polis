@@ -105,7 +105,9 @@ class DashboardView(SuperuserRequiredMixin, TemplateView):
                     "top_insurers": top_insurers,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
-                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "insurance_types": InsuranceType.objects.filter(
+                        is_osago=False
+                    ).order_by("name"),
                     "clients": Client.objects.all().order_by("client_name")[
                         :100
                     ],  # Limit for performance
@@ -472,7 +474,9 @@ class BranchAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "total_policy_count": total_policies,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
-                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "insurance_types": InsuranceType.objects.filter(
+                        is_osago=False
+                    ).order_by("name"),
                     "clients": Client.objects.all().order_by("client_name")[
                         :100
                     ],  # Limit for performance
@@ -822,7 +826,9 @@ class BranchPortfolioAnalyticsV2View(SuperuserRequiredMixin, TemplateView):
                     "policy_status": self.request.GET.get("policy_status", "active"),
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
-                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "insurance_types": InsuranceType.objects.filter(
+                        is_osago=False
+                    ).order_by("name"),
                     "clients": Client.objects.all().order_by("client_name")[:100],
                     "current_filter": analytics_filter,
                     "filter_applied": analytics_filter.has_filters()
@@ -1193,7 +1199,9 @@ class InsurerAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "total_policy_count": total_policies,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
-                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "insurance_types": InsuranceType.objects.filter(
+                        is_osago=False
+                    ).order_by("name"),
                     "clients": Client.objects.all().order_by("client_name")[
                         :100
                     ],  # Limit for performance
@@ -1566,7 +1574,9 @@ class ClientAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "total_policy_count": total_policy_count,
                     "branches": Branch.objects.all().order_by("branch_name"),
                     "insurers": Insurer.objects.all().order_by("insurer_name"),
-                    "insurance_types": InsuranceType.objects.all().order_by("name"),
+                    "insurance_types": InsuranceType.objects.filter(
+                        is_osago=False
+                    ).order_by("name"),
                     "clients": Client.objects.all().order_by("client_name")[
                         :100
                     ],  # Limit for performance

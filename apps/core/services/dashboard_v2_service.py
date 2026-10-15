@@ -258,8 +258,9 @@ class DashboardV2Service:
             today=today,
         )
 
+        # Каждое ОСАГО ежегодно «новое» — индекс нового бизнеса без ОСАГО.
         nb_index = self._build_new_business_index(
-            policies_qs=policies_qs,
+            policies_qs=policies_qs.without_osago(),
             today=today,
         )
 
@@ -709,7 +710,10 @@ class DashboardV2Service:
         active_policies_count = active_policies_qs.count()
         active_payments_count = active_payments_qs.count()
 
-        not_uploaded_count = active_policies_qs.filter(policy_uploaded=False).count()
+        # Загрузку документов по ОСАГО не контролируют (как в четверговом отчёте).
+        not_uploaded_count = (
+            active_policies_qs.without_osago().filter(policy_uploaded=False).count()
+        )
         missing_commission_count = active_payments_qs.filter(
             commission_rate__isnull=True
         ).count()
@@ -784,7 +788,10 @@ class DashboardV2Service:
         )
 
         active_policies_count = active_policies_qs.count()
-        not_uploaded_count = active_policies_qs.filter(policy_uploaded=False).count()
+        # Загрузку документов по ОСАГО не контролируют (как в четверговом отчёте).
+        not_uploaded_count = (
+            active_policies_qs.without_osago().filter(policy_uploaded=False).count()
+        )
 
         upcoming_count = upcoming_qs.count()
         overdue_count = overdue_qs.count()
@@ -863,7 +870,11 @@ class DashboardV2Service:
                 policy__broker_participation=True
             )
 
-        policy_count = scoped_payments_qs.values("policy_id").distinct().count()
+        # Структура — с ОСАГО только в разрезах по премии (решение владельца);
+        # счётчик полисов и разрезы по страховой сумме (а от них концентрация)
+        # — без ОСАГО.
+        osago_free_payments_qs = scoped_payments_qs.without_osago()
+        policy_count = osago_free_payments_qs.values("policy_id").distinct().count()
 
         actual_qs = scoped_payments_qs.filter(
             due_date__lt=current_month_start, paid_date__isnull=False
@@ -871,21 +882,21 @@ class DashboardV2Service:
         planned_qs = scoped_payments_qs.filter(due_date__gte=current_month_start)
 
         by_branch = self._build_policy_max_distribution(
-            payments_qs=scoped_payments_qs,
+            payments_qs=osago_free_payments_qs,
             label_field="policy__branch__branch_name",
             id_field="policy__branch_id",
             logo_field="policy__branch__logo",
             value_field="insurance_sum",
         )
         by_insurer = self._build_policy_max_distribution(
-            payments_qs=scoped_payments_qs,
+            payments_qs=osago_free_payments_qs,
             label_field="policy__insurer__insurer_name",
             id_field="policy__insurer_id",
             logo_field="policy__insurer__logo",
             value_field="insurance_sum",
         )
         by_type = self._build_policy_max_distribution(
-            payments_qs=scoped_payments_qs,
+            payments_qs=osago_free_payments_qs,
             label_field="policy__insurance_type__name",
             id_field="policy__insurance_type_id",
             logo_field="policy__insurance_type__icon",

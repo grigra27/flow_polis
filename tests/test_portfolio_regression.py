@@ -305,19 +305,12 @@ def test_snapshot_is_deterministic(portfolio):
     assert portfolio_snapshot(portfolio) == portfolio_snapshot(portfolio)
 
 
-# Разделы слепка, уже переведённые на портфель без ОСАГО (растёт по этапам;
-# после этапа 5 — весь слепок).
-OSAGO_FREE_KEYS = [
-    "insurer_statistics",
-    "branch_statistics",
-    "property_snapshot",
-]
-
-
 def test_osago_policy_does_not_change_osago_free_sections(portfolio):
+    """Весь слепок — разделы «без ОСАГО»: полис ОСАГО не меняет ни одной цифры."""
     before = portfolio_snapshot(portfolio)
     add_osago_policy(portfolio)
     after = portfolio_snapshot(portfolio)
 
-    for key in OSAGO_FREE_KEYS:
+    assert after.keys() == before.keys()
+    for key in before:
         assert after[key] == before[key], key

@@ -466,6 +466,11 @@ class Command(BaseCommand):
         else:  # text
             return f"{emoji} {name}: {old_value} → {new_value}"
 
+    @staticmethod
+    def _osago_mark(policy):
+        """ОСАГО в дайджесте идёт вместе с остальными, но помечается видом."""
+        return " · ОСАГО" if policy.is_osago else ""
+
     def _escape_markdown_text(self, text):
         """Экранирует специальные символы для Markdown (только для обычного текста)"""
         if not text:
@@ -611,9 +616,9 @@ class Command(BaseCommand):
         # Обрабатываем каждый полис
         for policy_id, changes in policy_changes_by_id.items():
             try:
-                policy = Policy.objects.select_related("client", "insurer").get(
-                    pk=policy_id
-                )
+                policy = Policy.objects.select_related(
+                    "client", "insurer", "insurance_type"
+                ).get(pk=policy_id)
 
                 # Определяем тип изменения (создание или обновление)
                 has_create = any(
@@ -662,7 +667,7 @@ class Command(BaseCommand):
         for change in payment_changes:
             try:
                 payment = PaymentSchedule.objects.select_related(
-                    "policy__client", "policy__insurer"
+                    "policy__client", "policy__insurer", "policy__insurance_type"
                 ).get(pk=change.object_pk)
                 policy_id = payment.policy.pk
 
@@ -966,7 +971,9 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                message_parts.append(f"• {policy_number} — {client_name}")
+                message_parts.append(
+                    f"• {policy_number}{self._osago_mark(policy)} — {client_name}"
+                )
 
                 kv_sum = policy.payment_schedule.aggregate(
                     total_kv=models.Sum("kv_rub")
@@ -994,7 +1001,9 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                message_parts.append(f"• {policy_number} — {client_name}")
+                message_parts.append(
+                    f"• {policy_number}{self._osago_mark(policy)} — {client_name}"
+                )
 
                 if item.get("change_details"):
                     changes_count = len(item["change_details"])
@@ -1025,7 +1034,9 @@ class Command(BaseCommand):
                 client_name = policy.client.client_name or "Неизвестный клиент"
                 insurer_name = policy.insurer.insurer_name or "Неизвестная страховая"
 
-                message_parts.append(f"• {policy_number} — {client_name}")
+                message_parts.append(
+                    f"• {policy_number}{self._osago_mark(policy)} — {client_name}"
+                )
 
                 if item.get("change_details"):
                     changes_count = len(item["change_details"])

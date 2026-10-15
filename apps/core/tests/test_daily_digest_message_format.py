@@ -197,3 +197,22 @@ def test_empty_digest_has_no_double_blank_lines(command):
         assert not (lines[i] == "" and lines[i + 1] == ""), (
             f"double blank line around index {i}: " f"{lines[max(0, i - 1) : i + 3]!r}"
         )
+
+
+@pytest.mark.django_db
+def test_osago_policy_is_marked_in_digest(command, sample_policy):
+    """ОСАГО идёт в дайджесте вместе со всеми, но с пометкой вида (этап 7)."""
+    sample_policy.insurance_type = InsuranceType.objects.create(
+        name="ОСАГО", is_osago=True
+    )
+    sample_policy.save()
+    url = f"https://polis.insflow.ru/policies/{sample_policy.pk}/"
+
+    message = command._format_message(
+        "23.09.2026",
+        [],
+        _created_policies_data(sample_policy, url),
+        EMPTY_PAYMENTS_DATA,
+    )
+
+    assert "• ДФА-001 · ОСАГО — ООО «Ромашка»" in message.split("\n")

@@ -217,6 +217,8 @@ class TestOsagoAcceptAdminFlow:
         journal = admin_client.get(reverse("policies:list")).content.decode()
         assert reverse(IMPORT_URL) in journal
         assert reverse("admin:policies_policy_import_accept") in journal
+        assert reverse("admin:policies_osagopolicy_add") in journal
+        assert "Добавить полис ОСАГО" in journal
 
     def test_requires_add_permission(self, client, django_user_model, refs):
         client.force_login(

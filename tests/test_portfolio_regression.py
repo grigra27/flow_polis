@@ -310,6 +310,7 @@ def test_snapshot_is_deterministic(portfolio):
 OSAGO_FREE_KEYS = [
     "insurer_statistics",
     "branch_statistics",
+    "property_snapshot",
 ]
 
 

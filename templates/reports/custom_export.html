@@ -716,6 +716,16 @@ function updateFilters(source) {
                             </select>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">ОСАГО</label>
+                            <select class="form-select" name="osago">
+                                <option value="">Все полисы</option>
+                                <option value="exclude">Без ОСАГО</option>
+                                <option value="only">Только ОСАГО</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
@@ -845,6 +855,18 @@ function updateFilters(source) {
                                 ${filterData.branches.map(branch =>
                                     `<option value="${branch.id}">${branch.branch_name}</option>`
                                 ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">ОСАГО</label>
+                            <select class="form-select" name="osago">
+                                <option value="">Все полисы</option>
+                                <option value="exclude">Без ОСАГО</option>
+                                <option value="only">Только ОСАГО</option>
                             </select>
                         </div>
                     </div>

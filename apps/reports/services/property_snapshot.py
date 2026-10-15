@@ -87,7 +87,8 @@ def _aggregate_dimension(
     """
     if as_of is None:
         as_of = timezone.localdate()
-    payments_qs = PaymentSchedule.objects.filter(
+    # Снимок по страховым суммам — без ОСАГО (у ОСАГО нет страховой суммы).
+    payments_qs = PaymentSchedule.objects.without_osago().filter(
         in_force_q(as_of, prefix="policy__"),
         policy__dfa_active=True,
     )
@@ -214,7 +215,7 @@ def build_property_snapshot(as_of=None) -> Dict[str, Any]:
     _attach_insurer_logos(by_insurer)
 
     active_policies_count = (
-        Policy.objects.in_force(as_of).filter(dfa_active=True).count()
+        Policy.objects.in_force(as_of).without_osago().filter(dfa_active=True).count()
     )
 
     return {

@@ -1,5 +1,18 @@
 import django_filters
 from apps.policies.models import Policy, PaymentSchedule
+
+OSAGO_FILTER_CHOICES = (("exclude", "Без ОСАГО"), ("only", "Только ОСАГО"))
+
+
+def filter_osago(queryset, name, value):
+    """Конструктор отчётов: весь портфель, без ОСАГО или только ОСАГО."""
+    if value == "exclude":
+        return queryset.without_osago()
+    if value == "only":
+        return queryset.osago()
+    return queryset
+
+
 from apps.clients.models import Client
 from apps.insurers.models import Insurer
 
@@ -34,6 +47,11 @@ class PolicyExportFilter(django_filters.FilterSet):
     )
     end_date_to = django_filters.DateFilter(
         field_name="end_date", lookup_expr="lte", label="Дата окончания до"
+    )
+    osago = django_filters.ChoiceFilter(
+        choices=OSAGO_FILTER_CHOICES,
+        method=filter_osago,
+        label="ОСАГО",
     )
 
     class Meta:
@@ -90,6 +108,11 @@ class PaymentExportFilter(django_filters.FilterSet):
     )
     is_paid = django_filters.BooleanFilter(
         field_name="paid_date", lookup_expr="isnull", exclude=True, label="Оплачен"
+    )
+    osago = django_filters.ChoiceFilter(
+        choices=OSAGO_FILTER_CHOICES,
+        method=filter_osago,
+        label="ОСАГО",
     )
 
     class Meta:

@@ -237,6 +237,11 @@ def export_policies_excel(request):
             "client", "insurer", "branch", "insurance_type"
         ).all()
 
+        # ОСАГО — только по явной галочке include_osago (решение владельца:
+        # в экспорте полисов ОСАГО выключено по умолчанию).
+        if request.GET.get("include_osago") not in ("1", "true", "on"):
+            policies = policies.without_osago()
+
         # Применяем опциональные фильтры (если переданы)
         branch_id = request.GET.get("branch")
         if branch_id:
@@ -370,6 +375,8 @@ def export_thursday_report(request):
                 "client", "insurer", "branch", "insurance_type", "policyholder"
             )
             .filter(policy_uploaded=False)
+            # Четверговый отчёт контролирует документы и оплаты — без ОСАГО.
+            .without_osago()
             .order_by("branch__branch_name", "policy_number")
         )
 
@@ -571,6 +578,7 @@ def export_policies_csv(request):
                 due_date__lte=end_date,
                 installment_number=1,
             )
+            .without_osago()  # CSV «Новая/Пролонгация» — без ОСАГО
             .exclude(cancelled_filter)
             .order_by("due_date")
         )
@@ -1358,6 +1366,8 @@ class CustomExportView(LoginRequiredMixin, FormView):
             "policy__branch",
             "year_number",
             "installment_number",
+            # Общий для обоих источников
+            "osago",
         ]
 
         for field in filter_fields:

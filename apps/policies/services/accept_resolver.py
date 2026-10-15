@@ -58,8 +58,9 @@ class AcceptResolver:
     """Сопоставляет акцепт со справочниками.
 
     osago=True — полис ОСАГО из того же акцепта: вид страхования всегда
-    «ОСАГО» (форма раздела подставляет его сама), срок — год от даты начала,
-    но не дольше лизинга, платёж без страховой суммы.
+    «ОСАГО» (форма раздела подставляет его сама), срок — всегда
+    год от даты начала (окончание лизинга не учитывается), платёж без
+    страховой суммы.
     """
 
     def __init__(self, osago=False):
@@ -157,16 +158,11 @@ class AcceptResolver:
         end = add_years(start, 1)
         if (start.month, start.day) != (2, 29):
             end -= timedelta(days=1)
-        lease_end = parsed_data.end_date
-        if lease_end and start <= lease_end < end:
-            end = lease_end
-            note = " (до окончания лизинга)"
-        else:
-            note = ""
+        # Всегда ровно год: окончание лизинга на срок ОСАГО не влияет.
         policy_initial["end_date"] = end.isoformat()
         resolved["term"] = {
             "status": "matched",
-            "label": f"{start:%d.%m.%Y} – {end:%d.%m.%Y}{note}",
+            "label": f"{start:%d.%m.%Y} – {end:%d.%m.%Y}",
         }
 
     def _resolve_osago_kind(self, parsed_data, warnings, resolved):

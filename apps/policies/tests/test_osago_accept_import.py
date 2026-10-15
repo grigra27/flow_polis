@@ -1,8 +1,8 @@
 """
 Полис ОСАГО из акцепта: тот же файл, что для КАСКО (в нём есть поле «ОСАГО»).
 
-Вид страхования — всегда «ОСАГО», срок — год от даты начала (но не дольше
-лизинга), один платёж без страховой суммы. Акцепт, разобранный для одного
+Вид страхования — всегда «ОСАГО», срок — всегда год от даты начала
+(окончание лизинга не учитывается), один платёж без страховой суммы. Акцепт, разобранный для одного
 раздела, не предзаполняет форму другого.
 """
 
@@ -71,18 +71,14 @@ class TestOsagoResolver:
         assert resolved.policy_initial["start_date"] == "2025-08-26"
         assert resolved.policy_initial["end_date"] == "2026-08-25"
 
-    def test_term_is_capped_by_lease_end(self, refs):
+    def test_term_ignores_earlier_lease_end(self, refs):
         resolved = resolve_osago(**{"Дата окончания срока лизинга": "01.03.2026"})
 
-        assert resolved.policy_initial["end_date"] == "2026-03-01"
-        assert "до окончания лизинга" in resolved.resolved["term"]["label"]
+        assert resolved.policy_initial["end_date"] == "2026-08-25"
 
     def test_leap_day_start(self, refs):
         resolved = resolve_osago(
-            **{
-                "Дата поставки / дата начала страхования": "29.02.2028",
-                "Дата окончания срока лизинга": "01.01.2031",
-            }
+            **{"Дата поставки / дата начала страхования": "29.02.2028"}
         )
 
         assert resolved.policy_initial["end_date"] == "2029-02-28"

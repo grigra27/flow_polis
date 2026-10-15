@@ -99,10 +99,26 @@ class BranchAdmin(admin.ModelAdmin):
 
 @admin.register(InsuranceType)
 class InsuranceTypeAdmin(admin.ModelAdmin):
-    list_display = ["name", "has_icon"]
+    list_display = ["name", "is_osago", "has_icon"]
     search_fields = ["name"]
+    # is_osago не редактируется: признак ставит миграция insurers.0014,
+    # смена у вида с полисами сломала бы правила их платежей.
     fields = ["name", "icon"]
     readonly_fields = ["icon_preview"]
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, may_have_duplicates = super().get_search_results(
+            request, queryset, search_term
+        )
+        # Автодополнение «Вид страхования» в разделе «Полисы»: ОСАГО
+        # заводится только в разделе «Полисы ОСАГО».
+        if (
+            request.GET.get("app_label") == "policies"
+            and request.GET.get("model_name") == "policy"
+            and request.GET.get("field_name") == "insurance_type"
+        ):
+            queryset = queryset.filter(is_osago=False)
+        return queryset, may_have_duplicates
 
     def has_icon(self, obj):
         return "✓" if obj.icon else "✗"

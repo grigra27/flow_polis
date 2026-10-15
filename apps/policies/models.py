@@ -536,15 +536,18 @@ class PaymentSchedule(TimeStampedModel):
                 f"Manual review recommended for policy {self.policy_id}"
             )
 
-    def insurance_kind_errors(self):
+    def insurance_kind_errors(self, policy=None):
         """
         Проверяет платёж по правилам вида страхования полиса.
+        `policy` — полис, к которому относится платёж, если он ещё не
+        присвоен (inline-formset нового полиса: policy_id пока None).
         ОСАГО: ровно один платёж (год 1, платёж 1), без страховой суммы,
         КВ не больше OSAGO_MAX_KV_PERCENT от премии. Остальные виды: страховая
         сумма обязательна. Возвращает словарь {поле: сообщение}.
         """
         errors = {}
-        if not self.policy.is_osago:
+        policy = policy or self.policy
+        if not policy.is_osago:
             if self.insurance_sum is None:
                 errors["insurance_sum"] = "Укажите страховую сумму."
             return errors
@@ -659,6 +662,20 @@ class PaymentSchedule(TimeStampedModel):
         if self.amount and self.amount > 0:
             return (self.kv_rub / self.amount) * Decimal("100")
         return Decimal("0")
+
+
+class OsagoPolicy(Policy):
+    """Полис ОСАГО — та же таблица полисов, отдельный раздел в админке.
+
+    Прокси нужен только для админки (своя форма: один платёж, без страховой
+    суммы и франшизы). Права на раздел — те же, что на обычные полисы
+    (решение владельца), см. OsagoPolicyAdmin.has_*_permission.
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "Полис ОСАГО"
+        verbose_name_plural = "Полисы ОСАГО"
 
 
 class PolicyInfo(TimeStampedModel):

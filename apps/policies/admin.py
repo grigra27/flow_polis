@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.admin.options import IS_POPUP_VAR
 from django.contrib import messages
@@ -13,8 +14,10 @@ from urllib.parse import urlencode
 from decimal import Decimal
 from uuid import uuid4
 
+from apps.insurers.models import InsuranceType, get_osago_insurance_type
+
 from .forms import AcceptUploadForm
-from .models import Policy, PaymentSchedule, PolicyInfo
+from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
 from .services.accept_parser import parse_accept_file
 from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
@@ -88,6 +91,9 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
         if any(self.errors):
             return
 
+        if self._add_insurance_kind_errors():
+            return
+
         rows = []
         form_by_row = {}
         for form in self.forms:
@@ -116,6 +122,36 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
                 raise ValidationError(list(errors.values()))
             for field, message in errors.items():
                 form.add_error(field, message)
+
+    def _add_insurance_kind_errors(self):
+        """
+        Правила вида страхования по родительскому полису formset'а: ОСАГО —
+        один платёж без страховой суммы, КВ ≤ 10%; остальные виды —
+        страховая сумма обязательна. У нового полиса policy_id ещё None,
+        PaymentSchedule.clean() их пропускает — без этой проверки ошибка
+        вылетала бы из save() как HTTP 500 (как в H-02).
+        Возвращает True, если ошибки найдены.
+        """
+        found = False
+        for form in self.forms:
+            if not form.cleaned_data or self._should_delete_form(form):
+                continue
+            errors = form.instance.insurance_kind_errors(policy=self.instance)
+            for field, message in errors.items():
+                form.add_error(field if field in form.fields else None, message)
+                found = True
+        return found
+
+
+class OsagoPaymentInlineFormSet(PaymentScheduleInlineFormSet):
+    """Единственный платёж ОСАГО: год 1, платёж 1, без страховой суммы."""
+
+    def _construct_form(self, i, **kwargs):
+        form = super()._construct_form(i, **kwargs)
+        form.instance.year_number = 1
+        form.instance.installment_number = 1
+        form.instance.insurance_sum = None
+        return form
 
 
 class PaymentScheduleInline(admin.TabularInline):
@@ -150,6 +186,30 @@ class PaymentScheduleInline(admin.TabularInline):
         }
 
 
+class OsagoPaymentInline(admin.TabularInline):
+    model = PaymentSchedule
+    formset = OsagoPaymentInlineFormSet
+    verbose_name = "Платёж"
+    verbose_name_plural = "Платёж по полису ОСАГО"
+    extra = 0
+    min_num = 1
+    max_num = 1
+    can_delete = False
+    fields = [
+        "due_date",
+        "amount",
+        "kv_rub",
+        "paid_date",
+        "insurer_date",
+        "alliance_paid",
+        "payment_info",
+    ]
+
+    class Media:
+        js = ("policies/js/auto_commission_rate.js",)
+        css = {"all": ("policies/css/auto_commission_rate.css",)}
+
+
 class PolicyInfoInline(admin.TabularInline):
     model = PolicyInfo
     extra = 1
@@ -158,6 +218,9 @@ class PolicyInfoInline(admin.TabularInline):
 
 @admin.register(Policy)
 class PolicyAdmin(admin.ModelAdmin):
+    # Раздел «Полисы» — портфель без ОСАГО; ОСАГО заводится и правится
+    # в разделе «Полисы ОСАГО» (OsagoPolicyAdmin, та же таблица).
+    osago_section = False
     change_form_template = "admin/policies/policy/change_form.html"
     change_list_template = "admin/policies/policy/change_list.html"
     save_and_open_front_button_name = "_save_and_open_front"
@@ -457,13 +520,49 @@ class PolicyAdmin(admin.ModelAdmin):
             return redirect(self._get_frontend_detail_url(obj))
         return super().response_change(request, obj)
 
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        kind_redirect = self._redirect_to_kind_section(request, object_id)
+        if kind_redirect is not None:
+            return kind_redirect
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def _redirect_to_kind_section(self, request, object_id):
+        """Полис ОСАГО открыт в «Полисах» (или наоборот) — ведём в его раздел.
+
+        Ссылки «Редактировать» с сайта ведут в policies_policy_change для
+        любого полиса; без редиректа ОСАГО дал бы «объект не найден».
+        """
+        try:
+            pk = int(object_id)
+        except (TypeError, ValueError):
+            return None
+        policy = Policy.objects.select_related("insurance_type").filter(pk=pk).first()
+        if policy is None or policy.is_osago == self.osago_section:
+            return None
+        url_name = (
+            "admin:policies_osagopolicy_change"
+            if policy.is_osago
+            else "admin:policies_policy_change"
+        )
+        url = reverse(url_name, args=[pk])
+        query = request.GET.urlencode()
+        return redirect(f"{url}?{query}" if query else url)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "insurance_type":
+            kwargs["queryset"] = InsuranceType.objects.filter(is_osago=False)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def filter_portfolio(self, queryset):
+        return queryset.without_osago()
+
     def get_queryset(self, request):
         # list_display обращается к client и insurer по каждой строке.
         # Без select_related это N+1: 1 + 2 × len(page).
         # premium_total_db — annotate'нутая сумма платежей; используется
         # вместо @property Policy.premium_total чтобы избежать +50 SQL'ей
         # на страницу listing'а.
-        return (
+        return self.filter_portfolio(
             super()
             .get_queryset(request)
             .select_related(
@@ -596,7 +695,10 @@ class PolicyAdmin(admin.ModelAdmin):
             self.message_user(request, message, messages.SUCCESS)
 
             # Redirect to edit the new policy
-            change_url = reverse("admin:policies_policy_change", args=[new_policy.id])
+            change_url = reverse(
+                f"admin:{self.opts.app_label}_{self.opts.model_name}_change",
+                args=[new_policy.id],
+            )
             return redirect(change_url)
 
         except Exception as e:
@@ -604,6 +706,146 @@ class PolicyAdmin(admin.ModelAdmin):
                 request, f"Ошибка при копировании полиса: {str(e)}", messages.ERROR
             )
             return
+
+
+class OsagoPolicyForm(forms.ModelForm):
+    """Форма ОСАГО: вид страхования всегда «ОСАГО», что бы ни пришло в POST.
+
+    Поле остаётся в форме скрытым — auto_commission_rate.js берёт из
+    #id_insurance_type вид для подстановки ставки КВ.
+    """
+
+    class Meta:
+        model = OsagoPolicy
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "insurance_type" not in self.fields:
+            return
+        # disabled: значение из POST игнорируется, берётся initial.
+        self.fields["insurance_type"].disabled = True
+        osago_type = get_osago_insurance_type()
+        if osago_type is not None:
+            self.initial["insurance_type"] = osago_type.pk
+
+    def clean_insurance_type(self):
+        osago_type = get_osago_insurance_type()
+        if osago_type is None:
+            raise forms.ValidationError(
+                "В справочнике нет вида страхования с признаком «ОСАГО»."
+            )
+        return osago_type
+
+
+@admin.register(OsagoPolicy)
+class OsagoPolicyAdmin(PolicyAdmin):
+    osago_section = True
+    form = OsagoPolicyForm
+    # Стандартный список: без кнопки «Загрузить акцепт» (импорт — для КАСКО).
+    change_list_template = None
+
+    list_filter = [
+        "policy_active",
+        "dfa_active",
+        "policy_uploaded",
+        "broker_participation",
+        "branch",
+        "insurer",
+        "start_date",
+    ]
+    autocomplete_fields = [
+        "client",
+        "policyholder",
+        "insurer",
+        "branch",
+        "leasing_manager",
+    ]
+    fieldsets = (
+        (
+            "Основная информация",
+            {
+                "fields": (
+                    "policy_number",
+                    "dfa_number",
+                    "client",
+                    "policyholder",
+                    "branch",
+                    "leasing_manager",
+                )
+            },
+        ),
+        (
+            "Детали страхования",
+            {
+                "fields": (
+                    "insurance_type",
+                    "property_description",
+                    "property_year",
+                    "vin_number",
+                    "start_date",
+                    "end_date",
+                ),
+                "description": (
+                    "ОСАГО: срок не больше года, без франшизы и страховой суммы."
+                ),
+            },
+        ),
+        ("Дополнительная информация", {"fields": ("info3", "info4")}),
+        (
+            "Статусы",
+            {
+                "fields": (
+                    "policy_active",
+                    "termination_date",
+                    "dfa_active",
+                    "dfa_deactivation_date",
+                    "policy_uploaded",
+                    "broker_participation",
+                    "renewal_to_old_dfa",
+                )
+            },
+        ),
+        (
+            "Системная информация",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+        ("Страховщик", {"fields": ("insurer",)}),
+    )
+    inlines = [OsagoPaymentInline, PolicyInfoInline]
+
+    def get_urls(self):
+        # Без import-accept: импорт акцепта создаёт обычные полисы.
+        return admin.ModelAdmin.get_urls(self)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "insurance_type":
+            kwargs["queryset"] = InsuranceType.objects.filter(is_osago=True)
+            kwargs["widget"] = forms.HiddenInput()
+            return db_field.formfield(**kwargs)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def filter_portfolio(self, queryset):
+        return queryset.osago()
+
+    # Права на раздел — те же, что на обычные полисы (решение владельца
+    # 2026-10-15), чтобы не выдавать отдельные права ограниченным админам.
+    def _has_policy_perm(self, request, action):
+        return request.user.has_perm(f"policies.{action}_policy")
+
+    def has_view_permission(self, request, obj=None):
+        return self._has_policy_perm(request, "view") or self._has_policy_perm(
+            request, "change"
+        )
+
+    def has_add_permission(self, request):
+        return self._has_policy_perm(request, "add")
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_policy_perm(request, "change")
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_policy_perm(request, "delete")
 
 
 @admin.register(PaymentSchedule)

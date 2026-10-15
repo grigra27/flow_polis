@@ -10,6 +10,11 @@ from apps.core.file_validators import validate_image_file
 OSAGO_MAX_KV_PERCENT = Decimal("10")
 
 
+def get_osago_insurance_type():
+    """Вид страхования «ОСАГО» (создаётся миграцией insurers.0014) или None."""
+    return InsuranceType.objects.filter(is_osago=True).order_by("pk").first()
+
+
 class Insurer(models.Model):
     """
     Insurance company - Страховая компания

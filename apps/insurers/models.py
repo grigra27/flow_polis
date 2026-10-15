@@ -1,6 +1,13 @@
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import TimeStampedModel
 from apps.core.file_validators import validate_image_file
+
+# Предельное вознаграждение посредника по ОСАГО, % от премии (решение
+# владельца 2026-10-15: превышение запрещено и в ставке, и в платеже).
+OSAGO_MAX_KV_PERCENT = Decimal("10")
 
 
 class Insurer(models.Model):
@@ -81,6 +88,15 @@ class InsuranceType(models.Model):
         null=True,
         help_text="Рекомендуемый размер: 200x200px. Разрешены: jpg, jpeg, png (макс. 10MB)",
         validators=[validate_image_file],
+    )
+    is_osago = models.BooleanField(
+        "ОСАГО",
+        default=False,
+        help_text=(
+            "Полисы этого вида — ОСАГО: один платёж без страховой суммы, срок "
+            "не больше года, КВ не больше 10%. В аналитике по страховым "
+            "суммам и части отчётов такие полисы не учитываются."
+        ),
     )
 
     class Meta:
@@ -163,3 +179,20 @@ class CommissionRate(TimeStampedModel):
 
     def __str__(self):
         return f"{self.insurer} - {self.insurance_type}: {int(round(float(self.kv_percent)))}%"
+
+    def clean(self):
+        super().clean()
+        if (
+            self.insurance_type_id
+            and self.insurance_type.is_osago
+            and self.kv_percent is not None
+            and self.kv_percent > OSAGO_MAX_KV_PERCENT
+        ):
+            raise ValidationError(
+                {
+                    "kv_percent": (
+                        f"Ставка КВ по ОСАГО не может превышать "
+                        f"{OSAGO_MAX_KV_PERCENT:g}% от премии."
+                    )
+                }
+            )

@@ -11,6 +11,7 @@ from apps.insurers.models import (
     InfoTag,
     CommissionRate,
     LeasingManager,
+    OSAGO_MAX_KV_PERCENT,
 )
 
 
@@ -45,6 +46,27 @@ def in_force_q(as_of, prefix=""):
     )
 
 
+def osago_q(prefix=""):
+    """Q-фильтр полисов ОСАГО (вид страхования с признаком is_osago).
+
+    Портфель делится на «весь» и «без ОСАГО»: каждый отчёт и экран явно
+    выбирает одно из двух (см. вопросник ОСАГО, карта влияния). Для
+    «без ОСАГО» — ~osago_q(...) или .without_osago().
+
+    prefix — путь до Policy от модели запроса: "" для самого Policy,
+    "policy__" для PaymentSchedule и т.п.
+    """
+    return Q(**{f"{prefix}insurance_type__is_osago": True})
+
+
+def add_years(value, years):
+    """Дата через `years` лет; 29 февраля → 28 февраля в невисокосный год."""
+    try:
+        return value.replace(year=value.year + years)
+    except ValueError:
+        return value.replace(year=value.year + years, day=28)
+
+
 class PolicyQuerySet(models.QuerySet):
     def in_force(self, as_of=None):
         """Полисы, действующие на дату as_of (по умолчанию — сегодня)."""
@@ -54,13 +76,17 @@ class PolicyQuerySet(models.QuerySet):
             as_of = timezone.localdate()
         return self.filter(in_force_q(as_of))
 
+    def osago(self):
+        """Только полисы ОСАГО."""
+        return self.filter(osago_q())
 
-class PolicyManager(models.Manager):
-    def get_queryset(self):
-        return PolicyQuerySet(self.model, using=self._db)
+    def without_osago(self):
+        """Портфель без ОСАГО."""
+        return self.exclude(osago_q())
 
-    def in_force(self, as_of=None):
-        return self.get_queryset().in_force(as_of)
+
+class PolicyManager(models.Manager.from_queryset(PolicyQuerySet)):
+    pass
 
 
 class Policy(TimeStampedModel):
@@ -187,6 +213,38 @@ class Policy(TimeStampedModel):
         return f"{self.policy_number} - {self.client}"
 
     @property
+    def is_osago(self):
+        return bool(self.insurance_type_id) and self.insurance_type.is_osago
+
+    def clean(self):
+        """Правила ОСАГО: срок не больше года (короткие допустимы), без франшизы.
+
+        Остальные правила ОСАГО (один платёж, нет страховой суммы, КВ ≤ 10%)
+        проверяются на уровне платежа — PaymentSchedule.clean().
+        """
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if not self.is_osago:
+            return
+
+        errors = {}
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                errors[
+                    "end_date"
+                ] = "Дата окончания не может быть раньше даты начала страхования."
+            elif self.end_date > add_years(self.start_date, 1):
+                errors["end_date"] = (
+                    "Срок полиса ОСАГО не может быть больше года: "
+                    f"окончание не позже {add_years(self.start_date, 1):%d.%m.%Y}."
+                )
+        if self.franchise:
+            errors["franchise"] = "У полиса ОСАГО не бывает франшизы."
+        if errors:
+            raise ValidationError(errors)
+
+    @property
     def premium_total(self):
         """
         Общая сумма страховой премии = сумма всех платежей.
@@ -269,7 +327,8 @@ class Policy(TimeStampedModel):
             # Get first payment from dictionary (no additional DB query)
             first_payment = first_payments.get(year_number)
 
-            if not first_payment or first_payment.insurance_sum <= 0:
+            # У ОСАГО страховой суммы нет (NULL) — тариф не считается.
+            if not first_payment or not first_payment.insurance_sum:
                 continue
 
             # Determine if this is the current year
@@ -300,6 +359,16 @@ class Policy(TimeStampedModel):
         return rates_by_year
 
 
+class PaymentScheduleQuerySet(models.QuerySet):
+    def osago(self):
+        """Только платежи полисов ОСАГО."""
+        return self.filter(osago_q("policy__"))
+
+    def without_osago(self):
+        """Платежи портфеля без ОСАГО."""
+        return self.exclude(osago_q("policy__"))
+
+
 class PaymentSchedule(TimeStampedModel):
     """
     Payment Schedule - График платежей
@@ -320,8 +389,13 @@ class PaymentSchedule(TimeStampedModel):
         "Страховая сумма",
         max_digits=15,
         decimal_places=2,
+        blank=True,
+        null=True,
         validators=[MinValueValidator(Decimal("0.01"))],
-        help_text="Стоимость застрахованного имущества для данного платежа",
+        help_text=(
+            "Стоимость застрахованного имущества для данного платежа. "
+            "Обязательна для всех видов, кроме ОСАГО (у ОСАГО — пусто)."
+        ),
     )
     amount = models.DecimalField(
         "Страховая премия",
@@ -352,6 +426,8 @@ class PaymentSchedule(TimeStampedModel):
     )
     alliance_paid = models.BooleanField("Оплатил Альянс", default=False)
     payment_info = models.TextField("Дополнительная информация", blank=True)
+
+    objects = PaymentScheduleQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Платеж"
@@ -400,6 +476,12 @@ class PaymentSchedule(TimeStampedModel):
             or self.installment_number is None
         ):
             return
+
+        # Правила вида страхования проверяются до любых ранних выходов ниже:
+        # formset-путь (H-02) пропускает только проверку порядка дат.
+        kind_errors = self.insurance_kind_errors()
+        if kind_errors:
+            raise ValidationError(kind_errors)
 
         # H-02 (2026-10-13): в админке полиса порядок дат проверяет
         # PaymentScheduleInlineFormSet.clean() по итоговому набору строк.
@@ -453,6 +535,38 @@ class PaymentSchedule(TimeStampedModel):
                 f"Skipping date validation for payment due to error. "
                 f"Manual review recommended for policy {self.policy_id}"
             )
+
+    def insurance_kind_errors(self):
+        """
+        Проверяет платёж по правилам вида страхования полиса.
+        ОСАГО: ровно один платёж (год 1, платёж 1), без страховой суммы,
+        КВ не больше OSAGO_MAX_KV_PERCENT от премии. Остальные виды: страховая
+        сумма обязательна. Возвращает словарь {поле: сообщение}.
+        """
+        errors = {}
+        if not self.policy.is_osago:
+            if self.insurance_sum is None:
+                errors["insurance_sum"] = "Укажите страховую сумму."
+            return errors
+
+        if (self.year_number, self.installment_number) != (1, 1):
+            errors[
+                "installment_number"
+            ] = "У полиса ОСАГО может быть только один платёж: год 1, платёж 1."
+        if self.insurance_sum is not None:
+            errors[
+                "insurance_sum"
+            ] = "У ОСАГО нет страховой суммы — оставьте поле пустым."
+        if (
+            self.amount
+            and self.kv_rub
+            and self.kv_rub > self.amount * OSAGO_MAX_KV_PERCENT / Decimal("100")
+        ):
+            errors["kv_rub"] = (
+                f"КВ по ОСАГО не может превышать {OSAGO_MAX_KV_PERCENT:g}% "
+                f"от премии ({self.amount * OSAGO_MAX_KV_PERCENT / Decimal('100'):.2f} руб.)."
+            )
+        return errors
 
     def date_sequence_errors(self, previous_payment):
         """

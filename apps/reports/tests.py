@@ -1014,7 +1014,7 @@ class ThreePercentReportExportViewTest(TestCase):
         )
         self.insurer = Insurer.objects.create(insurer_name="СК 3%")
         self.branch = Branch.objects.create(branch_name="Санкт-Петербург")
-        self.insurance_type = InsuranceType.objects.create(name="ОСАГО")
+        self.insurance_type = InsuranceType.objects.create(name="Грузы")
         self.commission_rate = CommissionRate.objects.create(
             insurer=self.insurer,
             insurance_type=self.insurance_type,

@@ -329,7 +329,7 @@ class ReadyExportsTest(TestCase):
 
         self.branch = Branch.objects.create(branch_name="Филиал для экспортов")
 
-        self.insurance_type = InsuranceType.objects.create(name="ОСАГО")
+        self.insurance_type = InsuranceType.objects.create(name="Грузы")
 
         self.commission_rate = CommissionRate.objects.create(
             insurer=self.insurer,

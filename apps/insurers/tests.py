@@ -40,7 +40,7 @@ class InsurerStatisticsTestDataMixin:
         self.branch_a = Branch.objects.create(branch_name="Филиал А")
         self.branch_b = Branch.objects.create(branch_name="Филиал Б")
         self.type_casco = InsuranceType.objects.create(name="КАСКО")
-        self.type_osago = InsuranceType.objects.create(name="ОСАГО")
+        self.type_cargo = InsuranceType.objects.create(name="Грузы")
         self.leasing_client = LeasingClient.objects.create(
             client_name="Тестовый лизингополучатель", client_inn="7701234567"
         )
@@ -58,7 +58,7 @@ class InsurerStatisticsTestDataMixin:
         self.policy_a2 = self._create_policy(
             policy_number="POL-002",
             branch=self.branch_a,
-            insurance_type=self.type_osago,
+            insurance_type=self.type_cargo,
             premium=Decimal("4000.00"),
             start_date=date(2025, 6, 10),
             end_date=date(2026, 6, 9),
@@ -366,7 +366,7 @@ class InsurerStatisticsServiceTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(
             statistics["branch_distribution"][0]["metric_value_float"], 5000.0
         )
-        self.assertEqual(statistics["type_distribution"][0]["id"], self.type_osago.id)
+        self.assertEqual(statistics["type_distribution"][0]["id"], self.type_cargo.id)
         self.assertEqual(statistics["type_distribution"][0]["count"], 1)
         self.assertEqual(statistics["broker_participation"], 1)
         self.assertEqual(statistics["broker_percentage"], 50.0)
@@ -518,7 +518,7 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
             reverse("insurers:detail", args=[self.insurer.id]),
             {
                 "branch": str(self.branch_a.id),
-                "insurance_type": str(self.type_osago.id),
+                "insurance_type": str(self.type_cargo.id),
                 "stats_scope": "current",
                 "policy_scope": "all",
                 "metric": "premium",
@@ -534,7 +534,7 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
 
         self.assertEqual(response.context["selected_branch_id"], self.branch_a.id)
         self.assertEqual(
-            response.context["selected_insurance_type_id"], self.type_osago.id
+            response.context["selected_insurance_type_id"], self.type_cargo.id
         )
         self.assertEqual(response.context["stats_scope"], "current")
         self.assertEqual(response.context["policy_scope"], "all")

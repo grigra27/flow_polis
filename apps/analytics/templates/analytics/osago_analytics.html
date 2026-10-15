@@ -1,0 +1,95 @@
+{% extends "analytics/base.html" %}
+{% load currency_filters %}
+
+{% block title %}Аналитика ОСАГО - Система аналитики{% endblock %}
+{% block analytics_title %}Аналитика ОСАГО{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-car-front"></i> ОСАГО
+</li>
+{% endblock %}
+
+{% block analytics_actions %}
+<form method="get" class="d-flex align-items-center gap-2">
+    <label for="osagoYear" class="form-label mb-0">Год заключения:</label>
+    <select id="osagoYear" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for y in years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+    </select>
+</form>
+{% endblock %}
+
+{% block analytics_content %}
+<p class="text-muted small mb-4">
+    Полисы ОСАГО с датой начала в {{ year }} году. Премия и КВ — по единственному платежу полиса.
+    В остальной аналитике ОСАГО не учитывается.
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="h4 mb-1">{{ totals.policies }}</div>
+            <div class="text-muted small">Полисов за год</div>
+            <div class="text-muted small">в силе сегодня: {{ totals.in_force }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="h4 mb-1">{{ totals.premium|currency }}</div>
+            <div class="text-muted small">Премия</div>
+            <div class="text-muted small">оплачено платежей: {{ totals.paid }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="h4 mb-1">{{ totals.kv|currency }}</div>
+            <div class="text-muted small">КВ</div>
+            <div class="text-muted small">акт согласован: {{ totals.approved }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <div class="h4 mb-1">{{ totals.kv_percent|floatformat:1 }}%</div>
+            <div class="text-muted small">Средний КВ</div>
+            <div class="text-muted small">КВ / премия</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><strong>По месяцам</strong></div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Месяц</th><th class="text-end">Полисов</th><th class="text-end">Премия</th><th class="text-end">КВ</th></tr></thead>
+            <tbody>
+                {% for row in by_month %}
+                <tr{% if not row.policies %} class="text-muted"{% endif %}>
+                    <td>{{ row.name }}</td>
+                    <td class="text-end">{{ row.policies }}</td>
+                    <td class="text-end">{{ row.premium|currency }}</td>
+                    <td class="text-end">{{ row.kv|currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        {% include "analytics/includes/osago_breakdown.html" with title="По филиалам" rows=by_branch %}
+    </div>
+    <div class="col-lg-6">
+        {% include "analytics/includes/osago_breakdown.html" with title="По страховщикам" rows=by_insurer %}
+    </div>
+    <div class="col-12">
+        {% if clients_total > by_client|length %}
+            {% include "analytics/includes/osago_breakdown.html" with title="По клиентам (топ по премии)" rows=by_client note=clients_total %}
+        {% else %}
+            {% include "analytics/includes/osago_breakdown.html" with title="По клиентам" rows=by_client %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

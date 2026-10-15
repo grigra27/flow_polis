@@ -3230,3 +3230,26 @@ class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
             return (
                 f"{start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}"
             )
+
+
+class OsagoAnalyticsView(SuperuserRequiredMixin, TemplateView):
+    """Аналитика ОСАГО: полисы, премия и КВ по филиалам, СК, клиентам, месяцам.
+
+    Остальная аналитика идёт без ОСАГО (решение владельца), поэтому ОСАГО
+    вынесено на отдельную страницу.
+    """
+
+    template_name = "analytics/osago_analytics.html"
+
+    def get_context_data(self, **kwargs):
+        from .osago import build_osago_analytics
+
+        context = super().get_context_data(**kwargs)
+        try:
+            year = int(self.request.GET.get("year", ""))
+        except ValueError:
+            year = None
+        if year is not None and not 2000 <= year <= date.today().year + 1:
+            year = None
+        context.update(build_osago_analytics(year=year))
+        return context

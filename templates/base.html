@@ -90,6 +90,10 @@
                             <li><a class="dropdown-item{% if current_view == 'analytics:time_series_analytics' %} active{% endif %}" href="{% url 'analytics:time_series_analytics' %}">
                                 <i class="bi bi-graph-up-arrow"></i> Временная аналитика
                             </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item{% if current_view == 'analytics:osago_analytics' %} active{% endif %}" href="{% url 'analytics:osago_analytics' %}">
+                                <i class="bi bi-car-front"></i> Аналитика ОСАГО
+                            </a></li>
                         </ul>
                     </li>
                     {% endif %}

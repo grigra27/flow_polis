@@ -26,4 +26,5 @@ urlpatterns = [
         views.TimeSeriesAnalyticsView.as_view(),
         name="time_series_analytics",
     ),
+    path("osago/", views.OsagoAnalyticsView.as_view(), name="osago_analytics"),
 ]

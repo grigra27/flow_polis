@@ -1,0 +1,54 @@
+{% extends "analytics/v2/layout.html" %}
+{% load currency_filters %}
+
+{% block tab_content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-arrow-left"></i> Назад</a>
+        <span class="h5 align-middle">{{ metric.title }}</span>
+    </div>
+    <a href="?{{ export_query }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+</div>
+{% if metric.note %}<p class="av2-caption">{{ metric.note }}</p>{% endif %}
+
+<div class="d-flex flex-wrap gap-4 mb-3">
+    {% if is_payments %}
+    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">платежей ({{ totals.policies }} полисов)</div></div>
+    <div><div class="av2-number">{{ totals.commission|currency }}</div><div class="av2-caption">КВ</div></div>
+    <div><div class="av2-number">{{ totals.premium|currency }}</div><div class="av2-caption">премия</div></div>
+    {% else %}
+    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">полисов</div></div>
+    {% endif %}
+</div>
+
+{% if rows_truncated %}
+<div class="alert alert-warning py-2">Показаны первые {{ rows|length }} строк — полный список в Excel.</div>
+{% endif %}
+
+<div class="table-responsive">
+    <table class="table table-sm table-hover av2-table">
+        <thead class="table-light">
+            <tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for cell in row.cells %}
+                {% if forloop.first %}
+                <td><a href="{% url 'policies:detail' row.policy_id %}">{{ cell }}</a></td>
+                {% elif forloop.counter0 in money_columns %}
+                <td class="text-end">{{ cell|currency }}</td>
+                {% elif cell.year %}
+                <td>{{ cell|date:"d.m.Y" }}</td>
+                {% else %}
+                <td>{{ cell|default_if_none:"" }}</td>
+                {% endif %}
+                {% endfor %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{{ columns|length }}" class="text-muted">Нет данных</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

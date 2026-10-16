@@ -1,0 +1,13 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 %}
+{% block tab_content %}
+<div class="alert alert-light border">
+    <h2 class="h5"><i class="bi bi-cone-striped"></i> «{{ tab_title }}» — в разработке</h2>
+    <p class="mb-2">Вкладка появится на следующих этапах плана (docs/analytics-2.0-plan.md).</p>
+    <p class="mb-0">Пока можно проверить списки «под цифрой»:
+        <a href="{% drill_url 'in_force' %}">полисы в силе</a>,
+        <a href="{% drill_url 'payments_due' %}">платежи по графику за период</a>,
+        <a href="{% drill_url 'non_broker' %}">полисы без участия брокера</a>.
+    </p>
+</div>
+{% endblock %}

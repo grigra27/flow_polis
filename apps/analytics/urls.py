@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_v2
 
 app_name = "analytics"
 
@@ -27,4 +27,14 @@ urlpatterns = [
         name="time_series_analytics",
     ),
     path("osago/", views.OsagoAnalyticsView.as_view(), name="osago_analytics"),
+    # Аналитика 2.0 (docs/analytics-2.0-plan.md); до этапа 5 — по адресу v2/.
+    path("v2/list/<slug:key>/", views_v2.DrilldownView.as_view(), name="v2_list"),
+    *[
+        path(
+            "v2/" if key == "summary" else f"v2/{key.replace('_', '-')}/",
+            views_v2.AnalyticsTabView.as_view(tab=key),
+            name=f"v2_{key}",
+        )
+        for key in views_v2.TAB_KEYS
+    ],
 ]

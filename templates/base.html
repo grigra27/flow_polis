@@ -64,6 +64,10 @@
                             <i class="bi bi-bar-chart"></i> Аналитика
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="analyticsDropdown">
+                            <li><a class="dropdown-item{% if current_view|slice:':13' == 'analytics:v2_' %} active{% endif %}" href="{% url 'analytics:v2_summary' %}">
+                                <i class="bi bi-stars"></i> Аналитика 2.0 <span class="badge text-bg-warning">beta</span>
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item{% if current_view == 'analytics:dashboard' %} active{% endif %}" href="{% url 'analytics:dashboard' %}">
                                 <i class="bi bi-speedometer2"></i> Панель управления
                             </a></li>

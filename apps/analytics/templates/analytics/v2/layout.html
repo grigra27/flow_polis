@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load analytics_v2 %}
+
+{% block title %}Аналитика · {% if metric %}{{ metric.title }}{% else %}{{ tab_title }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.av2-filters { background: #f8f9fa; border-radius: .5rem; padding: .75rem 1rem; }
+.av2-filters .dropdown-menu { max-height: 22rem; overflow-y: auto; min-width: 16rem; }
+.av2-number { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+.av2-number a, a.av2-link { color: inherit; text-decoration: none; border-bottom: 1px dashed rgba(0,0,0,.3); }
+.av2-number a:hover, a.av2-link:hover { color: var(--bs-primary); border-bottom-color: var(--bs-primary); }
+.av2-caption { color: var(--bs-secondary-color); font-size: .875rem; }
+.av2-table td, .av2-table th { white-space: nowrap; }
+.av2-table td.text-wrap { white-space: normal; }
+.av2-chart { position: relative; height: 320px; }
+.nav-tabs .nav-link.disabled { opacity: .55; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-baseline mb-3 gap-2">
+    <h1 class="h3 mb-0"><i class="bi bi-bar-chart"></i> Аналитика</h1>
+    <div class="av2-caption">
+        Период: <strong>{{ params.period_label }}</strong>
+        {% if not params.with_osago %}· без ОСАГО{% endif %}
+        · без полисов «без участия брокера»
+    </div>
+</div>
+
+{% include "analytics/v2/includes/filters.html" %}
+
+{% if tabs %}
+<ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto">
+    {% for t in tabs %}
+    <li class="nav-item">
+        <a class="nav-link text-nowrap{% if t.active %} active{% endif %}{% if not t.ready %} text-muted{% endif %}"
+           href="{% tab_url t.url_name %}"{% if t.active %} aria-current="page"{% endif %}>
+            <i class="bi {{ t.icon }}"></i> {{ t.title }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% block tab_content %}{% endblock %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+{% block tab_js %}{% endblock %}
+{% endblock %}

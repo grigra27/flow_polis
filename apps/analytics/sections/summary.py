@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from django.db.models import Count, Q
 
 from .. import money, portfolio
+from . import data_quality
 from ..drilldown import POLICIES, metric
 
 USES_PERIOD = False
@@ -182,5 +183,6 @@ def build(params, query=None):
             },
             "manager_drops": _manager_drops(policies, today),
             "lost_undated": lost_undated,
+            "data_problems": data_quality.money_problem_count(params),
         },
     }

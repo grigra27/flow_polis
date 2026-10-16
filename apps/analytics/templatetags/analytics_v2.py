@@ -53,7 +53,10 @@ def drill_url(context, key, **kwargs):
 @register.simple_tag(takes_context=True)
 def tab_url(context, url_name, **overrides):
     """Ссылка на вкладку с текущими фильтрами раздела."""
-    query = context["params"].querystring(**overrides)
+    params = context["params"]
+    overrides, opts = split_overrides(params, overrides)
+    items = params.query_items(**overrides) + list(opts.items())
+    query = urlencode(items)
     url = reverse(url_name)
     return f"{url}?{query}" if query else url
 

@@ -1,0 +1,66 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Клиентов с КВ в периоде</div><div class="av2-number">{{ data.clients_total }}</div>
+        <div class="av2-caption">из них новых: {{ data.new_clients }}</div>
+    </div></div></div>
+    {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="КВ по графику за период" value=data.total_commission %}
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Доля топ-10 клиентов</div><div class="av2-number">{% if data.top10_share is not None %}{{ data.top10_share|floatformat:1 }}%{% else %}—{% endif %}</div>
+    </div></div></div>
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Доля топ-50 клиентов</div><div class="av2-number">{% if data.top50_share is not None %}{{ data.top50_share|floatformat:1 }}%{% else %}—{% endif %}</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Кривая концентрации</strong> <span class="av2-caption">накопленная доля КВ периода по клиентам от крупных к мелким</span></div>
+    <div class="card-body"><div class="av2-chart"><canvas id="chart-pareto"></canvas></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Крупнейшие клиенты</strong> <span class="av2-caption">топ-50 по КВ периода · ожидается — все неоплаченные будущие платежи</span></div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 av2-table">
+            <thead class="table-light"><tr>
+                <th>#</th><th>Клиент</th><th class="text-end">КВ за период</th><th class="text-end">Доля</th>
+                <th class="text-end">Полисов в силе</th><th class="text-end">Ожидается</th><th class="text-end">Ближайшее окончание</th>
+            </tr></thead>
+            <tbody>
+            {% for r in data.rows %}
+            <tr>
+                <td>{{ r.rank }}</td>
+                <td class="text-wrap"><a href="{% url 'clients:detail' r.id %}">{{ r.name }}</a>{% if r.is_new %} <span class="badge text-bg-success">новый</span>{% endif %}</td>
+                <td class="text-end">{{ r.commission|currency }}</td>
+                <td class="text-end">{% if r.share is not None %}{{ r.share|floatformat:1 }}%{% endif %}</td>
+                <td class="text-end"><a class="av2-link" href="{% drill_url 'client_policies' client=r.id %}">{{ r.in_force }}</a></td>
+                <td class="text-end">{{ r.expected|money_short }}</td>
+                <td class="text-end">{{ r.nearest_end|date:"d.m.Y"|default:"—" }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="7" class="text-muted">Нет данных</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ data.pareto|json_script:"pareto-chart" }}
+{% endblock %}
+
+{% block tab_js %}
+<script>
+(function () {
+    const d = JSON.parse(document.getElementById('pareto-chart').textContent);
+    new Chart(document.getElementById('chart-pareto'), {
+        type: 'line',
+        data: {labels: d.labels, datasets: [{label: 'Накопленная доля КВ, %', data: d.values, borderColor: '#1976d2', pointRadius: 0, fill: false}]},
+        options: {maintainAspectRatio: false, scales: {
+            x: {title: {display: true, text: 'клиентов (от крупных к мелким)'}, ticks: {maxTicksLimit: 15}},
+            y: {min: 0, max: 100, ticks: {callback: (v) => v + '%'}},
+        }, plugins: {legend: {display: false}}},
+    });
+})();
+</script>
+{% endblock %}

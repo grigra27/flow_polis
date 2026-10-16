@@ -131,6 +131,16 @@ class AnalyticsParams:
             q &= Q(**{f"{prefix}insurance_type__is_osago": False})
         return q
 
+    def osago_policies(self) -> QuerySet:
+        """Полисы ОСАГО по разрезам (переключатель ОСАГО не влияет), с участием брокера."""
+        from apps.policies.models import Policy
+
+        q = Q(insurance_type__is_osago=True, broker_participation=True)
+        for name, field_name in DIMENSIONS.items():
+            if getattr(self, name):
+                q &= Q(**{f"{field_name}__in": getattr(self, name)})
+        return Policy.objects.filter(q)
+
     def all_policies(self) -> QuerySet:
         """Полисы по разрезам и ОСАГО, включая полисы без участия брокера."""
         from apps.policies.models import Policy

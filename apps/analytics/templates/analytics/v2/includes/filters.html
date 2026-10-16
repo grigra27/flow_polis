@@ -2,7 +2,7 @@
 <form method="get" class="av2-filters mb-3" id="av2-filters">
     <div class="d-flex flex-wrap align-items-center gap-2">
         {% if show_period is False %}
-        <span class="av2-caption me-2"><i class="bi bi-calendar-check"></i> Сводка — на сегодня, {{ params.today|date:"d.m.Y" }}</span>
+        <span class="av2-caption me-2"><i class="bi bi-calendar-check"></i> {{ tab_title }} — на сегодня, {{ params.today|date:"d.m.Y" }}</span>
         {% if params.preset %}{% if params.preset != "year" %}<input type="hidden" name="period" value="{{ params.preset }}">{% endif %}{% else %}<input type="hidden" name="from" value="{{ params.date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ params.date_to|date:'Y-m-d' }}">{% endif %}
         {% else %}
         <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Период">

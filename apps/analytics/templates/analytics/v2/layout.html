@@ -24,7 +24,7 @@
     <h1 class="h3 mb-0"><i class="bi bi-bar-chart"></i> Аналитика</h1>
     <div class="av2-caption">
         {% if show_period is not False %}Период: <strong>{{ params.period_label }}</strong>{% endif %}
-        {% if not params.with_osago %}· без ОСАГО{% endif %}
+        {% if not params.with_osago and tab != 'osago' %}· без ОСАГО{% endif %}
         · без полисов «без участия брокера»
     </div>
 </div>

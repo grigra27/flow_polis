@@ -4,7 +4,7 @@
 {% block tab_content %}
 {% with b=data.bridge s=data.signals %}
 
-{% if s.stale_act.count or s.ending_soon.count or s.recent_losses.count or s.manager_drops.rows or s.lost_undated.count %}
+{% if s.stale_act.count or s.ending_soon.count or s.recent_losses.count or s.manager_drops.rows or s.lost_undated.count or s.data_problems %}
 <div class="card border-warning mb-4">
     <div class="card-header bg-warning-subtle"><strong><i class="bi bi-bell"></i> На что обратить внимание</strong></div>
     <ul class="list-group list-group-flush">
@@ -17,8 +17,9 @@
         {% endif %}
         {% if s.ending_soon.count %}
         <li class="list-group-item">
-            <a class="av2-link" href="{% drill_url 'ending_soon' %}">{{ s.ending_soon.count|plural:"полис,полиса,полисов" }}</a>
-            с активным ДФА заканчиваются в ближайшие {{ s.ending_soon.days }} дней — нужен новый полис.
+            В ближайшие {{ s.ending_soon.days }} дней заканчивается срок у
+            <a class="av2-link" href="{% drill_url 'ending_soon' %}">{{ s.ending_soon.count|plural:"полиса,полисов,полисов" }}</a>
+            с активным ДФА — нужен новый полис.
         </li>
         {% endif %}
         {% if s.recent_losses.count %}
@@ -39,6 +40,12 @@
         <li class="list-group-item">
             <a class="av2-link" href="{% drill_url 'lost' undated='1' %}">{{ s.lost_undated.count|plural:"платёж,платежа,платежей" }} ({{ s.lost_undated.commission|currency }} КВ)</a>
             отменены закрытием ДФА без даты — дату закрытия стоит заполнить.
+        </li>
+        {% endif %}
+        {% if s.data_problems %}
+        <li class="list-group-item">
+            <a class="av2-link" href="{% tab_url 'analytics:v2_data_quality' %}">{{ s.data_problems|plural:"запись,записи,записей" }}</a>
+            с ошибками данных, которые искажают деньги и удержание (вкладка «Качество данных»).
         </li>
         {% endif %}
     </ul>

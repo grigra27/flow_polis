@@ -1,0 +1,47 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+<p class="av2-caption">Полисы ОСАГО с датой начала в периоде. Премия и КВ — по единственному платежу полиса. На остальных вкладках ОСАГО учитывается только с переключателем «с ОСАГО».</p>
+{% with t=data.totals %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Полисов за период</div>
+        <div class="av2-number"><a href="{% drill_url 'osago_policies' %}">{{ t.policies }}</a></div>
+        <div class="av2-caption">в силе сегодня: <a class="av2-link" href="{% drill_url 'osago_in_force' %}">{{ t.in_force }}</a></div>
+    </div></div></div>
+    {% drill_url 'osago_payments' as u %}
+    {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="Премия" value=t.premium url=u caption=t.paid|plural:"платёж оплачен,платежа оплачено,платежей оплачено" %}
+    {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="КВ" value=t.kv url=u caption=t.approved|plural:"акт согласован,акта согласовано,актов согласовано" tone="success" %}
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Средний КВ</div><div class="av2-number">{{ t.kv_percent|floatformat:1 }}%</div>
+    </div></div></div>
+</div>
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-header"><strong>По месяцам</strong></div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 av2-table">
+            <thead class="table-light"><tr><th>Месяц</th><th class="text-end">Полисов</th><th class="text-end">Премия</th><th class="text-end">КВ</th></tr></thead>
+            <tbody>
+            {% for r in data.by_month %}
+            <tr{% if not r.policies %} class="text-muted"{% endif %}><td>{{ r.label }}</td><td class="text-end">{{ r.policies }}</td><td class="text-end">{{ r.premium|currency }}</td><td class="text-end">{{ r.kv|currency }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">{% include "analytics/includes/osago_breakdown.html" with title="По филиалам" rows=data.by_branch %}</div>
+    <div class="col-lg-6">{% include "analytics/includes/osago_breakdown.html" with title="По страховщикам" rows=data.by_insurer %}</div>
+    <div class="col-12">
+        {% if data.clients_total > data.by_client|length %}
+        {% include "analytics/includes/osago_breakdown.html" with title="По клиентам (топ по премии)" rows=data.by_client note=data.clients_total %}
+        {% else %}
+        {% include "analytics/includes/osago_breakdown.html" with title="По клиентам" rows=data.by_client %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

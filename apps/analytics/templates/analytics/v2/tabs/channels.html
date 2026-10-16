@@ -1,0 +1,55 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <div>
+            <strong>Каналы привлечения</strong>
+            <div class="av2-caption">Новый бизнес — за период и за {{ data.previous_from|date:"d.m.Y" }}–{{ data.previous_to|date:"d.m.Y" }}; в силе и КВ на 12 мес. — на сегодня; продление и потери — за период.</div>
+        </div>
+        <div class="btn-group btn-group-sm">
+            {% for g in data.groupings %}
+            <a class="btn {% if g.key == data.grouping %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?{{ params.querystring }}&by={{ g.key }}">{{ g.title }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 av2-table">
+            <thead class="table-light">
+                <tr>
+                    <th>{{ data.grouping_title }}</th>
+                    <th class="text-end">Новых полисов</th><th class="text-end">КВ 1-го года</th>
+                    <th class="text-end">Год назад</th><th class="text-end">Изменение</th>
+                    <th class="text-end">В силе</th><th class="text-end">КВ на 12 мес.</th>
+                    <th class="text-end">Продление</th><th class="text-end">Потеряно</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in data.rows %}
+            <tr{% if r.dropped %} class="table-warning"{% endif %}>
+                <td>{% if r.dropped %}<i class="bi bi-arrow-down-circle text-danger" title="Новый бизнес упал вдвое и больше"></i> {% endif %}{{ r.name }}</td>
+                <td class="text-end">
+                    {% if r.id and r.nb_count %}
+                    {% if data.grouping == "branch" %}{% drill_url 'new_business' branch=r.id as u %}{% else %}{% drill_url 'new_business' manager=r.id as u %}{% endif %}
+                    <a class="av2-link" href="{{ u }}">{{ r.nb_count }}</a>
+                    {% else %}{{ r.nb_count }}{% endif %}
+                </td>
+                <td class="text-end">{{ r.nb_kv|money_short }}</td>
+                <td class="text-end">{{ r.prev_count }} <span class="av2-caption">· {{ r.prev_kv|money_short }}</span></td>
+                <td class="text-end">{% if r.change is not None %}<span class="{% if r.change >= 0 %}text-success{% else %}text-danger{% endif %}">{% if r.change >= 0 %}+{% endif %}{{ r.change|floatformat:0 }}%</span>{% else %}—{% endif %}</td>
+                <td class="text-end">{{ r.in_force }}</td>
+                <td class="text-end">{{ r.horizon_kv|money_short }}</td>
+                <td class="text-end">{% if r.renewal_rate is not None %}{{ r.renewal_rate|floatformat:0 }}% <span class="av2-caption">из {{ r.renewal_due }}</span>{% else %}—{% endif %}</td>
+                <td class="text-end">{% if r.lost %}<span class="text-danger">{{ r.lost|money_short }}</span>{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}<tr><td colspan="9" class="text-muted">Нет данных</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if not data.history_ok %}
+<p class="av2-caption"><i class="bi bi-exclamation-circle"></i> Изменение к прошлому году не показано: прошлый период попадает на неполную историю (до июля 2025).</p>
+{% endif %}
+{% endblock %}

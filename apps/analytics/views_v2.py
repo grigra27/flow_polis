@@ -23,11 +23,11 @@ TABS = [
     ("money", "Деньги", "bi-cash-stack", "money"),
     ("sales", "Продажи", "bi-graph-up-arrow", "sales"),
     ("portfolio", "Портфель", "bi-briefcase", "portfolio"),
-    ("insurers", "Страховщики", "bi-building", None),
-    ("channels", "Каналы", "bi-diagram-3", None),
-    ("clients", "Клиенты", "bi-people", None),
-    ("osago", "ОСАГО", "bi-car-front", None),
-    ("data_quality", "Качество данных", "bi-clipboard-check", None),
+    ("insurers", "Страховщики", "bi-building", "insurers"),
+    ("channels", "Каналы", "bi-diagram-3", "channels"),
+    ("clients", "Клиенты", "bi-people", "clients"),
+    ("osago", "ОСАГО", "bi-car-front", "osago"),
+    ("data_quality", "Качество данных", "bi-clipboard-check", "data_quality"),
 ]
 TAB_KEYS = [key for key, *_ in TABS]
 

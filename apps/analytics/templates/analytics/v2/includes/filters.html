@@ -1,31 +1,39 @@
 {% load analytics_v2 %}
-<form method="get" class="av2-filters mb-3" id="av2-filters">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        {% if show_period is False %}
-        <span class="av2-caption me-2"><i class="bi bi-calendar-check"></i> {{ tab_title }} — на сегодня, {{ params.today|date:"d.m.Y" }}</span>
+<form method="get" class="ax-toolbar" id="ax-filters">
+    {% if show_period is False %}
+    <div class="ax-toolbar-group">
+        <span class="ax-toolbar-label"><i class="bi bi-calendar-check"></i> {{ tab_title }} — на сегодня</span>
         {% if params.preset %}{% if params.preset != "year" %}<input type="hidden" name="period" value="{{ params.preset }}">{% endif %}{% else %}<input type="hidden" name="from" value="{{ params.date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ params.date_to|date:'Y-m-d' }}">{% endif %}
-        {% else %}
-        <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Период">
-            {% for p in params.preset_links %}
-            <a class="btn {% if p.active %}btn-primary{% else %}btn-outline-primary{% endif %}"
-               href="?{{ p.query }}">{{ p.label }}</a>
-            {% endfor %}
-        </div>
-        <div class="d-flex align-items-center gap-1">
-            <input type="date" name="from" value="{{ params.date_from|date:'Y-m-d' }}" class="form-control form-control-sm" aria-label="С">
-            <span>—</span>
-            <input type="date" name="to" value="{{ params.date_to|date:'Y-m-d' }}" class="form-control form-control-sm" aria-label="По">
-        </div>
+    </div>
+    {% else %}
+    <div class="ax-toolbar-group" role="group" aria-label="Период">
+        {% for p in params.preset_links %}
+        <a class="ax-pill{% if p.active %} is-active{% endif %}" href="?{{ p.query }}">{{ p.label }}</a>
+        {% endfor %}
+    </div>
+    <div class="ax-toolbar-group">
+        <input type="date" name="from" value="{{ params.date_from|date:'Y-m-d' }}" class="ax-date" aria-label="Период с">
+        <span class="ax-muted">—</span>
+        <input type="date" name="to" value="{{ params.date_to|date:'Y-m-d' }}" class="ax-date" aria-label="Период по">
+    </div>
+    {% endif %}
 
-        {% endif %}
+    {% if show_as_of %}
+    <span class="ax-toolbar-sep"></span>
+    <div class="ax-toolbar-group">
+        <label for="ax-as-of" class="ax-toolbar-label">Срез на</label>
+        <input type="date" id="ax-as-of" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}" class="ax-date">
+    </div>
+    {% elif params.as_of != params.today %}<input type="hidden" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}">{% endif %}
 
+    <span class="ax-toolbar-sep"></span>
+    <div class="ax-toolbar-group">
         {% for f in filter_options %}
         <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                {{ f.label }}
-                {% for o in f.options %}{% if o.selected %}<span class="badge text-bg-primary ms-1">{{ o.name|truncatechars:14 }}</span>{% endif %}{% endfor %}
+            <button class="ax-pill dropdown-toggle{% if f.selected_count %} is-active{% endif %}" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                {{ f.label }}{% if f.selected_count %} <span class="ax-count">{{ f.selected_count }}</span>{% endif %}
             </button>
-            <div class="dropdown-menu p-2">
+            <div class="dropdown-menu">
                 {% for o in f.options %}
                 <label class="dropdown-item d-flex gap-2 align-items-center">
                     <input type="checkbox" class="form-check-input mt-0" name="{{ f.name }}" value="{{ o.id }}"{% if o.selected %} checked{% endif %}>
@@ -35,19 +43,16 @@
             </div>
         </div>
         {% endfor %}
-
         <div class="form-check form-switch mb-0 ms-1">
-            <input class="form-check-input" type="checkbox" role="switch" id="av2-osago" name="osago" value="1"{% if params.with_osago %} checked{% endif %}>
-            <label class="form-check-label small" for="av2-osago">с ОСАГО</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="ax-osago" name="osago" value="1"{% if params.with_osago %} checked{% endif %}>
+            <label class="form-check-label ax-toolbar-label" for="ax-osago">с ОСАГО</label>
         </div>
-        {% if show_as_of %}
-        <div class="d-flex align-items-center gap-1">
-            <label for="av2-as-of" class="small text-nowrap">Срез на</label>
-            <input type="date" id="av2-as-of" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}" class="form-control form-control-sm">
-        </div>
-        {% elif params.as_of != params.today %}<input type="hidden" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}">{% endif %}
+    </div>
 
-        <button type="submit" class="btn btn-sm btn-primary ms-auto"><i class="bi bi-funnel"></i> Применить</button>
-        <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+    <div class="ax-toolbar-end">
+        {% if params.has_dimension_filters or params.with_osago or not params.preset or params.preset != "year" or params.as_of != params.today %}
+        <a href="{{ request.path }}" class="ax-reset">Сбросить</a>
+        {% endif %}
+        <button type="submit" class="btn btn-primary btn-sm ax-btn-apply">Применить</button>
     </div>
 </form>

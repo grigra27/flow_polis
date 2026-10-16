@@ -20,11 +20,11 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 PERIOD_PRESETS = [
-    ("year", "Этот год"),
+    ("year", "Год"),
     ("prev_year", "Прошлый год"),
     ("quarter", "Квартал"),
     ("month", "Месяц"),
-    ("12m", "12 месяцев"),
+    ("12m", "12 мес."),
 ]
 
 # Разрезы: GET-параметр → поле Policy.

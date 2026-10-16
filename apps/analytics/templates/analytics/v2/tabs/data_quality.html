@@ -2,22 +2,36 @@
 {% load analytics_v2 currency_filters %}
 
 {% block tab_content %}
-<p class="av2-caption">Проверки на сегодня. Клик по числу — список записей для исправления. Отмеченные <i class="bi bi-cash-coin text-danger"></i> искажают деньги или удержание.</p>
-<div class="card mb-4">
-    <div class="table-responsive">
-        <table class="table table-sm mb-0 av2-table">
-            <thead class="table-light"><tr><th>Проверка</th><th class="text-end">Записей</th><th class="text-end">КВ</th><th>Что сделать</th></tr></thead>
-            <tbody>
-            {% for r in data.rows %}
-            <tr{% if r.count and r.affects_money %} class="table-warning"{% endif %}>
-                <td class="text-wrap">{% if r.affects_money %}<i class="bi bi-cash-coin text-danger"></i> {% endif %}{{ r.title }}</td>
-                <td class="text-end">{% if r.count %}<a class="av2-link fw-semibold" href="{% drill_url r.key %}">{{ r.count }}</a>{% else %}<span class="text-success"><i class="bi bi-check-lg"></i> 0</span>{% endif %}</td>
-                <td class="text-end">{% if r.is_payments and r.count %}{{ r.commission|currency }}{% endif %}</td>
-                <td class="text-wrap av2-caption">{{ r.hint }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <div class="ax-kicker">Проверки на сегодня</div>
+            <h2 class="ax-title">Качество данных</h2>
+            <p class="ax-sub">Клик по числу — список записей для исправления. Проверки с пометкой «влияет на деньги» искажают КВ, потери или удержание.</p>
+        </div>
     </div>
-</div>
+    <ul class="ax-signals">
+        {% for r in data.rows %}
+        <li>
+            {% if not r.count %}
+            <span class="ax-signal-icon" style="background:#e3f4ea;color:#17673a"><i class="bi bi-check-lg"></i></span>
+            {% elif r.affects_money %}
+            <span class="ax-signal-icon ax-signal-icon--critical"><i class="bi bi-exclamation-lg"></i></span>
+            {% else %}
+            <span class="ax-signal-icon ax-signal-icon--warning"><i class="bi bi-dash-lg"></i></span>
+            {% endif %}
+            <div class="flex-grow-1">
+                <div class="ax-signal-title">{{ r.title }}{% if r.affects_money %} <span class="ax-badge ax-badge--neutral">влияет на деньги</span>{% endif %}</div>
+                <div class="ax-signal-text">{{ r.hint }}</div>
+            </div>
+            <div class="text-end" style="min-width:110px">
+                {% if r.count %}
+                <a class="ax-link fs-5" href="{% drill_url r.key %}">{{ r.count }}</a>
+                {% if r.is_payments %}<div class="ax-muted small">КВ {{ r.commission|money_short }}</div>{% endif %}
+                {% else %}<span class="ax-muted">нет</span>{% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
 {% endblock %}

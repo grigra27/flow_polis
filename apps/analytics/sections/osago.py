@@ -93,15 +93,28 @@ def build(params, query=None):
         for m in money.month_starts(params.date_from, params.date_to)
     ]
     by_client = _breakdown(payments, "policy__client_id", "policy__client__client_name")
+    by_branch = _breakdown(payments, "policy__branch_id", "policy__branch__branch_name")
+    by_insurer = _breakdown(
+        payments, "policy__insurer_id", "policy__insurer__insurer_name"
+    )
     return {
+        "breakdowns": [
+            {"title": "По страховщикам", "rows": by_insurer},
+            {"title": "По филиалам", "rows": by_branch},
+            {
+                "title": "По клиентам",
+                "rows": by_client[:TOP_CLIENTS],
+                "note": (
+                    f"Показаны {TOP_CLIENTS} из {len(by_client)} — крупнейшие по премии."
+                    if len(by_client) > TOP_CLIENTS
+                    else ""
+                ),
+            },
+        ],
         "totals": totals,
         "by_month": by_month,
-        "by_branch": _breakdown(
-            payments, "policy__branch_id", "policy__branch__branch_name"
-        ),
-        "by_insurer": _breakdown(
-            payments, "policy__insurer_id", "policy__insurer__insurer_name"
-        ),
+        "by_branch": by_branch,
+        "by_insurer": by_insurer,
         "by_client": by_client[:TOP_CLIENTS],
         "clients_total": len(by_client),
     }

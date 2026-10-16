@@ -3,187 +3,189 @@
 
 {% block tab_content %}
 {% with k=data.kpi %}
-<div class="row g-3 mb-4">
+<div class="ax-kpis">
     {% drill_url 'earned' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="КВ заработано (по актам)" value=k.earned.commission url=u caption=k.earned.count|plural:"платёж,платежа,платежей" tone="success" %}
+    {% include "analytics/v2/includes/kpi.html" with title="Заработано по актам" value=k.earned.commission url=u caption=k.earned.count|plural:"платёж,платежа,платежей" tone="good" %}
     {% drill_url 'plan' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="План по графику за период" value=k.plan.commission url=u caption=k.plan.count|plural:"платёж,платежа,платежей" %}
+    {% if k.plan_completion is not None %}{% with c=k.plan_completion|floatformat:0 %}
+    {% include "analytics/v2/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u caption="выполнен на "|add:c|add:"%" %}
+    {% endwith %}{% else %}
+    {% include "analytics/v2/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u %}
+    {% endif %}
     {% drill_url 'expected' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Ожидается до конца периода" value=k.expected.commission url=u caption=k.expected.count|plural:"платёж,платежа,платежей" tone="primary" %}
+    {% include "analytics/v2/includes/kpi.html" with title="Ожидается до конца периода" value=k.expected.commission url=u caption=k.expected.count|plural:"платёж,платежа,платежей" tone="accent" %}
     {% drill_url 'awaiting_act' as u %}
     {% include "analytics/v2/includes/kpi.html" with title="Ждёт акта СК · сейчас" value=k.awaiting.commission url=u caption=k.awaiting.count|plural:"платёж,платежа,платежей" tone="warning" %}
     {% drill_url 'overdue' as u %}
     {% include "analytics/v2/includes/kpi.html" with title="Просрочено · сейчас" value=k.overdue.commission url=u caption=k.overdue.count|plural:"платёж,платежа,платежей" %}
     {% drill_url 'lost' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Потеряно за период" value=k.lost.commission url=u caption=k.lost.count|plural:"платёж,платежа,платежей" tone="danger" %}
+    {% include "analytics/v2/includes/kpi.html" with title="Потеряно за период" value=k.lost.commission url=u caption=k.lost.count|plural:"платёж,платежа,платежей" tone="critical" %}
 </div>
-{% if k.plan_completion is not None %}
-<p class="av2-caption mb-4">
-    Заработано {{ k.plan_completion|floatformat:0 }}% от плана по графику за период.
-    Все суммы — КВ; премия — в списках и выгрузке.
-    {% if k.lost_undated.count %}
-    Ещё <a class="av2-link" href="{% drill_url 'lost' undated='1' %}">{{ k.lost_undated.commission|currency }}</a>
-    потеряно без известной даты (ДФА закрыт без даты) — в период не попадает.
-    {% endif %}
-</p>
+{% if k.lost_undated.count %}
+<p class="ax-note"><i class="bi bi-info-circle"></i>Ещё <a class="ax-link" href="{% drill_url 'lost' undated='1' %}">{{ k.lost_undated.commission|currency }}</a> потеряно без даты (ДФА закрыт без даты) — в период не попадает.</p>
 {% endif %}
 {% endwith %}
 
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between">
-        <strong>КВ по месяцам: заработано по актам и план по графику</strong>
-        <span class="av2-caption">период фильтра</span>
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <div class="ax-kicker">По месяцам</div>
+            <h2 class="ax-title">КВ: заработано по актам и план по графику</h2>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="av2-chart"><canvas id="chart-monthly"></canvas></div>
+    <div class="ax-legend">
+        <span><i style="background:#2a78d6"></i>Заработано по актам</span>
+        <span><i class="line" style="background:#eb6834"></i>План по графику</span>
     </div>
-    <div class="table-responsive">
-        <table class="table table-sm mb-0 av2-table">
-            <thead class="table-light"><tr>
-                <th>Месяц</th><th class="text-end">Заработано</th><th class="text-end">План</th>
-                <th class="text-end">Заработано / план</th><th class="text-end">Потеряно</th>
-            </tr></thead>
-            <tbody>
-            {% for row in data.monthly %}
-            <tr>
-                <td>{{ row.label }}</td>
-                <td class="text-end"><a class="av2-link" href="{% drill_url 'earned' month=row.month_code %}">{{ row.earned_commission|currency }}</a></td>
-                <td class="text-end"><a class="av2-link" href="{% drill_url 'plan' month=row.month_code %}">{{ row.plan_commission|currency }}</a></td>
-                <td class="text-end">{% if row.plan_commission %}{% widthratio row.earned_commission row.plan_commission 100 %}%{% else %}—{% endif %}</td>
-                <td class="text-end">{% if row.lost_commission %}<a class="av2-link text-danger" href="{% drill_url 'lost' month=row.month_code %}">{{ row.lost_commission|currency }}</a>{% else %}—{% endif %}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+    <div class="ax-chart"><canvas id="chart-monthly"></canvas></div>
+    <details class="ax-details">
+        <summary>Таблица по месяцам</summary>
+        <div class="ax-table-wrap">
+            <table class="ax-table ax-table--compact">
+                <thead><tr><th>Месяц</th><th class="num">Заработано</th><th class="num">План</th><th class="num">Выполнение</th><th class="num">Потеряно</th></tr></thead>
+                <tbody>
+                {% for row in data.monthly %}
+                <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="num"><a class="ax-link" href="{% drill_url 'earned' month=row.month_code %}">{{ row.earned_commission|currency }}</a></td>
+                    <td class="num"><a class="ax-link" href="{% drill_url 'plan' month=row.month_code %}">{{ row.plan_commission|currency }}</a></td>
+                    <td class="num">{% if row.plan_commission %}{% widthratio row.earned_commission row.plan_commission 100 %}%{% else %}<span class="ax-zero">—</span>{% endif %}</td>
+                    <td class="num">{% if row.lost_commission %}<a class="ax-link" href="{% drill_url 'lost' month=row.month_code %}">{{ row.lost_commission|currency }}</a>{% else %}<span class="ax-zero">—</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
 
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between">
-        <strong>Долг СК по актам: клиент оплатил, акт не согласован</strong>
-        <span class="av2-caption">срез на сегодня · возраст = дней с даты оплаты</span>
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <div class="ax-kicker">Срез на сегодня</div>
+            <h2 class="ax-title">Долг СК по актам</h2>
+            <p class="ax-sub">Клиент оплатил, акт с СК не согласован. Возраст — дней с даты оплаты.</p>
+        </div>
     </div>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0 av2-table">
-            <thead class="table-light"><tr>
-                <th>СК</th><th class="text-end">Платежей</th><th class="text-end">КВ всего</th>
-                {% for b in data.age_buckets %}<th class="text-end">{{ b.label }}</th>{% endfor %}
-                <th class="text-end">Самый старый</th>
+    <div class="ax-table-wrap">
+        <table class="ax-table">
+            <thead><tr>
+                <th>СК</th><th class="num">Платежей</th><th class="num">КВ всего</th>
+                {% for b in data.age_buckets %}<th class="num">{{ b.label }}</th>{% endfor %}
+                <th class="num">Самый старый</th>
             </tr></thead>
             <tbody>
             {% for row in data.debt %}
             <tr>
-                <td>{{ row.insurer }}</td>
-                <td class="text-end">{{ row.count }}</td>
-                <td class="text-end"><a class="av2-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id %}">{{ row.commission|currency }}</a></td>
+                <td><a class="ax-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id %}">{{ row.insurer }}</a></td>
+                <td class="num">{{ row.count }}</td>
+                <td class="num"><strong>{{ row.commission|currency }}</strong></td>
                 {% for b in row.buckets %}
-                <td class="text-end{% if b.key == '90+' and b.commission %} text-danger fw-semibold{% endif %}">
-                    {% if b.commission %}<a class="av2-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id age=b.key %}">{{ b.commission|currency }}</a>{% else %}—{% endif %}
-                </td>
+                <td class="num">{% if b.commission %}{% if b.key == '90+' %}<span class="ax-badge ax-badge--critical">{% endif %}<a class="ax-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id age=b.key %}">{{ b.commission|currency }}</a>{% if b.key == '90+' %}</span>{% endif %}{% else %}<span class="ax-zero">—</span>{% endif %}</td>
                 {% endfor %}
-                <td class="text-end">{{ row.oldest|date:"d.m.Y" }} <span class="av2-caption">({{ row.oldest_days }} дн.)</span></td>
+                <td class="num">{{ row.oldest|date:"d.m.Y" }} <span class="ax-muted">· {{ row.oldest_days }} дн.</span></td>
             </tr>
             {% empty %}
-            <tr><td colspan="8" class="text-muted">Всё оплаченное закрыто актами</td></tr>
+            <tr><td colspan="8" class="ax-empty">Всё оплаченное закрыто актами</td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
+</section>
 
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between">
-        <strong>Потери: платежи, которых уже не будет</strong>
-        <span class="av2-caption">по дате события · досрочный выкуп — ДФА закрыт раньше окончания полиса более чем на 30 дн.</span>
-    </div>
-    <div class="card-body">
-        <div class="row g-4">
-            <div class="col-lg-4">
-                <table class="table table-sm av2-table mb-0">
-                    <thead><tr><th>Причина</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
-                    <tbody>
-                    {% for r in data.loss_reasons %}
-                    <tr>
-                        <td>{{ r.label }}</td>
-                        <td class="text-end">{{ r.count }}</td>
-                        <td class="text-end">{% if r.count %}<a class="av2-link" href="{% drill_url 'lost' reason=r.key %}">{{ r.commission|currency }}</a>{% else %}—{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="col-lg-4">
-                <table class="table table-sm av2-table mb-0">
-                    <thead><tr><th>Филиал</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
-                    <tbody>
-                    {% for r in data.loss_by_branch %}
-                    <tr><td>{{ r.name }}</td><td class="text-end">{{ r.count }}</td>
-                        <td class="text-end"><a class="av2-link" href="{% drill_url 'lost' branch=r.id %}">{{ r.commission|currency }}</a></td></tr>
-                    {% empty %}<tr><td colspan="3" class="text-muted">Потерь нет</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="col-lg-4">
-                <table class="table table-sm av2-table mb-0">
-                    <thead><tr><th>СК</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
-                    <tbody>
-                    {% for r in data.loss_by_insurer %}
-                    <tr><td>{{ r.name }}</td><td class="text-end">{{ r.count }}</td>
-                        <td class="text-end"><a class="av2-link" href="{% drill_url 'lost' insurer=r.id %}">{{ r.commission|currency }}</a></td></tr>
-                    {% empty %}<tr><td colspan="3" class="text-muted">Потерь нет</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <div class="ax-kicker">За период</div>
+            <h2 class="ax-title">Потери: платежи, которых уже не будет</h2>
+            <p class="ax-sub">По дате события. Досрочный выкуп — ДФА закрыт раньше окончания полиса более чем на 30 дней.</p>
         </div>
     </div>
-</div>
+    <div class="ax-grid ax-grid-3" style="margin-bottom:0">
+        <div>
+            <table class="ax-table ax-table--compact">
+                <thead><tr><th>Причина</th><th class="num">Платежей</th><th class="num">КВ</th></tr></thead>
+                <tbody>
+                {% for r in data.loss_reasons %}
+                <tr><td>{{ r.label }}</td><td class="num">{{ r.count }}</td>
+                    <td class="num">{% if r.count %}<a class="ax-link" href="{% drill_url 'lost' reason=r.key %}">{{ r.commission|currency }}</a>{% else %}<span class="ax-zero">—</span>{% endif %}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <table class="ax-table ax-table--compact">
+                <thead><tr><th>Филиал</th><th class="num">Платежей</th><th class="num">КВ</th></tr></thead>
+                <tbody>
+                {% for r in data.loss_by_branch %}
+                <tr><td>{{ r.name }}</td><td class="num">{{ r.count }}</td><td class="num"><a class="ax-link" href="{% drill_url 'lost' branch=r.id %}">{{ r.commission|currency }}</a></td></tr>
+                {% empty %}<tr><td colspan="3" class="ax-empty">Потерь нет</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <table class="ax-table ax-table--compact">
+                <thead><tr><th>СК</th><th class="num">Платежей</th><th class="num">КВ</th></tr></thead>
+                <tbody>
+                {% for r in data.loss_by_insurer %}
+                <tr><td>{{ r.name }}</td><td class="num">{{ r.count }}</td><td class="num"><a class="ax-link" href="{% drill_url 'lost' insurer=r.id %}">{{ r.commission|currency }}</a></td></tr>
+                {% empty %}<tr><td colspan="3" class="ax-empty">Потерь нет</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
-<div class="row g-4 mb-4">
-    <div class="col-xl-8">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between">
-                <strong>Прогноз на 12 месяцев: ожидается по графику</strong>
-                <span class="av2-caption">без просрочки и отменённых · пролонгации не учтены</span>
-            </div>
-            <div class="card-body"><div class="av2-chart"><canvas id="chart-forecast"></canvas></div></div>
-            <div class="table-responsive">
-                <table class="table table-sm mb-0 av2-table">
-                    <tbody>
-                    <tr>{% for row in data.forecast %}<th class="text-end">{{ row.label }}</th>{% endfor %}</tr>
-                    <tr>{% for row in data.forecast %}<td class="text-end"><a class="av2-link" href="{% drill_url 'forecast' month=row.month_code %}">{{ row.commission|money_short }}</a></td>{% endfor %}</tr>
-                    </tbody>
-                </table>
+<div class="ax-grid ax-grid-7-5">
+    <section class="ax-card">
+        <div class="ax-card-head">
+            <div>
+                <div class="ax-kicker">Прогноз · 12 месяцев</div>
+                <h2 class="ax-title">Ожидается по графику</h2>
+                <p class="ax-sub">Неоплаченные и неотменённые платежи с сегодняшнего дня. Пролонгации не учтены.</p>
             </div>
         </div>
-    </div>
-    <div class="col-xl-4">
-        <div class="card h-100">
-            <div class="card-header"><strong>Обеспечено на будущие годы</strong></div>
-            <div class="card-body">
-                <p class="av2-caption">КВ по графику уже заключённых договоров. Показывает, сколько нового бизнеса нужно, чтобы не упасть.</p>
-                <table class="table table-sm av2-table mb-0">
-                    <thead><tr><th>Год</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
+        <div class="ax-chart ax-chart--sm"><canvas id="chart-forecast"></canvas></div>
+        <details class="ax-details">
+            <summary>Таблица по месяцам</summary>
+            <div class="ax-table-wrap">
+                <table class="ax-table ax-table--compact">
+                    <thead><tr><th>Месяц</th><th class="num">Платежей</th><th class="num">КВ</th></tr></thead>
                     <tbody>
-                    {% for row in data.secured %}
-                    <tr><td>{{ row.year }}</td><td class="text-end">{{ row.count }}</td>
-                        <td class="text-end"><a class="av2-link" href="{% drill_url 'secured' year=row.year %}">{{ row.commission|currency }}</a></td></tr>
-                    {% empty %}<tr><td colspan="3" class="text-muted">Нет платежей после текущего года</td></tr>
+                    {% for row in data.forecast %}
+                    <tr><td>{{ row.label }}</td><td class="num">{{ row.count }}</td><td class="num"><a class="ax-link" href="{% drill_url 'forecast' month=row.month_code %}">{{ row.commission|currency }}</a></td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
             </div>
+        </details>
+    </section>
+    <section class="ax-card">
+        <div class="ax-card-head">
+            <div>
+                <div class="ax-kicker">Задел</div>
+                <h2 class="ax-title">Обеспечено на будущие годы</h2>
+                <p class="ax-sub">КВ по графику уже заключённых договоров: сколько нового бизнеса нужно, чтобы не упасть.</p>
+            </div>
         </div>
-    </div>
+        <table class="ax-table">
+            <thead><tr><th>Год</th><th class="num">Платежей</th><th class="num">КВ</th></tr></thead>
+            <tbody>
+            {% for row in data.secured %}
+            <tr><td>{{ row.year }}</td><td class="num">{{ row.count }}</td><td class="num"><a class="ax-link" href="{% drill_url 'secured' year=row.year %}">{{ row.commission|currency }}</a></td></tr>
+            {% empty %}<tr><td colspan="3" class="ax-empty">Нет платежей после текущего года</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
 </div>
 
 {% if data.non_broker.count %}
-<p class="av2-caption">
-    <i class="bi bi-info-circle"></i> Без участия брокера (исключены из всех цифр):
-    <a class="av2-link" href="{% drill_url 'non_broker_payments' %}">{{ data.non_broker.count }} платежей за период</a>,
-    премия {{ data.non_broker.premium|currency }}, КВ {{ data.non_broker.commission|currency }}.
-</p>
+<p class="ax-note"><i class="bi bi-info-circle"></i>Без участия брокера (исключены из всех цифр):
+    <a class="ax-link" href="{% drill_url 'non_broker_payments' %}">{{ data.non_broker.count|plural:"платёж,платежа,платежей" }} за период</a>,
+    премия {{ data.non_broker.premium|currency }}, КВ {{ data.non_broker.commission|currency }}.</p>
 {% endif %}
 
 {{ data.chart|json_script:"money-chart" }}
@@ -193,23 +195,18 @@
 {% block tab_js %}
 <script>
 (function () {
-    const money = (v) => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 0}).format(v) + ' ₽';
-    const axis = {ticks: {callback: (v) => (v / 1e6).toLocaleString('ru-RU') + ' млн'}};
-    const tooltip = {callbacks: {label: (c) => c.dataset.label + ': ' + money(c.parsed.y)}};
-    const m = JSON.parse(document.getElementById('money-chart').textContent);
-    new Chart(document.getElementById('chart-monthly'), {
-        type: 'bar',
+    const m = AX.data('money-chart');
+    AX.chart('chart-monthly', {
         data: {labels: m.labels, datasets: [
-            {label: 'Заработано по актам', data: m.earned, backgroundColor: '#2e7d32'},
-            {label: 'План по графику', data: m.plan, backgroundColor: 'rgba(25,118,210,.25)', borderColor: '#1976d2', borderWidth: 1},
+            AX.lineDataset('План по графику', m.plan, AX.COLORS.series2),
+            AX.barDataset('Заработано по актам', m.earned, AX.COLORS.series1),
         ]},
-        options: {maintainAspectRatio: false, scales: {y: axis}, plugins: {tooltip}},
+        options: {scales: AX.axes('money'), plugins: {tooltip: AX.tooltip('money')}},
     });
-    const f = JSON.parse(document.getElementById('forecast-chart').textContent);
-    new Chart(document.getElementById('chart-forecast'), {
-        type: 'bar',
-        data: {labels: f.labels, datasets: [{label: 'Ожидается КВ', data: f.values, backgroundColor: '#1976d2'}]},
-        options: {maintainAspectRatio: false, scales: {y: axis}, plugins: {legend: {display: false}, tooltip}},
+    const f = AX.data('forecast-chart');
+    AX.chart('chart-forecast', {
+        data: {labels: f.labels, datasets: [AX.barDataset('Ожидается КВ', f.values, AX.COLORS.series1)]},
+        options: {scales: AX.axes('money'), plugins: {tooltip: AX.tooltip('money')}},
     });
 })();
 </script>

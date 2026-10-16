@@ -114,6 +114,9 @@ def build(params, query=None):
     year_start = date(today.year, 1, 1)
 
     bridge = money.build_current_year_outlook(payments, today)
+    monthly = money.monthly_earned_vs_plan(
+        payments, year_start, date(today.year, 12, 31)
+    )
     loss_rows = money.lost_rows(payments)
     lost_ytd = money.sum_rows(money.lost_in_period(loss_rows, year_start, today))
     lost_undated = money.sum_rows([r for r in loss_rows if r["loss_date"] is None])
@@ -144,6 +147,11 @@ def build(params, query=None):
         "year_start": year_start,
         "year_end": date(today.year, 12, 31),
         "bridge": bridge,
+        "monthly_chart": {
+            "labels": [row["label"].split()[0] for row in monthly],
+            "earned": [float(row["earned_commission"]) for row in monthly],
+            "plan": [float(row["plan_commission"]) for row in monthly],
+        },
         "lost_ytd": lost_ytd,
         "lost_undated": lost_undated,
         "ytd": {

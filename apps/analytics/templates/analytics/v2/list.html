@@ -2,53 +2,41 @@
 {% load analytics_v2 currency_filters %}
 
 {% block tab_content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-        <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-arrow-left"></i> Назад</a>
-        <span class="h5 align-middle">{{ metric.title }}</span>
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <a href="javascript:history.back()" class="ax-reset"><i class="bi bi-arrow-left"></i> Назад</a>
+            <h2 class="ax-title mt-1">{{ metric.title }}</h2>
+            {% if metric.note %}<p class="ax-sub">{{ metric.note }}</p>{% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-4">
+            {% if is_payments %}
+            <div><div class="ax-muted small">{{ totals.count|plural_word:"платёж,платежа,платежей"|capfirst }}</div><div class="ax-hero">{{ totals.count }}</div><div class="ax-muted small">{{ totals.policies|plural:"полис,полиса,полисов" }}</div></div>
+            <div title="{{ totals.commission|currency }}"><div class="ax-muted small">КВ</div><div class="ax-hero">{{ totals.commission|money_short }}</div><div class="ax-muted small">премия {{ totals.premium|money_short }}</div></div>
+            {% else %}
+            <div><div class="ax-muted small">{{ totals.count|plural_word:"полис,полиса,полисов"|capfirst }}</div><div class="ax-hero">{{ totals.count }}</div></div>
+            {% endif %}
+            <a href="?{{ export_query }}" class="ax-pill"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+        </div>
     </div>
-    <a href="?{{ export_query }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-</div>
-{% if metric.note %}<p class="av2-caption">{{ metric.note }}</p>{% endif %}
-
-<div class="d-flex flex-wrap gap-4 mb-3">
-    {% if is_payments %}
-    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">{{ totals.count|plural_word:"платёж,платежа,платежей" }} ({{ totals.policies|plural:"полис,полиса,полисов" }})</div></div>
-    <div><div class="av2-number">{{ totals.commission|currency }}</div><div class="av2-caption">КВ</div></div>
-    <div><div class="av2-number">{{ totals.premium|currency }}</div><div class="av2-caption">премия</div></div>
-    {% else %}
-    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">{{ totals.count|plural_word:"полис,полиса,полисов" }}</div></div>
-    {% endif %}
-</div>
-
-{% if rows_truncated %}
-<div class="alert alert-warning py-2">Показаны первые {{ rows|length }} строк — полный список в Excel.</div>
-{% endif %}
-
-<div class="table-responsive">
-    <table class="table table-sm table-hover av2-table">
-        <thead class="table-light">
-            <tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr>
-        </thead>
-        <tbody>
+    {% if rows_truncated %}<p class="ax-note">Показаны первые {{ rows|length }} строк — полный список в Excel.</p>{% endif %}
+    <div class="ax-table-wrap">
+        <table class="ax-table ax-table--compact">
+            <thead><tr>{% for c in columns %}<th{% if forloop.counter0 in money_columns %} class="num"{% endif %}>{{ c }}</th>{% endfor %}</tr></thead>
+            <tbody>
             {% for row in rows %}
             <tr>
                 {% for cell in row.cells %}
-                {% if forloop.first %}
-                <td><a href="{% url 'policies:detail' row.policy_id %}">{{ cell }}</a></td>
-                {% elif forloop.counter0 in money_columns %}
-                <td class="text-end">{{ cell|currency }}</td>
-                {% elif cell.year %}
-                <td>{{ cell|date:"d.m.Y" }}</td>
-                {% else %}
-                <td>{{ cell|default_if_none:"" }}</td>
-                {% endif %}
+                {% if forloop.first %}<td><a class="ax-link" href="{% url 'policies:detail' row.policy_id %}">{{ cell }}</a></td>
+                {% elif forloop.counter0 in money_columns %}<td class="num">{{ cell|currency }}</td>
+                {% elif cell.year %}<td>{{ cell|date:"d.m.Y" }}</td>
+                {% else %}<td class="wrap">{{ cell|default_if_none:"" }}</td>{% endif %}
                 {% endfor %}
             </tr>
-            {% empty %}
-            <tr><td colspan="{{ columns|length }}" class="text-muted">Нет данных</td></tr>
+            {% empty %}<tr><td colspan="{{ columns|length }}" class="ax-empty">Нет данных</td></tr>
             {% endfor %}
-        </tbody>
-    </table>
-</div>
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}

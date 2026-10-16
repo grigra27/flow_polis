@@ -49,11 +49,15 @@ class AnalyticsV2Mixin(SuperuserRequiredMixin):
                 for pk, name in queryset.values_list("id", label_field)
             ]
 
+        def selected_count(name):
+            return len(getattr(params, name))
+
         return {
             "params": params,
             "filter_options": [
                 {
                     "name": "branch",
+                    "selected_count": selected_count("branch"),
                     "label": "Филиал",
                     "options": options(
                         Branch.objects.order_by("branch_name"),
@@ -63,6 +67,7 @@ class AnalyticsV2Mixin(SuperuserRequiredMixin):
                 },
                 {
                     "name": "insurer",
+                    "selected_count": selected_count("insurer"),
                     "label": "СК",
                     "options": options(
                         Insurer.objects.order_by("insurer_name"),
@@ -72,6 +77,7 @@ class AnalyticsV2Mixin(SuperuserRequiredMixin):
                 },
                 {
                     "name": "type",
+                    "selected_count": selected_count("type"),
                     "label": "Вид",
                     "options": options(
                         InsuranceType.objects.order_by("name"), "name", params.type
@@ -79,6 +85,7 @@ class AnalyticsV2Mixin(SuperuserRequiredMixin):
                 },
                 {
                     "name": "manager",
+                    "selected_count": selected_count("manager"),
                     "label": "Менеджер",
                     "options": options(
                         LeasingManager.objects.order_by("name"),
@@ -96,12 +103,7 @@ class AnalyticsTabView(AnalyticsV2Mixin, TemplateView):
     tab = "summary"
 
     def get_template_names(self):
-        module = self._tab_module()
-        return [
-            f"analytics/v2/tabs/{self.tab}.html"
-            if module
-            else "analytics/v2/tabs/placeholder.html"
-        ]
+        return [f"analytics/v2/tabs/{self.tab}.html"]
 
     def _tab_module(self):
         module_name = next(module for key, _, _, module in TABS if key == self.tab)

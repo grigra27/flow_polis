@@ -2,59 +2,63 @@
 {% load analytics_v2 currency_filters %}
 
 {% block tab_content %}
-<p class="av2-caption">
-    КВ за период — по графику без отменённых. Тариф — медиана «премия 1-го года / страховая сумма» новых полисов периода.
-    Дней до акта — медиана от оплаты клиентом до акта СК. Ждёт акта — на сегодня. Клик по СК — вкладка «Деньги» по этой СК.
-</p>
-<div class="card mb-4">
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0 av2-table">
-            <thead class="table-light">
+<section class="ax-card">
+    <div class="ax-card-head">
+        <div>
+            <div class="ax-kicker">За период · {{ data.new_business_total|plural:"новый полис,новых полиса,новых полисов" }}</div>
+            <h2 class="ax-title">Страховщики</h2>
+            <p class="ax-sub">КВ — по графику без отменённых. Тариф — медиана «премия 1-го года / страховая сумма» новых полисов. «Дней до акта» — медиана от оплаты клиентом до акта СК. «Ждёт акта» — на сегодня. Клик по СК открывает «Деньги» по этой СК.</p>
+        </div>
+    </div>
+    <div class="ax-table-wrap">
+        <table class="ax-table">
+            <thead>
                 <tr>
                     <th rowspan="2">СК</th>
-                    <th rowspan="2" class="text-end">В силе</th>
-                    <th rowspan="2" class="text-end">КВ за период</th>
-                    <th rowspan="2" class="text-end">Доля КВ</th>
-                    <th colspan="{{ data.types|length }}" class="text-center">КВ %</th>
-                    <th colspan="{{ data.types|length }}" class="text-center">Тариф, %</th>
-                    <th rowspan="2" class="text-end">Дней до акта</th>
-                    <th rowspan="2" class="text-end">Ждёт акта</th>
-                    <th rowspan="2" class="text-end">из них 90+</th>
-                    <th rowspan="2" class="text-end">Потеряно</th>
-                    <th rowspan="2" class="text-end">Доля в новом бизнесе</th>
+                    <th rowspan="2" class="num">В силе</th>
+                    <th rowspan="2" class="num">КВ за период</th>
+                    <th rowspan="2">Доля КВ</th>
+                    <th colspan="{{ data.types|length }}" class="num" style="border-bottom:0">КВ, %</th>
+                    <th colspan="{{ data.types|length }}" class="num" style="border-bottom:0">Тариф, %</th>
+                    <th rowspan="2" class="num">Дней<br>до акта</th>
+                    <th rowspan="2" class="num">Ждёт акта</th>
+                    <th rowspan="2" class="num">Потеряно</th>
+                    <th rowspan="2" class="num">Доля в новом<br>бизнесе</th>
                 </tr>
                 <tr>
-                    {% for t in data.types %}<th class="text-end small">{{ t }}</th>{% endfor %}
-                    {% for t in data.types %}<th class="text-end small">{{ t }}</th>{% endfor %}
+                    {% for t in data.types %}<th class="num" style="text-transform:none">{{ t }}</th>{% endfor %}
+                    {% for t in data.types %}<th class="num" style="text-transform:none">{{ t }}</th>{% endfor %}
                 </tr>
             </thead>
             <tbody>
             {% for r in data.rows %}
             <tr>
-                <td><a class="av2-link" href="{% tab_url 'analytics:v2_money' insurer=r.id %}">{{ r.name }}</a></td>
-                <td class="text-end">{% drill_url 'in_force' insurer=r.id as u %}<a class="av2-link" href="{{ u }}">{{ r.in_force }}</a></td>
-                <td class="text-end">{% drill_url 'plan' insurer=r.id as u %}<a class="av2-link" href="{{ u }}">{{ r.commission|money_short }}</a></td>
-                <td class="text-end">{% if r.share is not None %}{{ r.share|floatformat:1 }}%{% else %}—{% endif %}</td>
-                {% for v in r.kv_by_type %}<td class="text-end">{% if v is not None %}{{ v|floatformat:1 }}{% else %}—{% endif %}</td>{% endfor %}
-                {% for v in r.tariff_by_type %}<td class="text-end">{% if v is not None %}{{ v|floatformat:2 }}{% else %}—{% endif %}</td>{% endfor %}
-                <td class="text-end">{% if r.act_lag is not None %}{{ r.act_lag|floatformat:0 }}{% else %}—{% endif %}</td>
-                <td class="text-end">{% if r.awaiting %}{% drill_url 'awaiting_act' insurer=r.id as u %}<a class="av2-link" href="{{ u }}">{{ r.awaiting|money_short }}</a>{% else %}—{% endif %}</td>
-                <td class="text-end{% if r.awaiting_90 %} text-danger fw-semibold{% endif %}">{% if r.awaiting_90 %}{% drill_url 'awaiting_act' insurer=r.id age='90+' as u %}<a class="av2-link" href="{{ u }}">{{ r.awaiting_90|money_short }}</a>{% else %}—{% endif %}</td>
-                <td class="text-end">{% if r.lost %}{% drill_url 'lost' insurer=r.id as u %}<a class="av2-link text-danger" href="{{ u }}">{{ r.lost|money_short }}</a>{% else %}—{% endif %}</td>
-                <td class="text-end">
-                    {% if r.nb_share is not None %}{{ r.nb_share|floatformat:0 }}%{% else %}—{% endif %}
-                    {% if r.nb_share_change is not None %}<span class="av2-caption {% if r.nb_share_change >= 0 %}text-success{% else %}text-danger{% endif %}">({% if r.nb_share_change >= 0 %}+{% endif %}{{ r.nb_share_change|floatformat:0 }} п.п.)</span>{% endif %}
+                <td><a class="ax-link" href="{% tab_url 'analytics:v2_money' insurer=r.id %}">{{ r.name }}</a></td>
+                <td class="num">{% drill_url 'in_force' insurer=r.id as u %}<a class="ax-link" href="{{ u }}">{{ r.in_force }}</a></td>
+                <td class="num">{% drill_url 'plan' insurer=r.id as u %}<a class="ax-link" href="{{ u }}">{{ r.commission|money_short }}</a></td>
+                <td style="min-width:110px">{% if r.share is not None %}<div class="d-flex align-items-center gap-2"><div class="ax-bar flex-grow-1"><span style="width:{{ r.share|floatformat:0 }}%"></span></div><span class="ax-muted">{{ r.share|floatformat:0 }}%</span></div>{% endif %}</td>
+                {% for v in r.kv_by_type %}<td class="num">{% if v is not None %}{{ v|floatformat:1 }}{% else %}<span class="ax-zero">—</span>{% endif %}</td>{% endfor %}
+                {% for v in r.tariff_by_type %}<td class="num">{% if v is not None %}{{ v|floatformat:2 }}{% else %}<span class="ax-zero">—</span>{% endif %}</td>{% endfor %}
+                <td class="num">{% if r.act_lag is not None %}{{ r.act_lag|floatformat:0 }}{% else %}<span class="ax-zero">—</span>{% endif %}</td>
+                <td class="num">
+                    {% if r.awaiting %}{% drill_url 'awaiting_act' insurer=r.id as u %}<a class="ax-link" href="{{ u }}">{{ r.awaiting|money_short }}</a>
+                    {% if r.awaiting_90 %}{% drill_url 'awaiting_act' insurer=r.id age='90+' as u %}<div><a class="ax-badge ax-badge--critical text-decoration-none" href="{{ u }}">90+: {{ r.awaiting_90|money_short }}</a></div>{% endif %}
+                    {% else %}<span class="ax-zero">—</span>{% endif %}
+                </td>
+                <td class="num">{% if r.lost %}{% drill_url 'lost' insurer=r.id as u %}<a class="ax-link" href="{{ u }}">{{ r.lost|money_short }}</a>{% else %}<span class="ax-zero">—</span>{% endif %}</td>
+                <td class="num">
+                    {% if r.nb_share is not None %}{{ r.nb_share|floatformat:0 }}%{% else %}<span class="ax-zero">—</span>{% endif %}
+                    {% if r.nb_share_change is not None %}<div class="small {% if r.nb_share_change >= 0 %}ax-delta-up{% else %}ax-delta-down{% endif %}">{% if r.nb_share_change >= 0 %}+{% endif %}{{ r.nb_share_change|floatformat:0 }} п.п.</div>{% endif %}
                 </td>
             </tr>
-            {% empty %}<tr><td colspan="20" class="text-muted">Нет данных</td></tr>
+            {% empty %}<tr><td colspan="20" class="ax-empty">Нет данных</td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
-<p class="av2-caption">
-    Новых полисов за период: {{ data.new_business_total }}.
-    {% if data.history_ok %}Изменение доли — к {{ data.previous_from|date:"d.m.Y" }}–{{ data.previous_to|date:"d.m.Y" }}, в процентных пунктах.
-    {% else %}Изменение доли не показано: прошлый период попадает на неполную историю (до июля 2025).{% endif %}
-</p>
+    <p class="ax-note mt-3 mb-0">
+        {% if data.history_ok %}Изменение доли в новом бизнесе — к {{ data.previous_from|date:"d.m.Y" }}–{{ data.previous_to|date:"d.m.Y" }}, в процентных пунктах.
+        {% else %}Изменение доли в новом бизнесе не показано: прошлый период попадает на неполную историю (до июля 2025).{% endif %}
+    </p>
+</section>
 {% endblock %}

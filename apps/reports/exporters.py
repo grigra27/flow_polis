@@ -1023,9 +1023,12 @@ class ThursdayReportExporter(BaseExporter):
         # Собираем все записи (полисы без документов + платежи без оплаты)
         from apps.policies.models import PaymentSchedule
 
-        # Получаем платежи без даты оплаты (для активных полисов)
-        unpaid_payments_query = PaymentSchedule.objects.filter(
-            paid_date__isnull=True, policy__policy_active=True
+        # Платежи без даты оплаты: активный полис, действующий ДФА, без ОСАГО —
+        # те же правила, что у раздела «не подгружены документы» во view.
+        unpaid_payments_query = PaymentSchedule.objects.without_osago().filter(
+            paid_date__isnull=True,
+            policy__policy_active=True,
+            policy__dfa_active=True,
         )
 
         # Применяем фильтр по дате, если указана

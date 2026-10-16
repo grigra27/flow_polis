@@ -374,10 +374,10 @@ def export_thursday_report(request):
             Policy.objects.select_related(
                 "client", "insurer", "branch", "insurance_type", "policyholder"
             )
-            .filter(policy_uploaded=False)
+            # Закрытые ДФА в отчёт не попадают (просьба учёта, 2026-10-16).
+            .filter(policy_uploaded=False, dfa_active=True)
             # Четверговый отчёт контролирует документы и оплаты — без ОСАГО.
-            .without_osago()
-            .order_by("branch__branch_name", "policy_number")
+            .without_osago().order_by("branch__branch_name", "policy_number")
         )
 
         # Применяем опциональные фильтры (если переданы)

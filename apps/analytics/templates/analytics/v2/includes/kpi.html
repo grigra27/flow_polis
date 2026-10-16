@@ -1,0 +1,12 @@
+{% load analytics_v2 currency_filters %}
+<div class="{{ col|default:'col-6 col-lg-4 col-xxl-2' }}">
+    <div class="card h-100{% if tone %} border-{{ tone }}{% endif %}">
+        <div class="card-body">
+            <div class="av2-caption">{{ title }}</div>
+            <div class="av2-number{% if tone %} text-{{ tone }}{% endif %}" title="{{ value|currency }}">
+                {% if url %}<a href="{{ url }}">{{ value|money_short }}</a>{% else %}{{ value|money_short }}{% endif %}
+            </div>
+            {% if caption %}<div class="av2-caption">{{ caption }}</div>{% endif %}
+        </div>
+    </div>
+</div>

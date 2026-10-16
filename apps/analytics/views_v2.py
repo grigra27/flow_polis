@@ -19,8 +19,8 @@ from .filters import AnalyticsParams
 
 # (ключ, название, иконка, модуль sections или None — вкладка ещё не готова)
 TABS = [
-    ("summary", "Сводка", "bi-speedometer2", None),
-    ("money", "Деньги", "bi-cash-stack", None),
+    ("summary", "Сводка", "bi-speedometer2", "summary"),
+    ("money", "Деньги", "bi-cash-stack", "money"),
     ("sales", "Продажи", "bi-graph-up-arrow", None),
     ("portfolio", "Портфель", "bi-briefcase", None),
     ("insurers", "Страховщики", "bi-building", None),
@@ -130,6 +130,7 @@ class AnalyticsTabView(AnalyticsV2Mixin, TemplateView):
         context["tab_title"] = next(title for key, title, *_ in TABS if key == self.tab)
         context["current_url_name"] = tab_url_name(self.tab)
         module = self._tab_module()
+        context["show_period"] = getattr(module, "USES_PERIOD", True)
         if module:
             context["data"] = module.build(params)
         return context

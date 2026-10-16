@@ -1,0 +1,216 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+{% with k=data.kpi %}
+<div class="row g-3 mb-4">
+    {% drill_url 'earned' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="КВ заработано (по актам)" value=k.earned.commission url=u caption=k.earned.count|plural:"платёж,платежа,платежей" tone="success" %}
+    {% drill_url 'plan' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="План по графику за период" value=k.plan.commission url=u caption=k.plan.count|plural:"платёж,платежа,платежей" %}
+    {% drill_url 'expected' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="Ожидается до конца периода" value=k.expected.commission url=u caption=k.expected.count|plural:"платёж,платежа,платежей" tone="primary" %}
+    {% drill_url 'awaiting_act' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="Ждёт акта СК · сейчас" value=k.awaiting.commission url=u caption=k.awaiting.count|plural:"платёж,платежа,платежей" tone="warning" %}
+    {% drill_url 'overdue' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="Просрочено · сейчас" value=k.overdue.commission url=u caption=k.overdue.count|plural:"платёж,платежа,платежей" %}
+    {% drill_url 'lost' as u %}
+    {% include "analytics/v2/includes/kpi.html" with title="Потеряно за период" value=k.lost.commission url=u caption=k.lost.count|plural:"платёж,платежа,платежей" tone="danger" %}
+</div>
+{% if k.plan_completion is not None %}
+<p class="av2-caption mb-4">
+    Заработано {{ k.plan_completion|floatformat:0 }}% от плана по графику за период.
+    Все суммы — КВ; премия — в списках и выгрузке.
+    {% if k.lost_undated.count %}
+    Ещё <a class="av2-link" href="{% drill_url 'lost' undated='1' %}">{{ k.lost_undated.commission|currency }}</a>
+    потеряно без известной даты (ДФА закрыт без даты) — в период не попадает.
+    {% endif %}
+</p>
+{% endif %}
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>КВ по месяцам: заработано по актам и план по графику</strong>
+        <span class="av2-caption">период фильтра</span>
+    </div>
+    <div class="card-body">
+        <div class="av2-chart"><canvas id="chart-monthly"></canvas></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 av2-table">
+            <thead class="table-light"><tr>
+                <th>Месяц</th><th class="text-end">Заработано</th><th class="text-end">План</th>
+                <th class="text-end">Заработано / план</th><th class="text-end">Потеряно</th>
+            </tr></thead>
+            <tbody>
+            {% for row in data.monthly %}
+            <tr>
+                <td>{{ row.label }}</td>
+                <td class="text-end"><a class="av2-link" href="{% drill_url 'earned' month=row.month_code %}">{{ row.earned_commission|currency }}</a></td>
+                <td class="text-end"><a class="av2-link" href="{% drill_url 'plan' month=row.month_code %}">{{ row.plan_commission|currency }}</a></td>
+                <td class="text-end">{% if row.plan_commission %}{% widthratio row.earned_commission row.plan_commission 100 %}%{% else %}—{% endif %}</td>
+                <td class="text-end">{% if row.lost_commission %}<a class="av2-link text-danger" href="{% drill_url 'lost' month=row.month_code %}">{{ row.lost_commission|currency }}</a>{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>Долг СК по актам: клиент оплатил, акт не согласован</strong>
+        <span class="av2-caption">срез на сегодня · возраст = дней с даты оплаты</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 av2-table">
+            <thead class="table-light"><tr>
+                <th>СК</th><th class="text-end">Платежей</th><th class="text-end">КВ всего</th>
+                {% for b in data.age_buckets %}<th class="text-end">{{ b.label }}</th>{% endfor %}
+                <th class="text-end">Самый старый</th>
+            </tr></thead>
+            <tbody>
+            {% for row in data.debt %}
+            <tr>
+                <td>{{ row.insurer }}</td>
+                <td class="text-end">{{ row.count }}</td>
+                <td class="text-end"><a class="av2-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id %}">{{ row.commission|currency }}</a></td>
+                {% for b in row.buckets %}
+                <td class="text-end{% if b.key == '90+' and b.commission %} text-danger fw-semibold{% endif %}">
+                    {% if b.commission %}<a class="av2-link" href="{% drill_url 'awaiting_act' insurer=row.insurer_id age=b.key %}">{{ b.commission|currency }}</a>{% else %}—{% endif %}
+                </td>
+                {% endfor %}
+                <td class="text-end">{{ row.oldest|date:"d.m.Y" }} <span class="av2-caption">({{ row.oldest_days }} дн.)</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-muted">Всё оплаченное закрыто актами</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>Потери: платежи, которых уже не будет</strong>
+        <span class="av2-caption">по дате события · досрочный выкуп — ДФА закрыт раньше окончания полиса более чем на 30 дн.</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <table class="table table-sm av2-table mb-0">
+                    <thead><tr><th>Причина</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
+                    <tbody>
+                    {% for r in data.loss_reasons %}
+                    <tr>
+                        <td>{{ r.label }}</td>
+                        <td class="text-end">{{ r.count }}</td>
+                        <td class="text-end">{% if r.count %}<a class="av2-link" href="{% drill_url 'lost' reason=r.key %}">{{ r.commission|currency }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-4">
+                <table class="table table-sm av2-table mb-0">
+                    <thead><tr><th>Филиал</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
+                    <tbody>
+                    {% for r in data.loss_by_branch %}
+                    <tr><td>{{ r.name }}</td><td class="text-end">{{ r.count }}</td>
+                        <td class="text-end"><a class="av2-link" href="{% drill_url 'lost' branch=r.id %}">{{ r.commission|currency }}</a></td></tr>
+                    {% empty %}<tr><td colspan="3" class="text-muted">Потерь нет</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-4">
+                <table class="table table-sm av2-table mb-0">
+                    <thead><tr><th>СК</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
+                    <tbody>
+                    {% for r in data.loss_by_insurer %}
+                    <tr><td>{{ r.name }}</td><td class="text-end">{{ r.count }}</td>
+                        <td class="text-end"><a class="av2-link" href="{% drill_url 'lost' insurer=r.id %}">{{ r.commission|currency }}</a></td></tr>
+                    {% empty %}<tr><td colspan="3" class="text-muted">Потерь нет</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between">
+                <strong>Прогноз на 12 месяцев: ожидается по графику</strong>
+                <span class="av2-caption">без просрочки и отменённых · пролонгации не учтены</span>
+            </div>
+            <div class="card-body"><div class="av2-chart"><canvas id="chart-forecast"></canvas></div></div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 av2-table">
+                    <tbody>
+                    <tr>{% for row in data.forecast %}<th class="text-end">{{ row.label }}</th>{% endfor %}</tr>
+                    <tr>{% for row in data.forecast %}<td class="text-end"><a class="av2-link" href="{% drill_url 'forecast' month=row.month_code %}">{{ row.commission|money_short }}</a></td>{% endfor %}</tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header"><strong>Обеспечено на будущие годы</strong></div>
+            <div class="card-body">
+                <p class="av2-caption">КВ по графику уже заключённых договоров. Показывает, сколько нового бизнеса нужно, чтобы не упасть.</p>
+                <table class="table table-sm av2-table mb-0">
+                    <thead><tr><th>Год</th><th class="text-end">Платежей</th><th class="text-end">КВ</th></tr></thead>
+                    <tbody>
+                    {% for row in data.secured %}
+                    <tr><td>{{ row.year }}</td><td class="text-end">{{ row.count }}</td>
+                        <td class="text-end"><a class="av2-link" href="{% drill_url 'secured' year=row.year %}">{{ row.commission|currency }}</a></td></tr>
+                    {% empty %}<tr><td colspan="3" class="text-muted">Нет платежей после текущего года</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if data.non_broker.count %}
+<p class="av2-caption">
+    <i class="bi bi-info-circle"></i> Без участия брокера (исключены из всех цифр):
+    <a class="av2-link" href="{% drill_url 'non_broker_payments' %}">{{ data.non_broker.count }} платежей за период</a>,
+    премия {{ data.non_broker.premium|currency }}, КВ {{ data.non_broker.commission|currency }}.
+</p>
+{% endif %}
+
+{{ data.chart|json_script:"money-chart" }}
+{{ data.forecast_chart|json_script:"forecast-chart" }}
+{% endblock %}
+
+{% block tab_js %}
+<script>
+(function () {
+    const money = (v) => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 0}).format(v) + ' ₽';
+    const axis = {ticks: {callback: (v) => (v / 1e6).toLocaleString('ru-RU') + ' млн'}};
+    const tooltip = {callbacks: {label: (c) => c.dataset.label + ': ' + money(c.parsed.y)}};
+    const m = JSON.parse(document.getElementById('money-chart').textContent);
+    new Chart(document.getElementById('chart-monthly'), {
+        type: 'bar',
+        data: {labels: m.labels, datasets: [
+            {label: 'Заработано по актам', data: m.earned, backgroundColor: '#2e7d32'},
+            {label: 'План по графику', data: m.plan, backgroundColor: 'rgba(25,118,210,.25)', borderColor: '#1976d2', borderWidth: 1},
+        ]},
+        options: {maintainAspectRatio: false, scales: {y: axis}, plugins: {tooltip}},
+    });
+    const f = JSON.parse(document.getElementById('forecast-chart').textContent);
+    new Chart(document.getElementById('chart-forecast'), {
+        type: 'bar',
+        data: {labels: f.labels, datasets: [{label: 'Ожидается КВ', data: f.values, backgroundColor: '#1976d2'}]},
+        options: {maintainAspectRatio: false, scales: {y: axis}, plugins: {legend: {display: false}, tooltip}},
+    });
+})();
+</script>
+{% endblock %}

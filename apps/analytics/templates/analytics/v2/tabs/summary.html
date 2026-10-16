@@ -1,0 +1,133 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+{% with b=data.bridge s=data.signals %}
+
+{% if s.stale_act.count or s.ending_soon.count or s.recent_losses.count or s.manager_drops.rows or s.lost_undated.count %}
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning-subtle"><strong><i class="bi bi-bell"></i> На что обратить внимание</strong></div>
+    <ul class="list-group list-group-flush">
+        {% if s.stale_act.count %}
+        <li class="list-group-item">
+            <a class="av2-link" href="{% drill_url 'awaiting_act' age='60+' %}">{{ s.stale_act.commission|currency }} КВ</a>
+            ждут акта СК дольше {{ s.stale_act.days }} дней ({{ s.stale_act.count|plural:"платёж,платежа,платежей" }}):
+            {{ s.stale_act.insurers|join:", " }}.
+        </li>
+        {% endif %}
+        {% if s.ending_soon.count %}
+        <li class="list-group-item">
+            <a class="av2-link" href="{% drill_url 'ending_soon' %}">{{ s.ending_soon.count|plural:"полис,полиса,полисов" }}</a>
+            с активным ДФА заканчиваются в ближайшие {{ s.ending_soon.days }} дней — нужен новый полис.
+        </li>
+        {% endif %}
+        {% if s.recent_losses.count %}
+        <li class="list-group-item">
+            За последние {{ s.recent_losses.days }} дней потеряно
+            <a class="av2-link text-danger" href="{% drill_url 'lost' date_from=s.recent_losses.date_from date_to=data.today %}">{{ s.recent_losses.commission|currency }} КВ</a>
+            ({{ s.recent_losses.count|plural:"платёж,платежа,платежей" }}): закрытие ДФА или расторжение.
+        </li>
+        {% endif %}
+        {% for m in s.manager_drops.rows %}
+        <li class="list-group-item">
+            Менеджер <strong>{{ m.name }}</strong>: новых полисов за последние 90 дней —
+            <a class="av2-link" href="{% drill_url 'new_business' manager=m.id date_from=s.manager_drops.date_from date_to=data.today %}">{{ m.recent }}</a>,
+            за предыдущие 90 дней — {{ m.previous }}.
+        </li>
+        {% endfor %}
+        {% if s.lost_undated.count %}
+        <li class="list-group-item">
+            <a class="av2-link" href="{% drill_url 'lost' undated='1' %}">{{ s.lost_undated.count|plural:"платёж,платежа,платежей" }} ({{ s.lost_undated.commission|currency }} КВ)</a>
+            отменены закрытием ДФА без даты — дату закрытия стоит заполнить.
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>КВ {{ b.year }}: мост года</strong>
+        <span class="av2-caption">заработано — по дате акта с СК, как в ежемесячном отчёте по КВ</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 align-items-stretch">
+            {% drill_url 'earned' date_from=data.year_start date_to=data.today as u %}
+            {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="Заработано с 1 января" value=b.earned_commission url=u tone="success" %}
+            {% drill_url 'awaiting_act' as u %}
+            {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="+ ждёт акта СК" value=b.awaiting_act_commission url=u caption=b.awaiting_act_count|plural:"платёж,платежа,платежей" tone="warning" %}
+            {% drill_url 'expected' date_from=data.today date_to=data.year_end as u %}
+            {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="+ ожидается до 31.12" value=b.scheduled_commission url=u caption=b.scheduled_count|plural:"платёж,платежа,платежей" tone="primary" %}
+            {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="= итог года (ожидаемо)" value=b.projected_full_year_commission %}
+        </div>
+        <p class="av2-caption mt-3 mb-0">
+            Вне итога:
+            просрочено <a class="av2-link" href="{% drill_url 'overdue' %}">{{ b.overdue_commission|currency }}</a> ({{ b.overdue_count }} пл.),
+            потеряно с 1 января <a class="av2-link text-danger" href="{% drill_url 'lost' date_from=data.year_start date_to=data.today %}">{{ data.lost_ytd.commission|currency }}</a> ({{ data.lost_ytd.count }} пл.).
+        </p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><strong>Заработано с начала года к прошлому году</strong></div>
+            <div class="card-body">
+                {% with y=data.ytd %}
+                <div class="d-flex align-items-baseline gap-3">
+                    <div class="av2-number">{{ y.current.commission|money_short }}</div>
+                    {% if y.change is not None %}
+                    <span class="badge {% if y.change >= 0 %}text-bg-success{% else %}text-bg-danger{% endif %}">
+                        {% if y.change >= 0 %}+{% endif %}{{ y.change|floatformat:0 }}%
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="av2-caption">
+                    01.01–{{ data.today|date:"d.m" }} против
+                    <a class="av2-link" href="{% drill_url 'earned' date_from=y.previous_from date_to=y.previous_to %}">{{ y.previous.commission|currency }}</a>
+                    за тот же период {{ y.previous_from.year }}.
+                    {% if y.history_incomplete %}<br><i class="bi bi-exclamation-circle"></i> До июля 2025 история в базе неполная — процент роста не показываем.{% endif %}
+                </div>
+                {% endwith %}
+                {% if data.secured_next_year %}
+                <hr>
+                <div class="av2-caption">Уже обеспечено на {{ data.secured_next_year.year }} год</div>
+                <div class="av2-number"><a href="{% drill_url 'secured' year=data.secured_next_year.year %}">{{ data.secured_next_year.commission|money_short }}</a></div>
+                <div class="av2-caption">КВ по графику заключённых договоров</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header"><strong>Новый бизнес</strong> <span class="av2-caption">полисы с датой начала в периоде · КВ первого года</span></div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 av2-table">
+                    <thead class="table-light"><tr>
+                        <th>Период</th><th class="text-end">Полисов</th><th class="text-end">из них к старому ДФА</th>
+                        <th class="text-end">КВ 1-го года</th><th class="text-end">к прошлому году</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for label, nb in data.new_business_rows %}
+                    <tr>
+                        <td>{{ label }} <span class="av2-caption">{{ nb.date_from|date:"d.m" }}–{{ nb.date_to|date:"d.m" }}</span></td>
+                        <td class="text-end"><a class="av2-link" href="{% drill_url 'new_business' date_from=nb.date_from date_to=nb.date_to %}">{{ nb.current.count }}</a></td>
+                        <td class="text-end">{% if nb.current.to_old_dfa %}<a class="av2-link" href="{% drill_url 'new_business' date_from=nb.date_from date_to=nb.date_to to_old_dfa='1' %}">{{ nb.current.to_old_dfa }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{{ nb.current.commission|currency }}</td>
+                        <td class="text-end">
+                            {% if nb.commission_change is not None %}
+                            <span class="{% if nb.commission_change >= 0 %}text-success{% else %}text-danger{% endif %}">{% if nb.commission_change >= 0 %}+{% endif %}{{ nb.commission_change|floatformat:0 }}%</span>
+                            <span class="av2-caption">({{ nb.previous.count }} пол., {{ nb.previous.commission|money_short }})</span>
+                            {% elif nb.history_incomplete %}<span class="av2-caption" title="До июля 2025 история в базе неполная">нет полной истории</span>
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endwith %}
+{% endblock %}

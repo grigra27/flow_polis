@@ -1,5 +1,5 @@
 {% extends "analytics/v2/layout.html" %}
-{% load currency_filters %}
+{% load analytics_v2 currency_filters %}
 
 {% block tab_content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -13,11 +13,11 @@
 
 <div class="d-flex flex-wrap gap-4 mb-3">
     {% if is_payments %}
-    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">платежей ({{ totals.policies }} полисов)</div></div>
+    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">{{ totals.count|plural_word:"платёж,платежа,платежей" }} ({{ totals.policies|plural:"полис,полиса,полисов" }})</div></div>
     <div><div class="av2-number">{{ totals.commission|currency }}</div><div class="av2-caption">КВ</div></div>
     <div><div class="av2-number">{{ totals.premium|currency }}</div><div class="av2-caption">премия</div></div>
     {% else %}
-    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">полисов</div></div>
+    <div><div class="av2-number">{{ totals.count }}</div><div class="av2-caption">{{ totals.count|plural_word:"полис,полиса,полисов" }}</div></div>
     {% endif %}
 </div>
 

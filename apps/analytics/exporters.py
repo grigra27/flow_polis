@@ -1298,43 +1298,29 @@ class AnalyticsExporter:
         self._apply_header_style(worksheet, current_row, 2)
         current_row += 1
 
+        def money(key):
+            return self._format_value(outlook.get(key, Decimal("0")))
+
+        # Заработано — по дате акта с СК (как ежемесячный отчёт по КВ).
         metrics = [
             ("Год", outlook.get("year", datetime.now().year)),
-            ("Текущий месяц (номер)", outlook.get("current_month", 0)),
+            ("На дату", self._format_value(outlook.get("as_of"))),
             (
-                "Факт с начала года: премия",
-                self._format_value(outlook.get("ytd_actual_premium", Decimal("0"))),
+                "КВ: заработано с начала года (по актам с СК)",
+                money("earned_commission"),
             ),
+            ("КВ: ждёт акта (клиент оплатил)", money("awaiting_act_commission")),
+            ("КВ: ожидается по графику до конца года", money("scheduled_commission")),
+            ("КВ: итог года (ожидаемо)", money("projected_full_year_commission")),
             (
-                "Факт с начала года: комиссия",
-                self._format_value(outlook.get("ytd_actual_commission", Decimal("0"))),
+                "КВ: просрочено, под риском (в итог не входит)",
+                money("overdue_commission"),
             ),
-            (
-                "Прогноз до конца года: премия",
-                self._format_value(
-                    outlook.get("remaining_forecast_premium", Decimal("0"))
-                ),
-            ),
-            (
-                "Прогноз до конца года: комиссия",
-                self._format_value(
-                    outlook.get("remaining_forecast_commission", Decimal("0"))
-                ),
-            ),
-            (
-                "Итог года: премия",
-                self._format_value(
-                    outlook.get("projected_full_year_premium", Decimal("0"))
-                ),
-            ),
-            (
-                "Итог года: комиссия",
-                self._format_value(
-                    outlook.get("projected_full_year_commission", Decimal("0"))
-                ),
-            ),
-            ("Фактовых месяцев", outlook.get("ytd_months_count", 0)),
-            ("Прогнозных месяцев", outlook.get("forecast_months_count", 0)),
+            ("Премия: заработано с начала года", money("earned_premium")),
+            ("Премия: ждёт акта", money("awaiting_act_premium")),
+            ("Премия: ожидается по графику до конца года", money("scheduled_premium")),
+            ("Премия: итог года (ожидаемо)", money("projected_full_year_premium")),
+            ("Премия: просрочено", money("overdue_premium")),
         ]
 
         start_data_row = current_row
@@ -1350,9 +1336,10 @@ class AnalyticsExporter:
 
         headers = [
             "Месяц",
-            "Режим",
-            "Премия",
-            "Комиссия",
+            "КВ заработано",
+            "КВ ожидается",
+            "Премия заработано",
+            "Премия ожидается",
         ]
         for col, header in enumerate(headers, 1):
             worksheet.cell(row=current_row, column=col, value=header)
@@ -1362,19 +1349,15 @@ class AnalyticsExporter:
         monthly_breakdown = outlook.get("monthly_breakdown", [])
         start_data_row = current_row
         for month in monthly_breakdown:
-            mode = "Факт" if month.get("mode") == "actual" else "Прогноз"
-            worksheet.cell(row=current_row, column=1, value=month.get("month_name", ""))
-            worksheet.cell(row=current_row, column=2, value=mode)
-            worksheet.cell(
-                row=current_row,
-                column=3,
-                value=self._format_value(month.get("premium_value", 0)),
-            )
-            worksheet.cell(
-                row=current_row,
-                column=4,
-                value=self._format_value(month.get("commission_value", 0)),
-            )
+            values = [
+                month.get("month_name", ""),
+                self._format_value(month.get("earned_commission", 0)),
+                self._format_value(month.get("scheduled_commission", 0)),
+                self._format_value(month.get("earned_premium", 0)),
+                self._format_value(month.get("scheduled_premium", 0)),
+            ]
+            for col, value in enumerate(values, 1):
+                worksheet.cell(row=current_row, column=col, value=value)
             current_row += 1
 
         if current_row > start_data_row:

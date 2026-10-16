@@ -319,6 +319,7 @@
 </div>
 
 <!-- Year-over-Year Growth Summary -->
+<p class="text-muted small mb-2">Рост — с 1 января по сегодня против того же периода прошлого года. Премия и КВ — заработано по дате акта с СК, полисы — по дате начала.</p>
 <div class="row mb-4">
     <div class="col-lg-4">
         <div class="time-series-card growth">
@@ -329,7 +330,7 @@
             <div class="metric-value {% if year_over_year_growth.policy_count >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
                 {% if year_over_year_growth.policy_count >= 0 %}+{% endif %}{{ year_over_year_growth.policy_count|floatformat:1 }}%
             </div>
-            <div class="metric-label">Год к году</div>
+            <div class="metric-label">{{ year_over_year_growth.period_label|default:"Год к году" }}</div>
         </div>
     </div>
     <div class="col-lg-4">
@@ -341,7 +342,7 @@
             <div class="metric-value {% if year_over_year_growth.premium_volume >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
                 {% if year_over_year_growth.premium_volume >= 0 %}+{% endif %}{{ year_over_year_growth.premium_volume|floatformat:1 }}%
             </div>
-            <div class="metric-label">Год к году</div>
+            <div class="metric-label">{{ year_over_year_growth.period_label|default:"Год к году" }}</div>
         </div>
     </div>
     <div class="col-lg-4">
@@ -353,7 +354,8 @@
             <div class="metric-value {% if year_over_year_growth.commission_revenue >= 0 %}growth-positive{% else %}growth-negative{% endif %}">
                 {% if year_over_year_growth.commission_revenue >= 0 %}+{% endif %}{{ year_over_year_growth.commission_revenue|floatformat:1 }}%
             </div>
-            <div class="metric-label">Год к году</div>
+            <div class="metric-label">{{ year_over_year_growth.period_label|default:"Год к году" }}</div>
+            {% if year_over_year_growth.commission_previous %}<div class="metric-label">{{ year_over_year_growth.commission_current|floatformat:0 }} ₽ против {{ year_over_year_growth.commission_previous|floatformat:0 }} ₽</div>{% endif %}
         </div>
     </div>
 </div>
@@ -366,6 +368,7 @@
                 <i class="bi bi-graph-up"></i>
                 Динамика ключевых показателей
             </h5>
+            <p class="text-muted small mb-2">Сплошная линия — КВ заработано (по дате акта с СК), пунктир — КВ по графику платежей без расторгнутых полисов и закрытых ДФА. Премию можно включить, нажав на её название в легенде.</p>
             <div class="chart-container">
                 <div style="position: relative; height: 400px;">
                     <canvas id="timeSeriesChart"></canvas>
@@ -673,6 +676,8 @@ function initializeCharts() {
     const policyCountData = {{ policy_chart_data|safe }};
     const premiumVolumeData = {{ premium_chart_data|safe }};
     const commissionRevenueData = {{ commission_chart_data|safe }};
+    const premiumPlanData = {{ premium_plan_chart_data|default:"[]"|safe }};
+    const commissionPlanData = {{ commission_plan_chart_data|default:"[]"|safe }};
 
     // Debug: log data to console
     console.log('Time series labels:', timeSeriesLabels);
@@ -702,20 +707,40 @@ function initializeCharts() {
                 fill: false,
                 yAxisID: 'y'
             }, {
-                label: 'Объем премий (₽)',
-                data: premiumVolumeData,
-                borderColor: 'rgba(240, 147, 251, 1)',
-                backgroundColor: 'rgba(240, 147, 251, 0.1)',
-                tension: 0.4,
+                label: 'КВ заработано, по актам (₽)',
+                data: commissionRevenueData,
+                borderColor: 'rgba(31, 122, 100, 1)',
+                backgroundColor: 'rgba(31, 122, 100, 0.1)',
+                tension: 0.3,
                 fill: false,
                 yAxisID: 'y1'
             }, {
-                label: 'Комиссионный доход (₽)',
-                data: commissionRevenueData,
+                label: 'КВ по графику (₽)',
+                data: commissionPlanData,
                 borderColor: 'rgba(79, 172, 254, 1)',
                 backgroundColor: 'rgba(79, 172, 254, 0.1)',
-                tension: 0.4,
+                borderDash: [6, 4],
+                tension: 0.3,
                 fill: false,
+                yAxisID: 'y1'
+            }, {
+                label: 'Премия заработано, по актам (₽)',
+                data: premiumVolumeData,
+                borderColor: 'rgba(240, 147, 251, 1)',
+                backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                tension: 0.3,
+                fill: false,
+                hidden: true,
+                yAxisID: 'y1'
+            }, {
+                label: 'Премия по графику (₽)',
+                data: premiumPlanData,
+                borderColor: 'rgba(200, 120, 220, 1)',
+                backgroundColor: 'rgba(200, 120, 220, 0.1)',
+                borderDash: [6, 4],
+                tension: 0.3,
+                fill: false,
+                hidden: true,
                 yAxisID: 'y1'
             }]
         },

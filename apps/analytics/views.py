@@ -16,6 +16,7 @@ from apps.insurers.models import Branch, Insurer
 from apps.policies.models import InsuranceType
 from apps.clients.models import Client
 from apps.accounts.mixins import SuperuserRequiredMixin
+from apps.analytics.money import MONTH_NAMES
 
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
@@ -1831,15 +1832,6 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "future_monthly_forecast": [],
                     "current_year_outlook": {
                         "year": datetime.now().year,
-                        "current_month": datetime.now().month,
-                        "ytd_actual_premium": Decimal("0"),
-                        "ytd_actual_commission": Decimal("0"),
-                        "remaining_forecast_premium": Decimal("0"),
-                        "remaining_forecast_commission": Decimal("0"),
-                        "projected_full_year_premium": Decimal("0"),
-                        "projected_full_year_commission": Decimal("0"),
-                        "ytd_months_count": 0,
-                        "forecast_months_count": 0,
                         "monthly_breakdown": [],
                     },
                     "payment_status_analysis": {
@@ -2141,22 +2133,18 @@ class FinancialAnalyticsView(SuperuserRequiredMixin, TemplateView):
 
         import json
 
+        # Заработано — для прошедших и текущего месяца, ожидается — для текущего
+        # и будущих (в текущем месяце есть и то и другое).
         chart_data = {
             "labels": [item["month_short"] for item in monthly_breakdown],
-            "actual_premium": [
-                float(item["premium_value"]) if item["mode"] == "actual" else None
+            "earned_commission": [
+                float(item["earned_commission"]) if item["mode"] != "forecast" else None
                 for item in monthly_breakdown
             ],
-            "forecast_premium": [
-                float(item["premium_value"]) if item["mode"] == "forecast" else None
-                for item in monthly_breakdown
-            ],
-            "actual_commission": [
-                float(item["commission_value"]) if item["mode"] == "actual" else None
-                for item in monthly_breakdown
-            ],
-            "forecast_commission": [
-                float(item["commission_value"]) if item["mode"] == "forecast" else None
+            "scheduled_commission": [
+                float(item["scheduled_commission"])
+                if item["mode"] != "actual"
+                else None
                 for item in monthly_breakdown
             ],
         }
@@ -2786,12 +2774,19 @@ class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
             commission_chart_data = [
                 float(point["value"]) for point in commission_revenue_dynamics
             ]
+            # План по графику (без отменённых) — для сравнения с фактом по актам.
+            premium_plan_chart_data = [
+                float(point["value"])
+                for point in time_series_data.get("premium_plan_dynamics", [])
+            ]
+            commission_plan_chart_data = [
+                float(point["value"])
+                for point in time_series_data.get("commission_plan_dynamics", [])
+            ]
 
             # Prepare seasonal patterns chart data
             monthly_averages = seasonal_patterns.get("monthly_averages", {})
-            seasonal_chart_labels = [
-                calendar.month_name[month] for month in range(1, 13)
-            ]
+            seasonal_chart_labels = [MONTH_NAMES[month - 1] for month in range(1, 13)]
             seasonal_chart_data = [
                 float(monthly_averages.get(month, 0)) for month in range(1, 13)
             ]
@@ -2852,8 +2847,8 @@ class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
             # Get peak and low months names
             peak_months = seasonal_patterns.get("peak_months", [])
             low_months = seasonal_patterns.get("low_months", [])
-            peak_month_names = [calendar.month_name[month] for month in peak_months]
-            low_month_names = [calendar.month_name[month] for month in low_months]
+            peak_month_names = [MONTH_NAMES[month - 1] for month in peak_months]
+            low_month_names = [MONTH_NAMES[month - 1] for month in low_months]
 
             # Add filter options for the form
             context.update(
@@ -2874,6 +2869,8 @@ class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
                     "premium_chart_data": premium_chart_data,
                     "commission_chart_labels": commission_chart_labels,
                     "commission_chart_data": commission_chart_data,
+                    "premium_plan_chart_data": premium_plan_chart_data,
+                    "commission_plan_chart_data": commission_plan_chart_data,
                     "seasonal_chart_labels": seasonal_chart_labels,
                     "seasonal_chart_data": seasonal_chart_data,
                     "quarterly_chart_labels": quarterly_chart_labels,

@@ -367,6 +367,7 @@
     </div>
 
     <div class="section-kicker">Весь будущий прогноз</div>
+    <p class="text-muted small mb-2">По графикам заключённых договоров, без расторгнутых полисов и взносов после закрытия ДФА. Будущие пролонгации не входят — дальние месяцы заведомо ниже реальных.</p>
     <div class="row g-3 mb-4">
         <div class="col-xl col-md-6">
             <div class="metric-card">
@@ -539,50 +540,42 @@
             <div class="panel-card">
                 <h5 class="panel-title">
                     <i class="bi bi-calendar-check"></i>
-                    Текущий год: факт + прогноз
+                    {{ current_year_outlook.year }} год: КВ
                 </h5>
+                <p class="text-muted small mb-2">
+                    Заработано — по дате согласования акта с СК, как в ежемесячном отчёте по КВ.
+                    Расторгнутые полисы и взносы после закрытия ДФА не ожидаются.
+                </p>
                 <div class="mini-stat">
-                    <div class="label">Год</div>
-                    <div class="value">{{ current_year_outlook.year }}</div>
+                    <div class="label">Заработано с начала года</div>
+                    <div class="value">{{ current_year_outlook.earned_commission|currency }}</div>
                 </div>
                 <div class="mini-stat">
-                    <div class="label">Факт с начала года (премия)</div>
-                    <div class="value">{{ current_year_outlook.ytd_actual_premium|currency }}</div>
+                    <div class="label">+ Ждёт акта ({{ current_year_outlook.awaiting_act_count }} плат.)<br><span class="text-muted small">клиент оплатил, акт с СК не согласован</span></div>
+                    <div class="value">{{ current_year_outlook.awaiting_act_commission|currency }}</div>
                 </div>
                 <div class="mini-stat">
-                    <div class="label">Факт с начала года (комиссия)</div>
-                    <div class="value">{{ current_year_outlook.ytd_actual_commission|currency }}</div>
+                    <div class="label">+ Ожидается по графику до конца года ({{ current_year_outlook.scheduled_count }} плат.)</div>
+                    <div class="value">{{ current_year_outlook.scheduled_commission|currency }}</div>
                 </div>
                 <div class="mini-stat">
-                    <div class="label">Прогноз до конца года (премия)</div>
-                    <div class="value">{{ current_year_outlook.remaining_forecast_premium|currency }}</div>
+                    <div class="label"><strong>= Итог года (ожидаемо)</strong></div>
+                    <div class="value"><strong>{{ current_year_outlook.projected_full_year_commission|currency }}</strong></div>
                 </div>
                 <div class="mini-stat">
-                    <div class="label">Прогноз до конца года (комиссия)</div>
-                    <div class="value">{{ current_year_outlook.remaining_forecast_commission|currency }}</div>
+                    <div class="label text-danger">Просрочено, под риском ({{ current_year_outlook.overdue_count }} плат.)<br><span class="text-muted small">не оплачено в срок, в итог не входит</span></div>
+                    <div class="value text-danger">{{ current_year_outlook.overdue_commission|currency }}</div>
                 </div>
                 <div class="mini-stat">
-                    <div class="label">Итог года (премия)</div>
-                    <div class="value">{{ current_year_outlook.projected_full_year_premium|currency }}</div>
-                </div>
-                <div class="mini-stat">
-                    <div class="label">Итог года (комиссия)</div>
-                    <div class="value">{{ current_year_outlook.projected_full_year_commission|currency }}</div>
-                </div>
-                <div class="mini-stat">
-                    <div class="label">Фактовых месяцев</div>
-                    <div class="value">{{ current_year_outlook.ytd_months_count }}</div>
-                </div>
-                <div class="mini-stat">
-                    <div class="label">Прогнозных месяцев</div>
-                    <div class="value">{{ current_year_outlook.forecast_months_count }}</div>
+                    <div class="label">Премия: заработано / итог года</div>
+                    <div class="value">{{ current_year_outlook.earned_premium|currency }} / {{ current_year_outlook.projected_full_year_premium|currency }}</div>
                 </div>
             </div>
 
             <div class="panel-card">
                 <h5 class="panel-title">
                     <i class="bi bi-bar-chart"></i>
-                    Годовой мост по месяцам
+                    КВ по месяцам года
                 </h5>
                 <div class="chart-box" style="min-height: 280px;">
                     <canvas id="currentYearBridgeChart"></canvas>
@@ -592,40 +585,33 @@
             <div class="panel-card">
                 <h5 class="panel-title">
                     <i class="bi bi-list-ul"></i>
-                    Месяцы года: режим расчета
+                    Месяцы года
                 </h5>
                 <div class="table-responsive">
                     <table class="table year-table mb-0">
                         <thead>
                             <tr>
                                 <th>Месяц</th>
-                                <th>Режим</th>
-                                <th class="text-end">Премия</th>
-                                <th class="text-end">Комиссия</th>
+                                <th class="text-end">Заработано</th>
+                                <th class="text-end">Ожидается</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for month in current_year_outlook.monthly_breakdown %}
-                                <tr>
+                                <tr{% if month.mode == 'current' %} class="table-active"{% endif %}>
                                     <td data-label="Месяц">{{ month.month_name }}</td>
-                                    <td data-label="Режим">
-                                        {% if month.mode == 'actual' %}
-                                            <span class="badge actual-badge">Факт</span>
-                                        {% else %}
-                                            <span class="badge forecast-badge">Прогноз</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="Премия" class="text-end">{{ month.premium_value|currency }}</td>
-                                    <td data-label="Комиссия" class="text-end">{{ month.commission_value|currency }}</td>
+                                    <td data-label="Заработано" class="text-end">{% if month.mode != 'forecast' %}{{ month.earned_commission|currency }}{% else %}—{% endif %}</td>
+                                    <td data-label="Ожидается" class="text-end">{% if month.mode != 'actual' %}{{ month.scheduled_commission|currency }}{% else %}—{% endif %}</td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">Нет данных по текущему году</td>
+                                    <td colspan="3" class="text-center text-muted py-3">Нет данных по текущему году</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                <p class="text-muted small mt-2 mb-0">КВ в рублях. Текущий месяц выделен: в нём и уже заработанное, и ещё ожидаемое.</p>
             </div>
 
             <div class="panel-card">
@@ -749,38 +735,21 @@ function initializeCharts() {
                 datasets: [
                     {
                         type: 'bar',
-                        label: 'Премия (факт)',
-                        data: currentYearChartData.actual_premium,
-                        backgroundColor: 'rgba(31, 122, 100, 0.75)',
+                        label: 'КВ заработано (акт с СК)',
+                        data: currentYearChartData.earned_commission,
+                        backgroundColor: 'rgba(31, 122, 100, 0.8)',
                         borderColor: 'rgba(31, 122, 100, 1)',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        stack: 'kv'
                     },
                     {
                         type: 'bar',
-                        label: 'Премия (прогноз)',
-                        data: currentYearChartData.forecast_premium,
-                        backgroundColor: 'rgba(15, 95, 138, 0.75)',
+                        label: 'КВ ожидается по графику',
+                        data: currentYearChartData.scheduled_commission,
+                        backgroundColor: 'rgba(15, 95, 138, 0.35)',
                         borderColor: 'rgba(15, 95, 138, 1)',
-                        borderWidth: 1
-                    },
-                    {
-                        type: 'line',
-                        label: 'Комиссия (факт)',
-                        data: currentYearChartData.actual_commission,
-                        borderColor: 'rgba(255, 153, 0, 1)',
-                        backgroundColor: 'rgba(255, 153, 0, 0.12)',
-                        tension: 0.25,
-                        pointRadius: 3
-                    },
-                    {
-                        type: 'line',
-                        label: 'Комиссия (прогноз)',
-                        data: currentYearChartData.forecast_commission,
-                        borderColor: 'rgba(177, 119, 0, 1)',
-                        backgroundColor: 'rgba(177, 119, 0, 0.12)',
-                        borderDash: [5, 4],
-                        tension: 0.25,
-                        pointRadius: 3
+                        borderWidth: 1,
+                        stack: 'kv'
                     }
                 ]
             },
@@ -792,7 +761,9 @@ function initializeCharts() {
                     mode: 'index'
                 },
                 scales: {
+                    x: { stacked: true },
                     y: {
+                        stacked: true,
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {

@@ -1778,131 +1778,16 @@ class AnalyticsService:
             else:
                 date_range = None
 
-            # Generate monthly forecasts - determine how far to forecast based on future payments
-            monthly_premium_forecast = []
-            monthly_commission_forecast = []
+            # Деньги — по единым правилам apps.analytics.money: «заработано» по
+            # дате акта с СК, график и просрочка без отменённых платежей.
+            from apps.analytics import money
 
-            current_date = datetime.now().date()
+            current_date = timezone.localdate()
+            monthly_premium_forecast = money.build_monthly_forecast(
+                payments_qs, current_date
+            )
+            monthly_commission_forecast = monthly_premium_forecast
 
-            # Get all future payments to ensure we include them all
-            future_payments = payments_qs.filter(due_date__gt=current_date)
-
-            # Find the furthest future payment to determine forecast period
-            furthest_payment = future_payments.order_by("-due_date").first()
-            if furthest_payment:
-                # Calculate months between now and furthest payment, with minimum of 12 months
-                months_diff = (
-                    furthest_payment.due_date.year - current_date.year
-                ) * 12 + (furthest_payment.due_date.month - current_date.month)
-                forecast_months = max(
-                    12, months_diff + 3
-                )  # +3 to ensure we include the month of the furthest payment
-            else:
-                forecast_months = 12  # Default to 12 months if no future payments
-
-            # Track which payments have been included to ensure we don't miss any
-            included_payment_ids = set()
-
-            for i in range(forecast_months):
-                # Calculate forecast month - use first day of month for consistency
-                if i == 0:
-                    # Start from current month
-                    forecast_month = current_date.replace(day=1)
-                else:
-                    # Add months properly handling year boundaries
-                    year = current_date.year
-                    month = current_date.month + i
-                    while month > 12:
-                        month -= 12
-                        year += 1
-                    forecast_month = current_date.replace(year=year, month=month, day=1)
-
-                # Get payments due in this month - use proper month boundaries
-                month_start = forecast_month
-                if forecast_month.month == 12:
-                    month_end = forecast_month.replace(
-                        year=forecast_month.year + 1, month=1, day=1
-                    ) - timedelta(days=1)
-                else:
-                    month_end = forecast_month.replace(
-                        month=forecast_month.month + 1, day=1
-                    ) - timedelta(days=1)
-
-                month_payments = payments_qs.filter(
-                    due_date__gte=month_start, due_date__lte=month_end
-                )
-
-                # Track which payments we've included
-                for payment in month_payments:
-                    included_payment_ids.add(payment.id)
-
-                # Calculate forecasted amounts
-                forecasted_premium = self.calculator.calculate_premium_volume(
-                    month_payments
-                )
-                forecasted_commission = self.calculator.calculate_commission_revenue(
-                    month_payments
-                )
-
-                # Calculate actual amounts if month is in the past
-                actual_premium = None
-                actual_commission = None
-                if month_end < current_date:
-                    paid_payments = month_payments.filter(paid_date__isnull=False)
-                    actual_premium = self.calculator.calculate_premium_volume(
-                        paid_payments
-                    )
-                    actual_commission = self.calculator.calculate_commission_revenue(
-                        paid_payments
-                    )
-
-                monthly_premium_forecast.append(
-                    {
-                        "month": forecast_month,
-                        "forecasted_premium": forecasted_premium,
-                        "forecasted_commission": forecasted_commission,
-                        "actual_premium": actual_premium,
-                        "actual_commission": actual_commission,
-                        "confidence_level": Decimal("85.0"),  # Default confidence level
-                    }
-                )
-
-                monthly_commission_forecast.append(
-                    {
-                        "month": forecast_month,
-                        "forecasted_premium": forecasted_premium,
-                        "forecasted_commission": forecasted_commission,
-                        "actual_premium": actual_premium,
-                        "actual_commission": actual_commission,
-                        "confidence_level": Decimal("85.0"),
-                    }
-                )
-
-            # Check if any future payments were missed and add them to the last month
-            missed_payments = future_payments.exclude(id__in=included_payment_ids)
-            if missed_payments.exists():
-                # Add missed payments to the last forecast month
-                if monthly_premium_forecast:
-                    last_forecast = monthly_premium_forecast[-1]
-                    missed_premium = self.calculator.calculate_premium_volume(
-                        missed_payments
-                    )
-                    missed_commission = self.calculator.calculate_commission_revenue(
-                        missed_payments
-                    )
-
-                    last_forecast["forecasted_premium"] += missed_premium
-                    last_forecast["forecasted_commission"] += missed_commission
-
-                    # Update commission forecast as well
-                    monthly_commission_forecast[-1][
-                        "forecasted_premium"
-                    ] += missed_premium
-                    monthly_commission_forecast[-1][
-                        "forecasted_commission"
-                    ] += missed_commission
-
-            # Build future-oriented forecast blocks for dashboard
             (
                 future_forecast_summary,
                 future_quarterly_forecast,
@@ -1910,53 +1795,14 @@ class AnalyticsService:
                 monthly_premium_forecast, current_date
             )
 
-            # Build current-year bridge block: actual for elapsed months + forecast for remaining
-            current_year_outlook = self._build_current_year_outlook(
+            current_year_outlook = money.build_current_year_outlook(
                 payments_qs, current_date
             )
-
-            # Analyze payment statuses
-            today = timezone.now().date()
-
-            # Count payments by status (using paid_date field)
-            total_payments = payments_qs.count()
-            paid_payments = payments_qs.filter(paid_date__isnull=False).count()
-            pending_payments = payments_qs.filter(
-                paid_date__isnull=True, due_date__gte=today
-            ).count()
-            overdue_payments = payments_qs.filter(
-                paid_date__isnull=True, due_date__lt=today
-            ).count()
-
-            # Calculate amounts by status
-            paid_amount = self.calculator.calculate_premium_volume(
-                payments_qs.filter(paid_date__isnull=False)
+            payment_status_analysis = money.build_payment_status(
+                payments_qs, current_date
             )
-            pending_amount = self.calculator.calculate_premium_volume(
-                payments_qs.filter(paid_date__isnull=True, due_date__gte=today)
-            )
-            overdue_amount = self.calculator.calculate_premium_volume(
-                payments_qs.filter(paid_date__isnull=True, due_date__lt=today)
-            )
-
-            # Calculate payment discipline rate
-            if total_payments > 0:
-                payment_discipline_rate = (
-                    Decimal(str(paid_payments)) / Decimal(str(total_payments))
-                ) * Decimal("100")
-            else:
-                payment_discipline_rate = Decimal("0")
-
-            payment_status_analysis = {
-                "total_payments": total_payments,
-                "paid_payments": paid_payments,
-                "pending_payments": pending_payments,
-                "overdue_payments": overdue_payments,
-                "paid_amount": paid_amount,
-                "pending_amount": pending_amount,
-                "overdue_amount": overdue_amount,
-                "payment_discipline_rate": payment_discipline_rate,
-            }
+            today = current_date
+            overdue_amount = payment_status_analysis["overdue_amount"]
 
             # Calculate average commission rates by different dimensions
             average_commission_rates = {}
@@ -2005,9 +1851,9 @@ class AnalyticsService:
                     avg_rate = Decimal("0")
                 average_commission_rates[f"insurer_{insurer_name}"] = avg_rate
 
-            # Analyze overdue payments
-            overdue_payments_qs = payments_qs.filter(
-                paid_date__isnull=True, due_date__lt=today
+            # Analyze overdue payments (без отменённых — как в платёжном контуре)
+            overdue_payments_qs = money.expected_payments(payments_qs).filter(
+                due_date__lt=today
             )
 
             # Breakdown by days overdue (single grouped query)
@@ -2307,115 +2153,6 @@ class AnalyticsService:
         }
 
         return summary, future_quarterly_forecast
-
-    def _build_current_year_outlook(self, payments_qs, current_date):
-        """
-        Build current-year bridge:
-        elapsed months as actual (paid), remaining months as forecast (scheduled).
-        """
-        current_year = current_date.year
-        current_month = current_date.month
-        month_names_ru = {
-            1: "Январь",
-            2: "Февраль",
-            3: "Март",
-            4: "Апрель",
-            5: "Май",
-            6: "Июнь",
-            7: "Июль",
-            8: "Август",
-            9: "Сентябрь",
-            10: "Октябрь",
-            11: "Ноябрь",
-            12: "Декабрь",
-        }
-        month_short_ru = {
-            1: "Янв",
-            2: "Фев",
-            3: "Мар",
-            4: "Апр",
-            5: "Май",
-            6: "Июн",
-            7: "Июл",
-            8: "Авг",
-            9: "Сен",
-            10: "Окт",
-            11: "Ноя",
-            12: "Дек",
-        }
-
-        monthly_breakdown = []
-        ytd_actual_premium = Decimal("0")
-        ytd_actual_commission = Decimal("0")
-        remaining_forecast_premium = Decimal("0")
-        remaining_forecast_commission = Decimal("0")
-
-        for month in range(1, 13):
-            month_start = date(current_year, month, 1)
-            if month == 12:
-                month_end = date(current_year + 1, 1, 1) - timedelta(days=1)
-            else:
-                month_end = date(current_year, month + 1, 1) - timedelta(days=1)
-
-            month_payments = payments_qs.filter(
-                due_date__gte=month_start, due_date__lte=month_end
-            )
-            paid_month_payments = month_payments.filter(paid_date__isnull=False)
-
-            actual_premium = self.calculator.calculate_premium_volume(
-                paid_month_payments
-            )
-            actual_commission = self.calculator.calculate_commission_revenue(
-                paid_month_payments
-            )
-            forecasted_premium = self.calculator.calculate_premium_volume(
-                month_payments
-            )
-            forecasted_commission = self.calculator.calculate_commission_revenue(
-                month_payments
-            )
-
-            is_actual = month < current_month
-            premium_value = actual_premium if is_actual else forecasted_premium
-            commission_value = actual_commission if is_actual else forecasted_commission
-
-            if is_actual:
-                ytd_actual_premium += actual_premium
-                ytd_actual_commission += actual_commission
-            else:
-                remaining_forecast_premium += forecasted_premium
-                remaining_forecast_commission += forecasted_commission
-
-            monthly_breakdown.append(
-                {
-                    "month": month,
-                    "month_name": month_names_ru[month],
-                    "month_short": month_short_ru[month],
-                    "mode": "actual" if is_actual else "forecast",
-                    "premium_value": premium_value,
-                    "commission_value": commission_value,
-                    "actual_premium": actual_premium,
-                    "actual_commission": actual_commission,
-                    "forecasted_premium": forecasted_premium,
-                    "forecasted_commission": forecasted_commission,
-                }
-            )
-
-        return {
-            "year": current_year,
-            "current_month": current_month,
-            "ytd_actual_premium": ytd_actual_premium,
-            "ytd_actual_commission": ytd_actual_commission,
-            "remaining_forecast_premium": remaining_forecast_premium,
-            "remaining_forecast_commission": remaining_forecast_commission,
-            "projected_full_year_premium": ytd_actual_premium
-            + remaining_forecast_premium,
-            "projected_full_year_commission": ytd_actual_commission
-            + remaining_forecast_commission,
-            "ytd_months_count": max(0, current_month - 1),
-            "forecast_months_count": 13 - current_month,
-            "monthly_breakdown": monthly_breakdown,
-        }
 
     def _calculate_seasonal_analysis(
         self, monthly_forecast: list, analytics_filter: Optional[AnalyticsFilter] = None
@@ -3572,6 +3309,7 @@ class AnalyticsService:
             from django.db.models.functions import TruncMonth
             from collections import defaultdict
             import calendar
+            from django.utils import timezone
 
             # Get base querysets
             policies_qs = Policy.objects.all()
@@ -3583,8 +3321,9 @@ class AnalyticsService:
                 payments_qs = analytics_filter.apply_to_payments(payments_qs)
 
             # Determine time range - default to last 2 years
-            end_date = datetime.now().date()
-            start_date = end_date.replace(year=end_date.year - 2)
+            end_date = timezone.localdate()
+            # Два года назад с первого числа месяца — ряды идут целыми месяцами.
+            start_date = end_date.replace(year=end_date.year - 2, day=1)
 
             # Override with filter dates if provided
             if analytics_filter and analytics_filter.date_from:
@@ -3608,54 +3347,80 @@ class AnalyticsService:
                 .order_by("month")
             )
 
-            policy_count_dynamics = []
-            for item in policy_count_by_month:
-                policy_count_dynamics.append(
-                    {
-                        "date": item["month"],
-                        "value": Decimal(str(item["count"])),
-                        "label": item["month"].strftime("%Y-%m"),
-                        "additional_data": {"type": "policy_count"},
-                    }
+            # Одна ось месяцев для всех рядов: раньше премия и КВ рисовались по
+            # подписям ряда полисов и сдвигались, если в месяце не было новых полисов.
+            from apps.analytics import money
+            import copy
+
+            # Сегментные фильтры без дат: «заработано» отбирается по дате акта.
+            segment_payments_qs = PaymentSchedule.objects.all()
+            if analytics_filter:
+                segment_filter = copy.copy(analytics_filter)
+                segment_filter.date_from = segment_filter.date_to = None
+                segment_payments_qs = segment_filter.apply_to_payments(
+                    segment_payments_qs
                 )
 
-            # Calculate premium volume dynamics by month
-            premium_by_month = (
-                payments_in_range.annotate(month=TruncMonth("due_date"))
+            axis = []
+            month_cursor = start_date.replace(day=1)
+            while month_cursor <= end_date:
+                axis.append(month_cursor)
+                month_cursor = (
+                    month_cursor.replace(year=month_cursor.year + 1, month=1)
+                    if month_cursor.month == 12
+                    else month_cursor.replace(month=month_cursor.month + 1)
+                )
+
+            def _month_key(value):
+                return value.date() if hasattr(value, "date") else value
+
+            policy_counts = {
+                _month_key(item["month"]): item["count"]
+                for item in policy_count_by_month
+            }
+            plan_rows = {
+                _month_key(row["month"]): row
+                for row in money.scheduled_payments(payments_in_range)
+                .annotate(month=TruncMonth("due_date"))
                 .values("month")
-                .annotate(total=Sum("amount"))
-                .order_by("month")
-            )
-
-            premium_volume_dynamics = []
-            for item in premium_by_month:
-                premium_volume_dynamics.append(
-                    {
-                        "date": item["month"],
-                        "value": item["total"] or Decimal("0"),
-                        "label": item["month"].strftime("%Y-%m"),
-                        "additional_data": {"type": "premium_volume"},
-                    }
+                .annotate(premium=Sum("amount"), commission=Sum("kv_rub"))
+            }
+            earned_rows = {
+                _month_key(row["month"]): row
+                for row in money.earned_monthly_series(
+                    segment_payments_qs, start_date, end_date
                 )
+            }
 
-            # Calculate commission revenue dynamics by month
-            commission_by_month = (
-                payments_in_range.annotate(month=TruncMonth("due_date"))
-                .values("month")
-                .annotate(total=Sum("kv_rub"))
-                .order_by("month")
+            def _series(values_by_month, field, kind):
+                points = []
+                for month_date in axis:
+                    row = values_by_month.get(month_date)
+                    if isinstance(row, dict):
+                        value = row.get(field) or Decimal("0")
+                    else:
+                        value = Decimal(str(row or 0))
+                    points.append(
+                        {
+                            "date": month_date,
+                            "value": value,
+                            "label": month_date.strftime("%Y-%m"),
+                            "additional_data": {"type": kind},
+                        }
+                    )
+                return points
+
+            policy_count_dynamics = _series(policy_counts, None, "policy_count")
+            # Факт — заработано по дате акта с СК (решение владельца 2026-10-16).
+            premium_volume_dynamics = _series(earned_rows, "premium", "premium_earned")
+            commission_revenue_dynamics = _series(
+                earned_rows, "commission", "commission_earned"
             )
-
-            commission_revenue_dynamics = []
-            for item in commission_by_month:
-                commission_revenue_dynamics.append(
-                    {
-                        "date": item["month"],
-                        "value": item["total"] or Decimal("0"),
-                        "label": item["month"].strftime("%Y-%m"),
-                        "additional_data": {"type": "commission_revenue"},
-                    }
-                )
+            # План — по графику (сроку платежа), без отменённых платежей.
+            premium_plan_dynamics = _series(plan_rows, "premium", "premium_plan")
+            commission_plan_dynamics = _series(
+                plan_rows, "commission", "commission_plan"
+            )
 
             # Calculate seasonal patterns
             monthly_averages = {}
@@ -3771,66 +3536,52 @@ class AnalyticsService:
                     }
                 )
 
-            # Calculate year-over-year growth rates
-            year_over_year_growth = {}
-            current_year = end_date.year
-            previous_year = current_year - 1
-
-            # Policy count growth
-            current_year_policies = policies_qs.filter(
-                start_date__year=current_year
+            # Рост к прошлому году — за одинаковые периоды: 1 января – сегодня
+            # против того же отрезка прошлого года. Деньги — заработано по актам.
+            ytd_today = timezone.localdate()
+            ytd_current = money.year_to_date_totals(segment_payments_qs, ytd_today)
+            ytd_previous = money.year_to_date_totals(
+                segment_payments_qs, ytd_today, year=ytd_today.year - 1
+            )
+            ytd_end_previous = date(
+                ytd_today.year - 1,
+                ytd_today.month,
+                28 if (ytd_today.month, ytd_today.day) == (2, 29) else ytd_today.day,
+            )
+            policies_current = policies_qs.filter(
+                start_date__gte=date(ytd_today.year, 1, 1), start_date__lte=ytd_today
             ).count()
-            previous_year_policies = policies_qs.filter(
-                start_date__year=previous_year
+            policies_previous = policies_qs.filter(
+                start_date__gte=date(ytd_today.year - 1, 1, 1),
+                start_date__lte=ytd_end_previous,
             ).count()
 
-            if previous_year_policies > 0:
-                policy_growth = (
-                    (current_year_policies - previous_year_policies)
-                    / previous_year_policies
-                ) * 100
-                year_over_year_growth["policy_count"] = Decimal(str(policy_growth))
-            else:
-                year_over_year_growth["policy_count"] = Decimal("0")
+            def _growth(current, previous):
+                if not previous:
+                    return Decimal("0")
+                return (Decimal(current) - Decimal(previous)) / Decimal(previous) * 100
 
-            # Premium volume growth
-            current_year_premium = payments_qs.filter(
-                due_date__year=current_year
-            ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-            previous_year_premium = payments_qs.filter(
-                due_date__year=previous_year
-            ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-
-            if previous_year_premium > 0:
-                premium_growth = (
-                    (current_year_premium - previous_year_premium)
-                    / previous_year_premium
-                ) * 100
-                year_over_year_growth["premium_volume"] = premium_growth
-            else:
-                year_over_year_growth["premium_volume"] = Decimal("0")
-
-            # Commission revenue growth
-            current_year_commission = payments_qs.filter(
-                due_date__year=current_year
-            ).aggregate(total=Sum("kv_rub"))["total"] or Decimal("0")
-            previous_year_commission = payments_qs.filter(
-                due_date__year=previous_year
-            ).aggregate(total=Sum("kv_rub"))["total"] or Decimal("0")
-
-            if previous_year_commission > 0:
-                commission_growth = (
-                    (current_year_commission - previous_year_commission)
-                    / previous_year_commission
-                ) * 100
-                year_over_year_growth["commission_revenue"] = commission_growth
-            else:
-                year_over_year_growth["commission_revenue"] = Decimal("0")
+            year_over_year_growth = {
+                "policy_count": _growth(policies_current, policies_previous),
+                "premium_volume": _growth(
+                    ytd_current["premium"], ytd_previous["premium"]
+                ),
+                "commission_revenue": _growth(
+                    ytd_current["commission"], ytd_previous["commission"]
+                ),
+                "period_label": (
+                    f"01.01–{ytd_today:%d.%m}: {ytd_today.year} к {ytd_today.year - 1}"
+                ),
+                "commission_current": ytd_current["commission"],
+                "commission_previous": ytd_previous["commission"],
+            }
 
             return {
                 "policy_count_dynamics": policy_count_dynamics,
                 "premium_volume_dynamics": premium_volume_dynamics,
                 "commission_revenue_dynamics": commission_revenue_dynamics,
+                "premium_plan_dynamics": premium_plan_dynamics,
+                "commission_plan_dynamics": commission_plan_dynamics,
                 "seasonal_patterns": seasonal_patterns,
                 "branch_growth_trends": branch_growth_trends,
                 "year_over_year_growth": year_over_year_growth,

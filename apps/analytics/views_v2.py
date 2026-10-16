@@ -21,8 +21,8 @@ from .filters import AnalyticsParams
 TABS = [
     ("summary", "Сводка", "bi-speedometer2", "summary"),
     ("money", "Деньги", "bi-cash-stack", "money"),
-    ("sales", "Продажи", "bi-graph-up-arrow", None),
-    ("portfolio", "Портфель", "bi-briefcase", None),
+    ("sales", "Продажи", "bi-graph-up-arrow", "sales"),
+    ("portfolio", "Портфель", "bi-briefcase", "portfolio"),
     ("insurers", "Страховщики", "bi-building", None),
     ("channels", "Каналы", "bi-diagram-3", None),
     ("clients", "Клиенты", "bi-people", None),
@@ -131,8 +131,9 @@ class AnalyticsTabView(AnalyticsV2Mixin, TemplateView):
         context["current_url_name"] = tab_url_name(self.tab)
         module = self._tab_module()
         context["show_period"] = getattr(module, "USES_PERIOD", True)
+        context["show_as_of"] = getattr(module, "USES_AS_OF", False)
         if module:
-            context["data"] = module.build(params)
+            context["data"] = module.build(params, self.request.GET)
         return context
 
 

@@ -1,0 +1,115 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+{% with t=data.totals %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Новых полисов</div>
+        <div class="av2-number"><a href="{% drill_url 'new_business' %}">{{ t.count }}</a></div>
+        <div class="av2-caption">из них к старому ДФА: {% if t.to_old_dfa %}<a class="av2-link" href="{% drill_url 'new_business' to_old_dfa='1' %}">{{ t.to_old_dfa }}</a>{% else %}0{% endif %}</div>
+    </div></div></div>
+    {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="КВ первого года" value=t.commission tone="success" %}
+    {% include "analytics/v2/includes/kpi.html" with col="col-6 col-lg-3" title="Премия первого года" value=t.premium %}
+    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+        <div class="av2-caption">Средняя премия 1-го года</div>
+        <div class="av2-number">{% if t.count %}{% widthratio t.premium t.count 1 as avg %}{{ avg|money_short }}{% else %}—{% endif %}</div>
+    </div></div></div>
+</div>
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Новый бизнес по месяцам</strong> <span class="av2-caption">по дате начала полиса</span></div>
+    <div class="card-body"><div class="av2-chart"><canvas id="chart-sales"></canvas></div></div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 av2-table">
+            <thead class="table-light"><tr><th>Месяц</th><th class="text-end">Полисов</th><th class="text-end">к старому ДФА</th><th class="text-end">Премия 1-го года</th><th class="text-end">КВ 1-го года</th></tr></thead>
+            <tbody>
+            {% for r in data.monthly %}
+            <tr>
+                <td>{{ r.label }}</td>
+                <td class="text-end">{% if r.count %}<a class="av2-link" href="{% drill_url 'new_business' date_from=r.date_from date_to=r.date_to %}">{{ r.count }}</a>{% else %}0{% endif %}</td>
+                <td class="text-end">{{ r.to_old_dfa }}</td>
+                <td class="text-end">{{ r.premium|currency }}</td>
+                <td class="text-end">{{ r.commission|currency }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <strong>Откуда приходит бизнес</strong>
+        <div class="btn-group btn-group-sm">
+            {% for g in data.groupings %}
+            <a class="btn {% if g.key == data.grouping %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?{{ params.querystring }}&by={{ g.key }}">{{ g.title }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 av2-table">
+            <thead class="table-light"><tr>
+                <th>{{ data.grouping_title }}</th><th class="text-end">Полисов</th><th class="text-end">к старому ДФА</th>
+                <th class="text-end">Премия 1-го года</th><th class="text-end">Средняя премия</th><th class="text-end">КВ 1-го года</th><th class="text-end">Доля КВ</th>
+            </tr></thead>
+            <tbody>
+            {% for r in data.grouped %}
+            <tr>
+                <td>{{ r.name }}</td>
+                <td class="text-end">
+                    {% if r.id %}
+                    {% if data.grouping == "branch" %}{% drill_url 'new_business' branch=r.id as u %}{% elif data.grouping == "manager" %}{% drill_url 'new_business' manager=r.id as u %}{% elif data.grouping == "insurer" %}{% drill_url 'new_business' insurer=r.id as u %}{% else %}{% drill_url 'new_business' type=r.id as u %}{% endif %}
+                    <a class="av2-link" href="{{ u }}">{{ r.count }}</a>
+                    {% else %}{{ r.count }}{% endif %}
+                </td>
+                <td class="text-end">{{ r.to_old_dfa }}</td>
+                <td class="text-end">{{ r.premium|currency }}</td>
+                <td class="text-end">{{ r.avg_premium|currency }}</td>
+                <td class="text-end">{{ r.commission|currency }}</td>
+                <td class="text-end">{% if r.share is not None %}{{ r.share|floatformat:1 }}%{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}<tr><td colspan="7" class="text-muted">Нет новых полисов в периоде</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if data.insurer_share.rows %}
+<div class="card mb-4">
+    <div class="card-header"><strong>Доля СК в новом бизнесе по кварталам</strong> <span class="av2-caption">% от числа новых полисов квартала</span></div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 av2-table">
+            <thead class="table-light"><tr><th>СК</th>{% for q in data.insurer_share.quarters %}<th class="text-end">{{ q.label }}<br><span class="av2-caption">{{ q.total }} пол.</span></th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for r in data.insurer_share.rows %}
+            <tr><td>{{ r.name }}</td>{% for v in r.shares %}<td class="text-end">{% if v %}{{ v|floatformat:0 }}%{% else %}—{% endif %}</td>{% endfor %}</tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{{ data.chart|json_script:"sales-chart" }}
+{% endblock %}
+
+{% block tab_js %}
+<script>
+(function () {
+    const d = JSON.parse(document.getElementById('sales-chart').textContent);
+    new Chart(document.getElementById('chart-sales'), {
+        data: {labels: d.labels, datasets: [
+            {type: 'bar', label: 'Новых полисов', data: d.count, backgroundColor: 'rgba(25,118,210,.35)', yAxisID: 'y'},
+            {type: 'line', label: 'КВ 1-го года', data: d.commission, borderColor: '#2e7d32', backgroundColor: '#2e7d32', yAxisID: 'kv', tension: .25},
+        ]},
+        options: {maintainAspectRatio: false, scales: {
+            y: {position: 'left', title: {display: true, text: 'полисов'}},
+            kv: {position: 'right', grid: {drawOnChartArea: false}, ticks: {callback: (v) => (v / 1e6).toLocaleString('ru-RU') + ' млн'}},
+        }},
+    });
+})();
+</script>
+{% endblock %}

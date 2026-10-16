@@ -40,7 +40,12 @@
             <input class="form-check-input" type="checkbox" role="switch" id="av2-osago" name="osago" value="1"{% if params.with_osago %} checked{% endif %}>
             <label class="form-check-label small" for="av2-osago">с ОСАГО</label>
         </div>
-        {% if params.as_of != params.today %}<input type="hidden" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}">{% endif %}
+        {% if show_as_of %}
+        <div class="d-flex align-items-center gap-1">
+            <label for="av2-as-of" class="small text-nowrap">Срез на</label>
+            <input type="date" id="av2-as-of" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        {% elif params.as_of != params.today %}<input type="hidden" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}">{% endif %}
 
         <button type="submit" class="btn btn-sm btn-primary ms-auto"><i class="bi bi-funnel"></i> Применить</button>
         <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Сбросить</a>

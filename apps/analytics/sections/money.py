@@ -177,7 +177,7 @@ def _group_losses(rows, field, label_field):
     return result
 
 
-def build(params):
+def build(params, query=None):
     payments = params.payments()
     today = params.today
     start, end = params.date_from, params.date_to

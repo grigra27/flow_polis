@@ -106,7 +106,7 @@ def _manager_drops(policies, today):
     return {"date_from": recent_from, "rows": drops}
 
 
-def build(params):
+def build(params, query=None):
     today = params.today
     payments = params.payments()
     policies = params.policies()

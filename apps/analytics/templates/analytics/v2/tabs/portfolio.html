@@ -1,0 +1,137 @@
+{% extends "analytics/v2/layout.html" %}
+{% load analytics_v2 currency_filters %}
+
+{% block tab_content %}
+{% with s=data.snapshot %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>В силе на {{ s.as_of|date:"d.m.Y" }}</strong>
+        <span class="av2-caption">дату среза можно поменять в фильтре</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3">
+                <div class="av2-caption">Полисов в силе</div>
+                <div class="av2-number"><a href="{% drill_url 'in_force_at' %}">{{ s.count }}</a></div>
+            </div>
+            <div class="col-6 col-lg-4">
+                <div class="av2-caption">КВ по графику на 12 мес. вперёд</div>
+                <div class="av2-number" title="{{ s.commission|currency }}">{{ s.commission|money_short }}</div>
+                <div class="av2-caption">{{ s.as_of|date:"d.m.Y" }}–{{ s.horizon_end|date:"d.m.Y" }}, без отменённых</div>
+            </div>
+        </div>
+        <div class="row g-4">
+            {% for b in s.breakdowns %}
+            <div class="col-lg-4">
+                <table class="table table-sm av2-table mb-0">
+                    <thead><tr><th>{{ b.title }}</th><th class="text-end">Полисов</th><th class="text-end">КВ 12 мес.</th><th class="text-end">Доля</th></tr></thead>
+                    <tbody>
+                    {% for r in b.rows %}
+                    <tr>
+                        <td class="text-wrap">{{ r.name }}</td>
+                        <td class="text-end">
+                            {% if b.filter == "type" %}{% drill_url 'in_force_at' type=r.id as u %}{% elif b.filter == "branch" %}{% drill_url 'in_force_at' branch=r.id as u %}{% else %}{% drill_url 'in_force_at' insurer=r.id as u %}{% endif %}
+                            <a class="av2-link" href="{{ u }}">{{ r.count }}</a>
+                        </td>
+                        <td class="text-end">{{ r.commission|money_short }}</td>
+                        <td class="text-end">{% if r.share is not None %}{{ r.share|floatformat:0 }}%{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <strong>Календарь окончаний на 12 месяцев</strong>
+        <span class="av2-caption">не расторгнутые полисы · от текущего месяца</span>
+    </div>
+    <div class="card-body"><div class="av2-chart"><canvas id="chart-calendar"></canvas></div></div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 av2-table">
+            <tbody>
+            <tr><th></th>{% for r in data.calendar %}<th class="text-end">{{ r.label }}</th>{% endfor %}</tr>
+            <tr><td>Нужен новый полис <span class="av2-caption">(ДФА открыт)</span></td>{% for r in data.calendar %}<td class="text-end">{% if r.open %}<a class="av2-link fw-semibold" href="{% drill_url 'expiring' month=r.code dfa='open' %}">{{ r.open }}</a>{% else %}—{% endif %}</td>{% endfor %}</tr>
+            <tr><td>Уходят <span class="av2-caption">(ДФА закрыт)</span></td>{% for r in data.calendar %}<td class="text-end">{% if r.closed %}<a class="av2-link" href="{% drill_url 'expiring' month=r.code dfa='closed' %}">{{ r.closed }}</a>{% else %}—{% endif %}</td>{% endfor %}</tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="card h-100">
+            <div class="card-header">
+                <strong>Удержание: новый полис по тому же ДФА</strong>
+                <div class="av2-caption">Закончились при открытом ДФА; продлён — новый полис по тому же ДФА с началом в пределах ±{{ data.window_days }} дней. Расчёт приближённый.</div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 av2-table">
+                    <thead class="table-light"><tr><th>Квартал</th><th class="text-end">Требовали</th><th class="text-end">Продлены</th><th class="text-end">из них к другой СК</th><th class="text-end">Не продлены</th><th class="text-end">% продления</th></tr></thead>
+                    <tbody>
+                    {% for r in data.retention %}
+                    <tr>
+                        <td>{{ r.label }}</td>
+                        <td class="text-end">{% if r.due %}<a class="av2-link" href="{% drill_url 'renewal_due' quarter=r.code %}">{{ r.due }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{% if r.renewed %}<a class="av2-link" href="{% drill_url 'renewal_due' quarter=r.code status='renewed' %}">{{ r.renewed }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{% if r.switched %}<a class="av2-link" href="{% drill_url 'renewal_due' quarter=r.code status='switched' %}">{{ r.switched }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{% if r.not_renewed %}<a class="av2-link text-danger" href="{% drill_url 'renewal_due' quarter=r.code status='not_renewed' %}">{{ r.not_renewed }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{% if r.rate is not None %}{{ r.rate|floatformat:0 }}%{% else %}—{% endif %}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="6" class="text-muted">Период ещё не наступил</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <strong>Отток</strong>
+                <div class="av2-caption">Досрочный выкуп — ДФА закрыт раньше окончания полиса более чем на 30 дней. КВ — потерянные из-за этого платежи.</div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 av2-table">
+                    <thead class="table-light"><tr><th>Квартал</th><th class="text-end">Досрочный выкуп</th><th class="text-end">КВ</th><th class="text-end">Расторжения</th><th class="text-end">КВ</th></tr></thead>
+                    <tbody>
+                    {% for r in data.churn %}
+                    <tr>
+                        <td>{{ r.label }}</td>
+                        <td class="text-end">{% if r.early %}<a class="av2-link" href="{% drill_url 'churn' quarter=r.code reason='early_buyout' %}">{{ r.early }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{{ r.early_kv|money_short }}</td>
+                        <td class="text-end">{% if r.terminated %}<a class="av2-link" href="{% drill_url 'churn' quarter=r.code reason='termination' %}">{{ r.terminated }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{{ r.terminated_kv|money_short }}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="5" class="text-muted">Период ещё не наступил</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ data.calendar_chart|json_script:"calendar-chart" }}
+{% endblock %}
+
+{% block tab_js %}
+<script>
+(function () {
+    const d = JSON.parse(document.getElementById('calendar-chart').textContent);
+    new Chart(document.getElementById('chart-calendar'), {
+        type: 'bar',
+        data: {labels: d.labels, datasets: [
+            {label: 'Нужен новый полис (ДФА открыт)', data: d.open, backgroundColor: '#1976d2', stack: 's'},
+            {label: 'Уходят (ДФА закрыт)', data: d.closed, backgroundColor: 'rgba(120,120,120,.35)', stack: 's'},
+        ]},
+        options: {maintainAspectRatio: false, scales: {x: {stacked: true}, y: {stacked: true, ticks: {precision: 0}}}},
+    });
+})();
+</script>
+{% endblock %}

@@ -1172,6 +1172,7 @@ class ThreePercentReportExportViewTest(TestCase):
         from io import BytesIO
         from openpyxl import load_workbook
         from apps.policies.models import PaymentSchedule
+        from apps.reports.exporters import ThreePercentReportExporter
 
         PaymentSchedule.objects.filter(
             policy=self.policy,
@@ -1216,9 +1217,12 @@ class ThreePercentReportExportViewTest(TestCase):
         self.assertEqual(sheet.cell(row=6, column=1).value, "DFA-3P-001")
         self.assertAlmostEqual(float(sheet.cell(row=6, column=11).value), 15.0)
         self.assertAlmostEqual(float(sheet.cell(row=6, column=12).value), 1000.0)
-        self.assertFalse(str(standard_fill_rgb).upper().endswith("7A1F2B"))
-        self.assertTrue(str(nonstandard_fill_rgb).upper().endswith("7A1F2B"))
-        self.assertTrue(str(nonstandard_font_rgb).upper().endswith("FFFFFF"))
+        # Цвета из ThreePercentReportExporter (серая заливка, красный шрифт с 2026-05-07).
+        fill = ThreePercentReportExporter.NONSTANDARD_KV_FILL_COLOR
+        font = ThreePercentReportExporter.NONSTANDARD_KV_FONT_COLOR
+        self.assertFalse(str(standard_fill_rgb).upper().endswith(fill))
+        self.assertTrue(str(nonstandard_fill_rgb).upper().endswith(fill))
+        self.assertTrue(str(nonstandard_font_rgb).upper().endswith(font))
 
     def test_admin_gets_redirect_when_no_three_percent_data(self):
         """Тест: при отсутствии согласованных платежей за квартал админ возвращается."""

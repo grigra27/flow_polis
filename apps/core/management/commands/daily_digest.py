@@ -71,7 +71,7 @@ class Command(BaseCommand):
         # Определяем период для анализа
         if options["test"]:
             # Тестовый режим - последние 2 часа
-            end_time = datetime.now()
+            end_time = timezone.now()
             start_time = end_time - timedelta(hours=2)
             period_name = f"последние 2 часа (тест)"
         elif options["date"]:
@@ -90,7 +90,8 @@ class Command(BaseCommand):
                 return
         else:
             # По умолчанию - вчерашний день
-            yesterday = timezone.now().date() - timedelta(days=1)
+            # localdate, а не now().date(): «вчера» по Москве, а не по UTC.
+            yesterday = timezone.localdate() - timedelta(days=1)
             start_time = timezone.make_aware(
                 datetime.combine(yesterday, datetime.min.time())
             )

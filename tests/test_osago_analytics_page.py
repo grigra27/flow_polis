@@ -49,10 +49,13 @@ def test_year_filter(portfolio):  # noqa: F811
 
 
 def test_page_for_superuser(client, django_user_model, portfolio):  # noqa: F811
-    add_osago_policy(portfolio)
+    policy = add_osago_policy(portfolio)
     client.force_login(django_user_model.objects.create_superuser("r", "r@r.ru", "x"))
 
-    response = client.get(reverse("analytics:osago_analytics"))
+    # Год полиса явно: в первые дни января полис «10 дней назад» — прошлогодний.
+    response = client.get(
+        reverse("analytics:osago_analytics"), {"year": policy.start_date.year}
+    )
 
     assert response.status_code == 200
     html = response.content.decode()

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -8,9 +8,10 @@ from django.test import Client as DjangoClient
 from django.test import RequestFactory
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.clients.models import Client as LeasingClient
-from apps.policies.models import Policy
+from apps.policies.models import PaymentSchedule, Policy
 
 from .models import (
     Branch,
@@ -32,6 +33,16 @@ from .templatetags.insurer_tags import (
 User = get_user_model()
 
 
+def days_from_today(days):
+    """Дата относительно сегодняшнего дня.
+
+    Статистика делит полисы на действующие и нет по сегодняшней дате, поэтому
+    окна полисов задаются от сегодня: с фиксированными датами тесты ломались
+    бы, как только эти даты проходят (первые — 10.01.2027).
+    """
+    return timezone.localdate() + timedelta(days=days)
+
+
 class InsurerStatisticsTestDataMixin:
     def setUp_statistics_data(self):
         cache.clear()
@@ -50,8 +61,8 @@ class InsurerStatisticsTestDataMixin:
             branch=self.branch_a,
             insurance_type=self.type_casco,
             premium=Decimal("1000.00"),
-            start_date=date(2026, 1, 10),
-            end_date=date(2027, 1, 9),
+            start_date=days_from_today(-282),
+            end_date=days_from_today(82),
             policy_active=True,
             broker_participation=True,
         )
@@ -60,8 +71,8 @@ class InsurerStatisticsTestDataMixin:
             branch=self.branch_a,
             insurance_type=self.type_cargo,
             premium=Decimal("4000.00"),
-            start_date=date(2025, 6, 10),
-            end_date=date(2026, 6, 9),
+            start_date=days_from_today(-496),
+            end_date=days_from_today(-132),
             policy_active=False,
             broker_participation=False,
         )
@@ -70,8 +81,8 @@ class InsurerStatisticsTestDataMixin:
             branch=self.branch_b,
             insurance_type=self.type_casco,
             premium=Decimal("9000.00"),
-            start_date=date(2026, 3, 1),
-            end_date=date(2027, 2, 28),
+            start_date=days_from_today(-232),
+            end_date=days_from_today(132),
             policy_active=True,
             broker_participation=True,
         )
@@ -89,7 +100,7 @@ class InsurerStatisticsTestDataMixin:
         broker_participation,
         insurer=None,
     ):
-        return Policy.objects.create(
+        policy = Policy.objects.create(
             policy_number=policy_number,
             dfa_number=f"DFA-{policy_number}",
             client=self.leasing_client,
@@ -102,6 +113,18 @@ class InsurerStatisticsTestDataMixin:
             policy_active=policy_active,
             broker_participation=broker_participation,
         )
+        # Премия полиса считается из графика платежей (Policy.premium_total —
+        # @property с 2026-04-25), поэтому задаём её одним платежом.
+        PaymentSchedule.objects.create(
+            policy=policy,
+            year_number=1,
+            installment_number=1,
+            due_date=start_date,
+            insurance_sum=Decimal("1000000.00"),
+            amount=premium,
+            kv_rub=Decimal("0.00"),
+        )
+        return policy
 
 
 class CommissionRateAPITest(TestCase):
@@ -401,8 +424,8 @@ class BranchStatisticsServiceTest(InsurerStatisticsTestDataMixin, TestCase):
             branch=self.branch_a,
             insurance_type=self.type_casco,
             premium=Decimal("2000.00"),
-            start_date=date(2026, 4, 1),
-            end_date=date(2027, 3, 31),
+            start_date=days_from_today(-201),
+            end_date=days_from_today(163),
             policy_active=True,
             broker_participation=True,
             insurer=self.second_insurer,
@@ -555,8 +578,9 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
                 "stats_scope": "current",
                 "policy_scope": "wrong",
                 "metric": "wrong",
-                "date_from": "2026-12-31",
-                "date_to": "2026-01-01",
+                # Перепутанные местами границы — сервис должен их поменять.
+                "date_from": days_from_today(400).isoformat(),
+                "date_to": days_from_today(-600).isoformat(),
             },
         )
 
@@ -567,8 +591,8 @@ class InsurerDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(response.context["stats_scope"], "all")
         self.assertEqual(response.context["policy_scope"], "active")
         self.assertEqual(response.context["metric"], "premium")
-        self.assertEqual(response.context["date_from"], date(2026, 1, 1))
-        self.assertEqual(response.context["date_to"], date(2026, 12, 31))
+        self.assertEqual(response.context["date_from"], days_from_today(-600))
+        self.assertEqual(response.context["date_to"], days_from_today(400))
 
         policies = list(response.context["policies"])
         self.assertEqual(len(policies), 3)
@@ -593,8 +617,8 @@ class BranchDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
             branch=self.branch_a,
             insurance_type=self.type_casco,
             premium=Decimal("2000.00"),
-            start_date=date(2026, 4, 1),
-            end_date=date(2027, 3, 31),
+            start_date=days_from_today(-201),
+            end_date=days_from_today(163),
             policy_active=True,
             broker_participation=True,
             insurer=self.second_insurer,
@@ -675,8 +699,9 @@ class BranchDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
                 "stats_scope": "current",
                 "policy_scope": "wrong",
                 "metric": "wrong",
-                "date_from": "2026-12-31",
-                "date_to": "2026-01-01",
+                # Перепутанные местами границы — сервис должен их поменять.
+                "date_from": days_from_today(400).isoformat(),
+                "date_to": days_from_today(-600).isoformat(),
             },
         )
 
@@ -687,8 +712,8 @@ class BranchDetailViewTest(InsurerStatisticsTestDataMixin, TestCase):
         self.assertEqual(response.context["stats_scope"], "all")
         self.assertEqual(response.context["policy_scope"], "active")
         self.assertEqual(response.context["metric"], "premium")
-        self.assertEqual(response.context["date_from"], date(2026, 1, 1))
-        self.assertEqual(response.context["date_to"], date(2026, 12, 31))
+        self.assertEqual(response.context["date_from"], days_from_today(-600))
+        self.assertEqual(response.context["date_to"], days_from_today(400))
 
         policies = list(response.context["policies"])
         self.assertEqual(len(policies), 3)

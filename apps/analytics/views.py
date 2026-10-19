@@ -3223,7 +3223,9 @@ class TimeSeriesAnalyticsView(SuperuserRequiredMixin, TemplateView):
         else:
             # Default to last 2 years
             end_date = datetime.now().date()
-            start_date = date(end_date.year - 1, end_date.month, end_date.day)
+            # 29 февраля → 28 февраля прошлого года (иначе ValueError).
+            day = 28 if (end_date.month, end_date.day) == (2, 29) else end_date.day
+            start_date = date(end_date.year - 1, end_date.month, day)
             return (
                 f"{start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}"
             )

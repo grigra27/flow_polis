@@ -198,8 +198,13 @@ class TestPaymentScheduleProperties(TestCase):
         kv_rub=st.decimals(
             min_value=Decimal("0.00"), max_value=Decimal("999999999.99"), places=2
         ),
+        # Без NUL и одиночных суррогатов (категория Cs): их нельзя сохранить
+        # в БД, и тест падал случайно, когда Hypothesis генерировал '\ud800'.
         payment_info=st.text(
-            max_size=200, alphabet=st.characters(blacklist_characters="\x00")
+            max_size=200,
+            alphabet=st.characters(
+                blacklist_characters="\x00", blacklist_categories=("Cs",)
+            ),
         ),
     )
     def test_payment_copy_field_identity(

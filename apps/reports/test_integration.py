@@ -4,7 +4,7 @@
 Тестируют полный цикл работы системы экспорта от начала до конца.
 """
 
-from django.test import TestCase, Client as TestClient
+from django.test import TestCase, Client as DjangoClient
 from django.contrib.auth.models import User
 from django.urls import reverse
 from datetime import date, timedelta
@@ -81,7 +81,7 @@ class FullCycleCustomExportTest(TestCase):
             )
             self.policies.append(policy)
 
-        self.test_client = TestClient()
+        self.test_client = DjangoClient()
 
     def test_full_custom_export_cycle(self):
         """Тест полного цикла кастомного экспорта"""
@@ -214,7 +214,7 @@ class TemplateSaveAndLoadTest(TestCase):
             policy_active=True,
         )
 
-        self.test_client = TestClient()
+        self.test_client = DjangoClient()
 
     def test_save_and_load_template(self):
         """Тест сохранения и загрузки шаблона"""
@@ -365,7 +365,7 @@ class ReadyExportsTest(TestCase):
             paid_date=date(2024, 2, 28),
         )
 
-        self.test_client = TestClient()
+        self.test_client = DjangoClient()
 
     def test_ready_export_policies(self):
         """Тест готового экспорта полисов"""
@@ -1348,7 +1348,7 @@ class AuthorizationTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser", password="testpass123"
         )
-        self.test_client = TestClient()
+        self.test_client = DjangoClient()
 
     def test_index_requires_login(self):
         """Главная страница требует авторизации"""

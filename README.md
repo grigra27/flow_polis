@@ -400,8 +400,10 @@ admin.save()
 #### Запуск тестов
 
 ```bash
-python manage.py test
+pytest
 ```
+
+Только pytest: `python manage.py test` видит лишь часть набора. Подробнее — [tests/README.md](tests/README.md).
 
 #### Создание миграций
 
@@ -622,30 +624,8 @@ STAGING=1 ./scripts/init-letsencrypt.sh
 
 ### Testing
 
-#### Integration Tests
-
-Проект включает полный набор интеграционных тестов для Docker окружения:
-
-```bash
-# Запуск всех интеграционных тестов
-./tests/run_integration_tests.sh
-
-# Или напрямую через Python
-python tests/test_docker_integration.py
-
-# Валидация структуры тестов (без Docker)
-python tests/validate_tests.py
-```
-
-**Что тестируется:**
-- ✅ Запуск всех контейнеров
-- ✅ Подключение к PostgreSQL и Redis
-- ✅ Работа Nginx reverse proxy
-- ✅ Сбор и отдача статических файлов
-- ✅ **Property 1**: Персистентность данных при перезапуске
-- ✅ **Property 4**: Автоматический перезапуск упавших контейнеров
-
-Подробная документация: [docs/DOCKER_TESTING.md](docs/DOCKER_TESTING.md)
+Тесты запускаются в CI перед каждым деплоем (`pytest`). Как запускать и писать
+тесты — [tests/README.md](tests/README.md).
 
 ### Мониторинг и логирование
 
@@ -1447,7 +1427,7 @@ Workflow настроен в `.github/workflows/deploy.yml` и включает:
 - [Backup & Restore Guide](docs/BACKUP_RESTORE.md) - Руководство по резервному копированию
 
 #### Тестирование и скрипты
-- [Docker Testing Guide](docs/DOCKER_TESTING.md) - Руководство по интеграционным тестам
+- [Tests](tests/README.md) - Как запускать и писать тесты
 - [Scripts Documentation](scripts/README.md) - Документация по скриптам
 
 ## Лицензия

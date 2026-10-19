@@ -49,6 +49,7 @@ urlpatterns = [
         views.property_snapshot_report,
         name="property_snapshot_report",
     ),
+    path("property-report/", views.property_report, name="property_report"),
     path(
         "export/backups/database/",
         views.export_database_backup,

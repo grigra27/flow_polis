@@ -109,3 +109,20 @@ def month_name(month_num):
         return month_names.get(int(month_num), f"Месяц {month_num}")
     except (ValueError, TypeError):
         return f"Месяц {month_num}"
+
+
+@register.filter(name="money_mln")
+def format_money_mln(value):
+    """Крупные суммы для отчётов: 1 234 567 890 → «1 234,6 млн ₽», 540 000 → «540 тыс. ₽»."""
+    try:
+        num = float(value)
+    except (ValueError, TypeError):
+        return value
+    if abs(num) >= 1_000_000:
+        formatted = (
+            "{:,.1f}".format(num / 1_000_000).replace(",", " ").replace(".", ",")
+        )
+        return f"{formatted} млн ₽"
+    if abs(num) >= 1_000:
+        return "{:,} тыс. ₽".format(round(num / 1_000)).replace(",", " ")
+    return f"{round(num)} ₽"

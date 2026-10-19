@@ -957,6 +957,51 @@ def property_snapshot_report(request):
 
 
 @login_required
+def property_report(request):
+    """Подробный отчёт по имуществу для лизинговой компании (HTML / Excel).
+
+    Где и как застраховано имущество на дату среза. Без КВ, премии и тарифа.
+    Доступ — как у снэпшота, всем авторизованным пользователям.
+    """
+    from django.utils.dateparse import parse_date
+
+    from apps.insurers.models import Branch
+
+    from .services.property_report import (
+        build_property_report,
+        build_property_report_workbook,
+    )
+
+    as_of = parse_date(request.GET.get("as_of") or "")
+    branch_ids = [int(v) for v in request.GET.getlist("branch") if v.isdigit()]
+    report = build_property_report(as_of=as_of, branch_ids=branch_ids)
+
+    if request.GET.get("format") == "xlsx":
+        from io import BytesIO
+
+        buffer = BytesIO()
+        build_property_report_workbook(report).save(buffer)
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="property_report_{report["as_of"]:%Y%m%d}.xlsx"'
+        return response
+
+    branches = list(Branch.objects.order_by("branch_name").values("id", "branch_name"))
+    report["branches"] = [{**b, "selected": b["id"] in branch_ids} for b in branches]
+    report["selected_branches"] = [
+        b["branch_name"] for b in branches if b["id"] in branch_ids
+    ]
+    report["xlsx_query"] = request.GET.copy()
+    report["xlsx_query"]["format"] = "xlsx"
+    report["xlsx_query"] = report["xlsx_query"].urlencode()
+    return render(request, "reports/property_report.html", report)
+
+
+@login_required
 def export_database_backup(request):
     """Скачивание актуального backup-файла базы данных."""
     return _download_backup_file(request, "database")

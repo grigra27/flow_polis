@@ -1,0 +1,16 @@
+{% load currency_filters %}
+{% if title %}<h3>{{ title }}</h3>{% endif %}
+<table class="pr-table">
+    <thead><tr><th></th><th class="pr-barcell">Доля</th><th class="num">Стоимость</th><th class="num">Объектов</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+        <td>{{ r.name }}</td>
+        <td class="pr-barcell"><div class="d-flex align-items-center gap-2"><div class="pr-bar flex-grow-1"><span style="width:{{ r.bar }}%"></span></div><span style="min-width:3.2em;text-align:right">{{ r.share|floatformat:1 }}%</span></div></td>
+        <td class="num">{{ r.sum|money_mln }}</td>
+        <td class="num muted">{{ r.count }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="4" class="muted">Нет данных</td></tr>
+    {% endfor %}
+    </tbody>
+</table>

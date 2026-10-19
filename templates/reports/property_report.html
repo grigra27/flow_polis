@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+
+{% block title %}Страховая защита имущества{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pr {
+        --pr-bg: #f3f7fc;
+        --pr-card: #ffffff;
+        --pr-border: #dbe5f1;
+        --pr-line: #e8eef6;
+        --pr-title: #17324f;
+        --pr-text: #24384f;
+        --pr-muted: #5d748d;
+        --pr-accent: #1565c0;
+        --pr-bar: #2a78d6;
+        --pr-bar-soft: #edf3fb;
+        --pr-soft: #f6f9fd;
+        max-width: 1200px; margin: 0 auto; padding: 1.25rem 1rem 3rem;
+        color: var(--pr-text); font-variant-numeric: tabular-nums;
+    }
+    body { background: #f3f7fc; }
+
+    .pr-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; margin-bottom: 1rem; }
+    .pr-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .95rem; border-radius: 999px; font-weight: 600; font-size: .88rem;
+              background: var(--pr-accent); color: #fff; border: 1px solid var(--pr-accent); text-decoration: none; cursor: pointer; }
+    .pr-btn:hover { background: #104a91; color: #fff; }
+    .pr-btn--ghost { background: #fff; color: var(--pr-title); border-color: var(--pr-border); }
+    .pr-btn--ghost:hover { background: var(--pr-soft); color: var(--pr-title); }
+    .pr-toolbar form { display: inline-flex; align-items: center; gap: .5rem; margin: 0; font-size: .86rem; color: var(--pr-muted); }
+    .pr-toolbar input[type=date] { border: 1px solid var(--pr-border); border-radius: 999px; padding: .4rem .7rem; font: inherit; color: var(--pr-title); }
+    .pr-toolbar .dropdown-menu { border-radius: 12px; max-height: 20rem; overflow-y: auto; }
+    .pr-spacer { flex: 1; }
+
+    .pr-cover, .pr-section { background: var(--pr-card); border: 1px solid var(--pr-border); border-radius: 16px; padding: 1.35rem 1.6rem; margin-bottom: 1.1rem; }
+    .pr-kicker { font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--pr-muted); margin-bottom: .3rem; }
+    .pr-cover h1 { font-size: 1.7rem; font-weight: 800; color: var(--pr-title); margin: 0 0 .3rem; }
+    .pr-cover-sub { color: var(--pr-muted); margin-bottom: 1.1rem; }
+    .pr-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; }
+    .pr-stat { background: var(--pr-soft); border: 1px solid var(--pr-border); border-radius: 12px; padding: .8rem 1rem; }
+    .pr-stat-label { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--pr-muted); }
+    .pr-stat-value { font-size: 1.35rem; font-weight: 800; color: var(--pr-title); margin-top: .15rem; white-space: nowrap; }
+    .pr-stat-sub { font-size: .8rem; color: var(--pr-muted); margin-top: .1rem; }
+    .pr-up { color: #1f8b4c; font-weight: 700; }
+    .pr-down { color: #cf3e4f; font-weight: 700; }
+
+    .pr-section-head { margin-bottom: 1rem; }
+    .pr-section h2 { font-size: 1.25rem; font-weight: 800; color: var(--pr-title); margin: 0; }
+    .pr-section-sub { color: var(--pr-muted); font-size: .9rem; margin: .25rem 0 0; }
+    .pr-section h3 { font-size: 1rem; font-weight: 700; color: var(--pr-title); margin: 1.4rem 0 .6rem; }
+    .pr-section h3:first-child { margin-top: 0; }
+    .pr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; }
+    .pr-callout { background: var(--pr-soft); border-left: 3px solid var(--pr-accent); border-radius: 8px; padding: .7rem 1rem; margin: 1rem 0 0; color: var(--pr-text); }
+
+    .pr-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .pr-table th { text-align: left; color: var(--pr-muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+                   padding: .4rem .5rem; border-bottom: 1px solid var(--pr-border); white-space: nowrap; vertical-align: bottom; }
+    .pr-table td { padding: .45rem .5rem; border-bottom: 1px solid var(--pr-line); vertical-align: middle; }
+    .pr-table tr:last-child td { border-bottom: 0; }
+    .pr-table .num { text-align: right; white-space: nowrap; }
+    .pr-table .muted { color: var(--pr-muted); }
+    .pr-table tfoot td { font-weight: 700; color: var(--pr-title); border-top: 1px solid var(--pr-border); }
+    .pr-name { display: flex; align-items: center; gap: .5rem; font-weight: 600; color: var(--pr-title); }
+    .pr-logo { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--pr-line); }
+    .pr-barcell { width: 32%; }
+    .pr-bar { height: 8px; background: var(--pr-bar-soft); border-radius: 999px; overflow: hidden; }
+    .pr-bar > span { display: block; height: 100%; background: var(--pr-bar); border-radius: 999px; }
+    .pr-heat { text-align: right; white-space: nowrap; }
+    .pr-heat span { display: block; font-size: .74rem; color: var(--pr-muted); }
+    .pr-scroll { overflow-x: auto; }
+    .pr-note { color: var(--pr-muted); font-size: .84rem; margin: .6rem 0 0; }
+    .pr-methods { color: var(--pr-muted); font-size: .84rem; }
+    .pr-methods li { margin-bottom: .25rem; }
+
+    @media (max-width: 900px) {
+        .pr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .pr-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    @media print {
+        @page { size: A4; margin: 12mm; }
+        nav.navbar, footer, .pr-toolbar { display: none !important; }
+        body { background: #fff !important; }
+        .pr { max-width: none; padding: 0; }
+        .pr-cover, .pr-section { border: 0; border-radius: 0; padding: 0 0 .6rem; margin-bottom: .9rem; break-inside: auto; }
+        .pr-section + .pr-section { break-before: page; }
+        .pr-table tr, .pr-stat, .pr-callout { break-inside: avoid; }
+        .pr-bar, .pr-bar > span, .pr-heat, .pr-stat { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .pr-scroll { overflow: visible; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pr">
+    <div class="pr-toolbar">
+        <a href="{% url 'reports:index' %}" class="pr-btn pr-btn--ghost"><i class="bi bi-arrow-left"></i> К экспортам</a>
+        <span class="pr-spacer"></span>
+        <form method="get">
+            <div class="dropdown">
+                <button class="pr-btn pr-btn--ghost dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    {% if selected_branches %}Филиалы: {{ selected_branches|length }}{% else %}Все филиалы{% endif %}
+                </button>
+                <div class="dropdown-menu p-2">
+                    {% for b in branches %}
+                    <label class="dropdown-item d-flex gap-2 align-items-center">
+                        <input type="checkbox" class="form-check-input mt-0" name="branch" value="{{ b.id }}"{% if b.selected %} checked{% endif %}> {{ b.branch_name }}
+                    </label>
+                    {% endfor %}
+                    <div class="px-2 pt-2"><button type="submit" class="pr-btn w-100 justify-content-center">Применить</button></div>
+                </div>
+            </div>
+            <label>Срез на <input type="date" name="as_of" value="{{ as_of|date:'Y-m-d' }}" onchange="this.form.submit()"></label>
+        </form>
+        <a href="?{{ xlsx_query }}" class="pr-btn pr-btn--ghost"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+        <button type="button" class="pr-btn" onclick="window.print()"><i class="bi bi-printer"></i> Печать / PDF</button>
+    </div>
+
+    {# ── Обложка ── #}
+    <section class="pr-cover">
+        <div class="pr-kicker">Отчёт для лизинговой компании</div>
+        <h1>Страховая защита имущества</h1>
+        <p class="pr-cover-sub">
+            По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>{% if selected_branches %} · {{ selected_branches|join:", " }}{% endif %}.
+            Действующие полисы по договорам лизинга с активным ДФА, без ОСАГО. Страховая стоимость — страховая сумма текущего страхового года.
+        </p>
+        <div class="pr-stats">
+            <div class="pr-stat"><div class="pr-stat-label">Страховая стоимость</div><div class="pr-stat-value">{{ totals.sum|money_mln }}</div>
+                <div class="pr-stat-sub">
+                    {% if totals.change_12m %}за 12 мес.: <span class="{% if totals.change_12m.delta >= 0 %}pr-up{% else %}pr-down{% endif %}">{% if totals.change_12m.delta >= 0 %}+{% endif %}{{ totals.change_12m.percent|floatformat:1 }}%</span>
+                    {% elif totals.change_3m %}за 3 мес.: <span class="{% if totals.change_3m.delta >= 0 %}pr-up{% else %}pr-down{% endif %}">{% if totals.change_3m.delta >= 0 %}+{% endif %}{{ totals.change_3m.percent|floatformat:1 }}%</span>{% endif %}
+                </div>
+            </div>
+            <div class="pr-stat"><div class="pr-stat-label">Объектов</div><div class="pr-stat-value">{{ totals.count }}</div></div>
+            <div class="pr-stat"><div class="pr-stat-label">Средняя стоимость</div><div class="pr-stat-value">{{ totals.avg|money_mln }}</div></div>
+            <div class="pr-stat"><div class="pr-stat-label">Лизингополучателей</div><div class="pr-stat-value">{{ totals.lessees }}</div></div>
+            <div class="pr-stat"><div class="pr-stat-label">Страховых компаний</div><div class="pr-stat-value">{{ totals.insurers }}</div></div>
+        </div>
+    </section>
+
+    {# ── 1. Страховщики ── #}
+    <section class="pr-section">
+        <div class="pr-section-head">
+            <div class="pr-kicker">Раздел 1</div>
+            <h2>Где застраховано имущество</h2>
+            <p class="pr-section-sub">Распределение страховой стоимости по страховым компаниям.</p>
+        </div>
+        <div class="pr-scroll">
+        <table class="pr-table">
+            <thead><tr><th>Страховая компания</th><th class="pr-barcell">Доля</th><th class="num">Страховая стоимость</th><th class="num">Объектов</th><th class="num">Средняя</th><th class="num">Окончание<br>в {{ ending_soon_days }} дн.</th></tr></thead>
+            <tbody>
+            {% for r in insurers %}
+            <tr>
+                <td><div class="pr-name">{% if r.logo_url %}<img class="pr-logo" src="{{ r.logo_url }}" alt="">{% endif %}{{ r.name }}</div></td>
+                <td class="pr-barcell"><div class="d-flex align-items-center gap-2"><div class="pr-bar flex-grow-1"><span style="width:{{ r.bar }}%"></span></div><strong style="min-width:3.2em;text-align:right">{{ r.share|floatformat:1 }}%</strong></div></td>
+                <td class="num">{{ r.sum|rub }} ₽</td>
+                <td class="num">{{ r.count }}</td>
+                <td class="num muted">{{ r.avg|money_mln }}</td>
+                <td class="num muted">{% if r.ending_soon %}{{ r.ending_soon|money_mln }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr><td>Итого</td><td></td><td class="num">{{ totals.sum|rub }} ₽</td><td class="num">{{ totals.count }}</td><td class="num">{{ totals.avg|money_mln }}</td><td></td></tr></tfoot>
+        </table>
+        </div>
+        <div class="pr-callout">
+            <strong>Концентрация:</strong> на три крупнейшие страховые компании приходится {{ concentration.top3_share|floatformat:1 }}% страховой стоимости.
+            Индекс Херфиндаля–Хиршмана — {{ concentration.hhi|floatformat:0 }}
+            ({% if concentration.hhi < 1000 %}низкая концентрация{% elif concentration.hhi < 1800 %}умеренная концентрация{% else %}высокая концентрация{% endif %}).
+        </div>
+
+        <h3>Страховые компании по видам страхования</h3>
+        <div class="pr-scroll">
+        <table class="pr-table">
+            <thead><tr><th>Страховая компания</th>{% for h in insurer_by_type.headers %}<th class="num">{{ h }}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
+            <tbody>
+            {% for row in insurer_by_type.rows %}
+            <tr><td class="pr-name">{{ row.name }}</td>
+                {% for c in row.cells %}<td class="num">{% if c.sum %}{{ c.sum|money_mln }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
+                <td class="num"><strong>{{ row.total|money_mln }}</strong></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        {% if insurer_dynamics %}
+        <h3>Как менялись доли страховых компаний</h3>
+        <div class="pr-scroll">
+        <table class="pr-table">
+            <thead><tr><th>Страховая компания</th>{% for d in insurer_dynamics.dates %}<th class="num">{{ d|date:"d.m.Y" }}</th>{% endfor %}<th class="num">Изменение</th></tr></thead>
+            <tbody>
+            {% for row in insurer_dynamics.rows %}
+            <tr><td class="pr-name">{{ row.name }}</td>
+                {% for v in row.shares %}<td class="num">{{ v|floatformat:1 }}%</td>{% endfor %}
+                <td class="num {% if row.change > 0 %}pr-up{% elif row.change < 0 %}pr-down{% endif %}">{% if row.change > 0 %}+{% endif %}{{ row.change|floatformat:1 }} п.п.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        <p class="pr-note">Доля страховой стоимости на конец квартала. Сравнение доступно с июля 2025 года.</p>
+        {% endif %}
+    </section>
+
+    {# ── 2. Структура имущества ── #}
+    <section class="pr-section">
+        <div class="pr-section-head">
+            <div class="pr-kicker">Раздел 2</div>
+            <h2>Какое имущество застраховано</h2>
+            <p class="pr-section-sub">Вид страхования, размер и возраст объектов, новое и подержанное имущество, франшиза, марки.</p>
+        </div>
+        <div class="pr-grid">
+            <div>{% include "reports/includes/property_group_table.html" with title="Виды страхования" rows=by_type %}</div>
+            <div>{% include "reports/includes/property_group_table.html" with title="Страховая стоимость объекта" rows=by_size %}</div>
+            <div>{% include "reports/includes/property_group_table.html" with title="Возраст имущества" rows=by_age %}</div>
+            <div>{% include "reports/includes/property_group_table.html" with title="Новое и подержанное" rows=by_condition %}</div>
+            <div>{% include "reports/includes/property_group_table.html" with title="Франшиза" rows=by_franchise %}</div>
+        </div>
+        <h3>Марки</h3>
+        {% include "reports/includes/property_group_table.html" with rows=by_brand %}
+        <p class="pr-note">Марка и состояние определяются по описанию имущества в полисе. Марка распознана для {{ brands_recognized_share|floatformat:0 }}% страховой стоимости; «Не указано» у состояния — в описании нет пометки «новое» или «б/у».</p>
+    </section>
+
+    {# ── 3. Филиалы и менеджеры ── #}
+    <section class="pr-section">
+        <div class="pr-section-head">
+            <div class="pr-kicker">Раздел 3</div>
+            <h2>Филиалы и менеджеры</h2>
+            <p class="pr-section-sub">Страховая стоимость по филиалам и менеджерам лизинговой компании; какие страховщики работают в каждом филиале.</p>
+        </div>
+        <div class="pr-grid">
+            <div>{% include "reports/includes/property_group_table.html" with title="Филиалы" rows=by_branch %}</div>
+            <div>
+                {% include "reports/includes/property_group_table.html" with title="Менеджеры" rows=by_manager %}
+                {% if managers_total > by_manager|length %}<p class="pr-note">Показаны {{ by_manager|length }} из {{ managers_total }} менеджеров.</p>{% endif %}
+                {% if without_manager.count %}<p class="pr-note">Без менеджера: {{ without_manager.count }} объектов, {{ without_manager.sum|money_mln }}.</p>{% endif %}
+            </div>
+        </div>
+        <h3>Страховые компании в филиалах</h3>
+        <div class="pr-scroll">
+        <table class="pr-table">
+            <thead><tr><th>Филиал</th>{% for h in branch_by_insurer.headers %}<th class="num">{{ h }}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
+            <tbody>
+            {% for row in branch_by_insurer.rows %}
+            <tr><td class="pr-name">{{ row.name }}</td>
+                {% for c in row.cells %}<td class="pr-heat" style="background: rgba(42, 120, 214, {{ c.alpha }})">{% if c.sum %}{{ c.share|floatformat:0 }}%<span>{{ c.sum|money_mln }}</span>{% else %}<span>—</span>{% endif %}</td>{% endfor %}
+                <td class="num"><strong>{{ row.total|money_mln }}</strong></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        <p class="pr-note">Процент — доля страховой компании в страховой стоимости филиала.</p>
+    </section>
+
+    {# ── 4. Окончание страхования ── #}
+    <section class="pr-section">
+        <div class="pr-section-head">
+            <div class="pr-kicker">Раздел 4</div>
+            <h2>Когда заканчиваются полисы</h2>
+            <p class="pr-section-sub">Страховая стоимость, по которой полис заканчивается, а договор лизинга продолжается: по этим объектам понадобится новый полис.</p>
+        </div>
+        <div class="pr-grid">
+            <div>
+                <h3>Ближайшие 12 месяцев</h3>
+                <table class="pr-table">
+                    <thead><tr><th>Месяц</th><th class="pr-barcell"></th><th class="num">Объектов</th><th class="num">Стоимость</th></tr></thead>
+                    <tbody>
+                    {% for r in ending_by_month %}
+                    <tr><td>{{ r.label }}</td>
+                        <td class="pr-barcell"><div class="pr-bar"><span style="width:{{ r.bar }}%"></span></div></td>
+                        <td class="num">{{ r.count }}</td><td class="num">{% if r.sum %}{{ r.sum|money_mln }}{% else %}<span class="muted">—</span>{% endif %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div>{% include "reports/includes/property_group_table.html" with title="По году окончания полиса" rows=by_end_year %}</div>
+        </div>
+    </section>
+
+    {# ── 5. Условия ── #}
+    <section class="pr-section">
+        <div class="pr-section-head">
+            <div class="pr-kicker">Раздел 5</div>
+            <h2>Крупнейшие объекты</h2>
+            <p class="pr-section-sub">Двадцать объектов с наибольшей страховой стоимостью.</p>
+        </div>
+        <div class="pr-scroll">
+        <table class="pr-table">
+            <thead><tr><th>#</th><th>Лизингополучатель</th><th>Имущество</th><th>Страховая компания</th><th>Филиал</th><th class="num">Страховая стоимость</th><th class="num">Полис до</th></tr></thead>
+            <tbody>
+            {% for o in top_objects %}
+            <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{{ o.description|truncatechars:70 }}</td><td>{{ o.insurer }}</td><td class="muted">{{ o.branch }}</td>
+                <td class="num"><strong>{{ o.sum|rub }} ₽</strong></td><td class="num">{{ o.end_date|date:"d.m.Y" }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <section class="pr-section">
+        <div class="pr-kicker">Методика</div>
+        <ul class="pr-methods mb-0">
+            <li>В отчёт входят полисы, действующие на дату среза, по договорам лизинга с активным ДФА; полисы ОСАГО не входят (у них нет страховой суммы).</li>
+            <li>Страховая стоимость объекта — страховая сумма текущего страхового года полиса; у многолетних полисов она с годами снижается.</li>
+            <li>Возраст имущества — по году выпуска; марка и состояние — по описанию имущества.</li>
+            <li>Индекс Херфиндаля–Хиршмана — сумма квадратов долей страховых компаний в процентах: до 1000 — низкая концентрация, 1000–1800 — умеренная, выше — высокая.</li>
+        </ul>
+    </section>
+</div>
+{% endblock %}

@@ -6,20 +6,20 @@
 «топ-5 + Прочие». Используется для отчёта-презентации руководству лизинговой
 компании.
 
-Логика «страховой суммы полиса»:
-для каждого полиса берётся MAX(insurance_sum) из его графика платежей,
-эти значения суммируются по группам (филиал / страховщик / вид страхования).
+Логика «страховой суммы полиса» — insured_value.current_insured_sums:
+страховая сумма текущего страхового года (до 2026-10-17 брался максимум по
+графику, то есть сумма первого года). Суммы складываются по группам
+(филиал / страховщик / вид страхования).
 """
 import math
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
-from django.db.models import Max
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.insurers.models import Insurer
-from apps.policies.models import PaymentSchedule, Policy, in_force_q
+
+from .insured_value import InsuredObject, insured_portfolio
 
 
 DECIMAL_ZERO = Decimal("0")
@@ -77,49 +77,23 @@ PIE_LABEL_RADIUS_PCT = 32.5
 
 
 def _aggregate_dimension(
-    label_field: str,
-    id_field: Optional[str] = None,
-    as_of=None,
+    objects: List[InsuredObject], id_attr: str, name_attr: str
 ) -> Tuple[List[Dict[str, Any]], Decimal]:
-    """
-    Сгруппировать действующие («в силе») полисы по `label_field` и сложить
-    MAX(insurance_sum) по каждому полису внутри группы на дату среза as_of.
-    """
-    if as_of is None:
-        as_of = timezone.localdate()
-    # Снимок по страховым суммам — без ОСАГО (у ОСАГО нет страховой суммы).
-    payments_qs = PaymentSchedule.objects.without_osago().filter(
-        in_force_q(as_of, prefix="policy__"),
-        policy__dfa_active=True,
-    )
-
-    value_fields = [label_field, "policy_id"]
-    if id_field:
-        value_fields.append(id_field)
-
-    policy_rows = (
-        payments_qs.values(*value_fields)
-        .annotate(policy_max=Coalesce(Max("insurance_sum"), DECIMAL_ZERO))
-        .order_by()
-    )
-
-    grouped: Dict[str, Dict[str, Any]] = {}
-    for row in policy_rows:
-        label = row.get(label_field) or "Не указано"
-        entity_id = row.get(id_field) if id_field else None
-        key = f"{entity_id}:{label}" if entity_id is not None else label
-
-        grouped.setdefault(
-            key,
+    """Сложить страховую стоимость объектов по группам (id_attr, name_attr)."""
+    grouped: Dict[Any, Dict[str, Any]] = {}
+    for obj in objects:
+        entity_id = getattr(obj, id_attr)
+        group = grouped.setdefault(
+            entity_id,
             {
                 "id": entity_id,
-                "name": label,
+                "name": getattr(obj, name_attr) or "Не указано",
                 "insurance_sum": DECIMAL_ZERO,
                 "policy_count": 0,
             },
         )
-        grouped[key]["insurance_sum"] += row["policy_max"] or DECIMAL_ZERO
-        grouped[key]["policy_count"] += 1
+        group["insurance_sum"] += obj.insured_sum
+        group["policy_count"] += 1
 
     items = sorted(
         grouped.values(),
@@ -196,27 +170,14 @@ def build_property_snapshot(as_of=None) -> Dict[str, Any]:
     """
     if as_of is None:
         as_of = timezone.localdate()
-    by_branch, total = _aggregate_dimension(
-        label_field="policy__branch__branch_name",
-        id_field="policy__branch_id",
-        as_of=as_of,
-    )
-    by_insurer, _ = _aggregate_dimension(
-        label_field="policy__insurer__insurer_name",
-        id_field="policy__insurer_id",
-        as_of=as_of,
-    )
-    by_type, _ = _aggregate_dimension(
-        label_field="policy__insurance_type__name",
-        id_field="policy__insurance_type_id",
-        as_of=as_of,
-    )
+    objects = insured_portfolio(as_of)
+    by_branch, total = _aggregate_dimension(objects, "branch_id", "branch")
+    by_insurer, _ = _aggregate_dimension(objects, "insurer_id", "insurer")
+    by_type, _ = _aggregate_dimension(objects, "type_id", "type")
 
     _attach_insurer_logos(by_insurer)
 
-    active_policies_count = (
-        Policy.objects.in_force(as_of).without_osago().filter(dfa_active=True).count()
-    )
+    active_policies_count = len(objects)
 
     return {
         "as_of": as_of,

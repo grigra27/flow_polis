@@ -1,6 +1,11 @@
 # ── Builder stage ─────────────────────────────────────────────────────────────
 FROM python:3.12-slim AS builder
 
+# deb.debian.org с прода временами отдаёт десятки КБ/с, и сборка (а с ней
+# простой при деплое) растягивается на 15+ минут — берём пакеты с зеркала.
+ARG DEBIAN_MIRROR=http://mirror.yandex.ru
+RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc \
         libpq-dev \
@@ -14,6 +19,9 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+ARG DEBIAN_MIRROR=http://mirror.yandex.ru
+RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources
 
 # Runtime-only system deps; gosu used in entrypoint to drop root → app
 RUN apt-get update && apt-get install -y --no-install-recommends \

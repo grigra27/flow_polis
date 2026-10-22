@@ -668,15 +668,19 @@ class DashboardV2Service:
     def _build_renewal_radar(
         self, *, active_policies_qs, today: date
     ) -> Dict[str, Any]:
+        from apps.policies.models import prolongable_q
+
         active_total = active_policies_qs.count()
         prev_ref = today - timedelta(days=30)
+        # Работа по продлению: грузы не продлевают никогда.
+        prolongable_qs = active_policies_qs.filter(prolongable_q())
 
         horizons = []
         for days in (30, 60, 90):
-            current_count = active_policies_qs.filter(
+            current_count = prolongable_qs.filter(
                 end_date__gte=today, end_date__lte=today + timedelta(days=days)
             ).count()
-            previous_count = active_policies_qs.filter(
+            previous_count = prolongable_qs.filter(
                 end_date__gte=prev_ref, end_date__lte=prev_ref + timedelta(days=days)
             ).count()
             delta = current_count - previous_count

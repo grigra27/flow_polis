@@ -99,11 +99,11 @@ class BranchAdmin(admin.ModelAdmin):
 
 @admin.register(InsuranceType)
 class InsuranceTypeAdmin(admin.ModelAdmin):
-    list_display = ["name", "is_osago", "has_icon"]
+    list_display = ["name", "is_osago", "needs_prolongation", "has_icon"]
     search_fields = ["name"]
     # is_osago не редактируется: признак ставит миграция insurers.0014,
     # смена у вида с полисами сломала бы правила их платежей.
-    fields = ["name", "icon"]
+    fields = ["name", "needs_prolongation", "icon"]
     readonly_fields = ["icon_preview"]
 
     def get_search_results(self, request, queryset, search_term):

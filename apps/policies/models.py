@@ -59,6 +59,19 @@ def osago_q(prefix=""):
     return Q(**{f"{prefix}insurance_type__is_osago": True})
 
 
+def prolongable_q(prefix=""):
+    """Q-фильтр полисов, которые продлевают (вид страхования с признаком
+    needs_prolongation). Грузы не продлевают никогда — груз уже доставлен.
+
+    Применяется везде, где речь о пролонгации: раздел и экспорт
+    «Пролонгация», метрики продлений в дашборде и аналитике.
+
+    prefix — путь до Policy от модели запроса: "" для самого Policy,
+    "policy__" для PaymentSchedule и т.п.
+    """
+    return Q(**{f"{prefix}insurance_type__needs_prolongation": True})
+
+
 def add_years(value, years):
     """Дата через `years` лет; 29 февраля → 28 февраля в невисокосный год."""
     try:
@@ -83,6 +96,10 @@ class PolicyQuerySet(models.QuerySet):
     def without_osago(self):
         """Портфель без ОСАГО."""
         return self.exclude(osago_q())
+
+    def prolongable(self):
+        """Только полисы видов, которые продлевают (без грузов)."""
+        return self.filter(prolongable_q())
 
 
 class PolicyManager(models.Manager.from_queryset(PolicyQuerySet)):

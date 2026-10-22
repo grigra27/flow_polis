@@ -14,6 +14,7 @@ from apps.policies.models import (
     PaymentSchedule,
     dfa_deactivated_payments_q,
     in_force_q,
+    prolongable_q,
 )
 from apps.insurers.models import Insurer
 from .models import CustomExportTemplate
@@ -465,6 +466,7 @@ def export_policy_expiration(request):
         # а досрочно расторгнутые/закрытые вручную отсекаются. Это позволяет
         # строить отчёт и за прошлые периоды.
         # Статус ДФА не фильтруем: такие строки нужны в отчете и подсвечиваются.
+        # Грузы не продлевают никогда — исключаем (prolongable_q).
         # Сортируем по филиалу (алфавитно), затем по дате окончания
         policies = (
             Policy.objects.select_related(
@@ -477,6 +479,7 @@ def export_policy_expiration(request):
             )
             .filter(end_date__gte=date_from, end_date__lte=date_to)
             .filter(in_force_q(date_from))
+            .filter(prolongable_q())
             .order_by("branch__branch_name", "end_date", "policy_number")
         )
 

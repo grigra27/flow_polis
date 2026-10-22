@@ -13,7 +13,7 @@ from typing import Any, Dict
 from django.db.models import Count, DecimalField, F, Q, QuerySet, Sum
 from django.db.models.functions import Coalesce
 
-from apps.policies.models import PaymentSchedule, in_force_q
+from apps.policies.models import PaymentSchedule, in_force_q, prolongable_q
 
 ZERO = Decimal("0")
 
@@ -126,12 +126,14 @@ def expiring(policies: QuerySet, start: date, end: date) -> QuerySet:
 def renewal_due(policies: QuerySet, start: date, end: date) -> QuerySet:
     """Требовали продления: закончились в периоде при активном на окончание ДФА.
 
-    ОСАГО не продлевается в этом смысле — исключено всегда.
+    ОСАГО не продлевается в этом смысле, грузы не продлевают никогда —
+    исключены всегда.
     """
     return (
         expiring(policies, start, end)
         .filter(dfa_active_on_end_q())
         .exclude(insurance_type__is_osago=True)
+        .filter(prolongable_q())
     )
 
 

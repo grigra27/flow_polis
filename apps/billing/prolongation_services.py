@@ -21,7 +21,7 @@ from django.http import QueryDict
 from django.utils import timezone
 
 from apps.insurers.models import Branch, Insurer
-from apps.policies.models import Policy
+from apps.policies.models import Policy, prolongable_q
 from apps.reports.exporters import PolicyExpirationExporter
 
 from .models import MONTH_NAMES_RU, ProlongationBatch
@@ -74,7 +74,8 @@ def get_prolongation_policies(year, month, request_get=None, branch_ids_filter=N
     """Договоры пролонгации за месяц.
 
     Выборка повторяет reports.views.export_policy_expiration: активные полисы
-    с окончанием страхования в указанном месяце. Статус ДФА и участие брокера
+    с окончанием страхования в указанном месяце, кроме видов, которые не
+    продлевают (грузы, см. prolongable_q). Статус ДФА и участие брокера
     не фильтруются — такие строки нужны в таблице и помечаются примечанием.
     Опциональные фильтры (страховщик, филиал, поиск) применяются только для
     удобного просмотра в вебе; на состав письма они не влияют.
@@ -94,6 +95,7 @@ def get_prolongation_policies(year, month, request_get=None, branch_ids_filter=N
             end_date__lte=period_end,
             policy_active=True,
         )
+        .filter(prolongable_q())
         .order_by("branch__branch_name", "end_date", "policy_number")
     )
 
@@ -143,6 +145,7 @@ def build_prolongation_month_options(months, selected_year, selected_month):
             end_date__lte=max_end,
             policy_active=True,
         )
+        .filter(prolongable_q())
         .annotate(
             period_year=ExtractYear("end_date"),
             period_month=ExtractMonth("end_date"),

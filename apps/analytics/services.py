@@ -820,7 +820,7 @@ class AnalyticsService:
         risk profile and concentration by branch.
         """
         try:
-            from apps.policies.models import Policy, PaymentSchedule
+            from apps.policies.models import Policy, PaymentSchedule, prolongable_q
 
             as_of_date = as_of_date or datetime.now().date()
             horizon_months = max(1, min(int(horizon_months), 36))
@@ -859,21 +859,24 @@ class AnalyticsService:
                         filter=Q(
                             end_date__gte=as_of_date,
                             end_date__lte=renewal_30_end,
-                        ),
+                        )
+                        & prolongable_q(),
                     ),
                     renewals_60=Count(
                         "id",
                         filter=Q(
                             end_date__gte=as_of_date,
                             end_date__lte=renewal_60_end,
-                        ),
+                        )
+                        & prolongable_q(),
                     ),
                     renewals_90=Count(
                         "id",
                         filter=Q(
                             end_date__gte=as_of_date,
                             end_date__lte=renewal_90_end,
-                        ),
+                        )
+                        & prolongable_q(),
                     ),
                 )
                 .order_by("branch__branch_name")

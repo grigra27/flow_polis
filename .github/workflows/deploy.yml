@@ -256,6 +256,25 @@ jobs:
               fi
             done
             echo "✅ POSTGRES_* present in .env.prod"
+
+            # B-08: Django получает DB_* из POSTGRES_* (environment в compose),
+            # но в .env.prod могут остаться старые строки DB_NAME/DB_USER/
+            # DB_PASSWORD. Расхождение — ловушка при ручной правке: кто-то
+            # меняет DB_PASSWORD, а работает POSTGRES_PASSWORD. Сравниваем
+            # без вывода значений.
+            env_value() { grep -E "^$1=" .env.prod | tail -1 | cut -d= -f2-; }
+            check_same() {
+              legacy=$1; main=$2
+              if grep -qE "^${legacy}=" .env.prod && [ "$(env_value "$legacy")" != "$(env_value "$main")" ]; then
+                echo "❌ ${legacy} differs from ${main} in .env.prod"
+                echo "   Django uses ${main}; make ${legacy} equal to it or remove the ${legacy} line."
+                exit 1
+              fi
+            }
+            check_same DB_NAME POSTGRES_DB
+            check_same DB_USER POSTGRES_USER
+            check_same DB_PASSWORD POSTGRES_PASSWORD
+            echo "✅ DB_* in .env.prod match POSTGRES_*"
           ENDSSH
 
       - name: Check SSL certificates

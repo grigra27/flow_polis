@@ -72,6 +72,29 @@ def prolongable_q(prefix=""):
     return Q(**{f"{prefix}insurance_type__needs_prolongation": True})
 
 
+def prolongation_due_q(prefix=""):
+    """Q-фильтр полисов, подлежащих пролонгации к своей дате окончания.
+
+    Правило (решение 2026-10-23, «вариант А»): полис доживает до плановой
+    даты окончания — отмечен «Полис активен» и не расторгнут досрочно
+    (дата расторжения пуста или не раньше end_date); вид страхования
+    продлевают (prolongable_q). Расторгнутый внутри месяца окончания в
+    таблицу не попадает. Дата начала не важна: полис, начавшийся в том же
+    месяце, тоже подлежит пролонгации.
+
+    Единое правило для раздела «Пролонгация» (apps.billing) и экспорта
+    «Пролонгация» (apps.reports).
+    """
+    return (
+        Q(**{f"{prefix}policy_active": True})
+        & (
+            Q(**{f"{prefix}termination_date__isnull": True})
+            | Q(**{f"{prefix}termination_date__gte": F(f"{prefix}end_date")})
+        )
+        & prolongable_q(prefix)
+    )
+
+
 def add_years(value, years):
     """Дата через `years` лет; 29 февраля → 28 февраля в невисокосный год."""
     try:

@@ -13,8 +13,7 @@ from apps.policies.models import (
     Policy,
     PaymentSchedule,
     dfa_deactivated_payments_q,
-    in_force_q,
-    prolongable_q,
+    prolongation_due_q,
 )
 from apps.insurers.models import Insurer
 from .models import CustomExportTemplate
@@ -460,13 +459,10 @@ def export_policy_expiration(request):
             messages.error(request, "Дата начала не может быть позже даты окончания")
             return redirect("reports:index")
 
-        # Получаем действующие («в силе») полисы с окончанием страхования в
-        # заданном диапазоне. Срез in-force берём на начало периода (date_from):
-        # на эту дату полис ещё действует (end_date >= date_from по условию окна),
-        # а досрочно расторгнутые/закрытые вручную отсекаются. Это позволяет
-        # строить отчёт и за прошлые периоды.
+        # Полисы с окончанием страхования в диапазоне, подлежащие пролонгации:
+        # то же правило, что в разделе «Платежи → Пролонгация»
+        # (prolongation_due_q: активен, не расторгнут досрочно, не грузы).
         # Статус ДФА не фильтруем: такие строки нужны в отчете и подсвечиваются.
-        # Грузы не продлевают никогда — исключаем (prolongable_q).
         # Сортируем по филиалу (алфавитно), затем по дате окончания
         policies = (
             Policy.objects.select_related(
@@ -478,8 +474,7 @@ def export_policy_expiration(request):
                 "leasing_manager",
             )
             .filter(end_date__gte=date_from, end_date__lte=date_to)
-            .filter(in_force_q(date_from))
-            .filter(prolongable_q())
+            .filter(prolongation_due_q())
             .order_by("branch__branch_name", "end_date", "policy_number")
         )
 

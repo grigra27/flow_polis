@@ -8,7 +8,7 @@ This workflow automatically deploys the Insurance Broker application to Digital 
 
 1. **Validate** - Validates docker-compose syntax and checks for required files
 2. **Build** - Builds the Docker image and tests it
-3. **Deploy** - Deploys to Digital Ocean Droplet via SSH
+3. **Deploy** - Deploys to Digital Ocean Droplet via SSH. Images are built on the server **before** the old containers are stopped, so a slow uncached build (PyPI is ~20 KB/s from the server) does not take the site down; if the build fails, the old version keeps running. SSH uses `ServerAliveInterval 30` so long silent pip downloads don't drop the session
 4. **Run Migrations** - Executes database migrations and collects static files
 5. **Health Check** - Verifies all containers are running properly
 6. **Notify** - Reports deployment status
@@ -110,7 +110,7 @@ You can also trigger the deployment manually:
 
 ## Rollback
 
-If a deployment fails, the workflow automatically attempts to rollback to the previous version. You can also manually rollback:
+If a deployment fails, the workflow runs `docker-compose up -d` on the server: it starts whatever is down and leaves running containers alone. Note that this restarts the current `:latest` images; it only restores the previous version when the failure happened during the build (images were not retagged yet). You can also manually rollback:
 
 ```bash
 # SSH into your Droplet

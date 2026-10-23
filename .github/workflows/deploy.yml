@@ -140,6 +140,12 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
+          # Сборка без кэша на проде идёт 20+ минут: PyPI отдаёт ~20 КБ/с, и
+          # pip подолгу молчит. Без keepalive простаивающую SSH-сессию рвёт
+          # (22.10.2026: «client_loop: send disconnect: Broken pipe»), а buildx
+          # при потере клиента отменяет сборку.
+          printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
           echo "✅ SSH configured"
 
       - name: Preflight SSH connectivity
@@ -305,17 +311,23 @@ jobs:
             echo "📦 Pulling latest images..."
             docker-compose -f docker-compose.prod.yml pull || true
 
+            # Собираем, пока работают старые контейнеры: сборка без кэша
+            # идёт 20+ минут (медленные PyPI/Debian с сервера), и при
+            # down → build сайт всё это время лежал (22.10.2026). Если
+            # сборка упадёт, set -e выйдет здесь — старая версия продолжит
+            # работать.
+            echo "🔨 Building new images (old containers keep serving)..."
+            docker-compose -f docker-compose.prod.yml build
+
             echo "🛑 Stopping old containers..."
             docker-compose -f docker-compose.prod.yml down
 
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
-
-            echo "🔨 Building new images..."
-            docker-compose -f docker-compose.prod.yml build
-
             echo "🚀 Starting containers with new images..."
             docker-compose -f docker-compose.prod.yml up -d
+
+            # Старые образы после пересоздания контейнеров стали dangling.
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
 
             echo "⏳ Waiting for services to be ready..."
             sleep 15
@@ -471,6 +483,12 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
+          # Сборка без кэша на проде идёт 20+ минут: PyPI отдаёт ~20 КБ/с, и
+          # pip подолгу молчит. Без keepalive простаивающую SSH-сессию рвёт
+          # (22.10.2026: «client_loop: send disconnect: Broken pipe»), а buildx
+          # при потере клиента отменяет сборку.
+          printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Rollback to previous version
         env:
@@ -491,8 +509,10 @@ jobs:
               set +a
             fi
 
-            # Try to restart with previous images
-            docker-compose -f docker-compose.prod.yml down
+            # Поднять то, что лежит. Без down: если упала сборка, старые
+            # контейнеры работают и up -d их не трогает; если упали
+            # миграции или health check, down/up перезапустил бы те же
+            # образы :latest — только лишний простой.
             docker-compose -f docker-compose.prod.yml up -d
 
             echo "🔄 Rollback completed - previous version restored"

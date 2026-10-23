@@ -182,3 +182,48 @@ def test_page_and_export_use_the_same_rule(
         assert number in text
     for number in rule_a_cases["out"]:
         assert number not in text
+
+
+def _cells(content):
+    workbook = load_workbook(io.BytesIO(content), read_only=True)
+    return [
+        list(row)
+        for sheet in workbook.worksheets
+        for row in sheet.iter_rows(values_only=True)
+    ]
+
+
+def test_email_attachment_equals_export_for_the_month(
+    client, django_user_model, rule_a_cases, end
+):
+    """Excel к письму со вкладки и экспорт за тот же месяц — одна таблица."""
+    batch = prol.get_or_create_batch(end.year, end.month)
+    attachment = prol.build_prolongation_attachment(
+        batch, prol.get_prolongation_policies(end.year, end.month)
+    )
+
+    user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
+    client.force_login(user)
+    response = client.get(
+        reverse("reports:export_policy_expiration"),
+        {
+            "date_from": batch.starts_on.isoformat(),
+            "date_to": batch.ends_on.isoformat(),
+        },
+    )
+
+    assert _cells(attachment.read()) == _cells(response.content)
+
+
+def test_faq_modals_on_both_pages(client, django_user_model, db):
+    user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
+    client.force_login(user)
+    rule = "Дата расторжения» пуста или не раньше даты окончания"
+
+    page = client.get(reverse("policies:prolongation")).content.decode()
+    assert 'id="prolongationFaqModal"' in page
+    assert rule in page
+
+    reports = client.get(reverse("reports:index")).content.decode()
+    assert 'id="policyExpirationFaqModal"' in reports
+    assert rule in reports

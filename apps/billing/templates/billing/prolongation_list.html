@@ -39,6 +39,8 @@
     .mgr-page-header { padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--v2-border); }
     .mgr-page-kicker { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--v2-muted); margin-bottom: 0.2rem; }
     .mgr-page-title { font-size: 1.45rem; font-weight: 800; color: var(--v2-title); margin: 0; line-height: 1.25; }
+    .mgr-faq-btn { border: none; background: transparent; color: var(--v2-muted); font-size: 1.05rem; line-height: 1; padding: 0; margin-left: 0.4rem; vertical-align: middle; cursor: pointer; transition: color 0.15s ease; }
+    .mgr-faq-btn:hover { color: var(--v2-accent, #0d6efd); }
     .mgr-page-subtitle { font-size: 0.85rem; color: var(--v2-muted); margin-top: 0.35rem; max-width: 720px; }
 
     .mgr-section { border: 1px solid var(--v2-border); border-radius: 12px; background: var(--v2-card-bg); box-shadow: 0 2px 10px rgba(14,28,46,0.05); margin-bottom: 1rem; overflow: hidden; }
@@ -144,7 +146,13 @@
 
     <div class="mgr-page-header">
         <div class="mgr-page-kicker"><i class="bi bi-arrow-repeat"></i> Платежи</div>
-        <h1 class="mgr-page-title">Пролонгация</h1>
+        <h1 class="mgr-page-title">
+            Пролонгация
+            <button type="button" class="mgr-faq-btn" data-bs-toggle="modal"
+                    data-bs-target="#prolongationFaqModal" title="FAQ: как формируется список">
+                <i class="bi bi-question-circle"></i>
+            </button>
+        </h1>
         <div class="mgr-page-subtitle">Договоры с окончанием срока страхования по месяцам. Проверьте список и отправьте таблицу одним письмом с приложенным Excel-файлом.</div>
     </div>
 
@@ -382,6 +390,26 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- FAQ: Пролонгация -->
+    <div class="modal fade" id="prolongationFaqModal" tabindex="-1" aria-labelledby="prolongationFaqModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="prolongationFaqModalLabel">
+                        <i class="bi bi-question-circle"></i> FAQ: Пролонгация
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    {% include "includes/prolongation_rules.html" with place="page" %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </div>
 {% endblock %}

@@ -1,16 +1,15 @@
 """
-Деньги в финансовой аналитике (apps.analytics.money).
+Деньги в аналитике (apps.analytics.money).
 
 Решение владельца 2026-10-16: «заработано» — по дате акта с СК, как в
 ежемесячном отчёте по КВ. Расторгнутые полисы и взносы после закрытия ДФА не
 ожидаются; просрочка показывается отдельно и в итог года не входит.
 """
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pytest
-from django.urls import reverse
 
 from apps.analytics import money
 from apps.clients.models import Client
@@ -144,32 +143,6 @@ def test_projected_year_is_earned_plus_awaiting_plus_scheduled(make_payment):
     assert result["projected_full_year_premium"] == Decimal("1500")
 
 
-def test_monthly_forecast_skips_cancelled_and_keeps_paid(make_payment):
-    make_payment(10, due=date(2026, 10, 1), paid=date(2026, 10, 2))
-    make_payment(20, due=date(2026, 10, 20))
-    make_payment(700, due=date(2026, 10, 20), policy_active=False)
-    make_payment(5, due=date(2028, 3, 1))
-
-    forecast = money.build_monthly_forecast(PaymentSchedule.objects.all(), TODAY)
-
-    assert forecast[0]["month"] == date(2026, 10, 1)
-    assert forecast[0]["forecasted_commission"] == Decimal("30")
-    assert forecast[-1]["month"] == date(2028, 3, 1)
-    assert sum(m["forecasted_commission"] for m in forecast) == Decimal("35")
-
-
-def test_payment_status_overdue_skips_cancelled(make_payment):
-    make_payment(10, due=date(2026, 8, 1))
-    make_payment(10, due=date(2026, 8, 1), policy_active=False)
-    make_payment(10, due=date(2026, 11, 1))
-
-    status = money.build_payment_status(PaymentSchedule.objects.all(), TODAY)
-
-    assert status["overdue_payments"] == 1
-    assert status["pending_payments"] == 1
-    assert status["total_payments"] == 3
-
-
 def test_year_to_date_totals_same_period(make_payment):
     make_payment(
         10, due=date(2025, 3, 1), paid=date(2025, 3, 1), act=date(2025, 10, 16)
@@ -181,65 +154,3 @@ def test_year_to_date_totals_same_period(make_payment):
     assert money.year_to_date_totals(PaymentSchedule.objects.all(), TODAY, year=2025)[
         "commission"
     ] == Decimal("10")
-
-
-def test_financial_page_renders_bridge(client, django_user_model, make_payment):
-    make_payment(100, due=date.today(), paid=date.today(), act=date.today())
-    client.force_login(django_user_model.objects.create_superuser("r", "r@r.ru", "x"))
-
-    response = client.get(reverse("analytics:financial_analytics"))
-
-    assert response.status_code == 200
-    html = response.content.decode()
-    assert "Заработано с начала года" in html
-    assert "Ждёт акта" in html
-    assert "Просрочено, под риском" in html
-
-
-def test_financial_export_works(client, django_user_model, make_payment):
-    make_payment(100, due=date.today(), paid=date.today(), act=date.today())
-    client.force_login(django_user_model.objects.create_superuser("r", "r@r.ru", "x"))
-
-    response = client.get(reverse("analytics:financial_analytics"), {"export": "excel"})
-
-    assert response.status_code == 200
-    assert "spreadsheet" in response["Content-Type"]
-
-
-def test_time_series_shared_axis_fact_by_act_and_plan(make_payment):
-    from apps.analytics.services import AnalyticsService
-    from django.core.cache import cache
-
-    today = date.today()
-    month_start = today.replace(day=1)
-    prev_month = (month_start - timedelta(days=1)).replace(day=1)
-    # Акт в текущем месяце по взносу со сроком в прошлом месяце.
-    make_payment(100, due=prev_month, paid=prev_month, act=today)
-    make_payment(40, due=prev_month)  # план прошлого месяца, не оплачен
-    make_payment(999, due=prev_month, policy_active=False)  # отменён — не в плане
-
-    cache.clear()
-    data = AnalyticsService().get_time_series_analytics()
-
-    labels = [p["label"] for p in data["commission_revenue_dynamics"]]
-    assert labels == [p["label"] for p in data["policy_count_dynamics"]]
-    assert labels == [p["label"] for p in data["commission_plan_dynamics"]]
-    fact = {p["label"]: p["value"] for p in data["commission_revenue_dynamics"]}
-    plan = {p["label"]: p["value"] for p in data["commission_plan_dynamics"]}
-    assert fact[today.strftime("%Y-%m")] == Decimal("100")
-    assert fact[prev_month.strftime("%Y-%m")] == Decimal("0")
-    assert plan[prev_month.strftime("%Y-%m")] == Decimal("140")
-
-
-def test_time_series_page_renders_russian_months(
-    client, django_user_model, make_payment
-):
-    make_payment(100, due=date.today(), paid=date.today(), act=date.today())
-    client.force_login(django_user_model.objects.create_superuser("r", "r@r.ru", "x"))
-
-    response = client.get(reverse("analytics:time_series_analytics"))
-
-    assert response.status_code == 200
-    html = response.content.decode()
-    assert "January" not in html
-    assert "КВ по графику" in html

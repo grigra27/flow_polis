@@ -3,8 +3,8 @@
 
 Разделы «без ОСАГО» проверяет test_portfolio_regression (весь слепок не
 меняется от полиса ОСАГО). Здесь — разделы «с ОСАГО» по решению владельца:
-финансовая аналитика (премия и КВ), на главной — разрезы структуры по
-премии, просрочки и радар продлений.
+на главной — разрезы структуры по премии, просрочки и радар продлений.
+Переключатель ОСАГО в аналитике проверяет test_analytics_v2_framework.
 """
 
 from datetime import timedelta
@@ -34,19 +34,6 @@ def _add_overdue_osago(portfolio):  # noqa: F811
     policy.save()
     policy.payment_schedule.update(due_date=start, paid_date=None)
     return policy
-
-
-def test_financial_analytics_includes_osago(portfolio):  # noqa: F811
-    from apps.analytics.services import AnalyticsService
-
-    cache.clear()
-    before = AnalyticsService().get_financial_analytics()["payment_status_analysis"]
-    add_osago_policy(portfolio)
-    cache.clear()
-    after = AnalyticsService().get_financial_analytics()["payment_status_analysis"]
-
-    assert after["total_payments"] == before["total_payments"] + 1
-    assert after["paid_amount"] == before["paid_amount"] + Decimal("15000")
 
 
 def test_structure_premium_breakdown_includes_osago(portfolio):  # noqa: F811
@@ -81,25 +68,3 @@ def test_renewal_radar_includes_osago(portfolio):  # noqa: F811
     add_osago_policy(portfolio)
 
     assert _dashboard_v2()["dashboard_v2_renewal"]["active_total"] == before + 1
-
-
-def test_osago_free_analytics_hide_osago_type_in_filters(client, django_user_model):
-    from django.urls import reverse
-
-    from apps.insurers.models import InsuranceType
-
-    InsuranceType.objects.create(name="ОСАГО (фильтр)", is_osago=True)
-    InsuranceType.objects.create(name="КАСКО (фильтр)")
-    client.force_login(
-        django_user_model.objects.create_superuser("root", "r@r.ru", "x")
-    )
-
-    for url_name, osago_visible in [
-        ("analytics:insurer_analytics", False),
-        ("analytics:client_analytics", False),
-        ("analytics:financial_analytics", True),
-    ]:
-        response = client.get(reverse(url_name))
-        names = [t.name for t in response.context["insurance_types"]]
-        assert "КАСКО (фильтр)" in names, url_name
-        assert ("ОСАГО (фильтр)" in names) is osago_visible, url_name

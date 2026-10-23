@@ -191,7 +191,6 @@ def _normalize(value):
 
 def portfolio_snapshot(portfolio):
     """Слепок выходов, которые по карте влияния должны быть БЕЗ ОСАГО."""
-    from apps.analytics.services import AnalyticsService
     from apps.core.services.dashboard_v2_service import DashboardV2Service
     from apps.insurers.services.statistics import (
         BranchStatisticsService,
@@ -200,7 +199,6 @@ def portfolio_snapshot(portfolio):
     from apps.reports.services.property_snapshot import build_property_snapshot
 
     cache.clear()
-    service = AnalyticsService()
     dashboard_v2 = DashboardV2Service().get_dashboard_context()
 
     insurer_stats = {}
@@ -234,11 +232,6 @@ def portfolio_snapshot(portfolio):
         )
 
     snapshot = {
-        "analytics_dashboard": service.get_dashboard_metrics(),
-        "analytics_branches": service.get_branch_analytics(),
-        "analytics_branches_v2": service.get_branch_portfolio_analytics_v2(),
-        "analytics_insurers": service.get_insurer_analytics(),
-        "analytics_clients": service.get_client_analytics(),
         "property_snapshot": build_property_snapshot(),
         # Структура портфеля на главной — С ОСАГО (решение владельца),
         # поэтому в слепок не входит; концентрация и индекс нового бизнеса — без.
@@ -249,24 +242,6 @@ def portfolio_snapshot(portfolio):
     }
     cache.clear()
     return _normalize(snapshot)
-
-
-def test_baseline_dashboard_metrics(portfolio):
-    from apps.analytics.services import AnalyticsService
-
-    cache.clear()
-    metrics = AnalyticsService().get_dashboard_metrics()
-
-    assert "error" not in metrics
-    # Все прошлые платежи оплачены → мост = сумма всех 7 платежей.
-    assert metrics["total_premium_volume"] == Decimal("470000")
-    assert metrics["total_commission_revenue"] == Decimal("47000")
-    # СС полиса = максимум по графику: 3.0 + 5.0 + 2.0 + 3.5 млн.
-    assert metrics["total_insurance_sum"] == Decimal("13500000")
-    assert metrics["total_policy_count"] == 4
-    # В силе сегодня: P1 и P2 (P3 истёк, P4 ещё не начался).
-    assert metrics["active_policies_count"] == 2
-    assert metrics["average_commission_rate"] == Decimal("10")
 
 
 def test_baseline_rates_by_year(portfolio):
@@ -293,11 +268,6 @@ def test_snapshot_services_return_real_data(portfolio):
         assert value is not None, key
         if isinstance(value, dict):
             assert "error" not in value, (key, value.get("error"))
-
-    assert snapshot["analytics_dashboard"]["total_policy_count"] == 4
-    assert Decimal(str(snapshot["analytics_dashboard"]["total_insurance_sum"])) == (
-        Decimal("13500000")
-    )
 
 
 def test_snapshot_is_deterministic(portfolio):

@@ -45,7 +45,7 @@ def drill_url(context, key, **kwargs):
     overrides, opts = split_overrides(params, kwargs)
     items = params.query_items(**overrides)
     items.extend(opts.items())
-    url = reverse("analytics:v2_list", args=[key])
+    url = reverse("analytics:list", args=[key])
     query = urlencode(items)
     return f"{url}?{query}" if query else url
 

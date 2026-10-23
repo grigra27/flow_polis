@@ -1,14 +1,14 @@
-{% extends "analytics/v2/layout.html" %}
-{% load analytics_v2 currency_filters %}
+{% extends "analytics/layout.html" %}
+{% load analytics_tags currency_filters %}
 
 {% block tab_content %}
 {% with t=data.totals %}
 <div class="ax-kpis">
     {% drill_url 'new_business' as u %}
-    {% with o=t.to_old_dfa|stringformat:"s" %}{% include "analytics/v2/includes/kpi.html" with title="Новых полисов" value=t.count raw=1 url=u caption="к старому ДФА: "|add:o tone="accent" %}{% endwith %}
-    {% include "analytics/v2/includes/kpi.html" with title="КВ первого года" value=t.commission tone="good" %}
-    {% include "analytics/v2/includes/kpi.html" with title="Премия первого года" value=t.premium %}
-    {% if t.count %}{% widthratio t.premium t.count 1 as avg %}{% include "analytics/v2/includes/kpi.html" with title="Средняя премия 1-го года" value=avg %}{% endif %}
+    {% with o=t.to_old_dfa|stringformat:"s" %}{% include "analytics/includes/kpi.html" with title="Новых полисов" value=t.count raw=1 url=u caption="к старому ДФА: "|add:o tone="accent" %}{% endwith %}
+    {% include "analytics/includes/kpi.html" with title="КВ первого года" value=t.commission tone="good" %}
+    {% include "analytics/includes/kpi.html" with title="Премия первого года" value=t.premium %}
+    {% if t.count %}{% widthratio t.premium t.count 1 as avg %}{% include "analytics/includes/kpi.html" with title="Средняя премия 1-го года" value=avg %}{% endif %}
 </div>
 {% endwith %}
 

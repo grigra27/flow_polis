@@ -1,4 +1,4 @@
-{% load analytics_v2 currency_filters %}{% if url %}<a class="ax-kpi{% if tone %} ax-kpi--{{ tone }}{% endif %}" href="{{ url }}" title="{{ value|currency }}">{% else %}<div class="ax-kpi{% if tone %} ax-kpi--{{ tone }}{% endif %}" title="{{ value|currency }}">{% endif %}
+{% load analytics_tags currency_filters %}{% if url %}<a class="ax-kpi{% if tone %} ax-kpi--{{ tone }}{% endif %}" href="{{ url }}" title="{{ value|currency }}">{% else %}<div class="ax-kpi{% if tone %} ax-kpi--{{ tone }}{% endif %}" title="{{ value|currency }}">{% endif %}
     <div class="ax-kpi-label">{% if op %}<span class="ax-op">{{ op }}</span>{% endif %}{{ title }}</div>
     <div class="ax-kpi-value">{% if raw %}{{ value }}{% else %}{{ value|money_short }}{% endif %}</div>
     {% if caption %}<div class="ax-kpi-sub">{{ caption }}</div>{% endif %}

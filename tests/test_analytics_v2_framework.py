@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from apps.analytics import drilldown
 from apps.analytics.filters import AnalyticsParams
-from apps.analytics.views_v2 import TAB_KEYS
+from apps.analytics.views import TAB_KEYS
 from tests.test_portfolio_regression import add_osago_policy, portfolio  # noqa: F401
 
 TODAY = date(2026, 10, 16)
@@ -135,7 +135,7 @@ def superuser_client(client, django_user_model):
 @pytest.mark.parametrize("tab", TAB_KEYS)
 def test_tabs_render(superuser_client, portfolio, tab):  # noqa: F811
     add_osago_policy(portfolio)
-    url = reverse(f"analytics:v2_{tab}")
+    url = reverse(f"analytics:{tab}")
     assert superuser_client.get(url).status_code == 200
     assert superuser_client.get(url + "?period=prev_year&osago=1").status_code == 200
 
@@ -144,7 +144,7 @@ def test_tabs_render(superuser_client, portfolio, tab):  # noqa: F811
 @pytest.mark.django_db
 def test_tabs_are_superuser_only(client, django_user_model):
     client.force_login(django_user_model.objects.create_user("u", "u@u.ru", "x"))
-    response = client.get(reverse("analytics:v2_summary"))
+    response = client.get(reverse("analytics:summary"))
     assert response.status_code == 302
     assert "access" in response["Location"]
 
@@ -153,7 +153,7 @@ def test_tabs_are_superuser_only(client, django_user_model):
 @pytest.mark.django_db
 @pytest.mark.parametrize("key", ["payments_due", "in_force", "non_broker"])
 def test_drilldown_list_and_excel(superuser_client, portfolio, key):  # noqa: F811
-    url = reverse("analytics:v2_list", args=[key])
+    url = reverse("analytics:list", args=[key])
     response = superuser_client.get(url)
     assert response.status_code == 200
 
@@ -167,7 +167,7 @@ def test_drilldown_list_and_excel(superuser_client, portfolio, key):  # noqa: F8
 def test_drilldown_numbers_match_queryset(superuser_client, portfolio):  # noqa: F811
     p = params(today=portfolio["today"])
     expected = drilldown.resolve("in_force", p).count()
-    response = superuser_client.get(reverse("analytics:v2_list", args=["in_force"]))
+    response = superuser_client.get(reverse("analytics:list", args=["in_force"]))
     assert response.context["totals"]["count"] == expected
     assert len(response.context["rows"]) == expected
 
@@ -175,5 +175,23 @@ def test_drilldown_numbers_match_queryset(superuser_client, portfolio):  # noqa:
 @pytest.mark.integration
 @pytest.mark.django_db
 def test_unknown_metric_is_404(superuser_client):
-    response = superuser_client.get(reverse("analytics:v2_list", args=["nope"]))
+    response = superuser_client.get(reverse("analytics:list", args=["nope"]))
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        ("/analytics/v2/", "/analytics/"),
+        ("/analytics/v2/money/?period=prev_year", "/analytics/money/?period=prev_year"),
+        ("/analytics/v2/list/in_force/", "/analytics/list/in_force/"),
+        ("/analytics/branches/", "/analytics/"),
+        ("/analytics/financial-history/", "/analytics/"),
+        ("/analytics/time-series/", "/analytics/"),
+    ],
+)
+def test_old_addresses_redirect(superuser_client, old, new):
+    response = superuser_client.get(old)
+    assert response.status_code in (301, 302)
+    assert response["Location"] == new

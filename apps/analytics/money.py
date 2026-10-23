@@ -1,5 +1,5 @@
 """
-Деньги брокера: единые определения для финансовой аналитики и временных рядов.
+Деньги брокера: единые определения для аналитики, главной и отчётов.
 
 Решение владельца 2026-10-16: «заработано» — по дате согласования акта с СК
 (insurer_date), как в ежемесячном отчёте по КВ. Отсюда:
@@ -171,70 +171,6 @@ def build_current_year_outlook(payments: QuerySet, today: date) -> Dict[str, Any
     }
 
 
-def build_monthly_forecast(
-    payments: QuerySet, today: date, min_months: int = 12
-) -> List[Dict[str, Any]]:
-    """График по месяцам от текущего до последнего платежа (без отменённых).
-
-    Только заключённые договоры: будущие пролонгации сюда не входят, поэтому
-    дальние месяцы заведомо ниже реальных.
-    """
-    first_month = today.replace(day=1)
-    rows = {
-        row["month"]: row
-        for row in scheduled_payments(payments)
-        .filter(due_date__gte=first_month)
-        .annotate(month=TruncMonth("due_date"))
-        .values("month")
-        .annotate(premium=_money("amount"), commission=_money("kv_rub"))
-    }
-    last = max(rows) if rows else first_month
-    months_count = max(
-        min_months,
-        (last.year - first_month.year) * 12 + last.month - first_month.month + 1,
-    )
-
-    forecast = []
-    year, month = first_month.year, first_month.month
-    for _ in range(months_count):
-        month_date = date(year, month, 1)
-        row = rows.get(month_date, {})
-        forecast.append(
-            {
-                "month": month_date,
-                "forecasted_premium": row.get("premium", ZERO),
-                "forecasted_commission": row.get("commission", ZERO),
-                "actual_premium": None,
-                "actual_commission": None,
-            }
-        )
-        month += 1
-        if month > 12:
-            year, month = year + 1, 1
-    return forecast
-
-
-def build_payment_status(payments: QuerySet, today: date) -> Dict[str, Any]:
-    """Платёжный контур: оплачено / ожидается / просрочено (без отменённых)."""
-    expected_qs = expected_payments(payments)
-    paid = _totals(payments.filter(paid_date__isnull=False))
-    pending = _totals(expected_qs.filter(due_date__gte=today))
-    overdue = _totals(expected_qs.filter(due_date__lt=today))
-    total_count = payments.count()
-    return {
-        "total_payments": total_count,
-        "paid_payments": paid["count"],
-        "pending_payments": pending["count"],
-        "overdue_payments": overdue["count"],
-        "paid_amount": paid["premium"],
-        "pending_amount": pending["premium"],
-        "overdue_amount": overdue["premium"],
-        "payment_discipline_rate": (
-            Decimal(paid["count"]) / Decimal(total_count) * 100 if total_count else ZERO
-        ),
-    }
-
-
 def year_to_date_totals(
     payments: QuerySet, today: date, year: Optional[int] = None
 ) -> Dict[str, Decimal]:
@@ -245,22 +181,6 @@ def year_to_date_totals(
         end_day = 28 if year % 4 else 29
     start, end = date(year, 1, 1), date(year, today.month, end_day)
     return _totals(earned_payments(payments, start, end))
-
-
-def earned_monthly_series(payments: QuerySet, start: date, end: date):
-    """Заработано по месяцам (по дате акта) — факт для временных рядов."""
-    return [
-        {
-            "month": row["month"],
-            "premium": row["premium"],
-            "commission": row["commission"],
-        }
-        for row in earned_payments(payments, start, end)
-        .annotate(month=TruncMonth("insurer_date"))
-        .values("month")
-        .annotate(premium=_money("amount"), commission=_money("kv_rub"))
-        .order_by("month")
-    ]
 
 
 # --- Аналитика 2.0: граница надёжной истории ----------------------------------

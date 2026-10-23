@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load static analytics_v2 %}
+{% load static analytics_tags %}
 
 {% block title %}Аналитика · {% if metric %}{{ metric.title }}{% else %}{{ tab_title }}{% endif %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'analytics/css/analytics-v2.css' %}">
+<link rel="stylesheet" href="{% static 'analytics/css/analytics.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    {% include "analytics/v2/includes/filters.html" %}
+    {% include "analytics/includes/filters.html" %}
 
     {% if tabs %}
     <nav class="ax-tabs" aria-label="Разделы аналитики">
@@ -38,6 +38,6 @@
 {% block extra_js %}
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-<script src="{% static 'analytics/js/analytics-v2.js' %}"></script>
+<script src="{% static 'analytics/js/analytics.js' %}"></script>
 {% block tab_js %}{% endblock %}
 {% endblock %}

@@ -1,15 +1,15 @@
-{% extends "analytics/v2/layout.html" %}
-{% load analytics_v2 currency_filters %}
+{% extends "analytics/layout.html" %}
+{% load analytics_tags currency_filters %}
 
 {% block tab_content %}
 {% with t=data.totals %}
 <div class="ax-kpis">
     {% drill_url 'osago_policies' as u %}
-    {% with n=t.in_force|stringformat:"s" %}{% include "analytics/v2/includes/kpi.html" with title="Полисов ОСАГО за период" value=t.policies raw=1 url=u caption="в силе сегодня: "|add:n tone="accent" %}{% endwith %}
+    {% with n=t.in_force|stringformat:"s" %}{% include "analytics/includes/kpi.html" with title="Полисов ОСАГО за период" value=t.policies raw=1 url=u caption="в силе сегодня: "|add:n tone="accent" %}{% endwith %}
     {% drill_url 'osago_payments' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Премия" value=t.premium url=u caption=t.paid|plural:"платёж оплачен,платежа оплачено,платежей оплачено" %}
-    {% include "analytics/v2/includes/kpi.html" with title="КВ" value=t.kv url=u caption=t.approved|plural:"акт согласован,акта согласовано,актов согласовано" tone="good" %}
-    {% with v=t.kv_percent|floatformat:1 %}{% include "analytics/v2/includes/kpi.html" with title="Средний КВ" value=v|add:"%" raw=1 %}{% endwith %}
+    {% include "analytics/includes/kpi.html" with title="Премия" value=t.premium url=u caption=t.paid|plural:"платёж оплачен,платежа оплачено,платежей оплачено" %}
+    {% include "analytics/includes/kpi.html" with title="КВ" value=t.kv url=u caption=t.approved|plural:"акт согласован,акта согласовано,актов согласовано" tone="good" %}
+    {% with v=t.kv_percent|floatformat:1 %}{% include "analytics/includes/kpi.html" with title="Средний КВ" value=v|add:"%" raw=1 %}{% endwith %}
 </div>
 {% endwith %}
 <p class="ax-note"><i class="bi bi-info-circle"></i>Полисы ОСАГО с датой начала в периоде; премия и КВ — по единственному платежу полиса. На остальных вкладках ОСАГО учитывается только с переключателем «с ОСАГО».</p>

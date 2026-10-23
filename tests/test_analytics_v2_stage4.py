@@ -249,6 +249,6 @@ def test_osago_tab_ignores_toggle(make):
 def test_stage4_lists_render(client, django_user_model, make, key):
     make(date(2026, 4, 2), [(40000, 0, date(2026, 4, 2), None, None, M)])
     client.force_login(django_user_model.objects.create_superuser("r", "r@r.ru", "x"))
-    url = reverse("analytics:v2_list", args=[key])
+    url = reverse("analytics:list", args=[key])
     assert client.get(url + "?client=1").status_code == 200
     assert client.get(url + "?format=xlsx").status_code == 200

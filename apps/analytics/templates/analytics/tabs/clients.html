@@ -1,12 +1,12 @@
-{% extends "analytics/v2/layout.html" %}
-{% load analytics_v2 currency_filters %}
+{% extends "analytics/layout.html" %}
+{% load analytics_tags currency_filters %}
 
 {% block tab_content %}
 <div class="ax-kpis">
-    {% with n=data.new_clients|stringformat:"s" %}{% include "analytics/v2/includes/kpi.html" with title="Клиентов с КВ в периоде" value=data.clients_total raw=1 caption="новых: "|add:n tone="accent" %}{% endwith %}
-    {% include "analytics/v2/includes/kpi.html" with title="КВ по графику за период" value=data.total_commission tone="good" %}
-    {% if data.top10_share is not None %}{% with v=data.top10_share|floatformat:1 %}{% include "analytics/v2/includes/kpi.html" with title="Доля 10 крупнейших" value=v|add:"%" raw=1 %}{% endwith %}{% endif %}
-    {% if data.top50_share is not None %}{% with v=data.top50_share|floatformat:1 %}{% include "analytics/v2/includes/kpi.html" with title="Доля 50 крупнейших" value=v|add:"%" raw=1 %}{% endwith %}{% endif %}
+    {% with n=data.new_clients|stringformat:"s" %}{% include "analytics/includes/kpi.html" with title="Клиентов с КВ в периоде" value=data.clients_total raw=1 caption="новых: "|add:n tone="accent" %}{% endwith %}
+    {% include "analytics/includes/kpi.html" with title="КВ по графику за период" value=data.total_commission tone="good" %}
+    {% if data.top10_share is not None %}{% with v=data.top10_share|floatformat:1 %}{% include "analytics/includes/kpi.html" with title="Доля 10 крупнейших" value=v|add:"%" raw=1 %}{% endwith %}{% endif %}
+    {% if data.top50_share is not None %}{% with v=data.top50_share|floatformat:1 %}{% include "analytics/includes/kpi.html" with title="Доля 50 крупнейших" value=v|add:"%" raw=1 %}{% endwith %}{% endif %}
 </div>
 
 <div class="ax-grid ax-grid-7-5">

@@ -1,25 +1,25 @@
-{% extends "analytics/v2/layout.html" %}
-{% load analytics_v2 currency_filters %}
+{% extends "analytics/layout.html" %}
+{% load analytics_tags currency_filters %}
 
 {% block tab_content %}
 {% with k=data.kpi %}
 <div class="ax-kpis">
     {% drill_url 'earned' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Заработано по актам" value=k.earned.commission url=u caption=k.earned.count|plural:"платёж,платежа,платежей" tone="good" %}
+    {% include "analytics/includes/kpi.html" with title="Заработано по актам" value=k.earned.commission url=u caption=k.earned.count|plural:"платёж,платежа,платежей" tone="good" %}
     {% drill_url 'plan' as u %}
     {% if k.plan_completion is not None %}{% with c=k.plan_completion|floatformat:0 %}
-    {% include "analytics/v2/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u caption="выполнен на "|add:c|add:"%" %}
+    {% include "analytics/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u caption="выполнен на "|add:c|add:"%" %}
     {% endwith %}{% else %}
-    {% include "analytics/v2/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u %}
+    {% include "analytics/includes/kpi.html" with title="План по графику" value=k.plan.commission url=u %}
     {% endif %}
     {% drill_url 'expected' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Ожидается до конца периода" value=k.expected.commission url=u caption=k.expected.count|plural:"платёж,платежа,платежей" tone="accent" %}
+    {% include "analytics/includes/kpi.html" with title="Ожидается до конца периода" value=k.expected.commission url=u caption=k.expected.count|plural:"платёж,платежа,платежей" tone="accent" %}
     {% drill_url 'awaiting_act' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Ждёт акта СК · сейчас" value=k.awaiting.commission url=u caption=k.awaiting.count|plural:"платёж,платежа,платежей" tone="warning" %}
+    {% include "analytics/includes/kpi.html" with title="Ждёт акта СК · сейчас" value=k.awaiting.commission url=u caption=k.awaiting.count|plural:"платёж,платежа,платежей" tone="warning" %}
     {% drill_url 'overdue' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Просрочено · сейчас" value=k.overdue.commission url=u caption=k.overdue.count|plural:"платёж,платежа,платежей" %}
+    {% include "analytics/includes/kpi.html" with title="Просрочено · сейчас" value=k.overdue.commission url=u caption=k.overdue.count|plural:"платёж,платежа,платежей" %}
     {% drill_url 'lost' as u %}
-    {% include "analytics/v2/includes/kpi.html" with title="Потеряно за период" value=k.lost.commission url=u caption=k.lost.count|plural:"платёж,платежа,платежей" tone="critical" %}
+    {% include "analytics/includes/kpi.html" with title="Потеряно за период" value=k.lost.commission url=u caption=k.lost.count|plural:"платёж,платежа,платежей" tone="critical" %}
 </div>
 {% if k.lost_undated.count %}
 <p class="ax-note"><i class="bi bi-info-circle"></i>Ещё <a class="ax-link" href="{% drill_url 'lost' undated='1' %}">{{ k.lost_undated.commission|currency }}</a> потеряно без даты (ДФА закрыт без даты) — в период не попадает.</p>

@@ -215,7 +215,7 @@ jobs:
             docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml config --quiet
 
             # Fail before rsync if the namespace does not match existing data.
-            [[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' insurance_broker_db)" == "$COMPOSE_PROJECT_NAME" ]]
+            [[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' insurance_broker_db)" == "$COMPOSE_PROJECT_NAME" ]] || { echo "❌ Existing database belongs to a different Compose project"; exit 1; }
             for volume in postgres_data redis_data static_volume media_volume; do
               docker volume inspect "${COMPOSE_PROJECT_NAME}_${volume}" > /dev/null
             done
@@ -390,33 +390,45 @@ jobs:
             # every application image before changing any running service.
             echo "🔨 Building new images (old containers keep serving)..."
             rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py
-            "${compose[@]}" build web celery_worker celery_beat
+            "${compose[@]}" build web celery_worker celery_beat < /dev/null
+            : > "$release_dir/new-image-ids"
+            for service in web celery_worker celery_beat; do
+              image_id=$(docker image inspect --format '{{.Id}}' "insurance_broker_${service}:latest")
+              printf '%s %s\n' "$service" "$image_id" >> "$release_dir/new-image-ids"
+            done
 
             echo "🔧 Removing the known obsolete migration record..."
-            "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+            # SSH passes this shell script on stdin. Disable stdin attachment
+            # explicitly: otherwise Compose can consume the remaining script.
+            "${compose[@]}" exec -T --interactive=false db psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
               DELETE FROM django_migrations
               WHERE app = 'policies'
                 AND name = '0011_alter_paymentschedule_unique_together';
-            "
+            " < /dev/null
 
             # Application entrypoint is gosu/app: migrations and static collection
             # run once here, not concurrently in web and both Celery containers.
             echo "🔄 Running database migrations with the new image..."
-            "${compose[@]}" run --rm --no-deps --pull never web python manage.py migrate --noinput
+            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never web python manage.py migrate --noinput < /dev/null
             echo "📦 Collecting static files..."
-            "${compose[@]}" run --rm --no-deps --pull never web python manage.py collectstatic --noinput
+            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never web python manage.py collectstatic --noinput < /dev/null
 
             # A fresh one-off container sees the new rsynced configuration inode.
-            "${compose[@]}" run --rm --no-deps --pull never nginx nginx -t
+            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never nginx nginx -t < /dev/null
             touch "$release_dir/activating"
             echo "🚀 Recreating application services, preserving database/Redis/certbot..."
-            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 web celery_worker celery_beat
+            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 web celery_worker celery_beat < /dev/null
 
             # Recreate nginx to rebind replaced config files and resolve the new
             # web container IP; reload alone cannot replace a bind-mounted inode.
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx
-            "${compose[@]}" exec -T nginx nginx -t
-            "${compose[@]}" exec -T nginx nginx -s reload
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx < /dev/null
+            "${compose[@]}" exec -T --interactive=false nginx nginx -t < /dev/null
+            "${compose[@]}" exec -T --interactive=false nginx nginx -s reload < /dev/null
+            while read -r service expected_id; do
+              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
+              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Expected new image is not running: $service"; exit 1; }
+            done < "$release_dir/new-image-ids"
+            touch "$release_dir/switched"
             echo "✅ Application switched; final health and HTTPS checks follow"
           ENDSSH
 
@@ -460,6 +472,16 @@ jobs:
             flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
             compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
 
+            # A healthy old release must never make an incomplete deploy green.
+            test -f "$release_dir/activating"
+            test -f "$release_dir/switched"
+            test "$(wc -l < "$release_dir/new-image-ids")" -eq 3
+            while read -r service expected_id; do
+              case "$service" in web|celery_worker|celery_beat) ;; *) exit 1 ;; esac
+              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
+              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Running image differs from this release: $service"; exit 1; }
+            done < "$release_dir/new-image-ids"
+
             echo "🏥 Checking every production service..."
             for service in db redis web celery_worker celery_beat nginx certbot; do
               container_id=$("${compose[@]}" ps -q "$service")
@@ -467,15 +489,15 @@ jobs:
               state=$(docker inspect --format '{{.State.Status}}' "$container_id")
               health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
               echo "$service: state=$state health=$health"
-              [[ "$state" == running ]]
+              [[ "$state" == running ]] || { echo "❌ Service is not running: $service"; exit 1; }
               case "$service" in
-                celery_beat|certbot) [[ "$health" == none || "$health" == healthy ]] ;;
-                *) [[ "$health" == healthy ]] ;;
+                celery_beat|certbot) [[ "$health" == none || "$health" == healthy ]] || { echo "❌ Unhealthy service: $service"; exit 1; } ;;
+                *) [[ "$health" == healthy ]] || { echo "❌ Health check failed: $service"; exit 1; } ;;
               esac
             done
 
             login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
-            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]]
+            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]] || { echo "❌ HTTPS response does not contain the login form"; exit 1; }
             unset login_page
             touch "$release_dir/verified"
             echo "✅ All service healthchecks and HTTPS login page passed"
@@ -579,17 +601,17 @@ jobs:
 
             # Only the three app containers and nginx are replaced. Saved image
             # tags preserve the actual running hotfix image, even after a build.
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 180 web celery_worker celery_beat
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx
-            "${compose[@]}" exec -T nginx nginx -t
-            "${compose[@]}" exec -T nginx nginx -s reload
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 180 web celery_worker celery_beat < /dev/null
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx < /dev/null
+            "${compose[@]}" exec -T --interactive=false nginx nginx -t < /dev/null
+            "${compose[@]}" exec -T --interactive=false nginx nginx -s reload < /dev/null
 
             while read -r service expected_id; do
               actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
-              [[ "$actual_id" == "$expected_id" ]]
+              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Saved image was not restored: $service"; exit 1; }
             done < "$release_dir/image-ids"
             login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
-            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]]
+            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]] || { echo "❌ Restored service did not return the login form"; exit 1; }
             unset login_page
             touch "$release_dir/restored"
 

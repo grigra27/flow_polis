@@ -508,10 +508,9 @@ docker compose run --rm --service-ports web
 1. Скопируйте примеры файлов окружения:
 ```bash
 cp .env.prod.example .env.prod
-cp .env.prod.db.example .env.prod.db
 ```
 
-2. Отредактируйте `.env.prod` и `.env.prod.db` с вашими production значениями:
+2. Отредактируйте `.env.prod` с вашими production значениями. `POSTGRES_*` используются и PostgreSQL, и приложением; отдельный `.env.prod.db` не нужен:
    - Сгенерируйте новый `SECRET_KEY`
    - Установите `DEBUG=False`
    - Настройте `ALLOWED_HOSTS` с вашим доменом
@@ -756,15 +755,15 @@ docker compose -f docker-compose.prod.yml ps db
 # Проверка логов БД
 docker compose -f docker-compose.prod.yml logs db
 
-# Проверка переменных окружения
-docker compose -f docker-compose.prod.yml exec web env | grep DB_
+# Проверка конфигурации без вывода паролей
+docker compose -f docker-compose.prod.yml exec web python manage.py check --database default
 
 # Тест подключения
 docker compose -f docker-compose.prod.yml exec web python manage.py dbshell
 ```
 
 **Решения:**
-1. Убедитесь, что `DB_PASSWORD` в `.env.prod` совпадает с `POSTGRES_PASSWORD` в `.env.prod.db`
+1. Проверьте `POSTGRES_PASSWORD` в `.env.prod`: Compose передаёт его приложению как `DB_PASSWORD`. Пароль существующей роли PostgreSQL меняется отдельно; см. [процедуру ротации](docs/SECRETS_ROTATION.md).
 2. Проверьте, что `DB_HOST=db` (имя сервиса в docker-compose)
 3. Дождитесь полного запуска PostgreSQL (может занять 10-15 секунд)
 4. Проверьте health check: `docker inspect --format='{{.State.Health.Status}}' insurance_broker_db`

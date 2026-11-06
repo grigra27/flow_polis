@@ -217,11 +217,12 @@ jobs:
           retention-days: 2
 
   deploy:
-    name: Deploy to Timeweb Cloud
+    name: Deploy through restricted SSH controller
     runs-on: ubuntu-latest
     needs: build
     env:
-      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
       IMAGE_REF: ${{ needs.build.outputs.image-ref }}
       EXPECTED_CONFIG_DIGEST: ${{ needs.build.outputs.config-digest }}
       EXPECTED_ARCHIVE_SHA256: ${{ needs.build.outputs.archive-sha256 }}
@@ -237,565 +238,139 @@ jobs:
           path: ${{ runner.temp }}/onlinepolis-image/
           digest-mismatch: error
 
-      - name: Setup SSH
+      - name: Setup restricted SSH with pinned host key
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          [[ "$DROPLET_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] && (( 10#$SSH_PORT > 0 && 10#$SSH_PORT <= 65535 ))
+          umask 077
+          mkdir -p "$RUNNER_TEMP/onlinepolis-ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/onlinepolis-ssh/key"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/onlinepolis-ssh/known_hosts"
+          ssh-keygen -l -f "$RUNNER_TEMP/onlinepolis-ssh/known_hosts" > /dev/null
+          cat > "$RUNNER_TEMP/onlinepolis-ssh/config" <<EOF
+          Host onlinepolis-production
+            HostName $DROPLET_HOST
+            HostKeyAlias onlinepolis-production
+            User onlinepolis-deploy
+            Port $SSH_PORT
+            IdentityFile $RUNNER_TEMP/onlinepolis-ssh/key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile $RUNNER_TEMP/onlinepolis-ssh/known_hosts
+            GlobalKnownHostsFile /dev/null
+            RequestTTY no
+            ClearAllForwardings yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+          EOF
 
-          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${DROPLET_HOST:-}" ] || [ -z "${DROPLET_USER:-}" ]; then
-            echo "❌ Missing required deployment secrets (SSH_PRIVATE_KEY, DROPLET_HOST, DROPLET_USER)"
-            exit 1
-          fi
-
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
-          # Keep long image-transfer/import sessions alive without rebuilding
-          # application images on the production host.
-          printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-          echo "✅ SSH configured"
-
-      - name: Preflight SSH connectivity
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+      - name: Check controller and protected host configuration
         run: |
           set -euo pipefail
-          echo "Network diagnostics for $DROPLET_HOST:${SSH_PORT:-22}"
-          echo "--- DNS (all records via getent ahosts) ---"
-          getent ahosts "$DROPLET_HOST" || true
-          echo "--- IPv4 TCP probe ---"
-          ipv4_list=$(getent ahostsv4 "$DROPLET_HOST" | awk '{print $1}' | sort -u || true)
-          if [ -z "${ipv4_list:-}" ]; then
-            echo "⚠️ No IPv4 addresses resolved for $DROPLET_HOST"
-          else
-            for ip in $ipv4_list; do
-              if timeout 5 bash -lc "cat < /dev/null > /dev/tcp/$ip/${SSH_PORT:-22}" 2>/dev/null; then
-                echo "✅ TCP reachable: $ip:${SSH_PORT:-22}"
-              else
-                echo "❌ TCP not reachable: $ip:${SSH_PORT:-22}"
-              fi
-            done
-          fi
-          echo "Checking SSH access to $DROPLET_HOST:${SSH_PORT:-22}"
-          ssh -4 -i ~/.ssh/deploy_key \
-              -p "${SSH_PORT:-22}" \
-              -o BatchMode=yes \
-              -o ConnectTimeout=15 \
-              -o StrictHostKeyChecking=no \
-              "$DROPLET_USER@$DROPLET_HOST" \
-              "echo '✅ SSH connection established'; hostname"
+          ssh -F "$RUNNER_TEMP/onlinepolis-ssh/config" onlinepolis-production status > "$RUNNER_TEMP/onlinepolis-controller.json"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          status = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'onlinepolis-controller.json').read_text())
+          if status.get('protocol') != 1:
+              raise SystemExit('Unsupported deployment controller')
+          protected = status.get('config_source_hashes', {})
+          for name in ('docker-compose.prod.yml', 'scripts/deploy/security.override.yml', 'nginx/nginx.conf', 'nginx/default.conf'):
+              expected = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
+              if protected.get(name) != expected:
+                  raise SystemExit('Protected host configuration differs: ' + name + '; an administrator must review and install infrastructure changes first')
+          print('Restricted controller and protected host configuration verified')
+          PY
 
-      - name: Preflight Compose plugin and preserve running release
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
-            set -euo pipefail
-            deployment_id=$1
-            [[ "$deployment_id" =~ ^[0-9]+-[0-9]+$ ]]
-            compose_version=$(docker compose version --short)
-            if [[ ! "$compose_version" =~ ^v?([0-9]+)\.([0-9]+) ]] ||
-               (( BASH_REMATCH[1] < 2 || (BASH_REMATCH[1] == 2 && BASH_REMATCH[2] < 20) )); then
-              echo "❌ Docker Compose plugin >= 2.20 is required (including newer major versions)"
-              exit 1
-            fi
-            docker compose version
-            docker info --format 'Docker Engine {{.ServerVersion}}'
-            command -v curl > /dev/null
-            command -v flock > /dev/null
-            command -v python3 > /dev/null
-            command -v sha256sum > /dev/null
-            mkdir -p "$HOME/.local/state"
-            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
-            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
-            cd ~/insurance_broker
-            set -a
-            source .env.prod
-            set +a
-            export COMPOSE_PROJECT_NAME=insurance_broker
-            docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml config --quiet
-
-            # Fail before rsync if the namespace does not match existing data.
-            [[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' insurance_broker_db)" == "$COMPOSE_PROJECT_NAME" ]] || { echo "❌ Existing database belongs to a different Compose project"; exit 1; }
-            for volume in postgres_data redis_data static_volume media_volume; do
-              docker volume inspect "${COMPOSE_PROJECT_NAME}_${volume}" > /dev/null
-            done
-            umask 077
-            release_dir="$HOME/.local/state/onlinepolis-deploy/$deployment_id"
-            mkdir -p "$release_dir/artifact"
-            cp docker-compose.prod.yml "$release_dir/docker-compose.prod.yml"
-            cp -a nginx "$release_dir/nginx"
-            printf 'services:\n' > "$release_dir/rollback.yml"
-            : > "$release_dir/image-ids"
-            for service in web celery_worker celery_beat; do
-              image_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
-              backup_tag="onlinepolis-rollback:${deployment_id}-${service}"
-              docker image tag "$image_id" "$backup_tag"
-              printf '  %s:\n    image: %s\n    entrypoint: ["gosu", "app"]\n' "$service" "$backup_tag" >> "$release_dir/rollback.yml"
-              printf '%s %s\n' "$service" "$image_id" >> "$release_dir/image-ids"
-            done
-            touch "$release_dir/prepared"
-            echo "✅ Compose plugin, existing project volumes and rollback images verified"
-          ENDSSH
-
-      - name: Transfer verified image to release storage
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+      - name: Upload the verified application image
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/onlinepolis-image"
           printf '%s  image.tar.gz\n' "$EXPECTED_ARCHIVE_SHA256" | sha256sum --check -
-          scp -4 -i ~/.ssh/deploy_key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=no \
-            image.tar.gz image.tar.gz.sha256 manifest.json \
-            "$DROPLET_USER@$DROPLET_HOST:.local/state/onlinepolis-deploy/$DEPLOYMENT_ID/artifact/"
+          image_bytes=$(stat -c '%s' image.tar.gz)
+          ssh -F "$RUNNER_TEMP/onlinepolis-ssh/config" onlinepolis-production \
+            upload "$DEPLOYMENT_ID" "$GITHUB_SHA" "$IMAGE_REF" "$EXPECTED_CONFIG_DIGEST" "$EXPECTED_ARCHIVE_SHA256" "$image_bytes" < image.tar.gz
 
-      - name: Copy files to server
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+      - name: Activate the application image
         run: |
-          # H-11: --delete — на сервере не остаётся файлов, удалённых из
-          # репозитория (иначе там копились старые скрипты/шаблоны, а
-          # удалённая из git миграция осталась бы и применилась).
-          # Исключения ЗАЩИЩАЮТ от удаления всё, что живёт только на сервере:
-          #   /.env, /.env.prod* — секреты (кроме .env.prod.example из репо);
-          #   /certbot/ — SSL-сертификаты; /logs/ — логи (cron, django, nginx);
-          #   /media/, /db.sqlite3 — данные. Новый серверный файл в корне
-          #   проекта — сначала добавить сюда, иначе следующий деплой его удалит.
-          # Пути с ведущим / привязаны к корню проекта.
-          RSYNC_ARGS=(
-            -avz --delete
-            -e "ssh -4 -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o StrictHostKeyChecking=no"
-            --exclude='.git'
-            --exclude='venv'
-            --exclude='black_venv'
-            --exclude='__pycache__'
-            --exclude='*.pyc'
-            --exclude='/.env'
-            --include='/.env.prod.example'
-            --exclude='/.env.prod*'
-            --exclude='/db.sqlite3'
-            --exclude='/certbot/'
-            --exclude='/logs/'
-            --exclude='/media/'
-            ./ "$DROPLET_USER@$DROPLET_HOST:~/insurance_broker/"
-          )
+          set -euo pipefail
+          ssh -F "$RUNNER_TEMP/onlinepolis-ssh/config" onlinepolis-production activate "$DEPLOYMENT_ID" < /dev/null
 
-          # Страховка от ошибки в исключениях: сначала dry-run, список
-          # удаляемого — в лог CI; если туда попали секреты/сертификаты/
-          # логи/данные — деплой останавливается, ничего не удалив.
-          echo "🔍 rsync --delete dry-run:"
-          rsync --dry-run "${RSYNC_ARGS[@]}" | grep '^deleting ' > /tmp/rsync-deletions.txt || true
-          echo "Will delete $(wc -l < /tmp/rsync-deletions.txt) path(s) on server:"
-          cat /tmp/rsync-deletions.txt
-          if grep -E '^deleting (\.env($|\.prod)|certbot/|logs/|media/|db\.sqlite3$)' /tmp/rsync-deletions.txt; then
-            echo "❌ rsync --delete would remove server-only data (see above) — aborting"
-            exit 1
-          fi
-
-          rsync "${RSYNC_ARGS[@]}"
-          echo "✅ Files copied to server (preserving credentials, certificates and logs)"
-
-      - name: Verify env files on server
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+      - name: Verify running image IDs, services and HTTPS
         run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
-            cd ~/insurance_broker
+          set -euo pipefail
+          ssh -F "$RUNNER_TEMP/onlinepolis-ssh/config" onlinepolis-production health "$DEPLOYMENT_ID" < /dev/null
 
-            if [ ! -f .env.prod ]; then
-              echo "❌ .env.prod not found!"
-              echo "Please create it manually on the server before deploying"
-              exit 1
-            fi
-            echo "✅ .env.prod exists (preserving existing credentials)"
-
-            # PLAN 11.7: POSTGRES_* теперь живут в .env.prod (раньше — в .env.prod.db).
-            # docker-compose.prod.yml interpolation требует чтобы POSTGRES_DB / USER /
-            # PASSWORD были определены в .env.prod, иначе db не получит креды
-            # и Django получит пустые DB_NAME/DB_USER/DB_PASSWORD через environment маппинг.
-            for var in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
-              if ! grep -qE "^${var}=" .env.prod; then
-                echo "❌ ${var} missing in .env.prod"
-                echo "   Run on the server BEFORE deploy:"
-                echo "   cat .env.prod.db >> .env.prod   # перенесёт 3 строки из старого файла"
-                echo "   Then re-run the workflow."
-                exit 1
-              fi
-            done
-            echo "✅ POSTGRES_* present in .env.prod"
-
-            # B-08: Django получает DB_* из POSTGRES_* (environment в compose),
-            # но в .env.prod могут остаться старые строки DB_NAME/DB_USER/
-            # DB_PASSWORD. Расхождение — ловушка при ручной правке: кто-то
-            # меняет DB_PASSWORD, а работает POSTGRES_PASSWORD. Сравниваем
-            # без вывода значений.
-            env_value() { grep -E "^$1=" .env.prod | tail -1 | cut -d= -f2-; }
-            check_same() {
-              legacy=$1; main=$2
-              if grep -qE "^${legacy}=" .env.prod && [ "$(env_value "$legacy")" != "$(env_value "$main")" ]; then
-                echo "❌ ${legacy} differs from ${main} in .env.prod"
-                echo "   Django uses ${main}; make ${legacy} equal to it or remove the ${legacy} line."
-                exit 1
-              fi
-            }
-            check_same DB_NAME POSTGRES_DB
-            check_same DB_USER POSTGRES_USER
-            check_same DB_PASSWORD POSTGRES_PASSWORD
-            echo "✅ DB_* in .env.prod match POSTGRES_*"
-          ENDSSH
-
-      - name: Check SSL certificates
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          SSL_STATUS=$(ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            cd ~/insurance_broker
-
-            # Check if SSL certificates exist
-            if [ -d "certbot/conf/live/polis.insflow.ru" ]; then
-              echo "✅ SSL certificates found"
-              echo "true"
-            else
-              echo "⚠️  SSL certificates not found - will use initial config"
-
-              # Backup SSL config and use initial config
-              if [ -f "nginx/default.conf" ]; then
-                cp nginx/default.conf nginx/default.conf.ssl
-                cp nginx/default.conf.initial nginx/default.conf
-                echo "✅ Switched to initial nginx config (no SSL)"
-              fi
-              echo "false"
-            fi
-          ENDSSH
-          )
-
-          # Extract the last line (true/false) from the output
-          SSL_EXISTS=$(echo "$SSL_STATUS" | tail -n 1)
-          echo "SSL_EXISTS=$SSL_EXISTS" >> $GITHUB_ENV
-          echo "SSL certificates status: $SSL_EXISTS"
-
-      - name: Deploy on server
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" "$GITHUB_SHA" "$IMAGE_REF" "$EXPECTED_CONFIG_DIGEST" "$EXPECTED_ARCHIVE_SHA256" << 'ENDSSH'
-            set -euo pipefail
-            cd ~/insurance_broker
-            set -a
-            source .env.prod
-            set +a
-            export COMPOSE_PROJECT_NAME=insurance_broker
-            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
-            # A remote shell may survive a lost SSH connection. Recovery uses
-            # this same host lock before restoring any files or containers.
-            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
-            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
-            test -f "$release_dir/prepared"
-            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
-
-            # Verify the exact tested CI artifact before loading or retagging it.
-            # The expected digests come from build-job outputs, not this upload.
-            echo "📦 Verifying and importing the tested CI image..."
-            (cd "$release_dir/artifact" && printf '%s  image.tar.gz\n' "$5" | sha256sum --check -)
-            python3 - "$release_dir" "$2" "$3" "$4" "$5" <<'PY'
-          import hashlib, json, pathlib, re, sys, tarfile
-          release = pathlib.Path(sys.argv[1])
-          revision, image_ref, expected_config, expected_archive = sys.argv[2:]
-          def require(condition, message):
-              if not condition:
-                  raise SystemExit(message)
-          require(re.fullmatch(r"[0-9a-f]{40}", revision), "Invalid expected revision")
-          require(re.fullmatch(r"insurance-broker:" + revision + r"-[0-9]+-[0-9]+", image_ref), "Invalid image reference")
-          require(re.fullmatch(r"sha256:[0-9a-f]{64}", expected_config), "Invalid expected config digest")
-          require(re.fullmatch(r"[0-9a-f]{64}", expected_archive), "Invalid expected archive checksum")
-          artifact = release / "artifact"
-          require((artifact / "image.tar.gz.sha256").read_text().strip() == expected_archive + "  image.tar.gz", "Checksum manifest differs from CI output")
-          metadata = json.loads((artifact / "manifest.json").read_text())
-          require(metadata.get("schema") == 1 and metadata.get("image_ref") == image_ref, "Image manifest/tag mismatch")
-          require(metadata.get("revision") == revision and metadata.get("platform") == "linux/amd64", "Image revision/platform mismatch")
-          require(metadata.get("config_digest") == expected_config, "Manifest config digest differs from CI output")
-          with tarfile.open(artifact / "image.tar.gz", "r:gz") as archive:
-              entries = json.load(archive.extractfile("manifest.json"))
-              require(len(entries) == 1 and entries[0]["RepoTags"] == [image_ref], "Saved image tag mismatch")
-              config_blob = archive.extractfile(entries[0]["Config"]).read()
-          require("sha256:" + hashlib.sha256(config_blob).hexdigest() == expected_config, "Saved image config digest mismatch")
-          config = json.loads(config_blob)
-          require(config.get("os") == "linux" and config.get("architecture") == "amd64", "Saved image platform mismatch")
-          require(config.get("config", {}).get("Labels", {}).get("org.opencontainers.image.revision") == revision, "Saved image revision mismatch")
-          print("CI artifact verified: " + revision + " " + expected_config + " linux/amd64")
-          PY
-            docker image load --input "$release_dir/artifact/image.tar.gz" < /dev/null
-            python3 - "$release_dir" "$2" "$3" <<'PY'
-          import json, pathlib, re, subprocess, sys
-          release, revision, image_ref = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-          image = json.loads(subprocess.check_output(["docker", "image", "inspect", image_ref]))[0]
-          if image.get("Os") != "linux" or image.get("Architecture") != "amd64":
-              raise SystemExit("Loaded image platform mismatch")
-          if image.get("Config", {}).get("Labels", {}).get("org.opencontainers.image.revision") != revision:
-              raise SystemExit("Loaded image revision mismatch")
-          native_id = image["Id"]
-          if not re.fullmatch(r"sha256:[0-9a-f]{64}", native_id):
-              raise SystemExit("Invalid production image ID")
-          metadata = json.loads((release / "artifact/manifest.json").read_text())
-          metadata["production_image_id"] = native_id
-          # Classic and containerd image stores expose different .Id forms.
-          # Archive/config digests establish CI identity; local IDs guard runtime.
-          (release / "loaded-image.json").write_text(json.dumps(metadata, indent=2) + "\n")
-          (release / "loaded-image-id").write_text(native_id + "\n")
-          print("Imported CI image; production image ID: " + native_id)
-          PY
-            image_ref=$3
-            native_id=$(cat "$release_dir/loaded-image-id")
-            rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py
-            : > "$release_dir/new-image-ids"
-            for service in web celery_worker celery_beat; do
-              docker image tag "$image_ref" "insurance_broker_${service}:latest"
-              image_id=$(docker image inspect --format '{{.Id}}' "insurance_broker_${service}:latest")
-              [[ "$image_id" == "$native_id" ]] || { echo "❌ Application tag does not reference the imported CI image: $service"; exit 1; }
-              printf '%s %s\n' "$service" "$image_id" >> "$release_dir/new-image-ids"
-            done
-
-            echo "🔧 Removing the known obsolete migration record..."
-            # SSH passes this shell script on stdin. Disable stdin attachment
-            # explicitly: otherwise Compose can consume the remaining script.
-            "${compose[@]}" exec -T --interactive=false db psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
-              DELETE FROM django_migrations
-              WHERE app = 'policies'
-                AND name = '0011_alter_paymentschedule_unique_together';
-            " < /dev/null
-
-            # Application entrypoint is gosu/app: migrations and static collection
-            # run once here, not concurrently in web and both Celery containers.
-            echo "🔄 Running database migrations with the new image..."
-            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never web python manage.py migrate --noinput < /dev/null
-            echo "📦 Collecting static files..."
-            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never web python manage.py collectstatic --noinput < /dev/null
-
-            # A fresh one-off container sees the new rsynced configuration inode.
-            "${compose[@]}" run --rm -T --interactive=false --no-deps --pull never nginx nginx -t < /dev/null
-            touch "$release_dir/activating"
-            echo "🚀 Recreating application services, preserving database/Redis/certbot..."
-            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 web celery_worker celery_beat < /dev/null
-
-            # Recreate nginx to rebind replaced config files and resolve the new
-            # web container IP; reload alone cannot replace a bind-mounted inode.
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx < /dev/null
-            "${compose[@]}" exec -T --interactive=false nginx nginx -t < /dev/null
-            "${compose[@]}" exec -T --interactive=false nginx nginx -s reload < /dev/null
-            while read -r service expected_id; do
-              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
-              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Expected new image is not running: $service"; exit 1; }
-            done < "$release_dir/new-image-ids"
-            touch "$release_dir/switched"
-            echo "✅ Application switched; final health and HTTPS checks follow"
-          ENDSSH
-
-      - name: Setup SSL (first deployment only)
-        if: env.SSL_EXISTS == 'false'
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
-            cd ~/insurance_broker
-
-            echo "🔐 Setting up SSL certificates..."
-            echo "⚠️  This is a first deployment - SSL setup required"
-            echo ""
-            echo "Please run the following command on the server:"
-            echo "  cd ~/insurance_broker && ./scripts/setup-ssl.sh"
-            echo ""
-            echo "Or manually:"
-            echo "  1. Verify DNS is configured: nslookup polis.insflow.ru"
-            echo "  2. Run: docker compose -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot certonly --webroot --webroot-path=/var/www/certbot --email admin@insflow.ru --agree-tos --no-eff-email -d polis.insflow.ru"
-            echo "  3. Switch to SSL config: cp nginx/default.conf.ssl nginx/default.conf"
-            echo "  4. Recreate nginx: docker compose -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d --no-deps --no-build --pull never --force-recreate nginx"
-          ENDSSH
-
-      - name: Health check
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
-            set -euo pipefail
-            cd ~/insurance_broker
-            set -a
-            source .env.prod
-            set +a
-            export COMPOSE_PROJECT_NAME=insurance_broker
-            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
-            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
-            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
-            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
-
-            # A healthy old release must never make an incomplete deploy green.
-            test -f "$release_dir/activating"
-            test -f "$release_dir/switched"
-            test -f "$release_dir/loaded-image.json"
-            test "$(wc -l < "$release_dir/new-image-ids")" -eq 3
-            while read -r service expected_id; do
-              case "$service" in web|celery_worker|celery_beat) ;; *) exit 1 ;; esac
-              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
-              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Running image differs from this release: $service"; exit 1; }
-            done < "$release_dir/new-image-ids"
-
-            echo "🏥 Checking every production service..."
-            for service in db redis web celery_worker celery_beat nginx certbot; do
-              container_id=$("${compose[@]}" ps -q "$service")
-              test -n "$container_id"
-              state=$(docker inspect --format '{{.State.Status}}' "$container_id")
-              health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
-              echo "$service: state=$state health=$health"
-              [[ "$state" == running ]] || { echo "❌ Service is not running: $service"; exit 1; }
-              case "$service" in
-                celery_beat|certbot) [[ "$health" == none || "$health" == healthy ]] || { echo "❌ Unhealthy service: $service"; exit 1; } ;;
-                *) [[ "$health" == healthy ]] || { echo "❌ Health check failed: $service"; exit 1; } ;;
-              esac
-            done
-
-            login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
-            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]] || { echo "❌ HTTPS response does not contain the login form"; exit 1; }
-            unset login_page
-            touch "$release_dir/verified"
-            echo "✅ All service healthchecks and HTTPS login page passed"
-
-            # Rollback images have immutable per-run tags and survive pruning.
-            docker image prune -f || true
-            docker volume prune -f || true
-            rm -f "$release_dir/artifact/image.tar.gz"
-          ENDSSH
-
-      - name: Cleanup SSH
+      - name: Cleanup SSH material
         if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
+        run: rm -rf -- "$RUNNER_TEMP/onlinepolis-ssh"
 
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
     needs: [validate, test, build, deploy]
     if: always()
-
     steps:
       - name: Deployment Success
         if: needs.deploy.result == 'success'
-        run: |
-          echo "✅ Deployment to production was successful!"
-          echo "🌐 Application should be available at https://polis.insflow.ru"
-
+        run: echo "Deployment and production health verification succeeded"
       - name: Deployment Failure
         if: needs.deploy.result == 'failure' || needs.build.result == 'failure' || needs.test.result == 'failure' || needs.validate.result == 'failure'
-        run: |
-          echo "❌ Deployment failed!"
-          echo "Please check the logs above for details."
+        run: echo "Deployment failed; inspect the controller recovery result"
 
   rollback:
-    name: Restore Saved Application Images on Failure
+    name: Recover through restricted controller
     runs-on: ubuntu-latest
     needs: deploy
     if: always() && needs.deploy.result == 'failure'
     env:
-      SSH_PORT: ${{ secrets.SSH_PORT }}
-
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
     steps:
-      - name: Setup SSH for rollback
+      - name: Prepare pinned SSH for recovery
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
-          # Recovery may wait for an interrupted image import to release the
-          # shared host lock; keep the SSH session alive while it waits.
-          printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
-      - name: Restore saved images and nginx configuration
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          set -euo pipefail
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          [[ "$DROPLET_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] && (( 10#$SSH_PORT > 0 && 10#$SSH_PORT <= 65535 ))
+          umask 077
+          mkdir -p "$RUNNER_TEMP/onlinepolis-ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/onlinepolis-ssh/key"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/onlinepolis-ssh/known_hosts"
+          ssh-keygen -l -f "$RUNNER_TEMP/onlinepolis-ssh/known_hosts" > /dev/null
+          cat > "$RUNNER_TEMP/onlinepolis-ssh/config" <<EOF
+          Host onlinepolis-production
+            HostName $DROPLET_HOST
+            HostKeyAlias onlinepolis-production
+            User onlinepolis-deploy
+            Port $SSH_PORT
+            IdentityFile $RUNNER_TEMP/onlinepolis-ssh/key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile $RUNNER_TEMP/onlinepolis-ssh/known_hosts
+            GlobalKnownHostsFile /dev/null
+            RequestTTY no
+            ClearAllForwardings yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+          EOF
+      - name: Restore saved images without changing the database schema
         run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
-            set -euo pipefail
-            cd ~/insurance_broker
-            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
-            mkdir -p "$HOME/.local/state"
-            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
-            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
-            if [ ! -f "$release_dir/prepared" ]; then
-              echo "Preflight did not finish; no release files or containers were changed"
-              exit 0
-            fi
-            if [ -f "$release_dir/verified" ]; then
-              echo "Release already passed health checks; no image rollback required"
-              exit 0
-            fi
-
-            cp "$release_dir/docker-compose.prod.yml" docker-compose.prod.yml
-            cp -a "$release_dir/nginx/." nginx/
-            # A failed/partial release can already have replaced :latest tags.
-            # Restore those too, so later ordinary Compose commands stay on
-            # the recovered release rather than recreating failed new images.
-            while read -r service expected_id; do
-              docker image tag "$expected_id" "insurance_broker_${service}:latest"
-            done < "$release_dir/image-ids"
-            if [ ! -f "$release_dir/activating" ]; then
-              echo "Deployment failed before application switch; restored compose/nginx files and image tags, old containers kept running"
-              echo "Database migrations, if applied, have not been reversed"
-              exit 0
-            fi
-
-            set -a
-            source .env.prod
-            set +a
-            export COMPOSE_PROJECT_NAME=insurance_broker
-            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml -f "$release_dir/rollback.yml")
-
-            # Only the three app containers and nginx are replaced. Saved image
-            # tags preserve the previous running image after a new CI import.
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 180 web celery_worker celery_beat < /dev/null
-            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx < /dev/null
-            "${compose[@]}" exec -T --interactive=false nginx nginx -t < /dev/null
-            "${compose[@]}" exec -T --interactive=false nginx nginx -s reload < /dev/null
-
-            while read -r service expected_id; do
-              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
-              [[ "$actual_id" == "$expected_id" ]] || { echo "❌ Saved image was not restored: $service"; exit 1; }
-            done < "$release_dir/image-ids"
-            login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
-            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]] || { echo "❌ Restored service did not return the login form"; exit 1; }
-            unset login_page
-            touch "$release_dir/restored"
-
-            echo "🔄 Saved application image IDs and nginx configuration restored; HTTPS login verified"
-            echo "Database migrations were NOT reversed; schema compatibility may require manual recovery"
-          ENDSSH
-
-      - name: Cleanup SSH
+          set -euo pipefail
+          ssh -F "$RUNNER_TEMP/onlinepolis-ssh/config" onlinepolis-production rollback "$DEPLOYMENT_ID" < /dev/null
+      - name: Cleanup SSH material
         if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
-
+        run: rm -rf -- "$RUNNER_TEMP/onlinepolis-ssh"
       - name: Report failed deployment
-        run: |
-          echo "⚠️ Deployment failed. See the recovery step for the verified image/configuration restore result."
-          echo "Database migrations are never automatically reversed."
-          exit 1
+        run: exit 1

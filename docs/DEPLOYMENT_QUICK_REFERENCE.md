@@ -2,15 +2,14 @@
 
 ## ⚠️ ВАЖНО: Credentials и Сертификаты
 
-GitHub Actions workflow **НЕ перезаписывает**:
+После включения B-08 CI доставляет только образ и **не перезаписывает**:
 - `.env.prod` - ваши production credentials
-- `.env.prod.db` - пароли базы данных
 - `certbot/` - SSL сертификаты Let's Encrypt
 
 Эти файлы сохраняются между деплоями!
 
-**Если забыли пароли:** `./scripts/show-production-credentials.sh`
-**Подробнее:** [docs/CREDENTIAL_RECOVERY.md](docs/CREDENTIAL_RECOVERY.md)
+**Ротация и проверка без вывода значений:** [SECRETS_ROTATION.md](SECRETS_ROTATION.md).
+**Ограниченный вход CI:** [GITHUB_SECRETS_SETUP.md](GITHUB_SECRETS_SETUP.md).
 
 ---
 
@@ -55,9 +54,13 @@ set -a
 source .env.prod
 set +a
 
+# Только для ручных административных операций после установки B-08.
+# Использовать ту же защищённую политику, что и ограниченный CI controller.
+compose_admin=(docker compose --compatibility -p insurance_broker --project-directory /root/insurance_broker --env-file /root/insurance_broker/.env.prod -f /etc/onlinepolis-deploy/compose.yml -f /etc/onlinepolis-deploy/security.override.yml)
+
 # Проверить установленный Compose plugin и конфигурацию без вывода переменных.
 docker compose version
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml config --quiet
+"${compose_admin[@]}" config --quiet
 ```
 
 Дальнейшие команды выполняются в этой shell из `/root/insurance_broker`.
@@ -74,39 +77,46 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 проверенный образ трём существующим тегам приложения. В production Compose нет
 `build`-блоков; повторная сборка и загрузка Python-зависимостей на сервере не нужны.
 
+### Изменение серверной конфигурации
+
+CI больше не делает rsync checkout. Изменения Compose, nginx, root scripts и
+controller проверяет и устанавливает администратор; при несовпадении source hashes
+preflight остановит выкладку. Приложения из образа запускаются с UID/GID10001,
+без capabilities и с no-new-privileges. См. [GITHUB_SECRETS_SETUP.md](GITHUB_SECRETS_SETUP.md).
+
 ### Управление контейнерами
 
 ```bash
 # Статус всех контейнеров
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
+"${compose_admin[@]}" ps
 
 # Запуск
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d
+"${compose_admin[@]}" up -d
 
 # Остановка
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml down
+"${compose_admin[@]}" down
 
 # Перезапуск
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml restart [service]
+"${compose_admin[@]}" restart [service]
 
 # Логи
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f [service]
+"${compose_admin[@]}" logs -f [service]
 ```
 
 ### Django команды
 
 ```bash
 # Миграции
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py migrate
+"${compose_admin[@]}" exec web python manage.py migrate
 
 # Сбор статики
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+"${compose_admin[@]}" exec web python manage.py collectstatic --noinput
 
 # Создание суперпользователя
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py createsuperuser
+"${compose_admin[@]}" exec web python manage.py createsuperuser
 
 # Django shell
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py shell
+"${compose_admin[@]}" exec web python manage.py shell
 ```
 
 ### SSL сертификат
@@ -116,21 +126,21 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 ./scripts/init-letsencrypt.sh
 
 # Обновление сертификата
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot renew
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec nginx nginx -s reload
+"${compose_admin[@]}" run --rm certbot renew
+"${compose_admin[@]}" exec nginx nginx -s reload
 
 # Проверка сертификата
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot certificates
+"${compose_admin[@]}" run --rm certbot certificates
 ```
 
 ### Бэкапы
 
 ```bash
 # Бэкап базы данных
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%Y%m%d).sql
+"${compose_admin[@]}" exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%Y%m%d).sql
 
 # Восстановление
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T db psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup_20240101.sql
+"${compose_admin[@]}" exec -T db psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup_20240101.sql
 ```
 
 ---
@@ -141,7 +151,7 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 
 ```bash
 # Статус контейнеров
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
+"${compose_admin[@]}" ps
 
 # Проверка сайта
 curl -I https://polis.insflow.ru
@@ -154,16 +164,16 @@ curl -I http://polis.insflow.ru
 
 ```bash
 # База данных
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py check --database default
+"${compose_admin[@]}" exec web python manage.py check --database default
 
 # Celery
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec celery_worker celery -A config inspect ping
+"${compose_admin[@]}" exec celery_worker celery -A config inspect ping
 
 # Использование ресурсов
 docker stats --no-stream
 
 # Логи
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs --tail=50
+"${compose_admin[@]}" logs --tail=50
 ```
 
 ---
@@ -174,10 +184,10 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 
 ```bash
 # Проверить логи
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs [service]
+"${compose_admin[@]}" logs [service]
 
 # Проверить конфигурацию без вывода секретов
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml config --quiet
+"${compose_admin[@]}" config --quiet
 ```
 
 Для пересборки и доставки образа повторите workflow: Actions → Deploy to Production
@@ -202,23 +212,23 @@ STAGING=1 ./scripts/init-letsencrypt.sh
 
 ```bash
 # Пересобрать статику
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput --clear
+"${compose_admin[@]}" exec web python manage.py collectstatic --noinput --clear
 
 # Перезапустить Nginx
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml restart nginx
+"${compose_admin[@]}" restart nginx
 ```
 
 ### Ошибки базы данных
 
 ```bash
 # Проверить статус
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps db
+"${compose_admin[@]}" ps db
 
 # Проверить логи
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs db
+"${compose_admin[@]}" logs db
 
 # Проверить соответствие настроек БД, не выводя значения.
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T web python - <<'PYCODE'
+"${compose_admin[@]}" exec -T web python - <<'PYCODE'
 import os
 for runtime, source in (("DB_NAME", "POSTGRES_DB"), ("DB_USER", "POSTGRES_USER"), ("DB_PASSWORD", "POSTGRES_PASSWORD")):
     matches = bool(os.environ.get(runtime)) and os.environ.get(runtime) == os.environ.get(source)
@@ -285,7 +295,7 @@ COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True
 
 ```bash
 # Статус контейнеров
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
+"${compose_admin[@]}" ps
 
 # Использование ресурсов
 docker stats
@@ -301,13 +311,13 @@ docker system df
 
 ```bash
 # Все логи
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f
+"${compose_admin[@]}" logs -f
 
 # Последние 100 строк
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs --tail=100
+"${compose_admin[@]}" logs --tail=100
 
 # Конкретный сервис
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f web
+"${compose_admin[@]}" logs -f web
 
 # Системные логи
 journalctl -u docker -f
@@ -359,7 +369,7 @@ sudo reboot
 
 # После перезагрузки контейнеры запустятся автоматически
 # Проверьте статус
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
+"${compose_admin[@]}" ps
 ```
 
 ---

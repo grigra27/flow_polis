@@ -1,372 +1,73 @@
-# 🔐 Настройка GitHub Secrets для CI/CD
+# Ограниченный SSH-доступ GitHub Actions
 
-## Обзор
+B-08 заменяет прежний неограниченный root-ключ отдельным входом для выкладки
+готового приложения. Текущий статус перехода — в [BACKLOG.md](BACKLOG.md).
 
-Этот документ описывает процесс настройки GitHub Secrets, необходимых для автоматического развертывания приложения на Digital Ocean через GitHub Actions.
+## Подготовка администратором
 
-## Необходимые секреты
+1. Сохранить независимый административный SSH-сеанс и доступ к консоли Timeweb.
+   Создать отдельный Ed25519-ключ CI в закрытом локальном каталоге, mode 0600.
+   Приватную часть не отправлять в чат, репозиторий, shell arguments или логи.
+2. Проверить публичную host key сервера через существующий доверенный SSH/консоль.
+   Сохранить строку known_hosts с именем `onlinepolis-production`: это фиксированный
+   `HostKeyAlias` workflow, независимый от адреса в `DROPLET_HOST`. Для ручных
+   проверок можно дополнительно сохранить строку фактического адреса сервера.
+3. Из проверенного исходного кода передать администраторским каналом файлы
+   `scripts/deploy/{install.sh,controller.py,gate.py,security.override.yml}`
+   в закрытый каталог сервера. Передать только публичную часть нового ключа.
+4. Выполнить installer вручную от root, передав путь к одному публичному ключу:
 
-Для работы CI/CD pipeline требуются следующие секреты:
+   ```bash
+   bash /root/onlinepolis-deploy-install/install.sh /root/new-deploy-key.pub
+   ```
 
-| Секрет | Описание | Пример значения |
-|--------|----------|-----------------|
-| `SSH_PRIVATE_KEY` | Приватный SSH ключ для подключения к Droplet | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `DROPLET_HOST` | IP адрес или домен Droplet | `64.227.75.233` или `onbr.site` |
-| `DROPLET_USER` | Пользователь SSH на Droplet | `root` |
+   Installer создаёт UID/GID 20001, root-owned gate/controller/Compose policy,
+   отдельный forced-command SSH-вход и единственное разрешение sudo. Проверяет
+   `sshd -t` и `visudo`, сохраняет snapshot и откатывает неуспешную установку.
+   Существующие root authorized_keys он не меняет.
+5. Через новый ключ с `IdentitiesOnly=yes`, `BatchMode=yes`,
+   `StrictHostKeyChecking=yes` проверить `status`. Отдельно убедиться, что
+   shell-команда, SFTP, PTY и port forwarding отклоняются. Подключиться заново
+   через независимый admin-вход.
 
-## Шаг 1: Получение SSH приватного ключа
+Не добавлять пользователя в группу docker и не давать ему общий sudo.
+Смена имени пользователя при сохранении таких прав не создаёт ограничения.
 
-### Вариант A: Использование существующего ключа
+## GitHub Secrets и включение workflow
 
-Если вы уже настроили SSH доступ к Droplet, найдите ваш приватный ключ:
-
-```bash
-# Обычно ключи находятся в ~/.ssh/
-ls -la ~/.ssh/
-
-# Просмотрите содержимое приватного ключа
-cat ~/.ssh/id_rsa
-# или
-cat ~/.ssh/id_ed25519
-```
-
-**Важно:** Копируйте ВЕСЬ ключ, включая строки `-----BEGIN OPENSSH PRIVATE KEY-----` и `-----END OPENSSH PRIVATE KEY-----`.
-
-### Вариант B: Создание нового SSH ключа специально для GitHub Actions
-
-Рекомендуется создать отдельный SSH ключ для CI/CD:
-
-```bash
-# Создайте новый SSH ключ
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github_actions_deploy
-
-# НЕ устанавливайте passphrase (просто нажмите Enter)
-# GitHub Actions не может работать с ключами, защищенными паролем
-
-# Просмотрите приватный ключ (это будет значение для SSH_PRIVATE_KEY)
-cat ~/.ssh/github_actions_deploy
-
-# Просмотрите публичный ключ (его нужно добавить на Droplet)
-cat ~/.ssh/github_actions_deploy.pub
-```
-
-### Добавление публичного ключа на Droplet
-
-Если вы создали новый ключ, добавьте его публичную часть на сервер:
+Добавить `DEPLOY_SSH_PRIVATE_KEY` и `DEPLOY_SSH_KNOWN_HOSTS` через защищённый
+интерфейс либо stdin CLI. Например, имена файлов ниже — локальные защищённые файлы:
 
 ```bash
-# Скопируйте публичный ключ на Droplet
-ssh-copy-id -i ~/.ssh/github_actions_deploy.pub root@64.227.75.233
-
-# Или вручную:
-cat ~/.ssh/github_actions_deploy.pub | ssh root@64.227.75.233 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+gh secret set DEPLOY_SSH_PRIVATE_KEY --repo grigra27/flow_polis < /private/path/deploy-key
+gh secret set DEPLOY_SSH_KNOWN_HOSTS --repo grigra27/flow_polis < /private/path/known_hosts
 ```
 
-### Проверка SSH подключения
-
-Убедитесь, что ключ работает:
-
-```bash
-# Если используете новый ключ
-ssh -i ~/.ssh/github_actions_deploy root@64.227.75.233 "echo 'SSH connection successful!'"
-
-# Если используете существующий ключ
-ssh root@64.227.75.233 "echo 'SSH connection successful!'"
-```
-
-Вы должны увидеть сообщение "SSH connection successful!" без запроса пароля.
-
-## Шаг 2: Добавление секретов в GitHub
-
-### Через веб-интерфейс GitHub
-
-1. **Откройте настройки репозитория:**
-   - Перейдите в ваш репозиторий на GitHub
-   - Нажмите на вкладку **Settings** (Настройки)
-
-2. **Перейдите в раздел Secrets:**
-   - В левом меню найдите **Secrets and variables**
-   - Выберите **Actions**
-
-3. **Добавьте каждый секрет:**
-   - Нажмите **New repository secret**
-   - Введите имя секрета и его значение
-   - Нажмите **Add secret**
-
-### Добавление SSH_PRIVATE_KEY
-
-**Name:** `SSH_PRIVATE_KEY`
-
-**Value:** Полное содержимое приватного ключа
-
-```
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBK... (много строк) ...
------END OPENSSH PRIVATE KEY-----
-```
-
-**Важно:**
-- Копируйте ВЕСЬ ключ целиком
-- Включая строки BEGIN и END
-- Сохраняйте все переносы строк
-- Не добавляйте лишних пробелов или символов
-
-### Добавление DROPLET_HOST
-
-**Name:** `DROPLET_HOST`
-
-**Value:** IP адрес вашего Droplet
-
-```
-64.227.75.233
-```
-
-**Альтернатива:** Можно использовать домен вместо IP:
-```
-onbr.site
-```
-
-### Добавление DROPLET_USER
-
-**Name:** `DROPLET_USER`
-
-**Value:** Имя пользователя SSH
-
-```
-root
-```
-
-**Примечание:** Если вы создали отдельного пользователя для деплоя (не root), используйте его имя.
-
-## Шаг 3: Проверка настройки секретов
-
-### Просмотр добавленных секретов
-
-1. Перейдите в **Settings** → **Secrets and variables** → **Actions**
-2. Вы должны увидеть список секретов:
-   - `SSH_PRIVATE_KEY`
-   - `DROPLET_HOST`
-   - `DROPLET_USER`
-
-**Примечание:** GitHub не показывает значения секретов после их добавления. Вы увидите только имена и дату последнего обновления.
-
-### Тестирование через GitHub Actions
-
-Создайте тестовый коммит для проверки:
-
-```bash
-# Создайте небольшое изменение
-echo "# Test deployment" >> README.md
-
-# Закоммитьте и отправьте в main
-git add README.md
-git commit -m "test: verify GitHub Actions secrets"
-git push origin main
-```
-
-Затем:
-
-1. Перейдите на вкладку **Actions** в вашем репозитории
-2. Найдите запущенный workflow "Deploy to Production"
-3. Откройте его и проверьте логи
-4. Убедитесь, что шаг "Setup SSH" выполнился успешно
-
-### Признаки успешной настройки
-
-В логах GitHub Actions вы должны увидеть:
-
-```
-✅ SSH configured
-✅ Files copied to server
-✅ Deployment completed
-```
-
-### Признаки проблем с секретами
-
-Если секреты настроены неправильно, вы увидите ошибки:
-
-**Проблема с SSH_PRIVATE_KEY:**
-```
-Load key "/home/runner/.ssh/deploy_key": invalid format
-Permission denied (publickey)
-```
-
-**Проблема с DROPLET_HOST:**
-```
-ssh: Could not resolve hostname: Name or service not known
-```
-
-**Проблема с DROPLET_USER:**
-```
-Permission denied (publickey)
-```
-
-## Шаг 4: Дополнительные секреты (опционально)
-
-В зависимости от ваших потребностей, вы можете добавить дополнительные секреты:
-
-### Для Docker Registry (если используете)
-
-```
-DOCKER_USERNAME=your_dockerhub_username
-DOCKER_PASSWORD=your_dockerhub_password
-```
-
-### Для уведомлений Slack (если используете)
-
-```
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-```
-
-### Для Sentry (если используете)
-
-```
-SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
-```
-
-## Безопасность
-
-### Лучшие практики
-
-1. **Никогда не коммитьте секреты в Git:**
-   - Проверьте `.gitignore` на наличие `.env*` файлов
-   - Используйте только GitHub Secrets для чувствительных данных
-
-2. **Используйте отдельный SSH ключ для CI/CD:**
-   - Не используйте ваш личный SSH ключ
-   - Создайте специальный ключ для GitHub Actions
-   - Это позволит легко отозвать доступ при необходимости
-
-3. **Ограничьте права пользователя деплоя:**
-   - Рассмотрите создание отдельного пользователя (не root) для деплоя
-   - Дайте ему только необходимые права через sudo
-
-4. **Регулярно ротируйте ключи:**
-   - Обновляйте SSH ключи каждые 6-12 месяцев
-   - Удаляйте старые ключи с сервера
-
-5. **Мониторьте использование секретов:**
-   - Проверяйте логи GitHub Actions на подозрительную активность
-   - Настройте уведомления о неудачных деплоях
-
-### Что делать при компрометации ключа
-
-Если вы подозреваете, что приватный ключ был скомпрометирован:
-
-1. **Немедленно удалите публичный ключ с Droplet:**
-```bash
-ssh root@64.227.75.233
-nano ~/.ssh/authorized_keys
-# Удалите строку с скомпрометированным ключом
-```
-
-2. **Удалите секрет из GitHub:**
-   - Settings → Secrets and variables → Actions
-   - Найдите `SSH_PRIVATE_KEY`
-   - Нажмите "Remove"
-
-3. **Создайте новый SSH ключ:**
-   - Следуйте инструкциям из Шага 1
-   - Добавьте новый ключ в GitHub Secrets
-
-4. **Проверьте логи на подозрительную активность:**
-```bash
-ssh root@64.227.75.233 "last -20"
-ssh root@64.227.75.233 "grep 'Accepted publickey' /var/log/auth.log | tail -20"
-```
-
-## Troubleshooting
-
-### Ошибка: "Load key: invalid format"
-
-**Причина:** Приватный ключ скопирован неправильно
-
-**Решение:**
-1. Убедитесь, что скопировали ВЕСЬ ключ
-2. Проверьте, что включены строки BEGIN и END
-3. Убедитесь, что нет лишних пробелов или символов
-4. Попробуйте скопировать ключ заново
-
-### Ошибка: "Permission denied (publickey)"
-
-**Причина:** Публичный ключ не добавлен на сервер или неправильный пользователь
-
-**Решение:**
-1. Проверьте, что публичный ключ добавлен в `~/.ssh/authorized_keys` на сервере
-2. Проверьте права на файл: `chmod 600 ~/.ssh/authorized_keys`
-3. Проверьте права на директорию: `chmod 700 ~/.ssh`
-4. Убедитесь, что `DROPLET_USER` указан правильно
-
-### Ошибка: "Host key verification failed"
-
-**Причина:** Сервер не добавлен в known_hosts
-
-**Решение:** Это не должно происходить, так как workflow использует `ssh-keyscan`. Если происходит:
-1. Проверьте, что `DROPLET_HOST` указан правильно
-2. Убедитесь, что сервер доступен из интернета
-
-### Workflow не запускается автоматически
-
-**Причина:** Workflow не настроен на триггер push в main
-
-**Решение:**
-1. Проверьте файл `.github/workflows/deploy.yml`
-2. Убедитесь, что есть секция:
-```yaml
-on:
-  push:
-    branches:
-      - main
-```
-
-## Проверочный чеклист
-
-Перед первым деплоем убедитесь:
-
-- [ ] SSH ключ создан и работает локально
-- [ ] Публичный ключ добавлен на Droplet в `~/.ssh/authorized_keys`
-- [ ] Все три секрета добавлены в GitHub:
-  - [ ] `SSH_PRIVATE_KEY`
-  - [ ] `DROPLET_HOST`
-  - [ ] `DROPLET_USER`
-- [ ] Тестовое подключение SSH работает без пароля
-- [ ] Workflow файл `.github/workflows/deploy.yml` существует
-- [ ] Сделан тестовый коммит для проверки workflow
-- [ ] Workflow запустился и выполнился успешно
-
-## Полезные команды
-
-### Проверка SSH подключения с ключом
-```bash
-ssh -i ~/.ssh/github_actions_deploy -v root@64.227.75.233
-```
-
-### Просмотр публичных ключей на сервере
-```bash
-ssh root@64.227.75.233 "cat ~/.ssh/authorized_keys"
-```
-
-### Просмотр логов SSH на сервере
-```bash
-ssh root@64.227.75.233 "sudo tail -f /var/log/auth.log"
-```
-
-### Тестирование rsync (как в workflow)
-```bash
-rsync -avz -e "ssh -i ~/.ssh/github_actions_deploy" \
-  --dry-run \
-  ./ root@64.227.75.233:~/insurance_broker/
-```
-
-## Дополнительные ресурсы
-
-- [GitHub Actions: Encrypted secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
-- [SSH Key Authentication](https://www.ssh.com/academy/ssh/public-key-authentication)
-- [Digital Ocean: SSH Keys](https://docs.digitalocean.com/products/droplets/how-to/add-ssh-keys/)
-
----
-
-**Дата создания:** 2024-11-25
-**Последнее обновление:** 2024-11-25
-**Статус:** Готов к использованию
+`DROPLET_HOST` сохраняется; `SSH_PORT` нужен только при отличии от 22.
+Пользователь в новом workflow зафиксирован как `onlinepolis-deploy`.
+Новый workflow не использует старые `SSH_PRIVATE_KEY` и `DROPLET_USER`.
+До проверки новой выкладки сохранить старый root deploy key и старые secrets —
+это позволяет вернуть прежний workflow при неуспешном переходе.
+
+После разрешённого push проверить полный CI и независимые production-проверки:
+ожидаемые image IDs всех трёх приложений, UID/capabilities, все healthcheck,
+HTTPS, закрытые анонимные вложения, скачивание после входа и публичные логотипы.
+Откат использует сохранённые image IDs и защищённую политику; БД не откатывается.
+
+Только после успеха отозвать конкретный старый root CI key по fingerprint,
+сохранив личный admin key и неидентифицированные чужие ключи. Удалить старый
+GitHub Secret `SSH_PRIVATE_KEY`, проверить отказ старого deploy-ключа и повторную
+работу нового. Не подменять весь root authorized_keys и не очищать чужие записи.
+Отпечатки, даты и результат фиксировать без приватного материала.
+
+## Последующие изменения инфраструктуры
+
+Деплой передаёт только образ через `upload`, затем вызывает `activate` и `health`.
+У ключа нет произвольного bash/SCP/rsync-доступа. Checkout не копируется на хост.
+Compose, nginx, root-скрипты и сам controller обновляет администратор после review.
+При изменении защищённых файлов CI остановится на проверке hashes до активации.
+
+Право заменить приложение включает доступ нового кода к его прикладным секретам
+и бизнес-данным. Ограничение SSH уменьшает права на хосте; оно не является
+изоляцией приложения от собственной БД или проверкой доверенной provenance.
+Процедура ротации: [SECRETS_ROTATION.md](SECRETS_ROTATION.md).

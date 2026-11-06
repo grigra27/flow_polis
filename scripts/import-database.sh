@@ -93,13 +93,13 @@ else
     exit 1
 fi
 
-# Step 4: Check if environment files exist
-echo -e "${YELLOW}[4/9] Checking environment files...${NC}"
-if [ -f ".env.prod" ] && [ -f ".env.prod.db" ]; then
-    echo -e "${GREEN}✓ Environment files found${NC}"
+# Step 4: The application and PostgreSQL share one protected configuration.
+echo -e "${YELLOW}[4/9] Checking environment file...${NC}"
+if [ -f ".env.prod" ]; then
+    echo -e "${GREEN}✓ .env.prod found${NC}"
 else
-    echo -e "${RED}✗ Environment files missing${NC}"
-    echo "Please create .env.prod and .env.prod.db before importing database"
+    echo -e "${RED}✗ .env.prod missing${NC}"
+    echo "Please create .env.prod with POSTGRES_* before importing database"
     exit 1
 fi
 

@@ -1,0 +1,18 @@
+# Installed manually as root policy; CI cannot replace this file or the base compose.
+# Numeric credentials avoid trusting /etc/passwd or a setuid entrypoint in an image.
+services:
+  web:
+    user: "10001:10001"
+    entrypoint: []
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  celery_worker:
+    user: "10001:10001"
+    entrypoint: []
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  celery_beat:
+    user: "10001:10001"
+    entrypoint: []
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

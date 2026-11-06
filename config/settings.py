@@ -4,6 +4,7 @@ Django settings for insurance_broker project.
 
 from pathlib import Path
 from decouple import config, Csv
+import json
 import sys
 import os
 import warnings
@@ -24,6 +25,34 @@ RUNNING_TESTS = "test" in sys.argv or "pytest" in sys.modules
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-this-key")
 DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
+
+
+# В тестах читаем критичные значения только из os.environ.
+# Это исключает влияние локального .env на unit-тесты настроек.
+def get_runtime_config(name, default=""):
+    if RUNNING_TESTS:
+        return os.environ.get(name, default)
+    return config(name, default=default)
+
+
+def _secret_key_fallbacks():
+    """Read optional rotation keys without exposing malformed secret values."""
+    message = "SECRET_KEY_FALLBACKS_JSON must be a JSON array of non-empty strings"
+    try:
+        values = json.loads(
+            get_runtime_config("SECRET_KEY_FALLBACKS_JSON", default="[]")
+        )
+    except (TypeError, ValueError):
+        raise ValueError(message) from None
+    if not isinstance(values, list) or any(
+        not isinstance(value, str) or not value.strip() for value in values
+    ):
+        raise ValueError(message)
+    return values
+
+
+SECRET_KEY_FALLBACKS = _secret_key_fallbacks()
+
 
 # Sentry Configuration for Error Monitoring
 # В тестах Sentry не инициализируем: иначе ожидаемые logger.exception из
@@ -96,14 +125,6 @@ def _should_filter_sentry_event(event, hint):
             return False
 
     return True
-
-
-# В тестах читаем критичные значения только из os.environ.
-# Это исключает влияние локального .env на unit-тесты настроек.
-def get_runtime_config(name, default=""):
-    if RUNNING_TESTS:
-        return os.environ.get(name, default)
-    return config(name, default=default)
 
 
 # Production environment checks

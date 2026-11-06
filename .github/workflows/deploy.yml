@@ -181,8 +181,17 @@ jobs:
           build_config_digest = build.get("containerimage.config.digest")
           require(not build_config_digest or config_digest == build_config_digest, "Build/export config digest mismatch")
           require(config["rootfs"]["diff_ids"] == image["RootFS"]["Layers"], "Saved filesystem differs from tested image")
+          def runtime_value(runtime_config, key):
+              value = runtime_config.get(key)
+              if value is not None:
+                  return value
+              if key in ("User", "WorkingDir", "StopSignal"):
+                  return ""
+              if key in ("Env", "Entrypoint", "Cmd"):
+                  return []
+              return {}
           for key in ("Env", "Entrypoint", "Cmd", "Labels", "User", "WorkingDir", "StopSignal", "Healthcheck", "Volumes", "ExposedPorts"):
-              require(config["config"].get(key) == image["Config"].get(key), "Saved runtime config differs from tested image: " + key)
+              require(runtime_value(config["config"], key) == runtime_value(image["Config"], key), "Saved runtime config differs from tested image: " + key)
           require(config["os"] == image["Os"] == "linux" and config["architecture"] == image["Architecture"] == "amd64", "Unexpected image platform")
           require(config["config"]["Labels"]["org.opencontainers.image.revision"] == revision, "Unexpected image revision")
           metadata = {"schema": 1, "image_ref": image_ref, "revision": revision,

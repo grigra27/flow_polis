@@ -1,7 +1,8 @@
 # Ротация секретов Onlinepolis
 
-Процедура для администратора production. Подготовлена 2026-11-06 по текущему
-коду: Django 5.1.11, PostgreSQL 15, Compose plugin, проект `insurance_broker`.
+Процедура для администратора production. Подготовлена 2026-11-06,
+актуализирована 2026-11-07 для кода на Django 5.2 LTS, PostgreSQL 15,
+Compose plugin, проект `insurance_broker`.
 Добавление этой инструкции и поддержки fallback-ключей **не меняет действующие
 секреты**. Каждый тип секрета меняется отдельной операцией.
 
@@ -99,14 +100,14 @@ Compose-проверки выше выполняются в уже удержи�
 3. Применить конфигурацию общей последовательностью выше. Новые подписи создаются
    новым ключом; fallback позволяет временно проверять старые. Проверить вход и
    ранее открытую сессию. Активная Django-сессия при проверке старого auth hash
-   переводится на новый ключ. [Django: сессии](https://docs.djangoproject.com/en/5.1/topics/auth/default/#session-invalidation-on-password-change).
+   переводится на новый ключ. [Django: сессии](https://docs.djangoproject.com/en/5.2/topics/auth/default/#session-invalidation-on-password-change).
 4. Назначить конечный срок grace-периода по максимальному реально используемому
    TTL сессий/подписанных данных. В текущем production `SESSION_COOKIE_AGE=86400`
    секунд; если используются password-reset токены или собственные подписи,
    отдельно учесть их сроки. После окна установить `SECRET_KEY_FALLBACKS_JSON='[]'`
    и снова пересоздать приложения/nginx. Старые немигрировавшие сессии и подписи
    перестанут приниматься. Пользовательские пароли от смены `SECRET_KEY` не меняются.
-   [Django: SECRET_KEY_FALLBACKS](https://docs.djangoproject.com/en/5.1/ref/settings/#secret-key-fallbacks).
+   [Django: SECRET_KEY_FALLBACKS](https://docs.djangoproject.com/en/5.2/ref/settings/#secret-key-fallbacks).
 
 При **компрометации** старого ключа не оставлять его в fallback: сразу новый ключ
 и `[]`, с ожидаемым завершением старых сессий/подписей. Не возвращать утёкший ключ

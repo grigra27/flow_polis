@@ -1,5 +1,5 @@
 # Core Django
-Django==5.1.11
+Django==5.2.19
 python-decouple==3.8
 
 # Database

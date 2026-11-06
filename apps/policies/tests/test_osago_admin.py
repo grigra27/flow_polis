@@ -25,7 +25,12 @@ POLICY_ADD_URL = "admin:policies_policy_add"
 
 @pytest.fixture
 def osago_type(db):
-    return InsuranceType.objects.create(name="ОСАГО (тест)", is_osago=True)
+    # Real migrations already create this canonical type; syncdb tests do not.
+    insurance_type, _ = InsuranceType.objects.get_or_create(
+        name="ОСАГО", defaults={"is_osago": True}
+    )
+    assert insurance_type.is_osago
+    return insurance_type
 
 
 @pytest.fixture

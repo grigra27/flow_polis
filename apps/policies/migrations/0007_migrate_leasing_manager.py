@@ -14,6 +14,11 @@ def migrate_leasing_managers_forward(apps, schema_editor):
     Policy = apps.get_model("policies", "Policy")
     LeasingManager = apps.get_model("insurers", "LeasingManager")
 
+    # На пустой БД преобразовывать нечего. Менеджер без филиала заблокирует
+    # insurers.0012 до того, как можно будет загрузить начальные справочники.
+    if not Policy.objects.exists():
+        return
+
     # Создаем менеджера "Не указан" для пустых значений
     default_manager, _ = LeasingManager.objects.get_or_create(
         name="Не указан",

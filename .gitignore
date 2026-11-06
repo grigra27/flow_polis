@@ -92,4 +92,6 @@ backups/
 .coverage
 .coverage.*
 
-fixtures/
+# Private exports stay local; only the reviewed bootstrap dictionaries are shared.
+fixtures/*
+!fixtures/initial_data.json

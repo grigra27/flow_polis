@@ -152,6 +152,69 @@ jobs:
                   message.ack()
           print("Redis broker publish/consume smoke test passed")'
 
+      - name: Smoke test PostgreSQL migrations in production image
+        env:
+          SECRET_KEY: ci-database-bootstrap-smoke-only-placeholder-2026-no-live-credentials  # pragma: allowlist secret
+        run: |
+          set -euo pipefail
+          database_network="onlinepolis-database-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          database_container="${database_network}-postgres"
+          cleanup() {
+            docker rm -fv "$database_container" > /dev/null 2>&1 || true
+            docker network rm "$database_network" > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create --internal "$database_network" > /dev/null
+          # Disposable DB, no published ports or production credentials/data.
+          docker run -d --name "$database_container" --network "$database_network" \
+            --network-alias bootstrap-postgres -e POSTGRES_DB=bootstrap \
+            -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15-alpine > /dev/null
+          ready=false
+          for attempt in {1..30}; do
+            if docker exec "$database_container" pg_isready -h 127.0.0.1 -U postgres -d bootstrap > /dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          "$ready"
+          docker run --rm -i --network "$database_network" --user 10001:10001 \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            -e DJANGO_SETTINGS_MODULE=config.settings -e DEBUG=False \
+            -e SECRET_KEY \
+            -e ALLOWED_HOSTS=bootstrap.invalid -e DB_NAME=bootstrap -e DB_USER=postgres \
+            -e DB_PASSWORD=unused-ci-only -e DB_HOST=bootstrap-postgres \
+            -e EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend \
+            -e SENTRY_DSN= -e TELEGRAM_ENABLED=false -e VK_ENABLED=false \
+            -e COMMUNICATIONS_EMAIL_ENABLED=false \
+            -e CELERY_BROKER_URL=memory:// -e CELERY_RESULT_BACKEND=cache+memory:// \
+            --entrypoint python "$IMAGE_REF" - <<'PY'
+          import django
+          django.setup()
+          from django.core.management import call_command
+          from django.db import connection
+          from django.db.migrations.executor import MigrationExecutor
+          from apps.insurers.models import Branch, InsuranceType, LeasingManager
+
+          assert connection.vendor == "postgresql"
+          assert not connection.introspection.table_names(), "Smoke DB must be empty"
+          call_command("check", deploy=True, fail_level="WARNING")
+          call_command("migrate", interactive=False, verbosity=0)
+          assert not Branch.objects.exists() and not LeasingManager.objects.exists()
+          for _ in range(2):
+              call_command("loaddata", "fixtures/initial_data.json", verbosity=0)
+              assert Branch.objects.count() == 4
+              assert InsuranceType.objects.count() == 4
+              assert list(InsuranceType.objects.filter(is_osago=True).values_list("name", flat=True)) == ["ОСАГО"]
+              assert not LeasingManager.objects.exists()
+              call_command("migrate", interactive=False, verbosity=0)
+          executor = MigrationExecutor(connection)
+          assert not executor.migration_plan(executor.loader.graph.leaf_nodes())
+          call_command("makemigrations", check=True, dry_run=True)
+          call_command("collectstatic", interactive=False, verbosity=0)
+          print(f"PostgreSQL {connection.pg_version}: bootstrap/static checks passed on Django {django.get_version()}")
+          PY
+
       - name: Export verified image and portable manifest
         id: export-image
         run: |
@@ -177,7 +240,7 @@ jobs:
           config_digest = "sha256:" + hashlib.sha256(config_blob).hexdigest()
           # Exporter metadata varies by Buildx driver. The saved config's hash
           # is portable; prove its filesystem and runtime config match the
-          # exact local image that passed the Python and Redis smoke tests.
+          # exact local image that passed the Python, Redis and PostgreSQL checks.
           build_config_digest = build.get("containerimage.config.digest")
           require(not build_config_digest or config_digest == build_config_digest, "Build/export config digest mismatch")
           require(config["rootfs"]["diff_ids"] == image["RootFS"]["Layers"], "Saved filesystem differs from tested image")

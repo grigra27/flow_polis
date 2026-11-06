@@ -1,0 +1,62 @@
+[
+  {
+    "model": "insurers.insuranceType",
+    "pk": 1,
+    "fields": {
+      "name": "ОСАГО",
+      "is_osago": true
+    }
+  },
+  {
+    "model": "insurers.insuranceType",
+    "pk": 2,
+    "fields": {
+      "name": "КАСКО",
+      "is_osago": false
+    }
+  },
+  {
+    "model": "insurers.insuranceType",
+    "pk": 3,
+    "fields": {
+      "name": "Имущество",
+      "is_osago": false
+    }
+  },
+  {
+    "model": "insurers.insuranceType",
+    "pk": 4,
+    "fields": {
+      "name": "Спецтехника",
+      "is_osago": false
+    }
+  },
+  {
+    "model": "insurers.branch",
+    "pk": 1,
+    "fields": {
+      "branch_name": "Москва"
+    }
+  },
+  {
+    "model": "insurers.branch",
+    "pk": 2,
+    "fields": {
+      "branch_name": "Казань"
+    }
+  },
+  {
+    "model": "insurers.branch",
+    "pk": 3,
+    "fields": {
+      "branch_name": "Псков"
+    }
+  },
+  {
+    "model": "insurers.branch",
+    "pk": 4,
+    "fields": {
+      "branch_name": "Архангельск"
+    }
+  }
+]

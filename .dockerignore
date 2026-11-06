@@ -71,4 +71,5 @@ backups/
 # Other
 *.bak
 *.tmp
-fixtures/
+fixtures/*
+!fixtures/initial_data.json

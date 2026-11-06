@@ -4,7 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from datetime import timedelta
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
@@ -241,54 +243,28 @@ def dashboard(request):
     return render(request, "core/dashboard.html", context)
 
 
+@never_cache
 @login_required
 def serve_media_file(request, path):
     """
-    Serves media files with Content-Disposition header for security.
-    Validates: Requirement 8.5
-
-    This prevents inline execution of uploaded files by forcing download.
+    Serve private media to authenticated users without browser/proxy caching.
     """
     from django.http import FileResponse, Http404
     from django.conf import settings
-    import os
-    import mimetypes
 
-    # Construct full file path
-    file_path = os.path.join(settings.MEDIA_ROOT, path)
-
-    # Check if file exists
-    if not os.path.exists(file_path):
-        raise Http404("File not found")
-
-    # Check if path is within MEDIA_ROOT (prevent directory traversal)
-    real_path = os.path.realpath(file_path)
-    real_media_root = os.path.realpath(settings.MEDIA_ROOT)
-
-    if not real_path.startswith(real_media_root):
-        raise Http404("Invalid file path")
-
-    # Get MIME type
-    content_type, _ = mimetypes.guess_type(file_path)
-    if content_type is None:
-        content_type = "application/octet-stream"
-
-    # Open file
+    # Resolve symlinks before checking containment: a string prefix also
+    # accepts sibling directories such as media-private next to media.
     try:
-        file_handle = open(file_path, "rb")
-    except IOError:
-        raise Http404("Cannot open file")
+        media_root = Path(settings.MEDIA_ROOT).resolve()
+        file_path = (media_root / path).resolve(strict=True)
+        if not file_path.is_relative_to(media_root) or not file_path.is_file():
+            raise Http404("File not found")
+        file_handle = file_path.open("rb")
+    except (OSError, RuntimeError, ValueError):
+        raise Http404("File not found") from None
 
-    # Create response with Content-Disposition header
-    response = FileResponse(file_handle, content_type=content_type)
-
-    # Set Content-Disposition to attachment to prevent inline execution
-    filename = os.path.basename(file_path)
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    # Additional security headers
+    response = FileResponse(file_handle, as_attachment=True, filename=file_path.name)
     response["X-Content-Type-Options"] = "nosniff"
-
     return response
 
 

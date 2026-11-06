@@ -2,17 +2,21 @@
 
 ## Overview
 
-This workflow automatically deploys the Insurance Broker application to Digital Ocean when code is pushed to the `main` branch.
+This workflow automatically deploys the Insurance Broker application to Timeweb Cloud when code is pushed to the `main` branch.
 
 ## Workflow Steps
 
-1. **Validate** - Validates docker-compose syntax and checks for required files
-2. **Build** - Builds the Docker image and tests it
-3. **Deploy** - Deploys to Digital Ocean Droplet via SSH. Images are built on the server **before** the old containers are stopped, so a slow uncached build (PyPI is ~20 KB/s from the server) does not take the site down; if the build fails, the old version keeps running. SSH uses `ServerAliveInterval 30` so long silent pip downloads don't drop the session
-4. **Run Migrations** - Executes database migrations and collects static files
-5. **Health Check** - Verifies all containers are running properly
-6. **Notify** - Reports deployment status
-7. **Rollback** - Automatically rolls back on failure
+1. **Validate and test** - Validates Compose syntax and required files, then runs the full pytest suite before building.
+2. **Build in CI** - Builds and smoke-tests the application Docker image. Production application images are also built on the server.
+3. **Preflight** - Requires the Docker Compose plugin >= 2.20 (newer major versions are accepted; production has v5.6.0), confirms project `insurance_broker` and existing volumes, then saves the running application image IDs, immutable per-run rollback tags, Compose file and nginx configuration before rsync.
+4. **Copy files** - Rsyncs the checkout while preserving production credentials, certificates, logs and user data. Recovery artifacts live outside the checkout in `~/.local/state/onlinepolis-deploy/<run_id>-<run_attempt>/`.
+5. **Build on the server** - Builds only `web`, `celery_worker` and `celery_beat` while the existing containers keep serving. SSH keepalive protects slow uncached builds.
+6. **Prepare the release** - Runs migrations and `collectstatic` once through one-off containers using the new web image, then validates nginx configuration.
+7. **Activate** - Recreates the three application services, waits for readiness, then recreates nginx to refresh its bind-mounted configuration and web DNS resolution. The workflow does not stop or recreate database, Redis or certbot containers.
+8. **Health check** - Inspects state and health for all seven services and verifies the HTTPS login page. Beat and certbot may have no Docker healthcheck but must be running.
+9. **Recover on failure** - Restores saved configuration before activation; after activation it also restores the saved application image IDs and verifies HTTPS. Database migrations are never automatically reversed.
+
+Runs are serialized by the `onlinepolis-production` concurrency group; a new push does not cancel an active deployment. Production commands use `docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml`. The explicit project and application image names preserve the existing infrastructure namespace. Legacy `docker-compose` v1 is retained for older read/exec scripts; it is not the deployment CLI.
 
 ## Required GitHub Secrets
 
@@ -27,7 +31,7 @@ Before the workflow can run, you need to configure the following secrets in your
 ### Required Secrets
 
 #### `SSH_PRIVATE_KEY`
-Your SSH private key for connecting to the Digital Ocean Droplet.
+Your SSH private key for connecting to the Timeweb Cloud Droplet.
 
 **How to generate:**
 ```bash
@@ -49,7 +53,7 @@ ssh-copy-id -i ~/.ssh/github_deploy_key.pub user@your-droplet-ip
 ```
 
 #### `DROPLET_HOST`
-The IP address or domain name of your Digital Ocean Droplet.
+The IP address or domain name of your Timeweb Cloud Droplet.
 
 **Example:** `123.45.67.89` or `onbr.site`
 
@@ -104,39 +108,48 @@ You can also trigger the deployment manually:
 - Review migration files for errors
 
 #### Container Health Check Failed
-- Check container logs: `docker-compose -f docker-compose.prod.yml logs`
+- Check container logs from the prepared production shell: `docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs --tail=50`
 - Verify all environment variables are set correctly
 - Check if ports are available
 
-## Rollback
+## Recovery
 
-If a deployment fails, the workflow runs `docker-compose up -d` on the server: it starts whatever is down and leaves running containers alone. Note that this restarts the current `:latest` images; it only restores the previous version when the failure happened during the build (images were not retagged yet). You can also manually rollback:
+Before copying files, preflight saves Compose/nginx configuration and the IDs of the three running application images under `~/.local/state/onlinepolis-deploy/<run_id>-<run_attempt>/`. Each application image receives an immutable `onlinepolis-rollback:<run_id>-<run_attempt>-<service>` tag so the currently running release remains available after a new build.
+
+If preflight fails, release files and containers have not changed. If a later failure happens before activation, recovery restores the saved configuration and leaves the old containers running. If activation has started, recovery restores the saved Compose/nginx configuration, recreates only the three application services with the saved images, recreates nginx, compares actual image IDs with the snapshot and checks the HTTPS login page. A release that already passed final health checks is not rolled back because a later notification failed.
+
+Recovery does not downgrade the database or restore media/static content. An incompatible migration may require manual database recovery. Keep the per-run artifacts until the release is accepted; the workflow does not automatically delete tagged rollback images. The failed deployment remains a failed workflow run even when recovery succeeds.
+
+For read-only inspection on the production server:
 
 ```bash
-# SSH into your Droplet
-ssh user@your-droplet-ip
-
-# Navigate to the project directory
-cd ~/insurance_broker
-
-# Restart with previous images
-docker-compose -f docker-compose.prod.yml down
-docker-compose -f docker-compose.prod.yml up -d
+cd /root/insurance_broker
+set +x
+set -a
+source .env.prod
+set +a
+docker compose version
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
 ```
 
 ## Testing Locally
 
-Before pushing to `main`, test the deployment process locally:
+Before pushing to `main`, run the project tests and image smoke check:
 
 ```bash
-# Validate docker-compose syntax
-docker-compose -f docker-compose.prod.yml config
-
-# Build the image
+pytest --tb=short
 docker build -t insurance-broker:test .
+docker run --rm --entrypoint python insurance-broker:test --version
+```
 
-# Test the image
-docker run --rm insurance-broker:test python --version
+When a local `.env.prod` has been prepared separately, validate Compose without printing expanded secrets:
+
+```bash
+set +x
+set -a
+source .env.prod
+set +a
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml config --quiet
 ```
 
 ## Workflow Customization

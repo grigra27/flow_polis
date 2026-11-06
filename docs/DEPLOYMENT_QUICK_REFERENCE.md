@@ -47,42 +47,60 @@ export DROPLET_IP="109.68.215.223"
 
 ```bash
 ssh root@109.68.215.223
-cd /opt/insurance_broker
+cd /root/insurance_broker
+
+# Подготовить окружение текущей shell, не выводя значения секретов.
+set +x
+set -a
+source .env.prod
+set +a
+
+# Проверить установленный Compose plugin и конфигурацию без вывода переменных.
+docker compose version
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml config --quiet
 ```
+
+Дальнейшие команды выполняются в этой shell из `/root/insurance_broker`.
+Используется Compose plugin версии 2.20 и выше (на production проверен v5.6.0,
+2026-11-06). Всегда указывайте `-p insurance_broker`: так сохраняются существующие
+сеть, тома и принадлежность контейнеров проекту. Имена образов приложения закреплены
+в `docker-compose.prod.yml`. Legacy `docker-compose` v1 оставлен для совместимости
+старых read/exec-скриптов; пересоздание контейнеров через него может падать с
+`KeyError: ContainerConfig`.
 
 ### Управление контейнерами
 
 ```bash
 # Статус всех контейнеров
-docker compose -f docker-compose.prod.yml ps
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
 
 # Запуск
-docker compose -f docker-compose.prod.yml up -d
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d
 
 # Остановка
-docker compose -f docker-compose.prod.yml down
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml down
 
 # Перезапуск
-docker compose -f docker-compose.prod.yml restart [service]
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml restart [service]
 
 # Логи
-docker compose -f docker-compose.prod.yml logs -f [service]
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f [service]
 ```
 
 ### Django команды
 
 ```bash
 # Миграции
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py migrate
 
 # Сбор статики
-docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
 
 # Создание суперпользователя
-docker compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py createsuperuser
 
 # Django shell
-docker compose -f docker-compose.prod.yml exec web python manage.py shell
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py shell
 ```
 
 ### SSL сертификат
@@ -92,21 +110,21 @@ docker compose -f docker-compose.prod.yml exec web python manage.py shell
 ./scripts/init-letsencrypt.sh
 
 # Обновление сертификата
-docker compose -f docker-compose.prod.yml run --rm certbot renew
-docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot renew
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec nginx nginx -s reload
 
 # Проверка сертификата
-docker compose -f docker-compose.prod.yml run --rm certbot certificates
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot certificates
 ```
 
 ### Бэкапы
 
 ```bash
 # Бэкап базы данных
-docker compose -f docker-compose.prod.yml exec db pg_dump -U postgres insurance_broker_prod > backup_$(date +%Y%m%d).sql
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%Y%m%d).sql
 
 # Восстановление
-cat backup_20240101.sql | docker compose -f docker-compose.prod.yml exec -T db psql -U postgres insurance_broker_prod
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T db psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup_20240101.sql
 ```
 
 ---
@@ -117,7 +135,7 @@ cat backup_20240101.sql | docker compose -f docker-compose.prod.yml exec -T db p
 
 ```bash
 # Статус контейнеров
-docker compose -f docker-compose.prod.yml ps
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
 
 # Проверка сайта
 curl -I https://polis.insflow.ru
@@ -130,16 +148,16 @@ curl -I http://polis.insflow.ru
 
 ```bash
 # База данных
-docker compose -f docker-compose.prod.yml exec web python manage.py check --database default
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py check --database default
 
 # Celery
-docker compose -f docker-compose.prod.yml exec celery_worker celery -A config inspect ping
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec celery_worker celery -A config inspect ping
 
 # Использование ресурсов
 docker stats --no-stream
 
 # Логи
-docker compose -f docker-compose.prod.yml logs --tail=50
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs --tail=50
 ```
 
 ---
@@ -150,11 +168,11 @@ docker compose -f docker-compose.prod.yml logs --tail=50
 
 ```bash
 # Проверить логи
-docker compose -f docker-compose.prod.yml logs [service]
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs [service]
 
 # Пересобрать образ
-docker compose -f docker-compose.prod.yml build --no-cache [service]
-docker compose -f docker-compose.prod.yml up -d [service]
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml build --no-cache [service]
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d [service]
 ```
 
 ### Проблемы с SSL
@@ -174,23 +192,28 @@ STAGING=1 ./scripts/init-letsencrypt.sh
 
 ```bash
 # Пересобрать статику
-docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput --clear
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput --clear
 
 # Перезапустить Nginx
-docker compose -f docker-compose.prod.yml restart nginx
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml restart nginx
 ```
 
 ### Ошибки базы данных
 
 ```bash
 # Проверить статус
-docker compose -f docker-compose.prod.yml ps db
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps db
 
 # Проверить логи
-docker compose -f docker-compose.prod.yml logs db
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs db
 
-# Проверить переменные
-docker compose -f docker-compose.prod.yml exec web env | grep DB_
+# Проверить соответствие настроек БД, не выводя значения.
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml exec -T web python - <<'PYCODE'
+import os
+for runtime, source in (("DB_NAME", "POSTGRES_DB"), ("DB_USER", "POSTGRES_USER"), ("DB_PASSWORD", "POSTGRES_PASSWORD")):
+    matches = bool(os.environ.get(runtime)) and os.environ.get(runtime) == os.environ.get(source)
+    print(f"{runtime}_matches_{source}={matches}")
+PYCODE
 ```
 
 ---
@@ -199,13 +222,13 @@ docker compose -f docker-compose.prod.yml exec web env | grep DB_
 
 | Что | Путь |
 |-----|------|
-| Приложение | `/opt/insurance_broker` |
-| Логи | `/opt/insurance_broker/logs` |
-| SSL сертификаты | `/opt/insurance_broker/certbot/conf` |
-| Nginx конфигурация | `/opt/insurance_broker/nginx` |
-| Статические файлы | Docker volume: `static_volume` |
-| Медиа файлы | Docker volume: `media_volume` |
-| База данных | Docker volume: `postgres_data` |
+| Приложение | `/root/insurance_broker` |
+| Логи | `/root/insurance_broker/logs` |
+| SSL сертификаты | `/root/insurance_broker/certbot/conf` |
+| Nginx конфигурация | `/root/insurance_broker/nginx` |
+| Статические файлы | Docker volume: `insurance_broker_static_volume` |
+| Медиа файлы | Docker volume: `insurance_broker_media_volume` |
+| База данных | Docker volume: `insurance_broker_postgres_data` |
 
 ---
 
@@ -252,7 +275,7 @@ COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True
 
 ```bash
 # Статус контейнеров
-docker compose -f docker-compose.prod.yml ps
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
 
 # Использование ресурсов
 docker stats
@@ -268,13 +291,13 @@ docker system df
 
 ```bash
 # Все логи
-docker compose -f docker-compose.prod.yml logs -f
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f
 
 # Последние 100 строк
-docker compose -f docker-compose.prod.yml logs --tail=100
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs --tail=100
 
 # Конкретный сервис
-docker compose -f docker-compose.prod.yml logs -f web
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs -f web
 
 # Системные логи
 journalctl -u docker -f
@@ -286,18 +309,23 @@ journalctl -u docker -f
 
 ### Обновление приложения
 
+Штатный деплой выполняется через GitHub Actions. Он сохраняет образы и конфигурацию
+для восстановления, собирает новую версию до переключения контейнеров, отдельно
+выполняет миграции/статику и проверяет все семь сервисов и HTTPS.
+
 ```bash
-# Через GitHub Actions (автоматически)
+# Из локального репозитория, после проверок и разрешения на push:
 git push origin main
 
-# Вручную
-ssh root@YOUR_DROPLET_IP
-cd /opt/insurance_broker
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate
-docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+# Повторить pipeline без нового коммита (из локального GitHub CLI):
+gh workflow run deploy.yml --ref main --repo grigra27/flow_polis
 ```
+
+В интерфейсе GitHub: Actions → Deploy to Production → Run workflow → main.
+Серверный checkout обновляется через rsync из workflow. Сохранённые образы и
+конфигурация находятся в `~/.local/state/onlinepolis-deploy/<run_id>-<run_attempt>/`.
+Автоматическое восстановление не откатывает миграции базы данных. Подробности:
+[workflow README](../.github/workflows/README.md#recovery).
 
 ### Очистка
 
@@ -320,7 +348,7 @@ sudo reboot
 
 # После перезагрузки контейнеры запустятся автоматически
 # Проверьте статус
-docker compose -f docker-compose.prod.yml ps
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml ps
 ```
 
 ---
@@ -330,7 +358,7 @@ docker compose -f docker-compose.prod.yml ps
 **Droplet IP:** `109.68.215.223`
 **Домен:** polis.insflow.ru
 **SSH:** `ssh root@109.68.215.223`
-**Директория:** `/opt/insurance_broker`
+**Директория:** `/root/insurance_broker`
 
 ### Документация
 
@@ -344,4 +372,4 @@ docker compose -f docker-compose.prod.yml ps
 
 ---
 
-**Последнее обновление:** 2024-11-25
+**Последнее обновление:** 2026-11-06 (Compose plugin и команды действующего production)

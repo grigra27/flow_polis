@@ -7,9 +7,15 @@ on:
       - main
   workflow_dispatch:  # Позволяет запускать вручную
 
+concurrency:
+  group: onlinepolis-production
+  cancel-in-progress: false
+
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
+  COMPOSE_PROJECT_NAME: insurance_broker
+  DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
   # Opt in to Node.js 24 for JavaScript actions to avoid Node 20 deprecation warnings.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -22,7 +28,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate docker-compose syntax
+      - name: Validate Compose syntax
         run: |
           # Create temporary env file for validation.
           # POSTGRES_* нужны для interpolation в environment блоке web/celery_*.
@@ -32,7 +38,7 @@ jobs:
           source .env.prod
           set +a
 
-          docker compose -f docker-compose.prod.yml config > /dev/null
+          docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" -f docker-compose.prod.yml config --quiet
           echo "✅ docker-compose.prod.yml syntax is valid"
 
           rm -f .env.prod
@@ -179,6 +185,58 @@ jobs:
               "$DROPLET_USER@$DROPLET_HOST" \
               "echo '✅ SSH connection established'; hostname"
 
+      - name: Preflight Compose plugin and preserve running release
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
+            set -euo pipefail
+            deployment_id=$1
+            [[ "$deployment_id" =~ ^[0-9]+-[0-9]+$ ]]
+            compose_version=$(docker compose version --short)
+            if [[ ! "$compose_version" =~ ^v?([0-9]+)\.([0-9]+) ]] ||
+               (( BASH_REMATCH[1] < 2 || (BASH_REMATCH[1] == 2 && BASH_REMATCH[2] < 20) )); then
+              echo "❌ Docker Compose plugin >= 2.20 is required (including newer major versions)"
+              exit 1
+            fi
+            docker compose version
+            docker info --format 'Docker Engine {{.ServerVersion}}'
+            command -v curl > /dev/null
+            command -v flock > /dev/null
+            mkdir -p "$HOME/.local/state"
+            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
+            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
+            cd ~/insurance_broker
+            set -a
+            source .env.prod
+            set +a
+            export COMPOSE_PROJECT_NAME=insurance_broker
+            docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml config --quiet
+
+            # Fail before rsync if the namespace does not match existing data.
+            [[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' insurance_broker_db)" == "$COMPOSE_PROJECT_NAME" ]]
+            for volume in postgres_data redis_data static_volume media_volume; do
+              docker volume inspect "${COMPOSE_PROJECT_NAME}_${volume}" > /dev/null
+            done
+            umask 077
+            release_dir="$HOME/.local/state/onlinepolis-deploy/$deployment_id"
+            mkdir -p "$release_dir"
+            cp docker-compose.prod.yml "$release_dir/docker-compose.prod.yml"
+            cp -a nginx "$release_dir/nginx"
+            printf 'services:\n' > "$release_dir/rollback.yml"
+            : > "$release_dir/image-ids"
+            for service in web celery_worker celery_beat; do
+              image_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
+              backup_tag="onlinepolis-rollback:${deployment_id}-${service}"
+              docker image tag "$image_id" "$backup_tag"
+              printf '  %s:\n    image: %s\n    entrypoint: ["gosu", "app"]\n' "$service" "$backup_tag" >> "$release_dir/rollback.yml"
+              printf '%s %s\n' "$service" "$image_id" >> "$release_dir/image-ids"
+            done
+            touch "$release_dir/prepared"
+            echo "✅ Compose plugin, existing project volumes and rollback images verified"
+          ENDSSH
+
       - name: Copy files to server
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
@@ -313,56 +371,53 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          # Note: Server uses docker-compose (v1 with hyphen), not docker compose (v2)
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
+          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
+            set -euo pipefail
             cd ~/insurance_broker
-
-            # PLAN 11.7: docker-compose делает interpolation ${POSTGRES_*}
-            # в environment блоке web/celery_*. Compose читает их из shell env,
-            # не из env_file. Поэтому source перед каждой командой что создаёт
-            # контейнеры (up, run). Для exec/down/build/pull это не нужно.
             set -a
-            # shellcheck disable=SC1091
             source .env.prod
             set +a
+            export COMPOSE_PROJECT_NAME=insurance_broker
+            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
+            # A remote shell may survive a lost SSH connection. Recovery uses
+            # this same host lock before restoring any files or containers.
+            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
+            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
+            test -f "$release_dir/prepared"
+            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
 
-            echo "📦 Pulling latest images..."
-            docker-compose -f docker-compose.prod.yml pull || true
-
-            # Собираем, пока работают старые контейнеры: сборка без кэша
-            # идёт 20+ минут (медленные PyPI/Debian с сервера), и при
-            # down → build сайт всё это время лежал (22.10.2026). Если
-            # сборка упадёт, set -e выйдет здесь — старая версия продолжит
-            # работать.
+            # Existing infrastructure images/containers remain in place. Build
+            # every application image before changing any running service.
             echo "🔨 Building new images (old containers keep serving)..."
-            docker-compose -f docker-compose.prod.yml build
+            rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py
+            "${compose[@]}" build web celery_worker celery_beat
 
-            echo "🛑 Stopping old containers..."
-            docker-compose -f docker-compose.prod.yml down
+            echo "🔧 Removing the known obsolete migration record..."
+            "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+              DELETE FROM django_migrations
+              WHERE app = 'policies'
+                AND name = '0011_alter_paymentschedule_unique_together';
+            "
 
-            echo "🚀 Starting containers with new images..."
-            docker-compose -f docker-compose.prod.yml up -d
+            # Application entrypoint is gosu/app: migrations and static collection
+            # run once here, not concurrently in web and both Celery containers.
+            echo "🔄 Running database migrations with the new image..."
+            "${compose[@]}" run --rm --no-deps --pull never web python manage.py migrate --noinput
+            echo "📦 Collecting static files..."
+            "${compose[@]}" run --rm --no-deps --pull never web python manage.py collectstatic --noinput
 
-            # Старые образы после пересоздания контейнеров стали dangling.
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
+            # A fresh one-off container sees the new rsynced configuration inode.
+            "${compose[@]}" run --rm --no-deps --pull never nginx nginx -t
+            touch "$release_dir/activating"
+            echo "🚀 Recreating application services, preserving database/Redis/certbot..."
+            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 web celery_worker celery_beat
 
-            echo "⏳ Waiting for services to be ready..."
-            sleep 15
-
-            # H-09: `down` оставляет сиротой анонимный том certbot
-            # (VOLUME /var/lib/letsencrypt в образе) — за год их накопилось
-            # 232. С Docker 23+ `volume prune` без --all удаляет только
-            # анонимные неиспользуемые тома; именованные (postgres_data,
-            # media_volume, ...) не трогает даже если они не подключены.
-            # Build cache старше недели не нужен — свежий остаётся для
-            # быстрых пересборок.
-            echo "🧹 Pruning dangling volumes and old build cache..."
-            docker volume prune -f || true
-            docker builder prune -f --filter until=168h || true
-
-            echo "✅ Deployment completed"
+            # Recreate nginx to rebind replaced config files and resolve the new
+            # web container IP; reload alone cannot replace a bind-mounted inode.
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx
+            "${compose[@]}" exec -T nginx nginx -t
+            "${compose[@]}" exec -T nginx nginx -s reload
+            echo "✅ Application switched; final health and HTTPS checks follow"
           ENDSSH
 
       - name: Setup SSL (first deployment only)
@@ -383,51 +438,9 @@ jobs:
             echo ""
             echo "Or manually:"
             echo "  1. Verify DNS is configured: nslookup polis.insflow.ru"
-            echo "  2. Run: docker-compose -f docker-compose.prod.yml run --rm certbot certonly --webroot --webroot-path=/var/www/certbot --email admin@insflow.ru --agree-tos --no-eff-email -d polis.insflow.ru"
+            echo "  2. Run: docker compose -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml run --rm certbot certonly --webroot --webroot-path=/var/www/certbot --email admin@insflow.ru --agree-tos --no-eff-email -d polis.insflow.ru"
             echo "  3. Switch to SSL config: cp nginx/default.conf.ssl nginx/default.conf"
-            echo "  4. Restart nginx: docker-compose -f docker-compose.prod.yml restart nginx"
-          ENDSSH
-
-      - name: Run migrations
-        env:
-          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
-            cd ~/insurance_broker
-
-            # PLAN 11.7: source POSTGRES_* для compose interpolation в `run` команд.
-            set -a
-            # shellcheck disable=SC1091
-            source .env.prod
-            set +a
-
-            echo "⏳ Waiting for database to be ready..."
-            sleep 10
-
-            echo "🔧 Fixing migration conflicts..."
-            # Remove old conflicting migration from database if exists
-            # H-18: раньше здесь было -U postgres -d insurance_broker — такой БД
-            # на проде нет, psql падал с FATAL (виден в логе db) и DELETE не
-            # выполнялся. POSTGRES_* экспортированы из .env.prod выше.
-            docker-compose -f docker-compose.prod.yml exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
-              DELETE FROM django_migrations
-              WHERE app = 'policies'
-                AND name = '0011_alter_paymentschedule_unique_together';
-            " 2>/dev/null || echo "No conflicting migration in database"
-
-            # Remove old migration file if exists
-            rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py 2>/dev/null || true
-            echo "✅ Migration conflicts resolved"
-
-            echo "🔄 Running database migrations..."
-            docker-compose -f docker-compose.prod.yml run --rm web python manage.py migrate --noinput
-
-            echo "📦 Collecting static files..."
-            docker-compose -f docker-compose.prod.yml run --rm web python manage.py collectstatic --noinput
-
-            echo "✅ Migrations completed"
+            echo "  4. Recreate nginx: docker compose -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d --no-deps --no-build --pull never --force-recreate nginx"
           ENDSSH
 
       - name: Health check
@@ -435,28 +448,42 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
+          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
+            set -euo pipefail
             cd ~/insurance_broker
+            set -a
+            source .env.prod
+            set +a
+            export COMPOSE_PROJECT_NAME=insurance_broker
+            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
+            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
+            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
+            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
 
-            echo "🏥 Checking container health..."
-            docker-compose -f docker-compose.prod.yml ps
+            echo "🏥 Checking every production service..."
+            for service in db redis web celery_worker celery_beat nginx certbot; do
+              container_id=$("${compose[@]}" ps -q "$service")
+              test -n "$container_id"
+              state=$(docker inspect --format '{{.State.Status}}' "$container_id")
+              health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
+              echo "$service: state=$state health=$health"
+              [[ "$state" == running ]]
+              case "$service" in
+                celery_beat|certbot) [[ "$health" == none || "$health" == healthy ]] ;;
+                *) [[ "$health" == healthy ]] ;;
+              esac
+            done
 
-            # Check if web container is running
-            if ! docker-compose -f docker-compose.prod.yml ps | grep -q "web.*Up"; then
-              echo "❌ Web container is not running"
-              docker-compose -f docker-compose.prod.yml logs web
-              exit 1
-            fi
+            login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
+            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]]
+            unset login_page
+            touch "$release_dir/verified"
+            echo "✅ All service healthchecks and HTTPS login page passed"
 
-            # Check if db container is running
-            if ! docker-compose -f docker-compose.prod.yml ps | grep -q "db.*Up"; then
-              echo "❌ Database container is not running"
-              docker-compose -f docker-compose.prod.yml logs db
-              exit 1
-            fi
-
-            echo "✅ All containers are healthy"
+            # Rollback images have immutable per-run tags and survive pruning.
+            docker image prune -f || true
+            docker volume prune -f || true
+            docker builder prune -f --filter until=168h || true
           ENDSSH
 
       - name: Cleanup SSH
@@ -484,10 +511,10 @@ jobs:
           echo "Please check the logs above for details."
 
   rollback:
-    name: Rollback on Failure
+    name: Restore Saved Application Images on Failure
     runs-on: ubuntu-latest
     needs: deploy
-    if: failure()
+    if: always() && needs.deploy.result == 'failure'
     env:
       SSH_PORT: ${{ secrets.SSH_PORT }}
 
@@ -509,32 +536,65 @@ jobs:
           printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
           chmod 600 ~/.ssh/config
 
-      - name: Rollback to previous version
+      - name: Restore saved images and nginx configuration
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" << 'ENDSSH'
-            set -e
+          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
+            set -euo pipefail
             cd ~/insurance_broker
-
-            echo "⚠️  Deployment failed, attempting rollback..."
-
-            # PLAN 11.7: source POSTGRES_* для compose interpolation.
-            if [ -f .env.prod ]; then
-              set -a
-              # shellcheck disable=SC1091
-              source .env.prod
-              set +a
+            release_dir="$HOME/.local/state/onlinepolis-deploy/$1"
+            mkdir -p "$HOME/.local/state"
+            exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
+            flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
+            if [ ! -f "$release_dir/prepared" ]; then
+              echo "Preflight did not finish; no release files or containers were changed"
+              exit 0
+            fi
+            if [ -f "$release_dir/verified" ]; then
+              echo "Release already passed health checks; no image rollback required"
+              exit 0
             fi
 
-            # Поднять то, что лежит. Без down: если упала сборка, старые
-            # контейнеры работают и up -d их не трогает; если упали
-            # миграции или health check, down/up перезапустил бы те же
-            # образы :latest — только лишний простой.
-            docker-compose -f docker-compose.prod.yml up -d
+            cp "$release_dir/docker-compose.prod.yml" docker-compose.prod.yml
+            cp -a "$release_dir/nginx/." nginx/
+            # A failed/partial build can already have replaced :latest tags.
+            # Restore those too, so later ordinary Compose commands stay on
+            # the recovered release rather than recreating failed new images.
+            while read -r service expected_id; do
+              docker image tag "$expected_id" "insurance_broker_${service}:latest"
+            done < "$release_dir/image-ids"
+            if [ ! -f "$release_dir/activating" ]; then
+              echo "Deployment failed before application switch; restored compose/nginx files and image tags, old containers kept running"
+              echo "Database migrations, if applied, have not been reversed"
+              exit 0
+            fi
 
-            echo "🔄 Rollback completed - previous version restored"
+            set -a
+            source .env.prod
+            set +a
+            export COMPOSE_PROJECT_NAME=insurance_broker
+            compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml -f "$release_dir/rollback.yml")
+
+            # Only the three app containers and nginx are replaced. Saved image
+            # tags preserve the actual running hotfix image, even after a build.
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 180 web celery_worker celery_beat
+            "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx
+            "${compose[@]}" exec -T nginx nginx -t
+            "${compose[@]}" exec -T nginx nginx -s reload
+
+            while read -r service expected_id; do
+              actual_id=$(docker inspect --format '{{.Image}}' "insurance_broker_$service")
+              [[ "$actual_id" == "$expected_id" ]]
+            done < "$release_dir/image-ids"
+            login_page=$(curl --fail --silent --show-error --max-time 20 --resolve polis.insflow.ru:443:127.0.0.1 https://polis.insflow.ru/accounts/login/)
+            [[ "$login_page" == *'name="username"'* && "$login_page" == *'name="password"'* ]]
+            unset login_page
+            touch "$release_dir/restored"
+
+            echo "🔄 Saved application image IDs and nginx configuration restored; HTTPS login verified"
+            echo "Database migrations were NOT reversed; schema compatibility may require manual recovery"
           ENDSSH
 
       - name: Cleanup SSH
@@ -542,8 +602,8 @@ jobs:
         run: |
           rm -f ~/.ssh/deploy_key
 
-      - name: Notify rollback
+      - name: Report failed deployment
         run: |
-          echo "⚠️  Deployment failed and rollback was executed"
-          echo "Previous version has been restored"
+          echo "⚠️ Deployment failed. See the recovery step for the verified image/configuration restore result."
+          echo "Database migrations are never automatically reversed."
           exit 1

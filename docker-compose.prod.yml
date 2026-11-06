@@ -49,6 +49,9 @@ services:
 
   # Django Web Application with Gunicorn
   web:
+    image: insurance_broker_web:latest
+    # Release workflow runs migrations/collectstatic once before switching apps.
+    entrypoint: ["gosu", "app"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -98,6 +101,8 @@ services:
 
   # Celery Worker
   celery_worker:
+    image: insurance_broker_celery_worker:latest
+    entrypoint: ["gosu", "app"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -137,6 +142,8 @@ services:
 
   # Celery Beat Scheduler
   celery_beat:
+    image: insurance_broker_celery_beat:latest
+    entrypoint: ["gosu", "app"]
     build:
       context: .
       dockerfile: Dockerfile

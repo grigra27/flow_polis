@@ -7,13 +7,13 @@ This workflow automatically deploys the Insurance Broker application to Timeweb 
 ## Workflow Steps
 
 1. **Validate and test** - Validates Compose syntax and required files, then runs the full pytest suite before building.
-2. **Build in CI** - Builds and smoke-tests the application Docker image. Production application images are also built on the server.
+2. **Build in CI** - Builds the application Docker image and tests a Kombu JSON publish/consume round trip against a disposable Redis in an isolated network. Production application images are also built on the server.
 3. **Preflight** - Requires the Docker Compose plugin >= 2.20 (newer major versions are accepted; production has v5.6.0), confirms project `insurance_broker` and existing volumes, then saves the running application image IDs, immutable per-run rollback tags, Compose file and nginx configuration before rsync.
 4. **Copy files** - Rsyncs the checkout while preserving production credentials, certificates, logs and user data. Recovery artifacts live outside the checkout in `~/.local/state/onlinepolis-deploy/<run_id>-<run_attempt>/`.
 5. **Build on the server** - Builds only `web`, `celery_worker` and `celery_beat` while the existing containers keep serving. SSH keepalive protects slow uncached builds.
-6. **Prepare the release** - Runs migrations and `collectstatic` once through one-off containers using the new web image, then validates nginx configuration.
+6. **Prepare the release** - Runs migrations and `collectstatic` once through noninteractive one-off containers using the new web image, then validates nginx configuration. Compose stdin is disconnected so it cannot consume the remaining SSH script.
 7. **Activate** - Recreates the three application services, waits for readiness, then recreates nginx to refresh its bind-mounted configuration and web DNS resolution. The workflow does not stop or recreate database, Redis or certbot containers.
-8. **Health check** - Inspects state and health for all seven services and verifies the HTTPS login page. Beat and certbot may have no Docker healthcheck but must be running.
+8. **Health check** - Requires completed activation markers and matches all three running application image IDs to the freshly built images, then inspects all seven services and verifies the HTTPS login page. Healthy old containers cannot satisfy this check; beat and certbot may have no Docker healthcheck but must be running.
 9. **Recover on failure** - Restores saved configuration before activation; after activation it also restores the saved application image IDs and verifies HTTPS. Database migrations are never automatically reversed.
 
 Runs are serialized by the `onlinepolis-production` concurrency group; a new push does not cancel an active deployment. Production commands use `docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml`. The explicit project and application image names preserve the existing infrastructure namespace. Legacy `docker-compose` v1 is retained for older read/exec scripts; it is not the deployment CLI.

@@ -346,7 +346,8 @@ def test_staging_symlink_is_rejected_without_following_it(setup, tmp_path):
     (instance.paths.state / "releases" / RUN).symlink_to(
         outside, target_is_directory=True
     )
-    with pytest.raises(controller.DeploymentError, match="links/special"):
+    # Symlink permission bits differ by OS; either guard must reject the link.
+    with pytest.raises(controller.DeploymentError):
         instance.execute(request, io.BytesIO(payload))
     assert list(outside.iterdir()) == []
     assert docker.images == docker.original

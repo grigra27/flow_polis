@@ -13,7 +13,6 @@
 import json
 import logging
 import os
-import random
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -24,9 +23,27 @@ from decouple import config
 
 # Reuse существующая VK-отправка — она содержит все нюансы (random_id,
 # обработка кода ошибок VK API, проверка enabled/token/user_id).
-from apps.core.vk_handler import VK_API_VERSION, VK_ATTRIBUTION_PREFIX, send_vk_message
+from apps.core.notification_utils import trim_with_middle_ellipsis
+from apps.core.vk_handler import (
+    VK_API_VERSION,
+    VK_MAX_MESSAGE_LENGTH,
+    format_vk_message,
+    new_vk_random_id,
+    send_vk_message,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _telegram_diagnostic(value) -> str:
+    """Scrub bot URLs before they reach any logger, including unfiltered ones."""
+    from apps.core.logging_filters import SensitiveDataFilter
+
+    record = logging.LogRecord(
+        __name__, logging.ERROR, __file__, 0, str(value), (), None
+    )
+    SensitiveDataFilter().filter(record)
+    return trim_with_middle_ellipsis(record.getMessage(), 500)
 
 
 class TelegramRateLimitError(Exception):
@@ -55,9 +72,9 @@ def _parse_retry_after(exc, body: str) -> int:
     # 1) JSON body
     try:
         data = json.loads(body) if body else {}
-        params = data.get("parameters") or {}
-        ra = params.get("retry_after")
-        if isinstance(ra, int) and ra > 0:
+        params = data.get("parameters") if isinstance(data, dict) else None
+        ra = params.get("retry_after") if isinstance(params, dict) else None
+        if type(ra) is int and ra > 0:
             return ra
     except (ValueError, TypeError):
         pass
@@ -129,42 +146,10 @@ def check_rate_limit(scope: str, max_per_hour: int = 10) -> bool:
 
 # Hard limit Telegram sendMessage — 4096 символов. Берём с запасом.
 TELEGRAM_MESSAGE_LIMIT = 3900
-# Hard limit VK messages.send — 4096 символов.
-VK_MESSAGE_LIMIT = 4096
+# Existing conservative budget shared by VK messages and file captions.
+VK_MESSAGE_LIMIT = VK_MAX_MESSAGE_LENGTH
 # Таймаут для одного HTTP-запроса к Telegram API (секунды).
 TELEGRAM_TIMEOUT = 10
-
-
-def trim_with_middle_ellipsis(
-    text: str,
-    max_length: int,
-    marker: str = " ... (truncated) ... ",
-    tail_ratio: float = 0.7,
-) -> str:
-    """
-    Обрезает длинный текст, сохраняя начало и конец.
-    Полезно для traceback'ов — конец содержит тип/сообщение исключения.
-
-    tail_ratio=0.7 значит: 30% места под начало, 70% под конец.
-    """
-    if text is None:
-        return ""
-    text = str(text)
-    if max_length is None or max_length <= 0 or len(text) <= max_length:
-        return text
-    marker = str(marker)
-    if max_length <= len(marker) + 10:
-        return text[-max_length:]
-    available = max_length - len(marker)
-    tail_len = int(available * tail_ratio)
-    head_len = available - tail_len
-    if head_len < 1:
-        head_len = 1
-        tail_len = available - head_len
-    if tail_len < 1:
-        tail_len = 1
-        head_len = available - tail_len
-    return text[:head_len] + marker + text[-tail_len:]
 
 
 def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
@@ -234,7 +219,7 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
             if result.get("ok"):
                 logger.debug("Telegram: сообщение отправлено")
                 return True
-            logger.error("Telegram API вернул ошибку: %s", result)
+            logger.error("Telegram API вернул ошибку: %s", _telegram_diagnostic(result))
             return False
     except HTTPError as e:
         try:
@@ -246,18 +231,25 @@ def send_telegram(text: str, raise_on_rate_limit: bool = False) -> bool:
         if e.code == 429 and raise_on_rate_limit:
             retry_after = _parse_retry_after(e, error_body)
             logger.warning(
-                "Telegram 429, will retry after %ss: %s", retry_after, error_body
+                "Telegram 429, will retry after %ss: %s",
+                retry_after,
+                _telegram_diagnostic(error_body),
             )
             raise TelegramRateLimitError(retry_after, raw=error_body)
-        logger.error("Telegram HTTP %s: %s | %s", e.code, e.reason, error_body)
+        logger.error(
+            "Telegram HTTP %s: %s | %s",
+            e.code,
+            _telegram_diagnostic(e.reason),
+            _telegram_diagnostic(error_body),
+        )
         return False
     except URLError as e:
         # Сюда падают timeouts, DNS-ошибки, network unreachable — норма для
         # сервера в РФ при блокировке Telegram. VK должен компенсировать.
-        logger.error("Telegram network error: %s", e)
+        logger.error("Telegram network error: %s", _telegram_diagnostic(e))
         return False
     except Exception as e:
-        logger.error("Telegram unexpected error: %s", e)
+        logger.error("Telegram unexpected error: %s", _telegram_diagnostic(e))
         return False
 
 
@@ -278,7 +270,10 @@ def _send_telegram_via_socks_proxy(
             api_url, data=data, proxies=proxies, timeout=TELEGRAM_TIMEOUT
         )
     except requests.exceptions.RequestException as e:
-        logger.error("Telegram (через SOCKS5-прокси) network error: %s", e)
+        logger.error(
+            "Telegram (через SOCKS5-прокси) network error: %s",
+            _telegram_diagnostic(e),
+        )
         return False
 
     if response.status_code == 429:
@@ -288,22 +283,29 @@ def _send_telegram_via_socks_proxy(
                 "Telegram 429 (через прокси), will retry after %ss", retry_after
             )
             raise TelegramRateLimitError(retry_after, raw=response.text)
-        logger.error("Telegram HTTP 429 (через прокси): %s", response.text)
+        logger.error(
+            "Telegram HTTP 429 (через прокси): %s",
+            _telegram_diagnostic(response.text),
+        )
         return False
 
     try:
         result = response.json()
     except ValueError:
         logger.error(
-            "Telegram (через прокси) вернул не-JSON ответ: %s", response.text[:200]
+            "Telegram (через прокси) вернул не-JSON ответ: %s",
+            _telegram_diagnostic(response.text),
         )
         return False
 
-    if result.get("ok"):
+    if isinstance(result, dict) and result.get("ok"):
         logger.debug("Telegram (через SOCKS5-прокси): сообщение отправлено")
         return True
 
-    logger.error("Telegram API вернул ошибку (через прокси): %s", result)
+    logger.error(
+        "Telegram API вернул ошибку (через прокси): %s",
+        _telegram_diagnostic(result),
+    )
     return False
 
 
@@ -372,9 +374,7 @@ def send_vk_file(file_path: str, caption: str = "") -> bool:
 
     # Та же атрибуция, что и в send_vk_message — файл приходит отдельным
     # сообщением в том же общем диалоге.
-    caption = (
-        f"{VK_ATTRIBUTION_PREFIX} · {caption}" if caption else VK_ATTRIBUTION_PREFIX
-    )
+    caption = format_vk_message(caption, separator=" · ")
 
     base_params = {"access_token": token, "v": VK_API_VERSION}
 
@@ -437,7 +437,7 @@ def send_vk_file(file_path: str, caption: str = "") -> bool:
         attachment = f"doc{owner_id}_{doc_id}"
 
         # Шаг 4: отправить документ как сообщение
-        random_id = random.randint(1, 2**31 - 1)
+        random_id = new_vk_random_id()
         r = requests.post(
             f"{VK_API_BASE}/messages.send",
             data={

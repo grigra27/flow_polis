@@ -15,6 +15,11 @@ class SensitiveDataFilter(logging.Filter):
 
     # Patterns for sensitive data in logs
     SENSITIVE_PATTERNS = [
+        # urllib/requests errors may include either the full bot URL or its path.
+        (
+            r"((?:https?://api\.telegram\.org)?/bot)\d+:[A-Za-z0-9_-]+",
+            r"\1***",
+        ),
         # Passwords - match quoted values first, then unquoted
         (r"'password':\s*'([^']*)'", "'password': '***'"),
         (r'"password":\s*"([^"]*)"', '"password": "***"'),

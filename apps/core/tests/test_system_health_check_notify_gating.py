@@ -12,6 +12,12 @@ cron дёргает команду новым процессом на кажды
   • _get_last_notified_status / _set_last_notified_status — round-trip
     через фейковый Redis-клиент, и fail-open (None), когда Redis недоступен.
 """
+import logging
+from io import StringIO
+
+import pytest
+
+from apps.core.management.commands import system_health_check as health_module
 from apps.core.management.commands.system_health_check import Command
 
 
@@ -122,3 +128,90 @@ def test_set_last_notified_status_swallows_redis_errors(monkeypatch):
     _patch_redis(monkeypatch, _BrokenRedis())
 
     command._set_last_notified_status("warning")  # не должно бросить исключение
+
+
+def _run_health(
+    monkeypatch,
+    *,
+    telegram=False,
+    vk=False,
+    success=True,
+    status="critical",
+    last_status=None
+):
+    output = StringIO()
+    command = Command(stdout=output)
+    calls, remembered = [], []
+    monkeypatch.setattr(
+        command,
+        "_check_disk_usage",
+        lambda: {"status": status, "message": "test disk result"},
+    )
+    monkeypatch.setattr(command, "_get_last_notified_status", lambda: last_status)
+    monkeypatch.setattr(command, "_set_last_notified_status", remembered.append)
+
+    def notify(overall_status, metrics, *, channels):
+        calls.append((overall_status, channels))
+        return success
+
+    monkeypatch.setattr(
+        health_module.TelegramErrorNotifier, "notify_system_health", notify
+    )
+    command.handle(
+        check_all=False,
+        check_db=False,
+        check_disk=True,
+        check_memory=False,
+        check_web=False,
+        check_telegram_proxy=False,
+        check_backups=False,
+        notify_telegram=telegram,
+        notify_vk=vk,
+        notify_always=False,
+    )
+    return calls, remembered, output.getvalue()
+
+
+@pytest.mark.parametrize(
+    "telegram,vk,channels",
+    [
+        (True, True, ("vk", "telegram")),
+        (True, False, ("telegram",)),
+        (False, True, ("vk",)),
+    ],
+)
+def test_cli_calls_notifier_once_for_requested_channels(
+    monkeypatch, caplog, telegram, vk, channels
+):
+    with caplog.at_level(logging.CRITICAL, logger=health_module.__name__):
+        calls, remembered, output = _run_health(monkeypatch, telegram=telegram, vk=vk)
+    assert calls == [("critical", channels)]
+    assert remembered == ["critical"]
+    assert "API подтвердил" in output
+    assert len(caplog.records) == 1
+    assert caplog.records[0].notification_handled is True
+
+
+def test_cli_failed_or_suppressed_delivery_does_not_mark_status_notified(monkeypatch):
+    calls, remembered, output = _run_health(monkeypatch, vk=True, success=False)
+    assert calls == [("critical", ("vk",))]
+    assert remembered == []
+    assert "API подтвердил" not in output
+    assert "Уведомление не отправлено" in output
+
+
+def test_cli_without_notification_flags_only_logs_results(monkeypatch, caplog):
+    calls, remembered, output = _run_health(monkeypatch)
+    assert calls == []
+    assert remembered == []
+    assert "📤" not in output
+    assert any(record.notification_handled for record in caplog.records)
+
+
+def test_cli_unchanged_status_does_not_send_or_update_history(monkeypatch):
+    calls, remembered, output = _run_health(
+        monkeypatch, telegram=True, vk=True, last_status="critical"
+    )
+    assert calls == []
+    assert remembered == []
+    assert "отправка пропущена" in output

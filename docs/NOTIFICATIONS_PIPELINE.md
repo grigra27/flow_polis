@@ -1,352 +1,118 @@
-# Pipeline нотификаций: Telegram & VK
-
-Этот документ описывает **как устроена** отправка сообщений и файлов в Telegram и VK в проекте — все каналы, триггеры, лимиты, конфигурация. Это обзорный документ; конкретные improvements собраны в PLAN.md (пункты 8 и follow-up'ы).
-
-Связанные:
-- `docs/SECRETS_OVERVIEW.md` — где хранятся `TELEGRAM_BOT_TOKEN`, `VK_COMMUNITY_TOKEN` и пр.
-- `docs/ENVIRONMENT_VARIABLES.md` — справочник по env-переменным.
-
-## ⚠️ Главный бизнес-принцип
-
-**Сервер в РФ. Telegram периодически блокируется. VK — резервный канал, должен дойти 100% случаев.**
-
-Из этого следуют **обязательные правила** для любого кода/скрипта, который что-то отправляет:
-
-1. **VK отправляется независимо от результата Telegram.** Не «если TG прошёл, тогда зеркалим в VK», а «отправляем в оба, не ждём успеха одного для другого».
-2. **VK отправляется ПЕРВЫМ** там где возможно — Telegram может дать timeout до 10 секунд из-за блокировки, не задерживаемся.
-3. **Любая новая точка отправки** должна следовать этим правилам, иначе резервный канал перестаёт быть резервным.
-4. В перспективе VK может стать **основным** каналом — закладываем это сейчас.
-
-Что **не** соответствовало правилам и было исправлено 2026-04-25:
-- `daily_digest._send_telegram_messages` — VK был внутри `if tg_success`, теперь отправляется всегда.
-- `TelegramHandler.emit` — Thread(daemon=True) убивался в management command'ах, ни TG ни VK не отправлялись. Теперь синхронно.
-- `TelegramErrorNotifier.notify_*` — та же проблема с Thread, исправлена.
-
----
-
-## TL;DR
-
-В проекте **два параллельных, не связанных канала** доставки в Telegram/VK:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  PYTHON-канал                                                    │
-│  Внутри Django-контейнера, читает .env через decouple            │
-│                                                                  │
-│  • TelegramHandler         — logging handler для ERROR+ событий  │
-│  • TelegramErrorNotifier   — утилитные методы (system_health и др│
-│  • daily_digest command    — суточный отчёт                      │
-│  • send_vk_message()       — общая функция VK                    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│  BASH-канал                                                      │
-│  На хосте сервера, читает .env.prod / .env через source          │
-│                                                                  │
-│  • telegram-config.sh      — загрузка env-переменных             │
-│  • telegram-notify.sh      — функции send_telegram_message и др. │
-│  • backup-db-telegram.sh   — бэкап БД + уведомление              │
-│  • backup-media-telegram.sh — бэкап media                        │
-│  • monitor-logs-telegram.sh — tail django.log → ERROR-алерты     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-Эти два канала **используют одинаковые токены** (`TELEGRAM_BOT_TOKEN`, `VK_COMMUNITY_TOKEN`) и обычно **тот же chat_id**, но логику обрезания, rate-limit, обработки ошибок реализуют **независимо**. Если изменишь один — второй продолжит работать по-старому.
-
-**Важный нюанс из практики**: сегодняшний alert «🚨 Log Error Detected» про brute-force — это **bash-канал** (`monitor-logs-telegram.sh`). Python-канал шлёт «🚨 Critical Error Detected». То есть **обе системы сейчас работают параллельно** на проде.
-
----
-
-## Канал 1: Python (внутри Django)
-
-### `apps/core/telegram_handler.py` — `TelegramHandler` (logging handler)
-
-**Триггер**: подключён в `config/settings.py` LOGGING как handler `"telegram"` с `level=ERROR`. Срабатывает на любой `logger.error()` / `logger.critical()` в коде.
-
-**Как работает**:
-1. `emit(record)` — основной entry point
-2. `_should_send_message()` проверяет:
-   - `enabled` + `bot_token` + `chat_id` есть
-   - `levelno >= ERROR`
-   - **Rate limit**: `len(self.sent_messages) >= max_messages_per_hour` (по умолчанию 10/час)
-   - **Группировка**: один и тот же ключ ошибки (`module|exception_type|first_100_chars`) — не чаще раз в 10 мин
-3. `_format_message()` — форматирует с emoji-префиксом «🚨 Critical Error Detected», сокращает по лимитам
-4. `_send_message_async()` запускается в **отдельном Thread** (daemon thread, fire-and-forget)
-5. **В конце метода** `_send_message_async` всегда вызывается `send_vk_message(message)` — то есть VK получает зеркало любого Telegram-алерта
-
-**Лимиты длины** (env-конфигурируемые):
-- `TELEGRAM_ERROR_MESSAGE_LIMIT=500` — ужатие сообщения об ошибке
-- `TELEGRAM_EXCEPTION_MESSAGE_LIMIT=700` — ужатие текста исключения
-- `TELEGRAM_TRACEBACK_LIMIT=2500` — ужатие traceback (с сохранением хвоста, потому что там самое полезное)
-- `TELEGRAM_MESSAGE_LIMIT=3900` — финальный лимит на всё сообщение (Telegram hard limit = 4096)
-
-**Состояние**:
-- `self.sent_messages: list[datetime]` — для rate-limit, **in-memory**
-- `self.message_cache: dict[key, datetime]` — для группировки, **in-memory**
-- ⚠️ Под Gunicorn с N воркерами — N независимых счётчиков. Реальный лимит = `N × max_messages_per_hour`.
-
-### `apps/core/telegram_handler.py` — `TelegramErrorNotifier` (статические утилиты)
-
-**Что**: класс с двумя статическими методами:
-- `notify_critical_error(title, message, details=None)` — кастомный алерт с заданным заголовком
-- `notify_system_health(status, metrics=None)` — health-check уведомление с emoji в зависимости от status
-
-**Как работает**: каждый раз создаёт **новый** `TelegramHandler()` (с заново прочитанным конфигом!), форматирует своё сообщение, запускает Thread на `_send_message_async`. То есть ⚠️ rate-limit/группировка из основного TelegramHandler **НЕ применяются** — это отдельная отправка.
-
-**Кто использует**:
-- `apps/core/management/commands/system_health_check.py` — `notify_system_health` после проверки docker/db/disk/memory. Уведомляет TG/VK только при **смене** overall_status (healthy↔warning↔critical) относительно последнего уведомления — не на каждом cron-тике (каждые 30 минут), пока проблема не устранена (2026-09-24; раньше один незамеченный сбой на несколько часов давал десятки одинаковых сообщений). Последний уведомлённый статус хранится в Redis (`Command.HEALTH_STATUS_REDIS_KEY`); `--notify-always` отключает это сравнение.
-
-### `apps/core/management/commands/daily_digest.py` (~1300 строк)
-
-**Триггер**: management command. Запускается через `python manage.py daily_digest`. Аргументы: `--date YYYY-MM-DD`, `--test` (последние 2 ч), `--no-telegram`, `--no-vk`.
-
-Запускается системным cron на сервере (root crontab): ежедневно в 06:00 МСК, `docker-compose -f docker-compose.prod.yml exec -T web python manage.py daily_digest >> logs/daily-digest.log`. Через Celery beat не планируется.
-
-**Что собирает**:
-- `_get_logins_data()` — успешные/неуспешные логины из `LoginAttempt`
-- `_get_policies_data()` — изменения полисов из `auditlog.LogEntry` (созданные/обновлённые)
-- `_get_payments_data()` — изменения платежей из `LogEntry`
-- `_format_message()` — большой текст с эмодзи, статистикой, цифрами, ссылками
-
-**Доставка** (`_send_telegram_messages`):
-1. `_split_message_into_parts(max_length=3900)` — режет длинный дайджест на части
-2. Для каждой части:
-   - `_send_single_telegram_message(message)` — собственная реализация (не TelegramHandler!) с детальной отладкой через `print()`
-   - При успехе и `mirror_to_vk=True` — `send_vk_message(message)`
-   - **Задержка 1 секунда** между сообщениями, чтобы не превысить Telegram rate-limit
-3. Возвращает `{"telegram": N, "vk": M}` — счётчики успешных доставок
-
-**Что особенного**:
-- `_send_single_telegram_message` дублирует логику Telegram-отправки из `TelegramHandler`, но **с собственным MAX_MESSAGE_LENGTH = 3900** (захардкожено) и собственной debug-печатью.
-- Использует `urllib`, не `requests`, как и `TelegramHandler`.
-- При `--no-telegram --no-vk` ничего не делает.
-
-### `apps/core/vk_handler.py` — `send_vk_message(text)`
-
-**Что**: одна функция, которая:
-1. Читает `VK_COMMUNITY_TOKEN`, `VK_USER_ID`, `VK_ENABLED` через decouple
-2. Если длина > **4096** (`VK_MAX_MESSAGE_LENGTH` захардкожено) — обрезает в конце
-3. Генерирует random `random_id` (защита от ретраев на стороне VK)
-4. POST на `https://api.vk.com/method/messages.send` (API version `5.199`)
-5. Обрабатывает HTTPError и общие Exception, логирует
-
-**Возвращает**: `True` / `False`.
-
-### `apps/core/management/commands/test_telegram_errors.py`
-
-**Что**: ручной тест Telegram-уведомлений. Флаги: `--test-error`, `--test-critical`, `--test-exception`. Использует `TelegramErrorNotifier`.
-
----
-
-## Канал 2: Bash (на хосте сервера)
-
-### `scripts/telegram-config.sh`
-
-**Что**: загружает env через `source .env.prod`, потом `source .env` (если есть). Экспортирует `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ENABLED`, `TELEGRAM_UPLOAD_FILES`, `TELEGRAM_MAX_FILE_SIZE`, `TELEGRAM_API_URL`, `TELEGRAM_SOCKS5_PROXY`, `VK_ENABLED`, `VK_COMMUNITY_TOKEN`, `VK_USER_ID`. Подключается в начале каждого bash-скрипта.
-
-**Дефолты**: `TELEGRAM_ENABLED=false`, `TELEGRAM_UPLOAD_FILES=true`, `TELEGRAM_MAX_FILE_SIZE=45` (Telegram hard limit для ботов = 50 МБ), `VK_ENABLED=false`, `TELEGRAM_SOCKS5_PROXY=""` (пусто = прямое соединение).
-
-**`TELEGRAM_SOCKS5_PROXY` (2026-09-24)**: сервер в РФ, `api.telegram.org` заблокирован на уровне DPI — прямые запросы уходят в таймаут. Если задано `host:port`, curl (bash) и `apps.core.notifications.send_telegram()` (Python, через `requests`+PySocks) идут через SOCKS5-прокси вместо прямого соединения — например, SSH `-D` туннель до сервера с чистой связью. Настройка и обоснование конкретной схемы (SSH-туннель до Амстердама, а не VPN или свой relay-сервис) — `scripts/setup-tg-relay-tunnel.md`.
-
-### `scripts/telegram-notify.sh` (~700 строк)
-
-**Что**: библиотека функций для bash-скриптов. Сорсится в начале backup/monitor скриптов.
-
-**Функции отправки**:
-- `send_telegram_message_only(text)` — `curl -4` (форс IPv4 — обход IPv6-багов в Docker), retry 2, timeout 15+60s
-- `send_telegram_file_only(path, caption)` — sendDocument, проверка размера, **автокомпрессия gzip** если > `TELEGRAM_MAX_FILE_SIZE`; если файл не влезает ни при какой компрессии — падает обратно на `send_telegram_message_only(caption)`, чтобы Telegram не остался вообще без уведомления (2026-09-24)
-- `send_vk_mirror_message(text)` — VK messages.send через curl; текст автоматически получает префикс атрибуции `🏢 polis.insflow` (в этот же диалог шлют сообщения и другие проекты, см. `VK_ATTRIBUTION_PREFIX`)
-- `send_vk_file(path, caption)` — **4-шаговая загрузка**: docs.getMessagesUploadServer → upload bytes → docs.save → messages.send (с attachment); caption получает тот же префикс атрибуции
-- `send_telegram_message(text)` — параллельная отправка в TG + VK через `&` и `wait`. **Возвращает 0 если хотя бы один канал успел.**
-- `send_telegram_file(path, caption)` — то же но для файлов
-
-**Wrapper-функции** для backup-скриптов (тексты на русском; message-count review 2026-09-24 убрал start-уведомление и слил success+файл в одно сообщение — раньше один успешный бэкап порождал до 3 отдельных сообщений):
-- `notify_backup_success(type, file, size, duration, [deleted_count, retention_days])` — «✅ Бэкап готов» + **файл одним сообщением** (текст — подпись к файлу через `send_telegram_file`, а не отдельный `send_telegram_message`); если `deleted_count > 0`, в это же сообщение добавляется строка про очистку вместо отдельного уведомления
-- `notify_backup_error(type, error)` — «❌ Бэкап не прошёл»
-
-**JSON-парсинг**: для VK file upload используется `python3 -c '...'` чтобы вытащить поля из JSON ответа (нет jq).
-
-### `scripts/backup-db-telegram.sh`
-
-**Триггер**: cron на сервере (см. `scripts/setup-backup-cron.sh`).
-
-**Что делает**:
-1. `pg_dump` через docker exec
-2. `gzip` сжатие
-3. проверка целостности (`verify_backup`)
-4. `cleanup_old_backups()` (старше `RETENTION_DAYS=30`, не менее `MIN_RETAINED_BACKUPS=5`) — результат сохраняется в `CLEANUP_DELETED_COUNT`/`CLEANUP_RETENTION_DAYS`, отдельного уведомления не шлёт
-5. `notify_backup_success("База данных", file, size, duration, "$CLEANUP_DELETED_COUNT", "$CLEANUP_RETENTION_DAYS")` — TG + VK, **одно сообщение** (текст + файл вместе, плюс строка про очистку, если что-то удалено)
-
-При любой ошибке — `notify_backup_error(...)`.
-
-### `scripts/backup-media-telegram.sh`
-
-То же самое, но для media volume.
-
-### `scripts/monitor-logs-telegram.sh`
-
-**Триггер**: запускается как daemon (`--daemon`) или разово (`--once`) через cron.
-
-**Что делает**:
-1. Хранит позицию чтения логов в `logs/.monitor_state` — продолжает с последнего места
-2. Каждые `CHECK_INTERVAL` секунд (по умолчанию 60) читает новые строки `logs/django.log` и `logs/security.log`
-3. Если строка содержит `ERROR` или `CRITICAL` — вызывает `send_error_notification`:
-   - Свой собственный rate-limit `MAX_ERRORS_PER_HOUR=10` (через тот же state file)
-   - Формирует сообщение «🚨 Log Error Detected» — отличается от Python «🚨 Critical Error Detected»
-   - Отправляет через `send_telegram_message` (TG+VK параллельно)
-
-**Это причина, по которой ты получаешь два разных вида алертов** — один из Python (когда Django вызывает `logger.error`), и один из bash (когда тот же логер записал в файл и monitor его подобрал). На текущем проде вероятно работают оба — это и есть **дублирование**.
-
-### `scripts/setup-telegram.sh`, `scripts/setup-error-monitoring.sh`
-
-Однократные setup-скрипты для первой настройки. Запрашивают токены, валидируют, прописывают в `.env.prod`.
-
-### `scripts/monitor-health.sh`
-
-**Не использует Telegram/VK** — это про email alerting (флаг `--alert-email`). Упоминаю чтобы не было путаницы: «health» в названии не значит «шлёт в Telegram». В Python `system_health_check` шлёт.
-
----
-
-## Конфигурация: где какая переменная читается
-
-| Переменная | Python (decouple) | Bash (env) | Default |
-|------------|-------------------|------------|---------|
-| `TELEGRAM_BOT_TOKEN` | ✓ | ✓ | пусто |
-| `TELEGRAM_CHAT_ID` | ✓ | ✓ | пусто |
-| `TELEGRAM_ENABLED` | ✓ | ✓ | `false` |
-| `TELEGRAM_UPLOAD_FILES` | ✗ | ✓ | `true` |
-| `TELEGRAM_MAX_FILE_SIZE` | ✗ | ✓ | `45` |
-| `TELEGRAM_ERROR_RATE_LIMIT` | ✓ | ✗ | `10` |
-| `TELEGRAM_ERROR_MESSAGE_LIMIT` | ✓ | ✗ | `500` |
-| `TELEGRAM_EXCEPTION_MESSAGE_LIMIT` | ✓ | ✗ | `700` |
-| `TELEGRAM_TRACEBACK_LIMIT` | ✓ | ✗ | `2500` |
-| `TELEGRAM_MESSAGE_LIMIT` | ✓ | ✗ | `3900` |
-| `MAX_ERRORS_PER_HOUR` (bash monitor) | ✗ | ✓ | `10` |
-| `VK_COMMUNITY_TOKEN` | ✓ | ✓ | пусто |
-| `VK_USER_ID` | ✓ | ✓ | пусто |
-| `VK_ENABLED` | ✓ | ✓ | `false` |
-
-Обрати внимание:
-- **Python-rate-limit и bash-rate-limit идут под одним именем** в коде, но **через разные переменные**. Их нельзя поменять одной правкой.
-- **`TELEGRAM_UPLOAD_FILES`** — только в bash. Python нигде не загружает файлы.
-- **`TELEGRAM_*_LIMIT`** — только в Python. В bash нет понятия лимита длины сообщения (полагается на вызывающего).
-
----
-
-## Дублирования и расхождения
-
-### 1. Две независимые реализации отправки в Telegram
-
-| Аспект | Python (TelegramHandler) | Python (daily_digest) | Bash (telegram-notify.sh) |
-|--------|--------------------------|------------------------|---------------------------|
-| HTTP клиент | urllib | urllib | curl |
-| Retry | нет | нет | `--retry 2-3` |
-| Force IPv4 | нет | нет | `-4` |
-| Обрезание | `_trim_with_middle_ellipsis` | `_truncate_message` | нет (полагается на caller) |
-| Rate limit | in-memory list | нет | state file |
-| Группировка | in-memory dict | нет | нет |
-| Параллельная VK-отправка | нет (последовательно) | нет (последовательно) | да (через `&` + `wait`) |
-
-### 2. Лимит длины сообщения — три места
-
-- `apps/core/telegram_handler.py:52` — `TELEGRAM_MESSAGE_LIMIT=3900` (env-настраиваемый)
-- `apps/core/management/commands/daily_digest.py:1114, 1261` — `3900` захардкожено в двух местах
-- `apps/core/vk_handler.py:19` — `VK_MAX_MESSAGE_LENGTH=4096` захардкожено
-- В bash — лимита нет
-
-### 3. Rate-limit «10 в час» — два независимых счётчика
-
-- `TelegramHandler.sent_messages` (Python, in-memory)
-- `monitor-logs-telegram.sh:.monitor_state` (Bash, file)
-
-Они не координируются. Если Python `logger.error` срабатывает 10 раз и упёрся в свой лимит — bash-monitor может прислать ещё 10 алертов про те же ошибки (они уже в файле логов).
-
-### 4. Два разных формата сообщения для одной и той же ошибки
-
-Если в коде `logger.error("X")`:
-- Python TelegramHandler сразу отправит «🚨 Critical Error Detected\n📊 Level: ERROR\n…»
-- Bash monitor через ~60 секунд прочитает строку и отправит «🚨 Log Error Detected\n📁 Log File: django.log\n…»
-
-Прод видит **оба сообщения**.
-
-### 5. VK-зеркалирование — три разные стратегии
-
-- `TelegramHandler._send_message_async` — после Telegram **всегда** зеркалит в VK
-- `daily_digest._send_telegram_messages(mirror_to_vk=True)` — управляется флагом
-- Bash `send_telegram_message` — параллельно в обе системы
-
-### 6. Файлы — только bash
-
-VK file upload реализован только в bash (`send_vk_file`, 4 шага). Python вообще не умеет грузить файлы куда-либо. Если Python захочет послать файл (например, экспорт Excel в TG) — придётся писать с нуля.
-
----
-
-## Дыры и риски
-
-### 1. ~~**Threading в TelegramHandler** = unbounded fan-out~~ — ИСПРАВЛЕНО 2026-04-25 (Thread удалён, отправка синхронная)
-
-Раньше `emit()` создавал `Thread(daemon=True)` на каждое логированное событие. Кроме fan-out риска, daemon thread killed в management commands вообще терял сообщения. Теперь — синхронно. Под нагрузкой rate-limit (10/час) защищает от блокировки логгера.
-
-### 2. **Rate-limit per-process under Gunicorn**
-
-Если Gunicorn запускает 4 воркера, у каждого свой `self.sent_messages`. Реальный потолок = 4 × 10 = 40/час, не 10. После рестарта счётчик обнуляется → возможность спама в первый час после деплоя.
-
-### 3. **Telegram API rate-limit 429 не обрабатывается**
-
-Telegram возвращает HTTP 429 + `retry_after` если бот превысил их лимиты (~30 сообщений/сек на чат). Сейчас:
-- Python: молча залогируется в print (не в Django logger!), сообщение потеряно
-- Bash: `curl --retry 2` повторит сразу, скорее всего опять 429, опять fail
-
-### 4. **TELEGRAM_BOT_TOKEN утечка через ошибочный логгер**
-
-В `telegram_handler.py` URL формируется как `https://api.telegram.org/bot{TOKEN}` (строка 59). Если эта строка попадёт в исключение и Django залогирует — **токен уйдёт в логи** (а оттуда в TG-канал того же бота). Сейчас вроде нет таких мест, но риск есть.
-
-### ~~Дублирование VK не гарантировалось~~ — ИСПРАВЛЕНО 2026-04-25
-
-Раньше было два бага, ломавших главный принцип «VK = 100%-резервный канал»:
-- `daily_digest._send_telegram_messages` — VK отправлялся **только** при успехе TG (внутри `if tg_success`). Когда TG падал, дайджест не доходил никуда.
-- `TelegramHandler.emit` создавал `Thread(daemon=True)` — в management command'ах thread убивался до HTTP-запроса. Ни TG ни VK не отправлялись.
-- `TelegramErrorNotifier.notify_critical_error / notify_system_health` — та же daemon-thread проблема.
-
-Сейчас (после правки): VK отправляется всегда, синхронно, **первым** (раньше TG, чтобы не задерживаться на 10s timeout). См. apps/core/telegram_handler.py и apps/core/management/commands/daily_digest.py:_send_telegram_messages.
-
-### 6. **VK random_id уникален «в рамках одного запуска»**
-
-`vk_handler.py:53` — `random.randint(1, 2**31 - 1)`. Если процесс отправит два сообщения подряд за миллисекунды — random может совпасть → VK дедупит, второе сообщение **молча потеряется**. На практике маловероятно, но не нулевой риск. Лучше использовать монотонный счётчик + время.
-
-### 6. **VK 4096 — обрезка в конце**
-
-`vk_handler.py:49` — `text[:VK_MAX_MESSAGE_LENGTH]`. Это режет **конец** сообщения. Для traceback'ов важнее конец (там тип исключения). VK получит начало, без главной информации. В Python TelegramHandler есть умное обрезание `_trim_with_middle_ellipsis` — VK его не использует.
-
-### 7. **Конфигурация через два файла**
-
-Если `.env` (Python) и `.env.prod` (bash) разъехались по `TELEGRAM_BOT_TOKEN` — Python и bash будут писать в разные чаты или один из них замолчит. Никакой проверки нет.
-
-### 8. **Дайджест не имеет fallback**
-
-В `daily_digest._send_telegram_messages` если Telegram упал — VK тоже не отправится (логика mirror только при success TG). Плюс нет retry если оба упали.
-
-### 9. **`monitor-logs-telegram.sh` зависит от файла лога**
-
-Если `logs/django.log` не существует или ротируется чем-то нестандартным — monitor либо ничего не делает, либо ловит «file rotated, starting from beginning» и присылает огромный пакет старых ошибок.
-
-### 10. **`TelegramErrorNotifier` создаёт новый handler на каждый вызов**
-
-`notify_critical_error()` и `notify_system_health()` делают `handler = TelegramHandler()` каждый раз — это **новый rate-limit-счётчик**. Поэтому health-check может слать неограниченно (свой счётчик пуст). Хорошо это или плохо — зависит от точки зрения.
-
----
-
-## Куда двигаться
-
-> **Не ведётся (2026-10-23).** Планы и задачи из этого раздела перенесены в единый бэклог [BACKLOG.md](BACKLOG.md), B-05 (упомянутого `PLAN.md` в репозитории нет); ниже — исторический текст.
-
-Список follow-up задач, которые я сформировал по итогам аудита, добавлен в `PLAN.md`:
-
-- **#8** (был раньше): rate-limit в Redis, чтобы Python и bash считали один счётчик; threading на Celery
-- **#11.1**: убрать дублирование Python ↔ bash для error-мониторинга. Один из вариантов — выпилить `monitor-logs-telegram.sh` целиком, оставить только Python TelegramHandler. Тогда ошибки логирования идут одним путём.
-- **#11.2**: единая утилита `apps.core.notifications` — обертка над Telegram + VK с единой обрезкой, ретраями, обработкой 429
-- **#11.3**: VK file upload в Python (если когда-то захотим слать Excel-экспорты)
-- **#11.4**: проверка консистентности `.env` и `.env.prod` (скрипт sanity-check на сервере)
-- **#11.5**: 429-aware retry с уважением `retry_after`
-
-См. PLAN.md, секция «11. Полный аудит pipeline...» — там это разнесено по приоритетам.
+# Уведомления Telegram и VK
+
+Актуализировано 2026-11-06 в рамках B-05. Здесь описана действующая схема;
+статусы задач ведутся только в [BACKLOG.md](BACKLOG.md).
+
+## Независимость каналов
+
+VK получает сообщения независимо от успеха Telegram. Telegram может быть
+недоступен с сервера в РФ; его ошибка не должна отменять отправку в VK.
+Для Python-уведомлений VK ставится в очередь первым. Каждый канал можно
+отключить своей переменной окружения.
+
+## Ошибки Django и служебные уведомления
+
+`config/settings.py` подключает `apps.core.telegram_handler.TelegramHandler`
+к ERROR/CRITICAL-логам. Обработчик форматирует сообщение, сохраняет полезный
+конец исключения/traceback и передаёт отправку в Celery.
+
+`TelegramErrorNotifier` использует тот же путь допуска сообщений. Кастомные
+критичные ошибки и critical health-check подчиняются общему лимиту ошибок,
+а healthy/warning health-уведомления имеют отдельные лимиты: штатная проверка
+здоровья не расходует бюджет ERROR-алертов.
+Секреты маскируются перед отправкой.
+
+Общий часовой лимит хранится в Redis (`TELEGRAM_ERROR_RATE_LIMIT`, по умолчанию
+10). Это один лимит для всех процессов приложения. Подавление повторов также
+должно переживать создание нового handler в очередном процессе/вызове.
+При недоступности Redis применяется fail-open: инфраструктурная ошибка
+ограничителя не должна сама отменять аварийное уведомление.
+
+`apps.core.tasks.send_to_all_task` создаёт отдельные задачи для VK и Telegram.
+Telegram при HTTP 429 повторяется до пяти раз с задержкой `retry_after`.
+При этих повторах VK повторно не отправляется. При недоступном брокере
+handler использует синхронную best-effort отправку в оба канала. Синхронный
+fallback не ожидает `retry_after` внутри пользовательского запроса.
+
+Возврат из постановки в очередь означает принятие задачи, а не подтверждение
+доставки получателю. Фактический результат определяется задачами отправки.
+
+## Health-check
+
+Cron вызывает `system_health_check --check-all --notify-telegram --notify-vk`.
+По умолчанию команда уведомляет при изменении состояния; `--notify-always`
+позволяет запросить уведомление независимо от предыдущего состояния.
+Одна проверка создаёт не более одного сообщения на каждый выбранный канал.
+Отправка health-check выполняется синхронно: история уведомлённого статуса
+обновляется только после подтверждённого успеха хотя бы одного канала.
+VK-only режим работает без настроенного Telegram.
+
+## Дайджест
+
+`apps/core/management/commands/daily_digest.py` формирует части отчёта и
+отправляет их через `apps.core.notifications`. У дайджеста остаётся собственная
+логика разбиения по разделам: это форматирование отчёта, а не вторая реализация
+HTTP-доставки. VK получает части независимо от результата Telegram.
+
+## Обрезка и VK
+
+Общая утилита `apps.core.notification_utils.trim_with_middle_ellipsis`
+сохраняет начало и конец длинного текста. Её используют низкоуровневые
+отправители и форматирование ошибок.
+
+Для VK сохраняется существующий консервативный бюджет 4096 символов с учётом
+префикса `🏢 polis.insflow`. Он применяется и к сообщениям, и к подписям файлов.
+Обрезается середина, чтобы не потерять заключительную строку исключения.
+`random_id` создаётся из системного источника случайности в совместимом
+положительном 31-битном диапазоне. Это вероятностная защита от совпадений,
+а не гарантия уникальности или постоянный идентификатор повторяемой операции.
+Автоматических повторов VK-задачи сейчас нет.
+
+## Скрипты хоста и резервные копии
+
+`scripts/telegram-notify.sh` остаётся библиотекой доставки сообщений/файлов
+для резервного копирования на хосте. Перенос бэкапов в Django не требуется.
+Отправка Telegram и VK выполняется независимо; результат различает доставку
+хотя бы в один канал, ошибку всех включённых каналов и отсутствие каналов.
+
+`backup-db-telegram.sh` и `backup-media-telegram.sh` отправляют результат
+и файл одним сообщением. Если media-файл не помещается в лимит Telegram,
+Telegram получает текст, а файл доставляется в VK. Это принятый режим работы.
+
+Повторный bash-разбор `django.log`/`security.log` удалён вместе с устаревшим
+setup-скриптом. На production служба `telegram-log-monitor.service` отключается
+при закрытии B-05. После ротации логов старые строки больше не могут породить
+вторую пачку алертов из этого контура. Django ERROR-обработчик, health-check,
+дайджест и задания резервного копирования остаются источниками уведомлений.
+
+## Настройки
+
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `TELEGRAM_ENABLED` | Включить Telegram | `false` |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Доступ к Telegram | пусто |
+| `VK_ENABLED` | Включить VK | `false` |
+| `VK_COMMUNITY_TOKEN`, `VK_USER_ID` | Доступ к VK | пусто |
+| `TELEGRAM_SOCKS5_PROXY` | SOCKS5 для Telegram в Python и bash | пусто |
+| `TELEGRAM_ERROR_RATE_LIMIT` | Часовой лимит Python-алертов | `10` |
+| `TELEGRAM_ERROR_MESSAGE_LIMIT` | Бюджет текста ошибки | `500` |
+| `TELEGRAM_EXCEPTION_MESSAGE_LIMIT` | Бюджет исключения | `700` |
+| `TELEGRAM_TRACEBACK_LIMIT` | Бюджет traceback | `2500` |
+| `TELEGRAM_MESSAGE_LIMIT` | Консервативный бюджет сообщения Telegram | `3900` |
+| `TELEGRAM_UPLOAD_FILES` | Загрузка файлов bash-библиотекой | `true` |
+| `TELEGRAM_MAX_FILE_SIZE` | Размер файла для bash-загрузки, МБ | `45` |
+
+Токены, адреса получателей и пароли не выводятся в диагностике и не хранятся
+в документации. Подробности: [SECRETS_OVERVIEW.md](SECRETS_OVERVIEW.md),
+[ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
+SOCKS5-туннель описан в `scripts/setup-tg-relay-tunnel.md`.
+
+## Проверка
+
+Регрессионные тесты покрывают общий допуск/подавление дублей, независимость
+каналов, один VK на health-check, сохранение хвоста длинной ошибки, маскирование
+секретов и обработку Telegram 429 без повторной доставки VK.
+На production проверяются эффективные handlers/настройки, задачи Celery,
+реальный Redis с изолированными ключами и перехваченной доставкой, а также
+состояние отключённого bash-монитора. Такие проверки не отправляют тестовый
+спам получателям.

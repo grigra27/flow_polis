@@ -50,8 +50,8 @@ class Command(BaseCommand):
             "--notify-always",
             action="store_true",
             help=(
-                "Слать уведомление в TG/VK даже когда всё healthy. "
-                "По умолчанию healthy-статус молчит."
+                "Повторить попытку уведомления TG/VK без смены статуса, "
+                "включая healthy. Дедупликация и лимиты отправки сохраняются."
             ),
         )
         parser.add_argument(
@@ -184,26 +184,23 @@ class Command(BaseCommand):
             overall_status, notify_requested, options["notify_always"]
         )
 
-        if options["notify_telegram"] and should_notify:
-            self._send_telegram_notification(results, overall_status)
-        elif options["notify_telegram"]:
-            self.stdout.write(
-                f"ℹ️  Status={overall_status} не изменился с прошлого "
-                "уведомления, Telegram-уведомление пропущено "
-                "(используй --notify-always чтобы слать всегда)"
-            )
-
-        if options["notify_vk"] and should_notify:
-            self._send_vk_notification(results, overall_status)
-        elif options["notify_vk"]:
-            self.stdout.write(
-                f"ℹ️  Status={overall_status} не изменился с прошлого "
-                "уведомления, VK-уведомление пропущено "
-                "(используй --notify-always чтобы слать всегда)"
-            )
-
         if notify_requested and should_notify:
-            self._set_last_notified_status(overall_status)
+            channels = tuple(
+                channel
+                for channel, requested in (
+                    ("vk", options["notify_vk"]),
+                    ("telegram", options["notify_telegram"]),
+                )
+                if requested
+            )
+            if self._send_notification(results, overall_status, channels):
+                self._set_last_notified_status(overall_status)
+        elif notify_requested:
+            self.stdout.write(
+                f"ℹ️  Status={overall_status} не изменился с прошлого "
+                "уведомления, отправка пропущена "
+                "(используй --notify-always чтобы повторить проверку каналов)"
+            )
 
         # Логируем критические проблемы
         if overall_status == "critical":
@@ -212,7 +209,12 @@ class Command(BaseCommand):
                 for name, result in results.items()
                 if result["status"] == "critical"
             ]
-            logger.critical(f"System health check failed: {'; '.join(critical_issues)}")
+            # Каналы определяются CLI flags выше. Сохраняем обычный log, но
+            # TelegramHandler не должен отправлять второе уведомление из него.
+            logger.critical(
+                f"System health check failed: {'; '.join(critical_issues)}",
+                extra={"notification_handled": True},
+            )
 
     def _resolve_notify_decision(self, overall_status, notify_requested, notify_always):
         """
@@ -589,59 +591,31 @@ class Command(BaseCommand):
 
         self.stdout.write("")
 
-    def _send_telegram_notification(self, results, overall_status):
-        """Отправляет уведомление в Telegram"""
-        self.stdout.write("📤 Отправка уведомления в Telegram...")
+    def _send_notification(self, results, overall_status, channels):
+        """Одна попытка на выбранный канал; очередь не считается доставкой."""
+        channel_names = {"vk": "VK", "telegram": "Telegram"}
+        selected = ", ".join(channel_names[channel] for channel in channels)
+        self.stdout.write(f"📤 Отправка уведомления: {selected}...")
 
         # Формируем метрики для отправки
         metrics = {}
         for check_name, result in results.items():
             metrics[check_name.title()] = f"{result['status']} - {result['message']}"
 
-        success = TelegramErrorNotifier.notify_system_health(overall_status, metrics)
-
-        if success:
-            self.stdout.write(self.style.SUCCESS("✅ Уведомление отправлено в Telegram"))
-        else:
-            self.stdout.write(
-                self.style.WARNING("⚠️ Не удалось отправить уведомление в Telegram")
-            )
-
-    def _send_vk_notification(self, results, overall_status):
-        """Отправляет уведомление о состоянии системы в VK"""
-        from apps.core.vk_handler import send_vk_message
-        from datetime import datetime, timezone, timedelta
-
-        self.stdout.write("📤 Отправка уведомления в VK...")
-
-        status_emoji = (
-            "✅"
-            if overall_status == "healthy"
-            else "⚠️"
-            if overall_status == "warning"
-            else "❌"
+        success = TelegramErrorNotifier.notify_system_health(
+            overall_status, metrics, channels=channels
         )
-        moscow_tz = timezone(timedelta(hours=3))
-        timestamp = datetime.now(moscow_tz).strftime("%Y-%m-%d %H:%M:%S MSK")
-
-        message_parts = [
-            f"{status_emoji} System Health Check",
-            "",
-            f"🕐 Time: {timestamp}",
-            f"📊 Status: {overall_status.upper()}",
-            "",
-            "📈 Metrics:",
-        ]
-        for check_name, result in results.items():
-            message_parts.append(
-                f"• {check_name.title()}: {result['status']} — {result['message']}"
-            )
-
-        success = send_vk_message("\n".join(message_parts))
 
         if success:
-            self.stdout.write(self.style.SUCCESS("✅ Уведомление отправлено в VK"))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "✅ API подтвердил отправку хотя бы в один выбранный канал"
+                )
+            )
         else:
             self.stdout.write(
-                self.style.WARNING("⚠️ Не удалось отправить уведомление в VK")
+                self.style.WARNING(
+                    "⚠️ Уведомление не отправлено: канал отключён, повтор, лимит или ошибка API"
+                )
             )
+        return success

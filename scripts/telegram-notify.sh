@@ -421,8 +421,7 @@ send_telegram_file_only() {
 #   0 = delivered to at least one enabled channel
 #   1 = at least one channel enabled, but delivery failed on all of them
 #   2 = no enabled/applicable channels (NOT a delivery success)
-# Best-effort callers (monitor-logs-telegram.sh, start notifications) keep
-# working via `|| true`.
+# Best-effort callers may explicitly ignore delivery errors via `|| true`.
 send_telegram_message() {
     local message="$1"
     local tg_pid=""

@@ -4,18 +4,20 @@
 """
 import json
 import logging
-import random
+import secrets
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from decouple import config
 
+from apps.core.notification_utils import trim_with_middle_ellipsis
+
 logger = logging.getLogger(__name__)
 
 VK_API_URL = "https://api.vk.com/method/messages.send"
 VK_API_VERSION = "5.199"
-# Лимит VK на длину одного сообщения
+# Existing conservative budget; the VK API 5.199 schema allows up to 9000.
 VK_MAX_MESSAGE_LENGTH = 4096
 
 # Атрибуция источника (2026-09-24): в этот же VK-диалог шлют сообщения и
@@ -24,6 +26,29 @@ VK_MAX_MESSAGE_LENGTH = 4096
 # apps.core.notifications.send_telegram) для этого получателя выделен
 # под данный проект отдельно и в атрибуции не нуждается.
 VK_ATTRIBUTION_PREFIX = "🏢 polis.insflow"
+
+
+def new_vk_random_id() -> int:
+    """Nonzero int32 from OS entropy, independent of process PRNG state.
+
+    VK uses random_id for duplicate suppression. Random draws still have a
+    collision probability; this is not a persistent uniqueness guarantee.
+    """
+    return secrets.randbelow(2**31 - 1) + 1
+
+
+def format_vk_message(text: str, separator: str = "\n\n") -> str:
+    """Keep attribution and the diagnostic tail within the existing budget."""
+    text = "" if text is None else str(text)
+    if not text:
+        return VK_ATTRIBUTION_PREFIX
+    prefix = VK_ATTRIBUTION_PREFIX + separator
+    if len(prefix) + len(text) > VK_MAX_MESSAGE_LENGTH:
+        logger.warning(
+            "Сообщение для VK превышает лимит (%d символов), будет обрезано",
+            len(prefix) + len(text),
+        )
+    return prefix + trim_with_middle_ellipsis(text, VK_MAX_MESSAGE_LENGTH - len(prefix))
 
 
 def send_vk_message(text: str) -> bool:
@@ -48,18 +73,8 @@ def send_vk_message(text: str) -> bool:
         logger.error("VK не настроен: отсутствует VK_COMMUNITY_TOKEN или VK_USER_ID")
         return False
 
-    text = f"{VK_ATTRIBUTION_PREFIX}\n\n{text}"
-
-    if len(text) > VK_MAX_MESSAGE_LENGTH:
-        logger.warning(
-            "Сообщение для VK превышает лимит (%d символов), будет обрезано",
-            len(text),
-        )
-        text = text[:VK_MAX_MESSAGE_LENGTH]
-
-    # random_id — обязательный параметр VK API, защищает от повторной отправки
-    # при retry. Уникален в рамках одного запуска.
-    random_id = random.randint(1, 2**31 - 1)
+    text = format_vk_message(text)
+    random_id = new_vk_random_id()
 
     data = {
         "user_id": user_id,

@@ -8,6 +8,7 @@ VK/Telegram (какой канал первый, независимость др
 test_notifications.py.
 """
 from urllib.parse import parse_qs
+from unittest.mock import patch
 
 import apps.core.vk_handler as vk_handler
 
@@ -74,3 +75,39 @@ def test_send_vk_message_truncation_accounts_for_prefix(monkeypatch):
 
     assert len(sent) == vk_handler.VK_MAX_MESSAGE_LENGTH
     assert sent.startswith(vk_handler.VK_ATTRIBUTION_PREFIX)
+
+
+def test_long_vk_error_keeps_attribution_context_and_exception_tail(monkeypatch):
+    tail = "IntegrityError: duplicate policy number"
+    text = "Request context\n" + "trace frame\n" * 1000 + tail
+
+    sent = _sent_message(monkeypatch, text)
+
+    assert len(sent) == vk_handler.VK_MAX_MESSAGE_LENGTH
+    assert sent.startswith(vk_handler.VK_ATTRIBUTION_PREFIX + "\n\nRequest context")
+    assert sent.endswith(tail)
+
+
+def test_vk_random_ids_use_os_entropy_within_nonzero_int32(monkeypatch):
+    """Copied/reseeded application PRNG state must not replay outgoing IDs."""
+    monkeypatch.setattr(vk_handler, "config", _vk_config_enabled())
+    draws = iter([0, 2**31 - 2])
+    bounds = []
+    sent_ids = []
+
+    def entropy(bound):
+        bounds.append(bound)
+        return next(draws)
+
+    def fake_urlopen(request, timeout=None):
+        sent_ids.append(int(parse_qs(request.data.decode())["random_id"][0]))
+        return _FakeResponse('{"response": 1}')
+
+    monkeypatch.setattr(vk_handler.secrets, "randbelow", entropy)
+    monkeypatch.setattr(vk_handler, "urlopen", fake_urlopen)
+    with patch("random.randint", return_value=42):
+        assert vk_handler.send_vk_message("first") is True
+        assert vk_handler.send_vk_message("second") is True
+
+    assert bounds == [2**31 - 1, 2**31 - 1]
+    assert sent_ids == [1, 2**31 - 1]

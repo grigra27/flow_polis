@@ -10,6 +10,7 @@
 from unittest.mock import patch
 
 import requests
+import pytest
 
 import apps.core.notifications as notifications
 
@@ -189,6 +190,73 @@ def test_send_telegram_via_proxy_handles_network_error(monkeypatch):
     monkeypatch.setattr(notifications.requests, "post", fake_post)
 
     assert notifications.send_telegram("hi") is False
+
+
+@pytest.mark.parametrize("proxy", [False, True])
+def test_telegram_network_diagnostics_scrub_full_and_relative_bot_urls(
+    monkeypatch, caplog, proxy
+):
+    from urllib.error import URLError
+
+    token = "123456789:" + "synthetic-notification-token"
+    monkeypatch.setattr(
+        notifications,
+        "config",
+        _proxy_config(
+            {
+                "TELEGRAM_BOT_TOKEN": token,
+                "TELEGRAM_SOCKS5_PROXY": "127.0.0.1:1080" if proxy else "",
+            }
+        ),
+    )
+    diagnostic = (
+        f"Connection failed: https://api.telegram.org/bot{token}/sendMessage; "
+        f"relative url: /bot{token}/sendMessage; connection refused"
+    )
+
+    def fail(*args, **kwargs):
+        if proxy:
+            raise requests.ConnectionError(diagnostic)
+        raise URLError(diagnostic)
+
+    monkeypatch.setattr(
+        notifications.requests if proxy else notifications,
+        "post" if proxy else "urlopen",
+        fail,
+    )
+
+    assert notifications.send_telegram("diagnostic") is False
+
+    records = [
+        record for record in caplog.records if record.name == notifications.__name__
+    ]
+    assert records
+    for record in records:
+        assert token not in record.getMessage()
+        assert token not in repr(record.args)
+    assert caplog.text.count("/bot***/sendMessage") == 2
+    assert "connection refused" in caplog.text
+
+
+def test_telegram_transport_diagnostic_is_bounded_and_keeps_error_tail(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+
+    def fail(*args, **kwargs):
+        raise requests.ConnectionError(
+            "connection details; " * 1000 + "connection refused"
+        )
+
+    monkeypatch.setattr(notifications.requests, "post", fail)
+
+    assert notifications.send_telegram("diagnostic") is False
+
+    record = next(
+        record for record in caplog.records if record.name == notifications.__name__
+    )
+    assert len(record.args[0]) <= 500
+    assert record.args[0].endswith("connection refused")
 
 
 def test_send_telegram_via_proxy_handles_non_json_response(monkeypatch):
@@ -431,6 +499,64 @@ def test_parse_retry_after_default_when_nothing_present():
     assert notifications._parse_retry_after(err, "") == 60
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "null",
+        "[]",
+        "123",
+        '"not an object"',
+        '{"parameters":[]}',
+        '{"parameters":"invalid"}',
+        '{"parameters":{"retry_after":true}}',
+    ],
+)
+def test_invalid_retry_after_json_shape_uses_retry_header(body):
+    err = _http_error_429(body, header_retry_after="17")
+
+    assert notifications._parse_retry_after(err, body) == 17
+
+
+@pytest.mark.parametrize("proxy", [False, True])
+def test_telegram_429_with_non_object_json_still_requests_retry(monkeypatch, proxy):
+    monkeypatch.setattr(
+        notifications,
+        "config",
+        _proxy_config({"TELEGRAM_SOCKS5_PROXY": "127.0.0.1:1080" if proxy else ""}),
+    )
+    if proxy:
+        monkeypatch.setattr(
+            notifications.requests,
+            "post",
+            lambda *a, **kw: _FakeRequestsResponse(
+                429, text="[]", headers={"Retry-After": "17"}
+            ),
+        )
+    else:
+
+        def fail_urlopen(*args, **kwargs):
+            raise _http_error_429("[]", header_retry_after="17")
+
+        monkeypatch.setattr(notifications, "urlopen", fail_urlopen)
+
+    with pytest.raises(notifications.TelegramRateLimitError) as caught:
+        notifications.send_telegram("message", raise_on_rate_limit=True)
+
+    assert caught.value.retry_after == 17
+
+
+@pytest.mark.parametrize("payload", [[], 42, "unexpected"])
+def test_telegram_proxy_non_object_response_returns_false(monkeypatch, payload):
+    monkeypatch.setattr(notifications, "config", _proxy_config())
+    monkeypatch.setattr(
+        notifications.requests,
+        "post",
+        lambda *a, **kw: _FakeRequestsResponse(200, payload),
+    )
+
+    assert notifications.send_telegram("message") is False
+
+
 # ──────────────────────────────────────────────────────────────────
 # Тесты VK file upload (PLAN 11.5)
 # ──────────────────────────────────────────────────────────────────
@@ -584,3 +710,42 @@ def test_send_vk_file_handles_network_error(monkeypatch, tmp_path):
     monkeypatch.setattr(notifications.requests, "post", fake_post)
 
     assert notifications.send_vk_file(str(test_file)) is False
+
+
+def test_vk_file_caption_keeps_prefix_and_tail_within_shared_budget(
+    monkeypatch, tmp_path
+):
+    from apps.core import vk_handler
+
+    monkeypatch.setattr(notifications, "config", _vk_config_enabled())
+    monkeypatch.setattr(vk_handler.secrets, "randbelow", lambda bound: 0)
+    test_file = tmp_path / "report.xlsx"
+    test_file.write_bytes(b"report fixture")
+    responses = iter(
+        [
+            {"response": {"upload_url": "https://upload.vk/fixture"}},
+            {"file": "file-token"},
+            {"response": [{"owner_id": -42, "id": 7}]},
+            {"response": 1},
+        ]
+    )
+    posts = []
+
+    def fake_post(url, **kwargs):
+        posts.append(kwargs.get("data"))
+        return _FakeResponse(next(responses))
+
+    monkeypatch.setattr(notifications.requests, "post", fake_post)
+    tail = "Final diagnostic: backup verified"
+    caption = "Backup context\n" + "details\n" * 1000 + tail
+
+    assert notifications.send_vk_file(str(test_file), caption) is True
+
+    sent = posts[-1]
+    assert len(sent["message"]) == vk_handler.VK_MAX_MESSAGE_LENGTH
+    assert sent["message"].startswith(
+        vk_handler.VK_ATTRIBUTION_PREFIX + " · Backup context"
+    )
+    assert sent["message"].endswith(tail)
+    assert sent["random_id"] == 1
+    assert sent["attachment"] == "doc-42_7"

@@ -3,18 +3,24 @@ Telegram Logging Handler for Django.
 
 Этот модуль реализует только специфику logging-handler'а:
   • Rate-limit через Redis (общий для всех Gunicorn-воркеров)
-  • Группировка одинаковых ошибок (раз в 10 мин, in-memory)
+  • Группировка одинаковых ошибок в Redis на 10 минут
   • Форматирование с emoji, timestamp, traceback, request info
 
-Отправка делегируется в Celery task apps.core.tasks.send_to_all_task —
-не блокирует request handler. При недоступности Celery/Redis fallback
-на синхронный apps.core.notifications.send_to_all.
+Отправка делегируется в Celery-задачи выбранных каналов и не ждёт их API.
+При недоступности очереди используется синхронная отправка в те же каналы.
 """
 import logging
+import hashlib
+import json
+import time
 import traceback
 from datetime import datetime, timezone, timedelta
+from threading import Lock
+from uuid import uuid4
 from decouple import config
-from apps.core.notifications import check_rate_limit, send_to_all
+from apps.core.notifications import check_rate_limit
+from apps.core.logging_filters import SensitiveDataFilter
+from apps.core.notification_utils import trim_with_middle_ellipsis
 
 
 def get_moscow_time():
@@ -25,16 +31,40 @@ def get_moscow_time():
 
 class TelegramHandler(logging.Handler):
     """
-    Кастомный logging handler для отправки критических ошибок в Telegram
+    Logging handler для отправки критических ошибок в Telegram/VK.
     """
+
+    ERROR_RATE_SCOPE = "telegram_handler"
+    HEALTH_RATE_SCOPE_PREFIX = "telegram_health"
+    DEDUP_KEY_PREFIX = "notification_dedup"
+    DEDUP_SECONDS = 600
+    FALLBACK_CACHE_MAX = 1024
+    _fallback_cache = {}
+    _fallback_lock = Lock()
+    _RELEASE_CLAIM = """
+        if redis.call('get', KEYS[1]) == ARGV[1] then
+            return redis.call('del', KEYS[1])
+        end
+        return 0
+    """
+    INTERNAL_LOGGERS = (
+        "apps.core.notifications",
+        "apps.core.vk_handler",
+        "apps.core.tasks",
+        __name__,
+    )
 
     def __init__(self, level=logging.ERROR):
         super().__init__(level)
 
-        # Загружаем настройки Telegram из переменных окружения
+        # Канал доступен только при enabled и полном наборе его настроек.
         self.bot_token = config("TELEGRAM_BOT_TOKEN", default="")
         self.chat_id = config("TELEGRAM_CHAT_ID", default="")
         self.enabled = config("TELEGRAM_ENABLED", default=False, cast=bool)
+        self.vk_enabled = config("VK_ENABLED", default=False, cast=bool)
+        self.vk_token = config("VK_COMMUNITY_TOKEN", default="")
+        self.vk_user_id = config("VK_USER_ID", default="")
+        self._sensitive_filter = SensitiveDataFilter()
 
         # Настройки rate limiting
         self.max_messages_per_hour = config(
@@ -53,84 +83,150 @@ class TelegramHandler(logging.Handler):
         self.telegram_message_limit = config(
             "TELEGRAM_MESSAGE_LIMIT", default=3900, cast=int
         )
-        self.message_cache = {}  # Кэш для группировки одинаковых ошибок
-        self.sent_messages = []  # История отправленных сообщений для rate limiting
-
-        # URL для Telegram API
-        if self.bot_token:
-            self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
-        else:
-            self.api_url = None
 
     def emit(self, record):
-        """
-        Отправляет лог-запись в Telegram + VK.
-
-        Раньше отправка шла в Thread(daemon=True) — но в management
-        command'ах daemon thread убивался при выходе процесса до того,
-        как успевала уйти HTTP-запись. Сообщения терялись.
-
-        Теперь синхронно: блокирует логгер до 10s × (TG + VK).
-        Это приемлемо: rate-limit не даст спамить, а критичные ошибки
-        важнее доли секунды задержки в request handler'е.
-        """
-        if not self._should_send_message(record):
+        """Ставит ERROR+ в очередь; ошибки самой доставки не порождают алерты."""
+        if (
+            record.levelno < logging.ERROR
+            or getattr(record, "notification_handled", False)
+            or self._is_delivery_record(record)
+        ):
             return
-
         try:
-            message = self._format_message(record)
-            self._send_message_async(message)
-        except Exception as e:
-            # Не должны падать если не можем отправить в Telegram
-            print(f"TelegramHandler error: {e}")
+            self.notify_message(
+                self._format_message(record), self._get_error_key(record)
+            )
+        except Exception as exc:
+            # Не печатаем текст исключения: сетевые ошибки могут содержать ключи.
+            print(f"TelegramHandler error: {type(exc).__name__}")
 
-    def _should_send_message(self, record):
-        """
-        Проверяет нужно ли отправлять сообщение.
+    @classmethod
+    def _is_delivery_record(cls, record):
+        if any(
+            record.name == name or record.name.startswith(name + ".")
+            for name in cls.INTERNAL_LOGGERS
+        ):
+            return True
+        data = getattr(record, "data", {})
+        task_name = getattr(record, "task_name", "")
+        if isinstance(data, dict):
+            task_name = data.get("name") or task_name
+        return isinstance(task_name, str) and task_name.startswith("apps.core.tasks.")
 
-        Rate-limit теперь через Redis (общий для всех воркеров) — раньше
-        был in-memory list, и при N Gunicorn-воркерах реальный потолок
-        был N × max_messages_per_hour, а не N. См. notifications.check_rate_limit.
+    def _configured_channels(self, channels):
+        requested = set(("vk", "telegram") if channels is None else channels)
+        if requested - {"vk", "telegram"}:
+            raise ValueError("Unknown notification channel")
+        configured = {
+            "vk": self.vk_enabled and self.vk_token and self.vk_user_id,
+            "telegram": self.enabled and self.bot_token and self.chat_id,
+        }
+        return tuple(
+            name
+            for name in ("vk", "telegram")
+            if name in requested and configured[name]
+        )
 
-        Группировка одинаковых ошибок осталась in-memory (per-worker) —
-        это менее критично и не требует Redis.
-        """
-        # Проверяем базовые настройки
-        if not self.enabled or not self.bot_token or not self.chat_id:
+    def _sanitize(self, message):
+        message = str(message)
+        for token in (self.bot_token, self.vk_token):
+            if len(token) >= 8:
+                message = message.replace(token, "***")
+        record = logging.makeLogRecord({"msg": message, "args": ()})
+        self._sensitive_filter.filter(record)
+        return record.getMessage()
+
+    def _claim_notification(self, scope, identity, channels):
+        from apps.core.notifications import _get_redis
+
+        fingerprint = hashlib.sha256(
+            self._sanitize(identity).encode("utf-8")
+        ).hexdigest()
+        key = f"{self.DEDUP_KEY_PREFIX}:{scope}:{','.join(channels)}:{fingerprint}"
+        token = uuid4().hex
+        client = _get_redis()
+        if client is not None:
+            try:
+                if not client.set(key, token, nx=True, ex=self.DEDUP_SECONDS):
+                    return None
+                return client, key, token
+            except Exception:
+                pass
+
+        # Redis outage: new Handler instances still share a bounded TTL cache.
+        now = time.monotonic()
+        with self._fallback_lock:
+            expired = [
+                key
+                for key, (deadline, _) in self._fallback_cache.items()
+                if deadline <= now
+            ]
+            for expired_key in expired:
+                del self._fallback_cache[expired_key]
+            if key in self._fallback_cache:
+                return None
+            if len(self._fallback_cache) >= self.FALLBACK_CACHE_MAX:
+                del self._fallback_cache[next(iter(self._fallback_cache))]
+            self._fallback_cache[key] = now + self.DEDUP_SECONDS, token
+        return None, key, token
+
+    def _release_notification(self, claim):
+        client, key, token = claim
+        if client is not None:
+            try:
+                client.eval(self._RELEASE_CLAIM, 1, key, token)
+            except Exception:
+                pass
+        else:
+            with self._fallback_lock:
+                cached = self._fallback_cache.get(key)
+                if cached is not None and cached[1] == token:
+                    del self._fallback_cache[key]
+
+    def notify_message(
+        self, message, identity, *, channels=None, scope=None, asynchronous=True
+    ):
+        """True: очередь приняла сообщение или хотя бы один API подтвердил отправку."""
+        channels = self._configured_channels(channels)
+        if not channels:
             return False
-
-        # Отправляем только ERROR и CRITICAL
-        if record.levelno < logging.ERROR:
+        scope = scope or self.ERROR_RATE_SCOPE
+        message = self._trim_with_middle_ellipsis(
+            self._sanitize(message), self.telegram_message_limit
+        )
+        claim = self._claim_notification(scope, identity, channels)
+        if claim is None:
             return False
-
-        # Группировка одинаковых ошибок (per-worker, in-memory)
-        now = datetime.now()
-        error_key = self._get_error_key(record)
-        if error_key in self.message_cache:
-            last_sent = self.message_cache[error_key]
-            if (now - last_sent).seconds < 600:
+        accepted = False
+        try:
+            if not check_rate_limit(scope, self.max_messages_per_hour):
                 return False
-        self.message_cache[error_key] = now
-
-        # Глобальный rate-limit через Redis
-        if not check_rate_limit("telegram_handler", self.max_messages_per_hour):
-            return False
-
-        return True
+            if asynchronous:
+                accepted = self._send_message_async(message, channels)
+            else:
+                accepted = self._send_message_sync(message, channels)
+            return accepted
+        finally:
+            if not accepted:
+                self._release_notification(claim)
 
     def _get_error_key(self, record):
         """
         Создает ключ для группировки одинаковых ошибок
         """
-        # Используем имя модуля + тип исключения + первую строку сообщения
-        key_parts = [
-            record.module or "unknown",
-            getattr(record, "exc_info", [None, None, None])[0].__name__
-            if record.exc_info and record.exc_info[0]
-            else "NoException",
-            record.getMessage().split("\n")[0][:100],  # Первые 100 символов
-        ]
-        return "|".join(str(part) for part in key_parts)
+        key_parts = [record.name, record.module, record.getMessage()]
+        if record.exc_info and record.exc_info[0]:
+            exception_type, exception, _ = record.exc_info
+            key_parts.extend(
+                [
+                    f"{exception_type.__module__}.{exception_type.__qualname__}",
+                    str(exception),
+                ]
+            )
+        request = getattr(record, "request", None)
+        if request is not None:
+            key_parts.extend([getattr(request, "method", ""), request.get_full_path()])
+        return json.dumps(key_parts, ensure_ascii=False)
 
     def _format_message(self, record):
         """
@@ -161,7 +257,7 @@ class TelegramHandler(logging.Handler):
             message_parts.extend(
                 [
                     f"👤 User: {user_info}",
-                    f"🌐 URL: {request.get_full_path()[:100]}",
+                    f"🌐 URL: {self._sanitize(request.get_full_path())[:100]}",
                     f"📱 Method: {request.method}",
                 ]
             )
@@ -225,7 +321,7 @@ class TelegramHandler(logging.Handler):
                 ]
             )
 
-        message = "\n".join(message_parts)
+        message = self._sanitize("\n".join(message_parts))
         if len(message) > self.telegram_message_limit:
             message = self._trim_with_middle_ellipsis(
                 message,
@@ -239,36 +335,9 @@ class TelegramHandler(logging.Handler):
     def _trim_with_middle_ellipsis(
         self, text, max_length, marker=" ... ", tail_ratio=0.7
     ):
-        """
-        Обрезает длинный текст, сохраняя начало и конец.
-        Полезно для traceback, где конец содержит тип/сообщение исключения.
-        """
-        if text is None:
-            return ""
-
-        text = str(text)
-        if max_length is None or max_length <= 0 or len(text) <= max_length:
-            return text
-
-        marker = str(marker)
-
-        # Если лимит слишком мал, отдаем хвост (обычно там самая ценная часть traceback).
-        if max_length <= len(marker) + 10:
-            return text[-max_length:]
-
-        available = max_length - len(marker)
-        tail_len = int(available * tail_ratio)
-        head_len = available - tail_len
-
-        # Защита от некорректных ratio/округления
-        if head_len < 1:
-            head_len = 1
-            tail_len = available - head_len
-        if tail_len < 1:
-            tail_len = 1
-            head_len = available - tail_len
-
-        return text[:head_len] + marker + text[-tail_len:]
+        """Скрывает секрет целиком до обрезки, сохраняя полезный хвост ошибки."""
+        safe_text = None if text is None else self._sanitize(text)
+        return trim_with_middle_ellipsis(safe_text, max_length, marker, tail_ratio)
 
     def _escape_html(self, text):
         """
@@ -284,29 +353,49 @@ class TelegramHandler(logging.Handler):
             import socket
 
             return socket.gethostname()
-        except:
+        except Exception:
             return "unknown"
 
-    def _send_message_async(self, message):
+    def _send_message_async(self, message, channels):
         """
-        Ставит отправку в Celery очередь (apps.core.tasks.send_to_all_task).
-        Не блокирует caller — возвращается мгновенно.
-
-        Если Celery/Redis недоступны (broker down, импорт упал),
-        делает fallback на синхронную отправку. Лучше задержать запрос
-        на 10-20 секунд чем потерять алерт.
+        True означает принятую задачу, а не подтверждение доставки API.
+        При отказе очереди пробует выбранные каналы синхронно.
         """
         try:
-            from apps.core.tasks import send_to_all_task
+            from apps.core.tasks import (
+                send_to_all_task,
+                send_telegram_task,
+                send_vk_task,
+            )
 
-            send_to_all_task.delay(message)
-        except Exception as e:
-            # Fail-open: синхронная отправка, чтобы алерт точно дошёл
-            print(f"TelegramHandler: Celery dispatch failed, sync fallback: {e}")
+            task = (
+                send_to_all_task
+                if len(channels) == 2
+                else send_vk_task
+                if channels == ("vk",)
+                else send_telegram_task
+            )
+            task.delay(message)
+            return True
+        except Exception as exc:
+            print(
+                f"TelegramHandler: очередь недоступна, sync fallback ({type(exc).__name__})"
+            )
+            return self._send_message_sync(message, channels)
+
+    def _send_message_sync(self, message, channels):
+        from apps.core.notifications import send_telegram, send_vk
+
+        sent = False
+        for channel in channels:
             try:
-                send_to_all(message)
-            except Exception as e2:
-                print(f"TelegramHandler: Sync fallback also failed: {e2}")
+                delivered = (
+                    send_vk(message) if channel == "vk" else send_telegram(message)
+                )
+                sent = bool(delivered) or sent
+            except Exception as exc:
+                print(f"TelegramHandler: ошибка {channel} ({type(exc).__name__})")
+        return sent
 
 
 class TelegramErrorNotifier:
@@ -317,12 +406,9 @@ class TelegramErrorNotifier:
     @staticmethod
     def notify_critical_error(title, message, details=None):
         """
-        Отправляет кастомное уведомление о критической ошибке
+        True: уведомление принято очередью или отправлено sync fallback.
         """
         handler = TelegramHandler()
-
-        if not handler.enabled:
-            return False
 
         timestamp = get_moscow_time().strftime("%Y-%m-%d %H:%M:%S MSK")
 
@@ -347,21 +433,17 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Синхронная отправка (внутри: VK сначала, потом Telegram).
-        # Раньше был Thread(daemon=True), но при вызове из management
-        # command'ов он убивался до отправки — см. emit() docstring.
-        handler._send_message_async(formatted_message)
-        return True
+        identity = json.dumps(
+            ["custom_error", title, message, details], sort_keys=True, default=str
+        )
+        return handler.notify_message(formatted_message, identity)
 
     @staticmethod
-    def notify_system_health(status, metrics=None):
+    def notify_system_health(status, metrics=None, *, channels=None):
         """
-        Отправляет уведомление о состоянии системы
+        Синхронно уведомляет выбранные каналы; True — хотя бы один API success.
         """
         handler = TelegramHandler()
-
-        if not handler.enabled:
-            return False
 
         timestamp = get_moscow_time().strftime("%Y-%m-%d %H:%M:%S MSK")
         status_emoji = (
@@ -384,8 +466,18 @@ class TelegramErrorNotifier:
 
         formatted_message = "\n".join(message_parts)
 
-        # Синхронная отправка (внутри: VK сначала, потом Telegram).
-        # Раньше был Thread(daemon=True), но при вызове из management
-        # command'ов он убивался до отправки — см. emit() docstring.
-        handler._send_message_async(formatted_message)
-        return True
+        identity = json.dumps(
+            ["system_health", status, metrics], sort_keys=True, default=str
+        )
+        scope = (
+            handler.ERROR_RATE_SCOPE
+            if status == "critical"
+            else f"{handler.HEALTH_RATE_SCOPE_PREFIX}_{status}"
+        )
+        return handler.notify_message(
+            formatted_message,
+            identity,
+            channels=channels,
+            scope=scope,
+            asynchronous=False,
+        )

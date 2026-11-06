@@ -52,9 +52,6 @@ services:
     image: insurance_broker_web:latest
     # Release workflow runs migrations/collectstatic once before switching apps.
     entrypoint: ["gosu", "app"]
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: insurance_broker_web
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     volumes:
@@ -103,9 +100,6 @@ services:
   celery_worker:
     image: insurance_broker_celery_worker:latest
     entrypoint: ["gosu", "app"]
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: insurance_broker_celery_worker
     command: celery -A config worker -l info
     volumes:
@@ -144,9 +138,6 @@ services:
   celery_beat:
     image: insurance_broker_celery_beat:latest
     entrypoint: ["gosu", "app"]
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: insurance_broker_celery_beat
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:

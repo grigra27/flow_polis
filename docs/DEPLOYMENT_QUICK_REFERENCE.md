@@ -68,6 +68,12 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 старых read/exec-скриптов; пересоздание контейнеров через него может падать с
 `KeyError: ContainerConfig`.
 
+Образ приложения собирается один раз в CI для `linux/amd64`, проходит проверки и
+доставляется на сервер как gzip-архив Docker с SHA-256 и manifest исходного коммита.
+Сервер проверяет архив и идентичность образа, выполняет `docker load` и назначает
+проверенный образ трём существующим тегам приложения. В production Compose нет
+`build`-блоков; повторная сборка и загрузка Python-зависимостей на сервере не нужны.
+
 ### Управление контейнерами
 
 ```bash
@@ -170,10 +176,14 @@ docker compose --compatibility -p insurance_broker --env-file .env.prod -f docke
 # Проверить логи
 docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml logs [service]
 
-# Пересобрать образ
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml build --no-cache [service]
-docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml up -d [service]
+# Проверить конфигурацию без вывода секретов
+docker compose --compatibility -p insurance_broker --env-file .env.prod -f docker-compose.prod.yml config --quiet
 ```
+
+Для пересборки и доставки образа повторите workflow: Actions → Deploy to Production
+→ Run workflow → main. Не используйте `docker compose build` с production-файлом:
+в нём намеренно нет сборки. Workflow проверит CI-артефакт, выполнит подготовку и
+переключение, а при ошибке восстановит сохранённые образы и конфигурацию.
 
 ### Проблемы с SSL
 
@@ -309,9 +319,10 @@ journalctl -u docker -f
 
 ### Обновление приложения
 
-Штатный деплой выполняется через GitHub Actions. Он сохраняет образы и конфигурацию
-для восстановления, собирает новую версию до переключения контейнеров, отдельно
-выполняет миграции/статику и проверяет все семь сервисов и HTTPS.
+Штатный деплой выполняется через GitHub Actions. Он один раз собирает и проверяет
+образ в CI, доставляет его по SSH с проверкой SHA-256, ревизии и идентичности,
+сохраняет прежние образы и конфигурацию для восстановления, отдельно выполняет
+миграции/статику и проверяет все семь сервисов и HTTPS.
 
 ```bash
 # Из локального репозитория, после проверок и разрешения на push:

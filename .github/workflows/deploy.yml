@@ -95,27 +95,37 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [validate, test]
+    env:
+      IMAGE_REF: insurance-broker:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      image-artifact-id: ${{ steps.upload-image.outputs.artifact-id }}
+      image-artifact-name: ${{ steps.export-image.outputs.artifact-name }}
+      image-ref: ${{ steps.export-image.outputs.image-ref }}
+      config-digest: ${{ steps.export-image.outputs.config-digest }}
+      archive-sha256: ${{ steps.export-image.outputs.archive-sha256 }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image once
         run: |
-          echo "Building Docker image..."
-          docker build -t insurance-broker:latest .
-          echo "✅ Docker image built successfully"
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 --provenance=false --load \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --metadata-file "$RUNNER_TEMP/image-build.json" -t "$IMAGE_REF" .
 
       - name: Verify image exists
         run: |
-          echo "Checking if image exists..."
-          docker images | grep insurance-broker
-          echo "✅ Image verified"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}}' "$IMAGE_REF"
 
       - name: Test Docker image
         run: |
           echo "Testing Docker image..."
-          docker run --rm --entrypoint python insurance-broker:latest --version
+          docker run --rm --entrypoint python "$IMAGE_REF" --version
           echo "✅ Docker image is functional"
 
       - name: Smoke test Redis broker transport
@@ -130,7 +140,7 @@ jobs:
           trap cleanup EXIT
           docker network create --internal "$broker_network" > /dev/null
           docker run -d --name "$broker_redis" --network "$broker_network" --network-alias broker-redis redis:7-alpine > /dev/null
-          docker run --rm --network "$broker_network" --entrypoint python insurance-broker:latest -c '
+          docker run --rm --network "$broker_network" --entrypoint python "$IMAGE_REF" -c '
           from kombu import Connection
           with Connection("redis://broker-redis:6379/0") as connection:
               connection.ensure_connection(max_retries=15, interval_start=0.2, interval_step=0.2, interval_max=1)
@@ -142,16 +152,81 @@ jobs:
                   message.ack()
           print("Redis broker publish/consume smoke test passed")'
 
+      - name: Export verified image and portable manifest
+        id: export-image
+        run: |
+          set -euo pipefail
+          image_dir="$RUNNER_TEMP/onlinepolis-image"
+          mkdir -p "$image_dir"
+          docker image save "$IMAGE_REF" | gzip -1 -n > "$image_dir/image.tar.gz"
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, tarfile
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "onlinepolis-image"
+          image_ref = os.environ["IMAGE_REF"]
+          revision = os.environ["GITHUB_SHA"]
+          build = json.loads((root.parent / "image-build.json").read_text())
+          image = json.loads(subprocess.check_output(["docker", "image", "inspect", image_ref]))[0]
+          with tarfile.open(root / "image.tar.gz", "r:gz") as archive:
+              entries = json.load(archive.extractfile("manifest.json"))
+              require(len(entries) == 1 and entries[0]["RepoTags"] == [image_ref], "Unexpected saved image tag")
+              config_blob = archive.extractfile(entries[0]["Config"]).read()
+          config = json.loads(config_blob)
+          config_digest = "sha256:" + hashlib.sha256(config_blob).hexdigest()
+          # Exporter metadata varies by Buildx driver. The saved config's hash
+          # is portable; prove its filesystem and runtime config match the
+          # exact local image that passed the Python and Redis smoke tests.
+          build_config_digest = build.get("containerimage.config.digest")
+          require(not build_config_digest or config_digest == build_config_digest, "Build/export config digest mismatch")
+          require(config["rootfs"]["diff_ids"] == image["RootFS"]["Layers"], "Saved filesystem differs from tested image")
+          for key in ("Env", "Entrypoint", "Cmd", "Labels", "User", "WorkingDir", "StopSignal", "Healthcheck", "Volumes", "ExposedPorts"):
+              require(config["config"].get(key) == image["Config"].get(key), "Saved runtime config differs from tested image: " + key)
+          require(config["os"] == image["Os"] == "linux" and config["architecture"] == image["Architecture"] == "amd64", "Unexpected image platform")
+          require(config["config"]["Labels"]["org.opencontainers.image.revision"] == revision, "Unexpected image revision")
+          metadata = {"schema": 1, "image_ref": image_ref, "revision": revision,
+                      "platform": "linux/amd64", "ci_image_id": image["Id"], "config_digest": config_digest}
+          (root / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n")
+          with (root / "image.tar.gz").open("rb") as stream:
+              digest = hashlib.file_digest(stream, "sha256").hexdigest()
+          (root / "image.tar.gz.sha256").write_text(digest + "  image.tar.gz\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"image-ref={image_ref}\nconfig-digest={config_digest}\narchive-sha256={digest}\n")
+              output.write(f'artifact-name=onlinepolis-image-{revision}-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}\n')
+          print(json.dumps(metadata, sort_keys=True))
+          PY
+
+      - name: Upload verified image artifact
+        id: upload-image
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.export-image.outputs.artifact-name }}
+          path: ${{ runner.temp }}/onlinepolis-image/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
+
   deploy:
     name: Deploy to Timeweb Cloud
     runs-on: ubuntu-latest
     needs: build
     env:
       SSH_PORT: ${{ secrets.SSH_PORT }}
+      IMAGE_REF: ${{ needs.build.outputs.image-ref }}
+      EXPECTED_CONFIG_DIGEST: ${{ needs.build.outputs.config-digest }}
+      EXPECTED_ARCHIVE_SHA256: ${{ needs.build.outputs.archive-sha256 }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download verified image artifact
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.image-artifact-id }}
+          path: ${{ runner.temp }}/onlinepolis-image/
+          digest-mismatch: error
 
       - name: Setup SSH
         env:
@@ -170,10 +245,8 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
-          # Сборка без кэша на проде идёт 20+ минут: PyPI отдаёт ~20 КБ/с, и
-          # pip подолгу молчит. Без keepalive простаивающую SSH-сессию рвёт
-          # (22.10.2026: «client_loop: send disconnect: Broken pipe»), а buildx
-          # при потере клиента отменяет сборку.
+          # Keep long image-transfer/import sessions alive without rebuilding
+          # application images on the production host.
           printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
           chmod 600 ~/.ssh/config
           echo "✅ SSH configured"
@@ -228,6 +301,8 @@ jobs:
             docker info --format 'Docker Engine {{.ServerVersion}}'
             command -v curl > /dev/null
             command -v flock > /dev/null
+            command -v python3 > /dev/null
+            command -v sha256sum > /dev/null
             mkdir -p "$HOME/.local/state"
             exec 9> "$HOME/.local/state/onlinepolis-deploy.lock"
             flock -w 3600 9 || { echo "❌ Timed out waiting for the production deployment lock"; exit 1; }
@@ -245,7 +320,7 @@ jobs:
             done
             umask 077
             release_dir="$HOME/.local/state/onlinepolis-deploy/$deployment_id"
-            mkdir -p "$release_dir"
+            mkdir -p "$release_dir/artifact"
             cp docker-compose.prod.yml "$release_dir/docker-compose.prod.yml"
             cp -a nginx "$release_dir/nginx"
             printf 'services:\n' > "$release_dir/rollback.yml"
@@ -260,6 +335,18 @@ jobs:
             touch "$release_dir/prepared"
             echo "✅ Compose plugin, existing project volumes and rollback images verified"
           ENDSSH
+
+      - name: Transfer verified image to release storage
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/onlinepolis-image"
+          printf '%s  image.tar.gz\n' "$EXPECTED_ARCHIVE_SHA256" | sha256sum --check -
+          scp -4 -i ~/.ssh/deploy_key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=no \
+            image.tar.gz image.tar.gz.sha256 manifest.json \
+            "$DROPLET_USER@$DROPLET_HOST:.local/state/onlinepolis-deploy/$DEPLOYMENT_ID/artifact/"
 
       - name: Copy files to server
         env:
@@ -395,7 +482,7 @@ jobs:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" << 'ENDSSH'
+          ssh -4 -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=no "$DROPLET_USER@$DROPLET_HOST" bash -s -- "$DEPLOYMENT_ID" "$GITHUB_SHA" "$IMAGE_REF" "$EXPECTED_CONFIG_DIGEST" "$EXPECTED_ARCHIVE_SHA256" << 'ENDSSH'
             set -euo pipefail
             cd ~/insurance_broker
             set -a
@@ -410,14 +497,65 @@ jobs:
             test -f "$release_dir/prepared"
             compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml)
 
-            # Existing infrastructure images/containers remain in place. Build
-            # every application image before changing any running service.
-            echo "🔨 Building new images (old containers keep serving)..."
+            # Verify the exact tested CI artifact before loading or retagging it.
+            # The expected digests come from build-job outputs, not this upload.
+            echo "📦 Verifying and importing the tested CI image..."
+            (cd "$release_dir/artifact" && printf '%s  image.tar.gz\n' "$5" | sha256sum --check -)
+            python3 - "$release_dir" "$2" "$3" "$4" "$5" <<'PY'
+          import hashlib, json, pathlib, re, sys, tarfile
+          release = pathlib.Path(sys.argv[1])
+          revision, image_ref, expected_config, expected_archive = sys.argv[2:]
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+          require(re.fullmatch(r"[0-9a-f]{40}", revision), "Invalid expected revision")
+          require(re.fullmatch(r"insurance-broker:" + revision + r"-[0-9]+-[0-9]+", image_ref), "Invalid image reference")
+          require(re.fullmatch(r"sha256:[0-9a-f]{64}", expected_config), "Invalid expected config digest")
+          require(re.fullmatch(r"[0-9a-f]{64}", expected_archive), "Invalid expected archive checksum")
+          artifact = release / "artifact"
+          require((artifact / "image.tar.gz.sha256").read_text().strip() == expected_archive + "  image.tar.gz", "Checksum manifest differs from CI output")
+          metadata = json.loads((artifact / "manifest.json").read_text())
+          require(metadata.get("schema") == 1 and metadata.get("image_ref") == image_ref, "Image manifest/tag mismatch")
+          require(metadata.get("revision") == revision and metadata.get("platform") == "linux/amd64", "Image revision/platform mismatch")
+          require(metadata.get("config_digest") == expected_config, "Manifest config digest differs from CI output")
+          with tarfile.open(artifact / "image.tar.gz", "r:gz") as archive:
+              entries = json.load(archive.extractfile("manifest.json"))
+              require(len(entries) == 1 and entries[0]["RepoTags"] == [image_ref], "Saved image tag mismatch")
+              config_blob = archive.extractfile(entries[0]["Config"]).read()
+          require("sha256:" + hashlib.sha256(config_blob).hexdigest() == expected_config, "Saved image config digest mismatch")
+          config = json.loads(config_blob)
+          require(config.get("os") == "linux" and config.get("architecture") == "amd64", "Saved image platform mismatch")
+          require(config.get("config", {}).get("Labels", {}).get("org.opencontainers.image.revision") == revision, "Saved image revision mismatch")
+          print("CI artifact verified: " + revision + " " + expected_config + " linux/amd64")
+          PY
+            docker image load --input "$release_dir/artifact/image.tar.gz" < /dev/null
+            python3 - "$release_dir" "$2" "$3" <<'PY'
+          import json, pathlib, re, subprocess, sys
+          release, revision, image_ref = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+          image = json.loads(subprocess.check_output(["docker", "image", "inspect", image_ref]))[0]
+          if image.get("Os") != "linux" or image.get("Architecture") != "amd64":
+              raise SystemExit("Loaded image platform mismatch")
+          if image.get("Config", {}).get("Labels", {}).get("org.opencontainers.image.revision") != revision:
+              raise SystemExit("Loaded image revision mismatch")
+          native_id = image["Id"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", native_id):
+              raise SystemExit("Invalid production image ID")
+          metadata = json.loads((release / "artifact/manifest.json").read_text())
+          metadata["production_image_id"] = native_id
+          # Classic and containerd image stores expose different .Id forms.
+          # Archive/config digests establish CI identity; local IDs guard runtime.
+          (release / "loaded-image.json").write_text(json.dumps(metadata, indent=2) + "\n")
+          (release / "loaded-image-id").write_text(native_id + "\n")
+          print("Imported CI image; production image ID: " + native_id)
+          PY
+            image_ref=$3
+            native_id=$(cat "$release_dir/loaded-image-id")
             rm -f apps/policies/migrations/0011_alter_paymentschedule_unique_together.py
-            "${compose[@]}" build web celery_worker celery_beat < /dev/null
             : > "$release_dir/new-image-ids"
             for service in web celery_worker celery_beat; do
+              docker image tag "$image_ref" "insurance_broker_${service}:latest"
               image_id=$(docker image inspect --format '{{.Id}}' "insurance_broker_${service}:latest")
+              [[ "$image_id" == "$native_id" ]] || { echo "❌ Application tag does not reference the imported CI image: $service"; exit 1; }
               printf '%s %s\n' "$service" "$image_id" >> "$release_dir/new-image-ids"
             done
 
@@ -499,6 +637,7 @@ jobs:
             # A healthy old release must never make an incomplete deploy green.
             test -f "$release_dir/activating"
             test -f "$release_dir/switched"
+            test -f "$release_dir/loaded-image.json"
             test "$(wc -l < "$release_dir/new-image-ids")" -eq 3
             while read -r service expected_id; do
               case "$service" in web|celery_worker|celery_beat) ;; *) exit 1 ;; esac
@@ -529,7 +668,7 @@ jobs:
             # Rollback images have immutable per-run tags and survive pruning.
             docker image prune -f || true
             docker volume prune -f || true
-            docker builder prune -f --filter until=168h || true
+            rm -f "$release_dir/artifact/image.tar.gz"
           ENDSSH
 
       - name: Cleanup SSH
@@ -575,10 +714,8 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -4 -p "${SSH_PORT:-22}" -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
-          # Сборка без кэша на проде идёт 20+ минут: PyPI отдаёт ~20 КБ/с, и
-          # pip подолгу молчит. Без keepalive простаивающую SSH-сессию рвёт
-          # (22.10.2026: «client_loop: send disconnect: Broken pipe»), а buildx
-          # при потере клиента отменяет сборку.
+          # Recovery may wait for an interrupted image import to release the
+          # shared host lock; keep the SSH session alive while it waits.
           printf 'Host *\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' >> ~/.ssh/config
           chmod 600 ~/.ssh/config
 
@@ -605,7 +742,7 @@ jobs:
 
             cp "$release_dir/docker-compose.prod.yml" docker-compose.prod.yml
             cp -a "$release_dir/nginx/." nginx/
-            # A failed/partial build can already have replaced :latest tags.
+            # A failed/partial release can already have replaced :latest tags.
             # Restore those too, so later ordinary Compose commands stay on
             # the recovered release rather than recreating failed new images.
             while read -r service expected_id; do
@@ -624,7 +761,7 @@ jobs:
             compose=(docker compose --compatibility -p "$COMPOSE_PROJECT_NAME" --env-file .env.prod -f docker-compose.prod.yml -f "$release_dir/rollback.yml")
 
             # Only the three app containers and nginx are replaced. Saved image
-            # tags preserve the actual running hotfix image, even after a build.
+            # tags preserve the previous running image after a new CI import.
             "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 180 web celery_worker celery_beat < /dev/null
             "${compose[@]}" up -d --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 90 nginx < /dev/null
             "${compose[@]}" exec -T --interactive=false nginx nginx -t < /dev/null

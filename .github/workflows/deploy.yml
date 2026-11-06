@@ -118,6 +118,30 @@ jobs:
           docker run --rm --entrypoint python insurance-broker:latest --version
           echo "✅ Docker image is functional"
 
+      - name: Smoke test Redis broker transport
+        run: |
+          set -euo pipefail
+          broker_network="onlinepolis-broker-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          broker_redis="${broker_network}-redis"
+          cleanup() {
+            docker rm -fv "$broker_redis" > /dev/null 2>&1 || true
+            docker network rm "$broker_network" > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create --internal "$broker_network" > /dev/null
+          docker run -d --name "$broker_redis" --network "$broker_network" --network-alias broker-redis redis:7-alpine > /dev/null
+          docker run --rm --network "$broker_network" --entrypoint python insurance-broker:latest -c '
+          from kombu import Connection
+          with Connection("redis://broker-redis:6379/0") as connection:
+              connection.ensure_connection(max_retries=15, interval_start=0.2, interval_step=0.2, interval_max=1)
+              with connection.SimpleQueue("ci-broker-smoke") as queue:
+                  payload = {"broker_smoke": True}
+                  queue.put(payload, serializer="json")
+                  message = queue.get(block=True, timeout=5)
+                  assert message.payload == payload, "Broker message round trip failed"
+                  message.ack()
+          print("Redis broker publish/consume smoke test passed")'
+
   deploy:
     name: Deploy to Timeweb Cloud
     runs-on: ubuntu-latest

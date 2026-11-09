@@ -465,6 +465,11 @@ LOGGING = {
         "level": "DEBUG" if DEBUG else "INFO",
     },
     "loggers": {
+        "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "django": {
             "handlers": ["console"] if DEBUG else ["console", "file", "telegram"],
             "level": "INFO",
@@ -552,3 +557,8 @@ if not DEBUG:
     logs_dir = BASE_DIR / "logs"
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
+
+# Между серверами передаются только данные явно открытого менеджером акцепта.
+FLOW_HANDOFF_ENABLED = config("FLOW_HANDOFF_ENABLED", default=False, cast=bool)
+FLOW_SERVICE_TOKEN = get_runtime_config("FLOW_SERVICE_TOKEN")
+FLOW_ZS_BASE_URL = config("FLOW_ZS_BASE_URL", default="https://zs.insflow.ru")

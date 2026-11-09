@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_filters.views import FilterView
@@ -153,6 +154,13 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         policy = self.object
+        context["flow_links"] = [
+            (
+                link.source_id,
+                f"{settings.FLOW_ZS_BASE_URL.rstrip('/')}/summaries/{link.source_id}/",
+            )
+            for link in policy.flow_links.all()
+        ]
         context["info1_tags"] = policy.info_tags.filter(info_field=1).select_related(
             "tag"
         )

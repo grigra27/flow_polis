@@ -29,3 +29,14 @@ def test_transport_endpoint_credentials_are_removed(endpoint, as_argument):
     assert "example_bot_credential" not in rendered
     assert "123456:" not in rendered
     assert "/bot***/sendMessage" in rendered
+
+
+def test_staff_handoff_ticket_is_removed_from_request_line():
+    record = logging.makeLogRecord(
+        {
+            "msg": "%s %s %s",
+            "args": ("GET /flow/from-zs/?code=ticket-for-one-use HTTP/1.1", 302, 0),
+        }
+    )
+    assert SensitiveDataFilter().filter(record)
+    assert record.getMessage() == "GET /flow/from-zs/?code=*** HTTP/1.1 302 0"

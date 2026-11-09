@@ -2,6 +2,19 @@
 {% load policies_admin %}
 
 {% block content %}
+{% if flow_snapshot %}
+<div class="module" id="flow-policy-source">
+<h2>Свод ЗС № {{ flow_snapshot.summary_id }}{% if flow_slot %} · объект {{ flow_slot }} из {{ flow_snapshot.source_object_count }}{% endif %}</h2>
+<p>{{ flow_snapshot.selected_company }} · {{ flow_snapshot.insurance_type }} · вариант {{ flow_snapshot.variant }} · {{ flow_snapshot.insurance_period }}</p>
+{% if flow_snapshot.lease_start_date or flow_snapshot.lease_end_date %}<p>Договор лизинга: {{ flow_snapshot.lease_start_date|default:"—" }} – {{ flow_snapshot.lease_end_date|default:"—" }}. Даты страхования укажите по полису.</p>{% endif %}
+<table><thead><tr><th>Год</th><th>Страховая сумма по своду</th><th>Годовая премия</th><th>Франшиза</th><th>Взносов</th></tr></thead><tbody>
+{% for offer in flow_snapshot.offers %}<tr><td>{{ offer.year }}</td><td>{{ offer.insurance_sum }}</td><td>{{ offer.premium }}</td><td>{{ offer.franchise }}</td><td>{{ offer.installments }}</td></tr>{% endfor %}
+</tbody></table>
+{% if flow_extras %}<dl>{% for label, value in flow_extras %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endif %}
+<ul>{% for warning in flow_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+<a href="{{ flow_review_url }}">К сопоставлению по ДФА</a>
+</div>
+{% endif %}
 {% if accept_import_parsed_rows %}
 <div class="module" style="margin-bottom: 20px;">
     <h2>Данные из акцепта</h2>
@@ -31,10 +44,18 @@
 {{ block.super }}
 {% endblock %}
 
+{% block after_related_objects %}
+{{ block.super }}
+{% if request.flow_finance_mismatches %}
+<div class="module"><h2>Расхождения со сводом</h2><ul>{% for mismatch in request.flow_finance_mismatches %}<li>{{ mismatch }}</li>{% endfor %}</ul>
+<label><input type="checkbox" name="_flow_actual" value="yes"> Подтверждаю суммы по выданному полису</label></div>
+{% endif %}
+{% endblock %}
+
 {% block submit_buttons_top %}
-{% policy_submit_row %}
+{% if flow_snapshot %}<div class="submit-row"><input type="submit" class="default" value="Сохранить полис и связать со сводом"></div>{% else %}{% policy_submit_row %}{% endif %}
 {% endblock %}
 
 {% block submit_buttons_bottom %}
-{% policy_submit_row %}
+{% if flow_snapshot %}<div class="submit-row"><input type="submit" class="default" value="Сохранить полис и связать со сводом"></div>{% else %}{% policy_submit_row %}{% endif %}
 {% endblock %}

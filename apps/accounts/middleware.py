@@ -212,6 +212,12 @@ class PermissionCheckMiddleware:
                 SecurityEventLogger.log_access_denied(
                     user=request.user.username, url=request.path, ip_address=ip_address
                 )
+                if "flow_draft" in request.GET and request.path_info == reverse(
+                    "admin:policies_policy_add"
+                ):
+                    from apps.policies.flow_permissions import forbidden
+
+                    return forbidden(request)
                 # Return 403 Forbidden
                 return HttpResponseForbidden(
                     "You do not have permission to access this page. "

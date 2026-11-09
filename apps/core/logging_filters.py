@@ -15,6 +15,8 @@ class SensitiveDataFilter(logging.Filter):
 
     # Patterns for sensitive data in logs
     SENSITIVE_PATTERNS = [
+        # Django's request logger can receive the raw path, including the handoff ticket.
+        (r"(/flow/from-zs/\?[^\s\"']*?\bcode=)[^&\s\"']+", r"\1***"),
         # urllib/requests errors may include either the full bot URL or its path.
         (
             r"((?:https?://api\.telegram\.org)?/bot)\d+:[A-Za-z0-9_-]+",

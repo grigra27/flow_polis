@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import F, OuterRef, Q, Subquery, Sum
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
@@ -801,3 +802,42 @@ def dfa_deactivated_payments_q(prefix=""):
         & Q(**{f"{prefix}policy__dfa_deactivation_date__isnull": False})
         & Q(**{f"{prefix}due_date__gt": F(f"{prefix}policy__dfa_deactivation_date")})
     )
+
+
+class FlowPolicySource(models.Model):
+    """Одна строка на акцепт ЗС. Блокируется при оформлении любой позиции."""
+
+    summary_id = models.PositiveBigIntegerField(primary_key=True)
+    mode = models.CharField(
+        max_length=8, choices=[("common", "Один полис"), ("separate", "По единицам")]
+    )
+    total = models.PositiveIntegerField("Количество одинаковых объектов")
+
+
+class FlowPolicyLink(models.Model):
+    source = models.ForeignKey(
+        FlowPolicySource, on_delete=models.PROTECT, related_name="links"
+    )
+    slot = models.PositiveIntegerField("Позиция (0 для общего полиса)")
+    policy = models.ForeignKey(
+        Policy, on_delete=models.PROTECT, related_name="flow_links"
+    )
+    revision = models.CharField("Версия условий акцепта", max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
+    )
+    created_from_summary = models.BooleanField("Полис создан из свода")
+
+    class Meta:
+        permissions = [
+            ("link_flow_policy", "Привязывать существующий полис к акцепту ЗС")
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "slot"], name="flow_unique_source_slot"
+            ),
+            models.UniqueConstraint(
+                fields=["source", "policy"], name="flow_unique_source_policy"
+            ),
+        ]

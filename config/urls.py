@@ -1,18 +1,29 @@
 """
 URL configuration for insurance_broker project.
 """
+from apps.policies.flow_api import link_status
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.policies import flow_views
 
 urlpatterns = [
+    path(
+        "internal/flow/v1/summaries/<int:summary_id>/links/",
+        link_status,
+        name="flow-link-status",
+    ),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
     path("clients/", include("apps.clients.urls")),
     path("insurers/", include("apps.insurers.urls")),
     path("policies/", include("apps.policies.urls")),
+    path("flow/from-zs/", flow_views.landing, name="flow_policy_landing"),
+    path(
+        "flow/from-zs/review/<slug:key>/", flow_views.review, name="flow_policy_review"
+    ),
     path("reports/", include("apps.reports.urls")),
     path("analytics/", include("apps.analytics.urls")),
 ]

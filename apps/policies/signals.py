@@ -62,7 +62,9 @@ def calculate_commission(sender, instance, **kwargs):
         if not instance.commission_rate:
             return
 
-        # For new records, always calculate
+        # Импорт из свода позволяет подтвердить отличающуюся от расчёта КВ.
+        if not instance.pk and getattr(instance, "_flow_explicit_commission", False):
+            return
         if not instance.pk:
             try:
                 instance.kv_rub = instance.calculate_kv_rub()

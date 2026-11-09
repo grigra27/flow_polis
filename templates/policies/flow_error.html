@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Оформление из ЗС</h1>
+<p role="alert">{{ error }}</p>
+<a href="{% url 'policies:list' %}">К журналу полисов</a>
+{% endblock %}

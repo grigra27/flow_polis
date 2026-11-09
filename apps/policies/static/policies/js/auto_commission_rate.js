@@ -36,6 +36,10 @@
                 return;
             }
 
+            if (document.getElementById("flow-policy-source") && $insurerField.val() && $insuranceTypeField.val()) {
+                updateCommissionRates(false);
+            }
+
             // Add change handlers
             $insurerField.on('change', function() {
                 updateCommissionRates();
@@ -62,7 +66,7 @@
             });
         }
 
-        function updateCommissionRates() {
+        function updateCommissionRates(applyToExisting) {
             var $insurerField = $('#id_insurer');
             var $insuranceTypeField = $('#id_insurance_type');
 
@@ -85,8 +89,11 @@
                     insurance_type_id: insuranceTypeId
                 },
                 success: function(response) {
+                    if ($('#id_insurer').val() !== insurerId || $('#id_insurance_type').val() !== insuranceTypeId) return;
                     if (response.success) {
                         currentKvPercent = response.kv_percent;
+                        // ЗС уже заполнила форму, в том числе сохранённые правки менеджера.
+                        if (applyToExisting === false) return;
                         applyCommissionRateToAllRows(
                             response.commission_rate_id,
                             response.kv_percent,

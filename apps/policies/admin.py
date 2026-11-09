@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from apps.insurers.models import InsuranceType, get_osago_insurance_type
 
+from . import flow_views
 from .forms import AcceptUploadForm
 from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
 from .services.accept_parser import parse_accept_file
@@ -85,6 +86,11 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
     def _construct_form(self, i, **kwargs):
         form = super()._construct_form(i, **kwargs)
         form.instance._date_sequence_checked_by_formset = True
+        if hasattr(self, "flow_request") and "kv_rub" in form.fields:
+            form.fields["kv_rub"].required = False
+            form.fields["kv_rub"].widget.attrs["placeholder"] = "По ставке"
+            if "kv_rub" not in form.initial:
+                form.initial["kv_rub"] = None
         return form
 
     def clean(self):
@@ -124,6 +130,51 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
             for field, message in errors.items():
                 form.add_error(field, message)
 
+        if hasattr(self, "flow_request"):
+            self._check_flow_amounts(rows)
+
+    def save_new(self, form, commit=True):
+        if hasattr(self, "flow_request"):
+            payment = form.instance
+            # Оставленная пустой сумма рассчитывается по ставке. Введённый ноль тоже является выбором.
+            payment._flow_explicit_commission = payment.kv_rub is not None
+            if payment.kv_rub is None:
+                payment.kv_rub = Decimal("0")
+        return super().save_new(form, commit)
+
+    def _check_flow_amounts(self, rows):
+        request = self.flow_request
+        offers = request.flow_source["offers"]
+        by_year = {offer["year"]: [] for offer in offers}
+        for row in rows:
+            if row.year_number not in by_year:
+                raise ValidationError("Проверьте номера лет в графике по своду.")
+            by_year[row.year_number].append(row)
+        if not all(by_year.values()):
+            raise ValidationError(
+                "Заполните взносы по каждому году выбранного предложения."
+            )
+        if request.flow_slot:
+            return  # Для отдельных объектов суммы распределяются по выданным договорам.
+        changes = []
+        for offer in offers:
+            year = offer["year"]
+            payments = by_year[year]
+            total = sum(p.amount for p in payments)
+            if total != Decimal(offer["premium"]):
+                changes.append(
+                    f"{year} год: премия по своду {offer['premium']}, в графике {total}."
+                )
+            if any(
+                p.insurance_sum != Decimal(offer["insurance_sum"]) for p in payments
+            ):
+                changes.append(
+                    f"{year} год: страховая сумма отличается от {offer['insurance_sum']} по своду."
+                )
+        if changes and request.POST.get("_flow_actual") != "yes":
+            request.flow_finance_mismatches = changes
+            raise ValidationError("Подтвердите расхождения с принятым предложением.")
+
     def _add_insurance_kind_errors(self):
         """
         Правила вида страхования по родительскому полису formset'а: ОСАГО —
@@ -148,7 +199,7 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
 # скрипта меняйте версию, иначе браузеры сотрудников возьмут старый файл.
 # Полный путь: static() закодировал бы «?» в %3F.
 AUTO_COMMISSION_RATE_JS = (
-    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-10-15"
+    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-09"
 )
 
 
@@ -180,6 +231,17 @@ class PaymentScheduleInline(admin.TabularInline):
         "payment_info",
     ]
     # commission_rate is excluded from visible fields but still saved via JavaScript
+
+    def get_extra(self, request, obj=None, **kwargs):
+        if hasattr(request, "flow_initial"):
+            return len(request.flow_initial["payments"])
+        return super().get_extra(request, obj, **kwargs)
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        if hasattr(request, "flow_source"):
+            formset.flow_request = request
+        return formset
 
     class Media:
         js = (
@@ -220,6 +282,11 @@ class OsagoPaymentInline(admin.TabularInline):
 
 
 class PolicyInfoInline(admin.TabularInline):
+    def get_extra(self, request, obj=None, **kwargs):
+        if hasattr(request, "flow_initial") and request.flow_initial.get("tags"):
+            return len(request.flow_initial["tags"]) + 1
+        return super().get_extra(request, obj, **kwargs)
+
     model = PolicyInfo
     extra = 1
     autocomplete_fields = ["tag"]
@@ -326,7 +393,9 @@ class PolicyAdmin(admin.ModelAdmin):
     inlines = [PaymentScheduleInline, PolicyInfoInline]
 
     class Media:
-        js = ("policies/js/auto_copy_policyholder.js",)
+        js = (
+            f"{settings.STATIC_URL}policies/js/auto_copy_policyholder.js?v=2026-11-09",
+        )
         css = {"all": ("policies/css/auto_copy_policyholder.css",)}
 
     def get_urls(self):
@@ -346,6 +415,20 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def _accept_title(self, title):
         return f"{title} (ОСАГО)" if self.osago_section else title
+
+    def add_view(self, request, form_url="", extra_context=None):
+        add = super().add_view
+        if "flow_draft" not in request.GET:
+            return add(request, form_url, extra_context)
+        if self.osago_section:
+            raise PermissionDenied
+        return flow_views.flow_admin_add(
+            request,
+            request.GET["flow_draft"],
+            lambda context: add(
+                request, form_url, {**(extra_context or {}), **context}
+            ),
+        )
 
     def import_accept_view(self, request):
         if not self.has_add_permission(request):
@@ -424,6 +507,9 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
+        if hasattr(request, "flow_initial"):
+            initial.update(request.flow_initial["policy"])
+            return initial
         payload = self._get_accept_import_payload(request)
         if payload:
             initial.update(payload.get("policy_initial", {}))
@@ -431,6 +517,13 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def get_formset_kwargs(self, request, obj, inline, prefix):
         kwargs = super().get_formset_kwargs(request, obj, inline, prefix)
+        if hasattr(request, "flow_initial"):
+            if request.method == "GET":
+                if inline.model is PaymentSchedule:
+                    kwargs["initial"] = request.flow_initial["payments"]
+                elif inline.model is PolicyInfo:
+                    kwargs["initial"] = request.flow_initial.get("tags", [])
+            return kwargs
         payload = self._get_accept_import_payload(request)
         if (
             request.method == "GET"
@@ -539,6 +632,9 @@ class PolicyAdmin(admin.ModelAdmin):
         }.get(status, "Вручную")
 
     def response_add(self, request, obj, post_url_continue=None):
+        if hasattr(request, "flow_initial"):
+            request.flow_saved_policy = obj
+            return redirect(self._get_frontend_detail_url(obj))
         if self._should_redirect_to_front(request):
             return redirect(self._get_frontend_detail_url(obj))
         if request.GET.get("accept_token"):

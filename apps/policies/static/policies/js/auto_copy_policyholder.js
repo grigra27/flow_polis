@@ -21,6 +21,9 @@
             return;
         }
 
+        // В форме из ЗС сторона берётся из принятой заявки или выбирается менеджером.
+        if (document.getElementById("flow-policy-source")) return;
+
         // Prevent double initialization
         if (initialized) {
             console.log('Auto-copy policyholder: Already initialized, skipping');

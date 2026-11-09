@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Проверьте совпадения по ДФА {{ dfa }}</h1>
+{% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
+<p>{% if candidates %}По указанному ДФА найдены полисы.{% else %}Совпадений по указанному ДФА больше нет.{% endif %} Введённая карточка и график сохранены в форме.</p>
+<form method="post">{% csrf_token %}
+{% for name, value in hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+<input type="hidden" name="_flow_confirm" value="{{ mark }}">
+<ul>{% for p in candidates %}
+<li><a href="{% url 'policies:detail' p.pk %}" target="_blank" rel="noopener">{{ p.policy_number }}</a> · {{ p.client }} · {{ p.insurer }} · {{ p.insurance_type }} · {{ p.property_description }} {{ p.vin_number }} · {{ p.start_date|date:"d.m.Y" }} – {{ p.end_date|date:"d.m.Y" }}
+{% if can_link %}<button name="_flow_link" value="{{ p.pk }}" class="btn btn-outline-secondary">Связать с этим полисом</button>{% endif %}</li>
+{% endfor %}</ul>
+<button type="submit" class="btn btn-primary">Создать отдельный полис с введёнными данными</button>
+</form>
+<a href="{{ review_url }}">К подбору по ДФА</a>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Оформление полиса из ЗС{% endblock %}
+{% block content %}
+<h1>Оформление полиса из свода № {{ source.summary_id }}</h1>
+<p>{{ source.client_name }} · ИНН {{ source.client_inn }} · {{ source.selected_company }} · {{ source.insurance_type }}</p>
+<p>{{ source.property_description }}{% if source.property_year %}, {{ source.property_year }} г.{% endif %}</p>
+{% if draft.previous %}
+<div class="alert alert-warning">
+<h2 class="h5">Условия акцепта обновились</h2>
+<table class="table"><thead><tr><th></th><th>До изменения</th><th>Сейчас в ЗС</th></tr></thead>
+<tbody>{% for label, before, after in changes %}<tr><th>{{ label }}</th><td>{{ before|default_if_none:"—" }}</td><td>{{ after|default_if_none:"—" }}</td></tr>{% endfor %}</tbody></table>
+{% if draft.edits %}Введённые реквизиты и правки взносов будут подставлены при оформлении той же позиции.{% endif %}</div>
+{% endif %}
+{% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
+{% if links %}
+<h2 class="h5">Связанные полисы</h2>
+<ul>{% for link in links %}<li><a href="{% url 'policies:detail' link.policy_id %}">{{ link.policy.policy_number }}</a>{% if link.slot %} · объект {{ link.slot }} из {{ total }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% if allow_common or slots %}
+<form method="post" class="mb-3">{% csrf_token %}
+<label for="search-dfa">ДФА для поиска совпадений</label>
+<input id="search-dfa" name="dfa" maxlength="100" value="{{ draft.dfa }}">
+<button class="btn btn-outline-secondary" name="action" value="search">Проверить номер</button>
+</form>
+<form method="post">{% csrf_token %}
+<input type="hidden" name="candidates" value="{{ candidate_mark }}">
+{% if total > 1 %}
+<label for="flow-slot">Оформление {{ total }} одинаковых объектов</label>
+<select id="flow-slot" name="slot" required>
+<option value="">Выберите объект или общий полис</option>
+{% if allow_common %}<option value="0">Один полис на все объекты</option>{% endif %}
+{% for slot in slots %}<option value="{{ slot }}">Отдельный полис на объект {{ slot }} из {{ total }}</option>{% endfor %}
+</select>
+{% else %}<input type="hidden" name="slot" value="0">{% endif %}
+{% if candidates %}
+<h2 class="h5 mt-3">Полисы по этому ДФА</h2>
+<table class="table"><thead><tr><th>Выбор</th><th>Полис</th><th>Клиент</th><th>Страховщик и вид</th><th>Объект</th><th>Действие договора</th></tr></thead><tbody>
+{% for p in candidates %}<tr>
+<td><input type="radio" aria-label="Выбрать полис {{ p.policy_number }}" name="policy_id" value="{{ p.pk }}"></td>
+<td><a target="_blank" rel="noopener" href="{% url 'policies:detail' p.pk %}">{{ p.policy_number }}</a>{% for existing in p.flow_links.all %}<br><small>Связан со сводом № {{ existing.source_id }}{% if existing.slot %}, объект {{ existing.slot }}{% endif %}</small>{% endfor %}</td>
+<td>{{ p.client }}<br>{{ p.client.client_inn|default:"" }}</td><td>{{ p.insurer }}<br>{{ p.insurance_type }}</td>
+<td>{{ p.property_description }}<br>{{ p.vin_number }}</td><td>{{ p.start_date|date:"d.m.Y" }} – {{ p.end_date|date:"d.m.Y" }}<br>{% if p.is_in_force %}В силе{% else %}Вне срока или закрыт{% endif %}</td>
+</tr>{% endfor %}
+</tbody></table>
+{% if can_link %}<button class="btn btn-primary" name="action" value="link">Связать выбранный полис</button>{% endif %}
+{% else %}<p>Совпадений по указанному ДФА нет.</p>{% endif %}
+{% if can_create %}
+{% if source.variant and source.offers %}
+<button class="btn {% if candidates %}btn-outline-primary{% else %}btn-primary{% endif %}" name="action" value="new">{% if candidates %}Создать отдельный полис{% else %}Открыть форму нового полиса{% endif %}</button>
+{% else %}<p class="mt-2">Для расчёта премии <a href="{{ variant_url }}">укажите принятый вариант в ЗС</a> и снова откройте оформление из свода.</p>{% endif %}
+{% endif %}
+{% if not can_create and not can_link %}<p>Для оформления требуется право на создание или привязку полиса.</p>{% endif %}
+</form>
+{% endif %}
+{% endblock %}

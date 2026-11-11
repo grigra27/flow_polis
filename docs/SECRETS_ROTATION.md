@@ -1,5 +1,8 @@
 # Ротация секретов Onlinepolis
 
+Сверено с [settings.py](../config/settings.py), [production policy](../scripts/deploy/security.override.yml) 2026-11-11.
+Эффективные серверные значения и состояние доступа проверяются отдельно.
+
 Процедура для администратора production. Подготовлена 2026-11-06,
 актуализирована 2026-11-07 для кода на Django 5.2 LTS, PostgreSQL 15,
 Compose plugin, проект `insurance_broker`.

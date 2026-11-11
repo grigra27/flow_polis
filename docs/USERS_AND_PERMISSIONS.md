@@ -1,163 +1,72 @@
 # Пользователи и права доступа
 
-## Типы пользователей
+Сверено с [middleware](../apps/accounts/middleware.py),
+[mixins](../apps/accounts/mixins.py), [billing](../apps/billing/views.py),
+[аналитикой](../apps/analytics/views.py) и
+[правами InsFlow](../apps/policies/flow_permissions.py) 2026-11-11.
 
-Система поддерживает три типа пользователей:
+## Роли
 
-### 1. Обычный пользователь
+| Учётная запись | Основные возможности |
+|---|---|
+| Обычная: `is_staff=False`, `is_superuser=False` | Общие журналы и карточки, главная, отчёты; без Django admin |
+| Ограниченный администратор: `is_staff=True`, `is_superuser=False` | Admin и действия по выданным model permissions |
+| Суперпользователь | Полный административный доступ, отдельный раздел аналитики |
 
-```python
-is_staff = False
-is_superuser = False
-```
+Флаг staff не заменяет права на модели в Django admin. Обычный пользователь
+не является строго read-only для всего продукта: комментарии очередных взносов
+доступны вошедшим пользователям, а отправка писем зависит от отдельного флага.
+Главная со сводкой и `/analytics/` — разные разделы.
 
-**Может:**
-- Просматривать всех клиентов, страховщиков, полисы, платежи
-- Экспортировать данные в Excel
-- Работать с дашбордом
+## Отдельные проверки
 
-**Не может:**
-- Создавать, редактировать или удалять записи
-- Заходить в admin-панель Django
+- `/analytics/` и её детализации/экспорт используют `SuperuserRequiredMixin`.
+- Middleware ограничивает административные и create/edit/update/delete URL;
+  обновление комментария задачи очередного взноса имеет явное исключение.
+- Отправка писем: `COMMUNICATIONS_RESTRICT_TO_SUPERUSER=True` по умолчанию
+  допускает только суперпользователя. При `False` допускается любой
+  авторизованный пользователь раздела. Permission
+  `communications.send_outbound_email` существует, но этот UI-гейт его
+  **не проверяет**. Саму отправку дополнительно включает
+  `COMMUNICATIONS_EMAIL_ENABLED`.
+- Создание полиса из InsFlow требует активного staff-пользователя с
+  `policies.add_policy` **и** `policies.add_paymentschedule`.
+- Связывание существующего полиса с InsFlow требует активного staff-пользователя
+  с `policies.link_flow_policy` либо права создания плюс
+  `policies.change_policy`.
+- Загрузка приватных media требует входа. В коде нет универсального
+  разграничения доступа к каждому документу по владельцу полиса.
 
-Кнопки «Добавить», «Редактировать», «Удалить» в интерфейсе скрыты.
+## Типовые model permissions
 
-### 2. Администратор с ограниченными правами
+| Модель | Коды |
+|---|---|
+| Полис | `policies.view_policy`, `add_policy`, `change_policy`, `delete_policy` |
+| Платёж | `policies.view_paymentschedule`, `add_paymentschedule`, `change_paymentschedule`, `delete_paymentschedule` |
+| Клиент | `clients.view_client`, `add_client`, `change_client`, `delete_client` |
+| Страховщик | `insurers.view_insurer`, `add_insurer`, `change_insurer`, `delete_insurer` |
+| Связь InsFlow | `policies.link_flow_policy` |
 
-```python
-is_staff = True
-is_superuser = False
-# + конкретные права в разделе "Права пользователя"
-```
+В строке таблицы префикс приложения относится ко всем перечисленным кодам.
+Для массового назначения используйте группы Django. Прав на уровне «видеть
+только свои полисы» общая ролевая модель не предоставляет.
 
-**Может:**
-- Всё что обычный пользователь
-- Заходить в admin-панель Django
-- Только те действия, на которые явно выданы права
+## Настройка сотрудника
 
-**Как настроить:** создать пользователя → `is_staff = True`, `is_superuser = False` → выбрать нужные права в разделе «Права пользователя».
+1. В Django admin создайте пользователя и личный пароль.
+2. Для просмотра общих журналов оставьте staff/superuser выключенными.
+3. Для работы в admin включите staff и выдайте минимальный необходимый набор
+   view/add/change/delete прав или группу.
+4. Для перехода из InsFlow отдельно проверьте права создания/связывания.
+5. Проверьте доступ под учётной записью сотрудника, включая прямые URL.
 
-### 3. Суперпользователь
-
-```python
-is_staff = True
-is_superuser = True
-```
-
-Полный доступ ко всему. Обходит все проверки прав. Может управлять другими пользователями.
-
----
-
-## Доступные права по моделям
-
-| Модель | Право | Код |
-|--------|-------|-----|
-| Полис | Создание | `policies.add_policy` |
-| Полис | Редактирование | `policies.change_policy` |
-| Полис | Удаление | `policies.delete_policy` |
-| Полис | Просмотр | `policies.view_policy` |
-| График платежей | Создание | `policies.add_paymentschedule` |
-| График платежей | Редактирование | `policies.change_paymentschedule` |
-| График платежей | Удаление | `policies.delete_paymentschedule` |
-| График платежей | Просмотр | `policies.view_paymentschedule` |
-| Клиент | Создание | `clients.add_client` |
-| Клиент | Редактирование | `clients.change_client` |
-| Клиент | Удаление | `clients.delete_client` |
-| Клиент | Просмотр | `clients.view_client` |
-| Страховщик | Создание | `insurers.add_insurer` |
-| Страховщик | Редактирование | `insurers.change_insurer` |
-| Страховщик | Удаление | `insurers.delete_insurer` |
-| Страховщик | Просмотр | `insurers.view_insurer` |
-
----
-
-## Примеры конфигураций
-
-**Менеджер по полисам** — создаёт и редактирует полисы, но не удаляет:
-- `is_staff = True`, `is_superuser = False`
-- Права: `add_policy`, `change_policy`, `view_policy`, `add_paymentschedule`, `change_paymentschedule`, `view_paymentschedule`
-
-**Оператор ввода данных** — только добавляет новые полисы:
-- `is_staff = True`, `is_superuser = False`
-- Права: `add_policy`, `view_policy`, `add_paymentschedule`, `view_paymentschedule`, `add_client`, `view_client`
-
-**Аудитор** — только просмотр:
-- `is_staff = False` (обычный пользователь) — достаточно для просмотра без admin
-
----
-
-## Создание пользователей
-
-### Через admin-панель (рекомендуется)
-
-1. Перейти на `/admin/` → Authentication and Authorization → Users → Add user
-2. Заполнить username и password → Save and continue editing
-3. Выставить флаги `is_staff` / `is_superuser` и при необходимости выбрать права
-4. Save
-
-### Через командную строку
+Для локального создания суперпользователя:
 
 ```bash
-# Суперпользователь
-docker-compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
+python manage.py createsuperuser
 ```
 
-### Через Django shell
-
-```python
-from django.contrib.auth.models import User
-
-# Обычный пользователь
-user = User.objects.create_user(username='ivanov', password='SecurePass123!')
-
-# Суперпользователь
-admin = User.objects.create_superuser(username='petrov', password='AdminPass456!')
-```
-
----
-
-## Использование прав в коде
-
-### Views
-
-```python
-from apps.accounts.decorators import admin_required
-from apps.accounts.mixins import AdminRequiredMixin
-
-@admin_required(permission='policies.add_policy')
-def create_policy(request): ...
-
-class PolicyCreateView(AdminRequiredMixin, CreateView):
-    permission_required = 'policies.add_policy'
-```
-
-### Шаблоны
-
-```django
-{% load permission_tags %}
-
-{% can_edit request.user as user_can_edit %}
-{% if user_can_edit %}
-    <a href="{% url 'policies:create' %}">Добавить полис</a>
-{% endif %}
-
-{% if perms.policies.change_policy %}
-    <a href="{% url 'policies:edit' policy.id %}">Редактировать</a>
-{% endif %}
-```
-
----
-
-## FAQ
-
-**Пользователь с `is_staff=True` не видит данные в админке?**
-Нужно выдать права на просмотр (`view_*`) для соответствующих моделей.
-
-**Как дать доступ только к просмотру полисов?**
-`is_staff=True`, `is_superuser=False`, права: `policies.view_policy`, `policies.view_paymentschedule`.
-
-**Можно создать группу с одинаковыми правами?**
-Да — в admin-панели есть раздел «Группы». Создать группу, назначить права, добавить пользователей в группу.
-
-**Row-level permissions (доступ только к своим полисам)?**
-Текущая система не поддерживает — потребуется доработка.
+На сервере команду запускает администратор в работающем web-контейнере:
+`docker exec -it insurance_broker_web python manage.py createsuperuser`.
+Это операция изменения данных; ограниченный deploy-ключ не даёт такого shell.
+Пароль не задавайте аргументом команды и не сохраняйте в документации.

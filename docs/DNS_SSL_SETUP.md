@@ -1,416 +1,91 @@
-# Руководство по настройке DNS и SSL
+# DNS, SSL и Nginx
 
-## Обзор
+Сверено с [default.conf](../nginx/default.conf),
+[nginx.conf](../nginx/nginx.conf), [Compose](../docker-compose.prod.yml) и
+[media view](../apps/core/views.py) 2026-11-11. Объединены прежние руководства
+по DNS/SSL, отдельный nginx/SSL_SETUP и разбор перезапуска Nginx.
+Фактические DNS-записи и срок сертификата требуют проверки сервера.
 
-Это руководство описывает процесс настройки DNS записей и получения SSL сертификата для домена `polis.insflow.ru` на сервере Timeweb Cloud с IP адресом `109.68.215.223`.
+## Домен и маршрутизация
 
-## Предварительные требования
+Канонический адрес — `https://polis.insflow.ru/`. A/AAAA должны соответствовать
+реальному адресу сервера; не добавляйте AAAA без работающего IPv6.
+HTTP-запросы к каноническому домену перенаправляются на HTTPS, кроме ACME
+и `/health/`. Webroot ACME — `/var/www/certbot` в контейнерах,
+на хосте — `/root/insurance_broker/certbot/www`.
 
-- Доступ к панели управления DNS вашего регистратора доменов
-- SSH доступ к серверу Timeweb Cloud (109.68.215.223)
-- Docker и Docker Compose установлены на сервере
-- Приложение развернуто и работает
+Для чужого Host Nginx закрывает HTTP соединение с кодом 444. Для неизвестного
+SNI, включая `www.polis.insflow.ru`, TLS handshake отклоняется. Это намеренное
+поведение, а не ошибка редиректа. Catch-all HTTP сохраняет ACME challenge:
+старый сертификат/renewal может содержать www, хотя сайт по нему не открывается.
+Решение по www зафиксировано в [бэклоге](BACKLOG.md); менять его для устранения
+«ошибки сайта» не требуется.
 
-## Часть 1: Настройка DNS
+## Сертификаты и продление
 
-### Шаг 1: Создание A записи
+Nginx читает:
 
-1. Войдите в панель управления вашего регистратора доменов (например, Reg.ru, Timeweb, или другой)
+- `/etc/letsencrypt/live/polis.insflow.ru/fullchain.pem`;
+- `/etc/letsencrypt/live/polis.insflow.ru/privkey.pem`.
 
-2. Найдите раздел управления DNS записями для домена `insflow.ru`
+Они берутся из host-каталога `certbot/conf`, смонтированного read-only в Nginx
+и с записью в certbot. ACME webroot также общий. Certbot каждые 12 часов
+выполняет `renew --webroot -w /var/www/certbot --quiet`; Nginx каждые 6 часов
+перезагружает конфигурацию. Наличие loop не доказывает успешное продление.
 
-3. Создайте новую A запись со следующими параметрами:
-
-   ```
-   Тип записи: A
-   Имя (Host): polis
-   Значение (Points to): 109.68.215.223
-   TTL: 300 (5 минут)
-   ```
-
-   **Примечание**: TTL 300 секунд (5 минут) позволяет быстро переключаться между серверами в случае необходимости отката.
-
-4. Сохраните изменения
-
-### Шаг 2: Проверка распространения DNS
-
-DNS изменения могут занять от нескольких минут до 24-48 часов для полного распространения. Используйте следующие команды для проверки:
-
-#### Проверка с помощью nslookup
+Администратор может проверить состояние без вывода приватного ключа:
 
 ```bash
-nslookup polis.insflow.ru
+docker exec insurance_broker_certbot certbot certificates
+docker exec insurance_broker_nginx nginx -t
+docker logs --tail=100 insurance_broker_certbot
 ```
 
-**Ожидаемый результат:**
-```
-Server:		8.8.8.8
-Address:	8.8.8.8#53
-
-Non-authoritative answer:
-Name:	polis.insflow.ru
-Address: 109.68.215.223
-```
-
-#### Проверка с помощью dig
+Проверка renewal с тестовым ACME:
 
 ```bash
-dig polis.insflow.ru +short
+docker exec insurance_broker_certbot certbot renew   --webroot -w /var/www/certbot --dry-run
 ```
 
-**Ожидаемый результат:**
-```
-109.68.215.223
-```
-
-#### Проверка с помощью dig (подробная информация)
-
-```bash
-dig polis.insflow.ru
-```
-
-Это покажет полную информацию о DNS запросе, включая TTL и серверы имен.
-
-#### Проверка из разных локаций
-
-Используйте онлайн сервисы для проверки распространения DNS из разных точек мира:
-- https://www.whatsmydns.net/
-- https://dnschecker.org/
-
-Введите `polis.insflow.ru` и тип записи `A`, чтобы увидеть результаты из разных стран.
-
-### Шаг 3: Проверка HTTP доступа
-
-После того как DNS распространился, проверьте HTTP доступ к серверу:
-
-```bash
-curl -I http://polis.insflow.ru
-```
-
-**Ожидаемый результат (если используется HTTP-only конфигурация):**
-```
-HTTP/1.1 200 OK
-Server: nginx
-...
-```
-
-**Или (если уже настроен редирект на HTTPS):**
-```
-HTTP/1.1 301 Moved Permanently
-Location: https://polis.insflow.ru/
-...
-```
-
-## Часть 2: Временная HTTP-only конфигурация
-
-Перед получением SSL сертификата необходимо убедиться, что сервер доступен по HTTP для прохождения ACME challenge от Let's Encrypt.
-
-### Когда использовать HTTP-only конфигурацию
-
-- При первоначальной настройке сервера
-- Когда DNS еще не распространился
-- Для отладки проблем с доступностью
-
-### Применение HTTP-only конфигурации
-
-1. На сервере перейдите в директорию проекта:
-
-   ```bash
-   cd ~/insurance_broker
-   ```
-
-2. Создайте резервную копию текущей конфигурации:
-
-   ```bash
-   cp nginx/default.conf nginx/default.conf.backup
-   ```
-
-3. Скопируйте HTTP-only конфигурацию:
-
-   ```bash
-   cp nginx/default.conf.http-only nginx/default.conf
-   ```
-
-4. Перезапустите nginx контейнер:
-
-   ```bash
-   docker-compose -f docker-compose.prod.yml restart nginx
-   ```
-
-5. Проверьте что сервер доступен:
-
-   ```bash
-   curl http://polis.insflow.ru
-   ```
-
-## Часть 3: Получение SSL сертификата
-
-### Автоматический метод (рекомендуется)
-
-Используйте предоставленный скрипт для автоматического получения SSL сертификата:
-
-1. Убедитесь что DNS настроен и распространился (см. Часть 1, Шаг 2)
-
-2. Убедитесь что используется HTTP-only конфигурация nginx (см. Часть 2)
-
-3. Запустите скрипт получения SSL:
-
-   ```bash
-   cd ~/insurance_broker
-   bash scripts/obtain-ssl.sh
-   ```
-
-4. Скрипт выполнит следующие действия:
-   - Проверит доступность домена
-   - Запустит certbot для получения сертификата
-   - Проверит успешность получения сертификата
-   - Предложит переключиться на HTTPS конфигурацию
-
-5. Следуйте инструкциям скрипта
-
-### Ручной метод
-
-Если автоматический скрипт не работает, выполните следующие шаги вручную:
-
-#### Шаг 1: Убедитесь что контейнеры запущены
-
-```bash
-cd ~/insurance_broker
-docker-compose -f docker-compose.prod.yml ps
-```
-
-Все контейнеры должны быть в состоянии "Up".
-
-#### Шаг 2: Запустите certbot
-
-```bash
-docker-compose -f docker-compose.prod.yml run --rm certbot certonly \
-  --webroot \
-  --webroot-path=/var/www/certbot \
-  --email your-email@example.com \
-  --agree-tos \
-  --no-eff-email \
-  -d polis.insflow.ru
-```
-
-**Замените** `your-email@example.com` на ваш реальный email адрес.
-
-#### Шаг 3: Проверьте получение сертификата
-
-```bash
-docker-compose -f docker-compose.prod.yml exec nginx ls -la /etc/letsencrypt/live/polis.insflow.ru/
-```
-
-Вы должны увидеть файлы:
-- `cert.pem` - сертификат
-- `chain.pem` - цепочка сертификатов
-- `fullchain.pem` - полная цепочка
-- `privkey.pem` - приватный ключ
-
-## Часть 4: Переключение на HTTPS конфигурацию
-
-После успешного получения SSL сертификата переключитесь на полную HTTPS конфигурацию:
-
-### Шаг 1: Восстановите HTTPS конфигурацию
-
-```bash
-cd ~/insurance_broker
-cp nginx/default.conf.backup nginx/default.conf
-```
-
-Или, если резервная копия не была создана, получите конфигурацию из репозитория:
-
-```bash
-git pull origin main
-```
-
-### Шаг 2: Перезапустите nginx
-
-```bash
-docker-compose -f docker-compose.prod.yml restart nginx
-```
-
-### Шаг 3: Проверьте HTTPS доступ
-
-```bash
-curl -I https://polis.insflow.ru
-```
-
-**Ожидаемый результат:**
-```
-HTTP/2 200
-server: nginx
-...
-strict-transport-security: max-age=31536000; includeSubDomains; preload
-...
-```
-
-### Шаг 4: Проверьте редирект с HTTP на HTTPS
-
-```bash
-curl -I http://polis.insflow.ru
-```
-
-**Ожидаемый результат:**
-```
-HTTP/1.1 301 Moved Permanently
-Location: https://polis.insflow.ru/
-...
-```
-
-### Шаг 5: Проверьте SSL сертификат в браузере
-
-1. Откройте браузер
-2. Перейдите на https://polis.insflow.ru
-3. Нажмите на иконку замка в адресной строке
-4. Проверьте информацию о сертификате:
-   - Издатель: Let's Encrypt
-   - Срок действия: ~90 дней с даты выдачи
-   - Домен: polis.insflow.ru
-
-## Часть 5: Автоматическое обновление SSL сертификата
-
-Let's Encrypt сертификаты действительны 90 дней. Certbot контейнер настроен на автоматическое обновление.
-
-### Проверка автоматического обновления
-
-Certbot контейнер запускается каждые 12 часов и проверяет необходимость обновления сертификата (обновление происходит за 30 дней до истечения).
-
-### Ручное обновление (если необходимо)
-
-```bash
-cd ~/insurance_broker
-docker-compose -f docker-compose.prod.yml run --rm certbot renew
-docker-compose -f docker-compose.prod.yml restart nginx
-```
-
-### Проверка срока действия сертификата
-
-```bash
-echo | openssl s_client -servername polis.insflow.ru -connect polis.insflow.ru:443 2>/dev/null | openssl x509 -noout -dates
-```
-
-## Устранение неполадок
-
-### Проблема: DNS не распространяется
-
-**Симптомы:**
-- `nslookup` или `dig` возвращают старый IP или ошибку
-- Прошло более 24 часов с момента изменения DNS
-
-**Решение:**
-1. Проверьте правильность настройки A записи в панели управления DNS
-2. Убедитесь что изменения сохранены
-3. Попробуйте очистить локальный DNS кеш:
-   ```bash
-   # macOS
-   sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
-
-   # Linux
-   sudo systemd-resolve --flush-caches
-
-   # Windows
-   ipconfig /flushdns
-   ```
-4. Используйте публичные DNS серверы для проверки (8.8.8.8, 1.1.1.1)
-
-### Проблема: Certbot не может получить сертификат
-
-**Симптомы:**
-- Ошибка "Failed authorization procedure"
-- Ошибка "Connection refused"
-
-**Решение:**
-1. Убедитесь что DNS настроен и распространился
-2. Проверьте что nginx контейнер запущен:
-   ```bash
-   docker-compose -f docker-compose.prod.yml ps nginx
-   ```
-3. Проверьте что порт 80 открыт:
-   ```bash
-   sudo ufw status
-   curl http://polis.insflow.ru/.well-known/acme-challenge/test
-   ```
-4. Проверьте логи nginx:
-   ```bash
-   docker-compose -f docker-compose.prod.yml logs nginx
-   ```
-5. Убедитесь что используется HTTP-only конфигурация
-
-### Проблема: HTTPS не работает после получения сертификата
-
-**Симптомы:**
-- Браузер показывает ошибку "Connection refused" или "SSL error"
-- `curl https://polis.insflow.ru` возвращает ошибку
-
-**Решение:**
-1. Проверьте что порт 443 открыт:
-   ```bash
-   sudo ufw status
-   ```
-2. Проверьте что nginx использует правильную конфигурацию:
-   ```bash
-   docker-compose -f docker-compose.prod.yml exec nginx nginx -t
-   ```
-3. Проверьте логи nginx:
-   ```bash
-   docker-compose -f docker-compose.prod.yml logs nginx
-   ```
-4. Убедитесь что файлы сертификата существуют:
-   ```bash
-   docker-compose -f docker-compose.prod.yml exec nginx ls -la /etc/letsencrypt/live/polis.insflow.ru/
-   ```
-5. Перезапустите nginx:
-   ```bash
-   docker-compose -f docker-compose.prod.yml restart nginx
-   ```
-
-### Проблема: Смешанный контент (Mixed Content)
-
-**Симптомы:**
-- Браузер показывает предупреждения о небезопасном контенте
-- Некоторые ресурсы не загружаются
-
-**Решение:**
-1. Убедитесь что все ссылки в приложении используют относительные пути или HTTPS
-2. Проверьте настройки Django:
-   ```python
-   SECURE_SSL_REDIRECT = True
-   SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-   ```
-3. Проверьте заголовки в nginx конфигурации
-
-## Проверочный чеклист
-
-После завершения настройки DNS и SSL, убедитесь что:
-
-- [ ] DNS запись создана и распространилась
-- [ ] `nslookup polis.insflow.ru` возвращает 109.68.215.223
-- [ ] `dig polis.insflow.ru +short` возвращает 109.68.215.223
-- [ ] HTTP доступ работает: `curl http://polis.insflow.ru`
-- [ ] SSL сертификат получен успешно
-- [ ] Файлы сертификата существуют в `/etc/letsencrypt/live/polis.insflow.ru/`
-- [ ] HTTPS доступ работает: `curl https://polis.insflow.ru`
-- [ ] HTTP редиректит на HTTPS
-- [ ] Браузер показывает зеленый замок для https://polis.insflow.ru
-- [ ] Сертификат выдан Let's Encrypt
-- [ ] Срок действия сертификата ~90 дней
-- [ ] HSTS заголовок присутствует
-- [ ] Автоматическое обновление certbot настроено
-
-## Дополнительные ресурсы
-
-- [Let's Encrypt документация](https://letsencrypt.org/docs/)
-- [Certbot документация](https://certbot.eff.org/docs/)
-- [Nginx SSL конфигурация](https://nginx.org/en/docs/http/configuring_https_servers.html)
-- [SSL Labs тест](https://www.ssllabs.com/ssltest/) - проверка качества SSL конфигурации
-
-## Следующие шаги
-
-После успешной настройки DNS и SSL:
-
-1. Проведите полное функциональное тестирование приложения
-2. Настройте мониторинг доступности и срока действия сертификата
-3. Обновите документацию с новым доменом
-4. Уведомите пользователей о новом адресе (если применимо)
-5. Настройте редирект со старого домена (если применимо)
+Успех зависит от DNS, доступности порта 80, webroot и всех имён существующей
+renewal-конфигурации. После изменения сертификата:
+`docker exec insurance_broker_nginx nginx -s reload`.
+
+На пустом сервере HTTPS-конфигурация не стартует без сертификата. Для первичной
+выдачи администратор отдельно подготавливает временный HTTP/webroot или другой
+согласованный ACME challenge, получает сертификат, затем возвращает проверенную
+HTTPS-конфигурацию. Универсального скрипта `init-letsencrypt.sh` в репозитории
+сейчас нет. [Подготовка сервера](DEPLOYMENT.md#первоначальное-развёртывание).
+
+## Static и media
+
+`/static/` обслуживается из общего `static_volume`, кеш — 30 дней.
+Публичны только три каталога media:
+`insurer_logos`, `branch_logos`, `insurance_type_icons`; кеш — 7 дней.
+
+Остальные `/media/` проксируются в Django с проверкой входа и запретом кеширования
+приватного ответа. Возвращать общий `alias /app/media/` для удобства нельзя:
+это откроет документы без авторизации. Приватные файлы отдаёт Django после
+проверки входа.
+
+## Проверки при сбое
+
+| Симптом | Проверка |
+|---|---|
+| Nginx перезапускается | `docker logs`, `nginx -t`, наличие и читаемость сертификатов, upstream web |
+| 502 | Работает ли web и прямой Django health, сети и DNS сервиса `web` |
+| Сертификат не продлевается | DNS всех SAN, порт 80, challenge webroot, лог certbot |
+| www/IP не открывается | Сверить канонический домен; блокировка задана явно |
+| Static отсутствует | Результат collectstatic и общий том web/Nginx |
+| Документ требует входа | Ожидаемое поведение приватных media; проверять авторизованный запрос |
+
+`/health/` Nginx отвечает сам. Проверка приложения —
+`docker exec insurance_broker_web python -m apps.core.health`.
+[Мониторинг](MONITORING.md) описывает остальные проверки.
+
+## Применение конфигурации
+
+Nginx-файлы защищены и сверяются по хешам в CI. Изменение в Git само по себе
+не устанавливает их на хост; это отдельная административная операция.
+После неё нужны `nginx -t`, reload и проверка HTTPS/входа/media.
+[Деплой и protected hashes](DEPLOYMENT.md).

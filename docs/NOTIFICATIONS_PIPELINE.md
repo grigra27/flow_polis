@@ -1,7 +1,25 @@
 # Уведомления Telegram и VK
 
-Актуализировано 2026-11-06 в рамках B-05. Здесь описана действующая схема;
-статусы задач ведутся только в [BACKLOG.md](BACKLOG.md).
+Сверено с исходным кодом 2026-11-11. Здесь объединены настройка Telegram/VK
+и описание pipeline; статусы задач ведутся только в [BACKLOG.md](BACKLOG.md).
+Это описание реализации, не новая проверка доставки с production.
+
+## Настройка каналов
+
+Для Telegram задайте `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` и
+`TELEGRAM_ENABLED=true`; бот должен иметь доступ к нужному чату. Для VK —
+`VK_COMMUNITY_TOKEN`, `VK_USER_ID`, `VK_ENABLED=true` и возможность писать
+этому получателю. Пустые токены и выключенный канал не обеспечивают доставку.
+В production значения хранятся в защищённом `.env.prod`, не в GitHub Secrets.
+
+При необходимости SOCKS5 задаётся `TELEGRAM_SOCKS5_PROXY=host:port`. Для Python
+в Docker это должен быть адрес, доступный из контейнера; localhost контейнера
+не является loopback хоста. Настройка не создаёт и не запускает туннель сама.
+Историческая установка — в [архиве](archive/telegram-relay-2026-09-24.md).
+
+После изменения env приложение должно перечитать окружение по
+[процедуре ротации](SECRETS_ROTATION.md). Bash сам загружает env-файл и может
+перезаписать внешний shell override. [Приоритеты](ENVIRONMENT_VARIABLES.md).
 
 ## Независимость каналов
 
@@ -22,8 +40,7 @@ VK получает сообщения независимо от успеха Te
 здоровья не расходует бюджет ERROR-алертов.
 Секреты маскируются перед отправкой.
 
-Общий часовой лимит хранится в Redis (`TELEGRAM_ERROR_RATE_LIMIT`, по умолчанию
-10). Это один лимит для всех процессов приложения. Подавление повторов также
+Общий часовой лимит `TELEGRAM_ERROR_RATE_LIMIT` хранится в Redis. Это один лимит для всех процессов приложения. Подавление повторов также
 должно переживать создание нового handler в очередном процессе/вызове.
 При недоступности Redis применяется fail-open: инфраструктурная ошибка
 ограничителя не должна сама отменять аварийное уведомление.
@@ -80,39 +97,37 @@ HTTP-доставки. VK получает части независимо от 
 Telegram получает текст, а файл доставляется в VK. Это принятый режим работы.
 
 Повторный bash-разбор `django.log`/`security.log` удалён вместе с устаревшим
-setup-скриптом. На production служба `telegram-log-monitor.service` отключается
-при закрытии B-05. После ротации логов старые строки больше не могут породить
+setup-скриптом. История отключения host-службы
+`telegram-log-monitor.service` зафиксирована в B-05; её текущее состояние
+проверяется отдельно. После ротации логов старые строки больше не могут породить
 вторую пачку алертов из этого контура. Django ERROR-обработчик, health-check,
 дайджест и задания резервного копирования остаются источниками уведомлений.
 
 ## Настройки
 
-| Переменная | Назначение | По умолчанию |
-|---|---|---|
-| `TELEGRAM_ENABLED` | Включить Telegram | `false` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Доступ к Telegram | пусто |
-| `VK_ENABLED` | Включить VK | `false` |
-| `VK_COMMUNITY_TOKEN`, `VK_USER_ID` | Доступ к VK | пусто |
-| `TELEGRAM_SOCKS5_PROXY` | SOCKS5 для Telegram в Python и bash | пусто |
-| `TELEGRAM_ERROR_RATE_LIMIT` | Часовой лимит Python-алертов | `10` |
-| `TELEGRAM_ERROR_MESSAGE_LIMIT` | Бюджет текста ошибки | `500` |
-| `TELEGRAM_EXCEPTION_MESSAGE_LIMIT` | Бюджет исключения | `700` |
-| `TELEGRAM_TRACEBACK_LIMIT` | Бюджет traceback | `2500` |
-| `TELEGRAM_MESSAGE_LIMIT` | Консервативный бюджет сообщения Telegram | `3900` |
-| `TELEGRAM_UPLOAD_FILES` | Загрузка файлов bash-библиотекой | `true` |
-| `TELEGRAM_MAX_FILE_SIZE` | Размер файла для bash-загрузки, МБ | `45` |
+Имена параметров, лимиты и defaults собраны в одном
+[справочнике окружения](ENVIRONMENT_VARIABLES.md#параметры-которые-читает-python);
+[bash-загрузка файлов](ENVIRONMENT_VARIABLES.md#параметры-compose-bash-и-ci)
+использует дополнительные параметры. Порядок включения каналов описан выше.
 
 Токены, адреса получателей и пароли не выводятся в диагностике и не хранятся
-в документации. Подробности: [SECRETS_OVERVIEW.md](SECRETS_OVERVIEW.md),
+в документации. Подробности: [SECURITY.md](SECURITY.md),
 [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
-SOCKS5-туннель описан в `scripts/setup-tg-relay-tunnel.md`.
+История SOCKS5-туннеля: [архив](archive/telegram-relay-2026-09-24.md).
 
 ## Проверка
 
 Регрессионные тесты покрывают общий допуск/подавление дублей, независимость
 каналов, один VK на health-check, сохранение хвоста длинной ошибки, маскирование
 секретов и обработку Telegram 429 без повторной доставки VK.
-На production проверяются эффективные handlers/настройки, задачи Celery,
+При отдельной production-проверке следует сверять эффективные handlers/настройки, задачи Celery,
 реальный Redis с изолированными ключами и перехваченной доставкой, а также
 состояние отключённого bash-монитора. Такие проверки не отправляют тестовый
 спам получателям.
+
+
+Источники: [notifications.py](../apps/core/notifications.py),
+[telegram_handler.py](../apps/core/telegram_handler.py),
+[tasks.py](../apps/core/tasks.py),
+[telegram-notify.sh](../scripts/telegram-notify.sh),
+[telegram-config.sh](../scripts/telegram-config.sh).

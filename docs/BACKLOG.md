@@ -17,10 +17,20 @@
 ### B-01. Не уходят письма из «Очередных взносов» (SMTP почтового сервера недоступен)
 - **Решение 2026-10-23:** вернуться на неделе с 2026-10-26.
 - **Что:** с 28.08.2026 ни одно письмо в СК и Альянс не отправлено. На 2026-10-23: 356 писем `sent` (последнее 27.08), 14 `failed` (последняя попытка 01.10). С `polis` порт 587 на `mail.on-linebroker.ru` не отвечает (таймаут), 465 — `Connection refused`.
-- **Причина:** не в проекте — на стороне почтового сервера / роутера офиса не проброшены 587/465. Разбор и текст письма администратору (Никите): [smtp-outage-2026-09-25.md](./smtp-outage-2026-09-25.md).
+- **Гипотеза исторического расследования:** проблема на стороне почтового сервера / сети офиса. Наблюдаемые timeout/refused подтверждают недоступность, но сами по себе не устанавливают причину или отсутствие проброса портов. Разбор и текст письма администратору (Никите): [smtp-outage-2026-09-25.md](archive/smtp-outage-2026-09-25.md).
 - **Кто:** администратор почтового сервера; от нас — проверка после исправления.
 - **После исправления:** с `polis` проверить приветствие `220` на 587 (без логина); переотправить из интерфейса актуальные письма из 14 `failed` (сначала проверить, какие ещё нужны). Алерт на `failed` уже есть (2026-10-13).
 - **Попутно:** SPF домена `on-linebroker.ru` заканчивается на `+all` — заменить на `~all`/`-all` (тоже администратор).
+
+## P2
+
+### B-15. Исправить инвертированный before_send фильтр Sentry
+- **Обнаружено 2026-11-11:** обычные ошибки и события без `exc_info`
+  отбрасываются, шумовые исключения сохраняются.
+- **Что сделать:** согласовать predicate/callback, добавить регрессии для
+  обычной ошибки, шума и события без exception; отдельно проверить доставку.
+- **Разбор и изолированная проверка:** [Sentry в мониторинге](MONITORING.md#sentry).
+  В рамках документации Python-код не менялся.
 
 ## Отложено
 
@@ -33,7 +43,7 @@
   - копия отправленного письма в папку «Отправленные» ящика;
   - входящий контур (IMAP, `InboundEmail`, сопоставление счетов с задачами), затем полуавтоматическая обработка счетов и осторожная автоотправка.
 - **Нужны решения владельца:** какой ящик в production (Яндекс 360 / Zimbra); кто из менеджеров получает отправку после снятия `COMMUNICATIONS_RESTRICT_TO_SUPERUSER`.
-- **Спека:** [improvement plans/email-communications-plan.md](./improvement%20plans/email-communications-plan.md) (этапы 4–7).
+- **Спека:** [improvement plans/email-communications-plan.md](archive/email/email-communications-plan.md) (этапы 4–7).
 - Имеет смысл только после B-01.
 
 ## Принятые риски
@@ -77,8 +87,8 @@
 | 2026-10-23 | Деплой: сборка до остановки контейнеров, SSH keepalive, мягкий откат | `837c961` |
 | 2026-10-22 | apt в Docker-образе — с зеркала Яндекса | `3c50828` |
 | 2026-10-22 | Грузы исключены из пролонгации и метрик продлений | `028f1bb` |
-| 2026-10-13 | Аудит прода H-01…H-22 закрыт | см. [prod-health-audit-2026-09-24.md](./prod-health-audit-2026-09-24.md) |
-| 2026-09-23 | Бэклог бэкапов закрыт (offsite отменён владельцем) | см. [prod-backup-improvement-backlog-2026-09-19.md](./prod-backup-improvement-backlog-2026-09-19.md) |
+| 2026-10-13 | Аудит прода H-01…H-22 закрыт | см. [prod-health-audit-2026-09-24.md](archive/prod-health-audit-2026-09-24.md) |
+| 2026-09-23 | Бэклог бэкапов закрыт (offsite отменён владельцем) | см. [prod-backup-improvement-backlog-2026-09-19.md](archive/prod-backup-improvement-backlog-2026-09-19.md) |
 
 ---
 
@@ -88,14 +98,14 @@
 
 | Документ | Что там |
 |---|---|
-| [prod-health-audit-2026-09-24.md](./prod-health-audit-2026-09-24.md) | Аудит прода H-01…H-22, всё закрыто |
-| [prod-backup-audit-2026-09-19.md](./prod-backup-audit-2026-09-19.md) | Аудит бэкапов |
-| [prod-backup-improvement-backlog-2026-09-19.md](./prod-backup-improvement-backlog-2026-09-19.md) | Бэклог бэкапов P0–P2, закрыт |
-| [smtp-outage-2026-09-25.md](./smtp-outage-2026-09-25.md) | Разбор отказа SMTP → B-01 |
-| [analytics-2.0-plan.md](./analytics-2.0-plan.md) | Спека Аналитики 2.0, все этапы готовы |
-| [FUTURE_IMPROVEMENTS.md](./FUTURE_IMPROVEMENTS.md) | Производственный календарь → B-10 |
-| [improvement plans/email-communications-plan.md](./improvement%20plans/email-communications-plan.md) | Бизнес-план почтового контура → B-06 |
-| [improvement plans/email-communications-technical-plan.md](./improvement%20plans/email-communications-technical-plan.md) | Технический план MVP почты (реализован) |
-| [public_api/policy_json_api.md](./public_api/policy_json_api.md) | Черновик JSON API — удалён из бэклога |
+| [prod-health-audit-2026-09-24.md](archive/prod-health-audit-2026-09-24.md) | Аудит прода H-01…H-22, всё закрыто |
+| [prod-backup-audit-2026-09-19.md](archive/prod-backup-audit-2026-09-19.md) | Аудит бэкапов |
+| [prod-backup-improvement-backlog-2026-09-19.md](archive/prod-backup-improvement-backlog-2026-09-19.md) | Бэклог бэкапов P0–P2, закрыт |
+| [smtp-outage-2026-09-25.md](archive/smtp-outage-2026-09-25.md) | Разбор отказа SMTP → B-01 |
+| [analytics-2.0-plan.md](archive/analytics-2.0-plan.md) | Спека Аналитики 2.0, все этапы готовы |
+| [improvement plans/email-communications-plan.md](archive/email/email-communications-plan.md) | Бизнес-план почтового контура → B-06 |
+| [improvement plans/email-communications-technical-plan.md](archive/email/email-communications-technical-plan.md) | Технический план MVP почты (реализован) |
 
-Разделы с планами в справочных документах тоже больше не ведутся: «Планы на будущее» в `VERSION.md`, «Следующие шаги» в `PROJECT_STRUCTURE.md`, «Чего пока нет» и «Что нужно подготовить к следующему этапу» в `EMAIL_COMMUNICATIONS_SETUP.md`, «Куда двигаться» в `NOTIFICATIONS_PIPELINE.md`, «Слабые места схемы» в `SECRETS_OVERVIEW.md`, «Расширенный мониторинг» в `MONITORING.md`.
+Старые списки задач в архивных планах больше не ведутся.
+Основные руководства актуализированы 2026-11-11; новые задачи добавляются
+только в этот бэклог. История прежних планов сохранена в архиве.

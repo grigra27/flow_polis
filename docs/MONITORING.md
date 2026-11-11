@@ -1,454 +1,131 @@
-# Мониторинг и логирование Docker окружения
+# Мониторинг и логи
 
-Данный документ описывает команды и инструменты для мониторинга и просмотра логов Docker контейнеров системы управления полисами.
+Сверено с [Compose](../docker-compose.prod.yml),
+[health module](../apps/core/health.py),
+[system_health_check](../apps/core/management/commands/system_health_check.py),
+[settings](../config/settings.py) и
+[контроллером](../scripts/deploy/controller.py) 2026-11-11.
+Команды ниже выполняет администратор; ключ CI не предоставляет произвольный shell.
 
-## Содержание
+## Три уровня проверки
 
-- [Просмотр логов](#просмотр-логов)
-- [Мониторинг контейнеров](#мониторинг-контейнеров)
-- [Health Checks](#health-checks)
-- [Использование ресурсов](#использование-ресурсов)
-- [Troubleshooting](#troubleshooting)
+| Проверка | Что подтверждает |
+|---|---|
+| Nginx `/health/` | Ответ самого Nginx; Django не вызывается |
+| `python -m apps.core.health` в web | Прямой ответ Gunicorn/Django, без обходного «зелёного» proxy health |
+| Controller `health <deployment_id>` | Verified release, image IDs трёх app-контейнеров, runtime policy, все семь сервисов, HTTPS login |
 
-## Просмотр логов
+`status` контроллера проверяет протокол и защищённую конфигурацию. Это не
+замена `health`. Зелёный локальный pytest не подтверждает состояние production.
 
-### Использование скрипта view-logs.sh
-
-Мы предоставляем удобный скрипт для просмотра логов:
-
-```bash
-# Показать последние 100 строк логов всех сервисов
-./scripts/view-logs.sh
-
-# Следить за логами конкретного сервиса в реальном времени
-./scripts/view-logs.sh web -f
-
-# Показать последние 50 строк с временными метками
-./scripts/view-logs.sh celery_worker -n 50 -t
-
-# Следить за всеми логами с временными метками
-./scripts/view-logs.sh all -f -t
-
-# Просмотр логов в dev окружении
-./scripts/view-logs.sh web --dev
-```
-
-### Прямые команды Docker Compose
-
-#### Просмотр логов всех сервисов
+## Основные команды
 
 ```bash
-# Production
-docker compose -f docker-compose.prod.yml logs
-
-# Development
-docker compose -f docker-compose.dev.yml logs
-```
-
-#### Просмотр логов конкретного сервиса
-
-```bash
-# Django приложение
-docker compose -f docker-compose.prod.yml logs web
-
-# PostgreSQL база данных
-docker compose -f docker-compose.prod.yml logs db
-
-# Redis
-docker compose -f docker-compose.prod.yml logs redis
-
-# Celery Worker
-docker compose -f docker-compose.prod.yml logs celery_worker
-
-# Celery Beat
-docker compose -f docker-compose.prod.yml logs celery_beat
-
-# Nginx
-docker compose -f docker-compose.prod.yml logs nginx
-
-# Certbot
-docker compose -f docker-compose.prod.yml logs certbot
-```
-
-#### Следить за логами в реальном времени
-
-```bash
-# Следить за логами web сервиса
-docker compose -f docker-compose.prod.yml logs -f web
-
-# Следить за логами всех сервисов
-docker compose -f docker-compose.prod.yml logs -f
-
-# Следить за логами с временными метками
-docker compose -f docker-compose.prod.yml logs -f -t
-```
-
-#### Ограничение количества строк
-
-```bash
-# Показать последние 50 строк
-docker compose -f docker-compose.prod.yml logs --tail=50 web
-
-# Показать последние 100 строк всех сервисов
-docker compose -f docker-compose.prod.yml logs --tail=100
-```
-
-### Прямые команды Docker
-
-```bash
-# Просмотр логов по имени контейнера
-docker logs insurance_broker_web
-
-# Следить за логами
-docker logs -f insurance_broker_web
-
-# Последние 100 строк с временными метками
-docker logs --tail=100 -t insurance_broker_web
-
-# Логи за последние 10 минут
-docker logs --since=10m insurance_broker_web
-
-# Логи с определенного времени
-docker logs --since="2024-01-01T00:00:00" insurance_broker_web
-```
-
-## Конфигурация логирования
-
-### Настройки в docker-compose.prod.yml
-
-Все сервисы настроены с следующими параметрами логирования:
-
-```yaml
-logging:
-  driver: "json-file"
-  options:
-    max-size: "10m"      # Максимальный размер одного лог-файла
-    max-file: "3"        # Количество ротируемых файлов
-    tag: "{{.Name}}"     # Тег для идентификации контейнера
-```
-
-**Итого:** Каждый контейнер хранит максимум ~30MB логов (3 файла по 10MB).
-
-### Ротация логов
-
-Docker автоматически ротирует логи согласно настройкам:
-- Когда лог-файл достигает 10MB, создается новый файл
-- Хранятся только последние 3 файла
-- Старые файлы автоматически удаляются
-
-## Мониторинг контейнеров
-
-### Статус контейнеров
-
-```bash
-# Список всех контейнеров
-docker compose -f docker-compose.prod.yml ps
-
-# Детальная информация
-docker compose -f docker-compose.prod.yml ps -a
-
-# Только запущенные контейнеры
-docker ps
-
-# Все контейнеры (включая остановленные)
-docker ps -a
-```
-
-### Проверка работоспособности
-
-```bash
-# Проверить статус всех сервисов
-docker compose -f docker-compose.prod.yml ps
-
-# Вывод должен показывать "healthy" для сервисов с health checks
-```
-
-Пример вывода:
-```
-NAME                              STATUS              PORTS
-insurance_broker_web              Up (healthy)        8000/tcp
-insurance_broker_db               Up (healthy)        5432/tcp
-insurance_broker_redis            Up (healthy)        6379/tcp
-insurance_broker_celery_worker    Up (healthy)
-insurance_broker_nginx            Up (healthy)        0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp
-```
-
-## Health Checks
-
-### Настроенные Health Checks
-
-Все основные сервисы имеют health checks:
-
-#### Web (Django)
-- **Команда:** `curl -f http://localhost:8000/admin/login/`
-- **Интервал:** 30 секунд
-- **Таймаут:** 10 секунд
-- **Попытки:** 3
-- **Период запуска:** 40 секунд
-
-#### Database (PostgreSQL)
-- **Команда:** `pg_isready -U postgres`
-- **Интервал:** 10 секунд
-- **Таймаут:** 5 секунд
-- **Попытки:** 5
-
-#### Redis
-- **Команда:** `redis-cli ping`
-- **Интервал:** 10 секунд
-- **Таймаут:** 5 секунд
-- **Попытки:** 5
-
-#### Celery Worker
-- **Команда:** `celery -A config inspect ping`
-- **Интервал:** 30 секунд
-- **Таймаут:** 10 секунд
-- **Попытки:** 3
-- **Период запуска:** 30 секунд
-
-#### Nginx
-- **Команда:** `wget --quiet --tries=1 --spider http://localhost/`
-- **Интервал:** 30 секунд
-- **Таймаут:** 10 секунд
-- **Попытки:** 3
-
-### Проверка Health Check вручную
-
-```bash
-# Проверить health status конкретного контейнера
-docker inspect --format='{{.State.Health.Status}}' insurance_broker_web
-
-# Детальная информация о health check
-docker inspect insurance_broker_web | jq '.[0].State.Health'
-```
-
-## Использование ресурсов
-
-### Мониторинг в реальном времени
-
-```bash
-# Использование CPU, памяти, сети и диска всех контейнеров
-docker stats
-
-# Только определенные контейнеры
-docker stats insurance_broker_web insurance_broker_db
-
-# Без потоковой передачи (один снимок)
+docker ps --format 'table {{.Names}}	{{.Status}}'
+docker exec insurance_broker_web python -m apps.core.health
+docker exec insurance_broker_web python manage.py system_health_check --check-all
 docker stats --no-stream
-```
-
-Пример вывода:
-```
-CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O
-abc123         insurance_broker_web       2.5%      256MiB / 2GiB        12.5%     1.2MB / 850KB     10MB / 5MB
-def456         insurance_broker_db        1.2%      128MiB / 2GiB        6.25%     500KB / 300KB     50MB / 20MB
-```
-
-### Использование дискового пространства
-
-```bash
-# Размер всех контейнеров
-docker ps -s
-
-# Использование дискового пространства Docker
-docker system df
-
-# Детальная информация
-docker system df -v
-```
-
-### Информация о volumes
-
-```bash
-# Список всех volumes
-docker volume ls
-
-# Детальная информация о volume
-docker volume inspect onlinepolis_postgres_data
-
-# Размер volumes
-docker system df -v | grep -A 10 "Local Volumes"
-```
-
-## Troubleshooting
-
-### Контейнер не запускается
-
-```bash
-# Проверить логи контейнера
-docker compose -f docker-compose.prod.yml logs web
-
-# Проверить последние события
-docker events --since 10m
-
-# Инспектировать контейнер
-docker inspect insurance_broker_web
-
-# Проверить exit code
-docker inspect insurance_broker_web | jq '.[0].State.ExitCode'
-```
-
-### Проблемы с подключением к базе данных
-
-```bash
-# Проверить, что PostgreSQL запущен и healthy
-docker compose -f docker-compose.prod.yml ps db
-
-# Проверить логи PostgreSQL
-docker compose -f docker-compose.prod.yml logs db
-
-# Проверить подключение из web контейнера
-docker compose -f docker-compose.prod.yml exec web python manage.py dbshell
-```
-
-### Проблемы с Celery
-
-```bash
-# Проверить статус Celery worker
-docker compose -f docker-compose.prod.yml logs celery_worker
-
-# Проверить подключение к Redis
-docker compose -f docker-compose.prod.yml exec redis redis-cli ping
-
-# Инспектировать Celery
-docker compose -f docker-compose.prod.yml exec celery_worker celery -A config inspect active
-```
-
-### Проблемы с Nginx
-
-```bash
-# Проверить логи Nginx
-docker compose -f docker-compose.prod.yml logs nginx
-
-# Проверить конфигурацию Nginx
-docker compose -f docker-compose.prod.yml exec nginx nginx -t
-
-# Перезагрузить Nginx
-docker compose -f docker-compose.prod.yml restart nginx
-```
-
-### Высокое использование ресурсов
-
-```bash
-# Найти контейнер с высоким использованием CPU/памяти
-docker stats --no-stream | sort -k 3 -h
-
-# Проверить процессы внутри контейнера
-docker compose -f docker-compose.prod.yml top web
-
-# Ограничить ресурсы контейнера (добавить в docker-compose.yml)
-# deploy:
-#   resources:
-#     limits:
-#       cpus: '0.5'
-#       memory: 512M
-```
-
-### Очистка логов
-
-```bash
-# Очистить логи конкретного контейнера
-truncate -s 0 $(docker inspect --format='{{.LogPath}}' insurance_broker_web)
-
-# Или через Docker
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d
-```
-
-### Полная очистка Docker (ОСТОРОЖНО!)
-
-```bash
-# Удалить неиспользуемые контейнеры, сети, образы
-docker system prune
-
-# Удалить все (включая volumes)
-docker system prune -a --volumes
-
-# Удалить только остановленные контейнеры
-docker container prune
-
-# Удалить неиспользуемые volumes
-docker volume prune
-```
-
-## Мониторинг в production
-
-### Базовый мониторинг
-
-```bash
-# Создать скрипт для проверки здоровья системы
-cat > /usr/local/bin/check-docker-health.sh << 'EOF'
-#!/bin/bash
-cd /path/to/project
-docker compose -f docker-compose.prod.yml ps | grep -v "Up (healthy)" | grep "Up" && echo "WARNING: Some services are not healthy"
-EOF
-
-chmod +x /usr/local/bin/check-docker-health.sh
-
-# Добавить в cron для регулярной проверки
-# */5 * * * * /usr/local/bin/check-docker-health.sh
-```
-
-### Алерты при падении контейнера
-
-```bash
-# Проверить, что все контейнеры запущены
-docker compose -f docker-compose.prod.yml ps | grep -v "Up" && echo "ALERT: Some containers are down"
-```
-
-### Мониторинг дискового пространства
-
-```bash
-# Проверить использование диска
 df -h
-
-# Проверить размер логов Docker
-du -sh /var/lib/docker/containers/*/*-json.log
-
-# Проверить размер volumes
-docker system df -v
 ```
 
-## Расширенный мониторинг (опционально)
+`system_health_check --check-all` проверяет БД, диск/память, web, настроенный
+Telegram proxy и свежесть бэкапов. Web-проверку нужно выполнять именно
+в web-контейнере. `--notify-telegram --notify-vk` включает реальные уведомления;
+по умолчанию они зависят от смены состояния, `--notify-always` не отменяет
+дедупликацию и лимиты доставки. Для обычной диагностики эти флаги не нужны.
 
-> **Не ведётся (2026-10-23).** Планы и задачи из этого раздела перенесены в единый бэклог [BACKLOG.md](BACKLOG.md), B-09; ниже — исторический текст.
+Проверка бэкапов читает `last_status.json`, а не просто наличие последнего
+архива: учитываются result и возраст записи. Пути выбираются из
+`BACKUP_DB_DIR`/`BACKUP_MEDIA_DIR`, затем `BACKUP_BASE_DIR`, затем
+`/app/server_backups`, затем домашнего каталога. Web получает серверные копии
+через read-only bind mount. [Контракт и восстановление](BACKUP_RESTORE.md).
 
-Для production рекомендуется настроить:
-
-1. **Prometheus + Grafana** - для сбора и визуализации метрик
-2. **Sentry** - для отслеживания ошибок приложения
-3. **ELK Stack** (Elasticsearch, Logstash, Kibana) - для централизованного логирования
-4. **Uptime monitoring** - UptimeRobot, Pingdom для проверки доступности
-
-## Полезные команды
+## Логи
 
 ```bash
-# Перезапустить все сервисы
-docker compose -f docker-compose.prod.yml restart
-
-# Перезапустить конкретный сервис
-docker compose -f docker-compose.prod.yml restart web
-
-# Остановить все сервисы
-docker compose -f docker-compose.prod.yml stop
-
-# Запустить все сервисы
-docker compose -f docker-compose.prod.yml start
-
-# Пересобрать и перезапустить
-docker compose -f docker-compose.prod.yml up -d --build
-
-# Выполнить команду в контейнере
-docker compose -f docker-compose.prod.yml exec web python manage.py shell
-
-# Войти в контейнер
-docker compose -f docker-compose.prod.yml exec web bash
+docker logs --tail=100 insurance_broker_web
+docker logs --tail=100 insurance_broker_celery_worker
+docker logs --tail=100 insurance_broker_nginx
+docker logs --tail=100 insurance_broker_certbot
 ```
 
-## Резюме
+На хосте `/root/insurance_broker/logs/`:
 
-- Используйте `./scripts/view-logs.sh` для удобного просмотра логов
-- Логи автоматически ротируются (max 30MB на контейнер)
-- Health checks обеспечивают автоматический мониторинг
-- Используйте `docker stats` для мониторинга ресурсов
-- Регулярно проверяйте статус контейнеров с помощью `docker compose ps`
-- Настройте алерты для production окружения
+- `django.log` и `security.log` — приложение и события безопасности;
+- `nginx/access.log`, `nginx/error.log` — persistent Nginx-логи;
+- `backup-db.log`, `backup-media.log`, `backup-cleanup.log` — логи расписания,
+  если cron установлен по соответствующему скрипту.
+
+Docker json-логи ротируются: 10 МБ × 3 файла. Django использует file handlers;
+для persistent Nginx-логов есть [setup-logrotate.sh](../scripts/setup-logrotate.sh).
+Проверяйте реально установленную политику хоста отдельно.
+
+`SensitiveDataFilter` маскирует секреты в Django handlers. Начальный переход
+из InsFlow содержит одноразовый код: Nginx специально убирает query и referer
+этого маршрута из access log. Не заменяйте формат логов без сохранения маскирования.
+
+## Проверка работающего кода
+
+```bash
+docker inspect --format '{{.Image}} {{.Config.User}}' insurance_broker_web
+docker exec insurance_broker_web python -m django --version
+```
+
+Сравнивайте загруженный image ID с результатом controller, а revision —
+с OCI label проверенного образа. Три app-контейнера должны работать на одном
+загруженном образе. Каталог `/root/insurance_broker` не обновляется checkout
+при каждом релизе, поэтому `git rev-parse HEAD` на хосте этого не доказывает.
+
+Полный `docker inspect` содержит окружение; не публикуйте его. Для Compose
+используйте защищённую команду из
+[руководства по деплою](DEPLOYMENT.md).
+
+## Уведомления и внешние инструменты
+
+[Telegram/VK](NOTIFICATIONS_PIPELINE.md) получают ошибки, дайджест и
+служебные сообщения. Успех постановки Celery-задачи не доказывает доставки.
+Повторный bash-разбор логов не является вторым обязательным каналом.
+
+`scripts/monitor-health.sh` — отдельная старая
+Compose/mail-утилита, а не реализация controller health и не доказательство
+наличия внешнего uptime-мониторинга. Расписания cron и внешние сервисы
+подтверждаются на сервере, не по наличию скрипта в репозитории.
+
+
+## Sentry
+
+Источник — [config/settings.py](../config/settings.py); это описание SDK,
+а не новая проверка приёма событий в production.
+
+Непустой `SENTRY_DSN` включает Django/Celery/Redis integrations. В тестах DSN
+принудительно пустой. `SENTRY_RELEASE` задаёт метку релиза; CI её автоматически
+не устанавливает. Defaults — в [справочнике окружения](ENVIRONMENT_VARIABLES.md#параметры-которые-читает-python).
+Изменённое окружение применяется через recreate по
+[инструкции ротации](SECRETS_ROTATION.md).
+
+SDK использует production/development по DEBUG, `sample_rate=1.0`,
+`traces_sample_rate=0.1` в production и `0.0` при DEBUG,
+`send_default_pii=False`, `attach_stacktrace=True`, `max_breadcrumbs=50`.
+Project alerts в интерфейсе Sentry репозиторием не управляются.
+
+Текущий callback инвертирует результат predicate:
+
+```python
+before_send=lambda event, hint: (
+    event if not _should_filter_sentry_event(event, hint) else None
+)
+```
+
+Predicate возвращает `False` для `DisallowedHost`, `SuspiciousOperation`,
+`PermissionDenied`, сообщений `broken pipe`, `connection reset by peer`,
+`client disconnected`; в остальных случаях — `True`.
+**Поэтому этот шум сохраняется, а обычные ошибки и события без `exc_info`
+отбрасываются.** Это противоположно комментариям о подавлении шума.
+Поведение подтверждено изолированным вызовом функции/callback без SDK и доставки.
+
+Исправление ведётся как B-15 в [бэклоге](BACKLOG.md); Python-код фильтра
+в рамках актуализации документов не менялся. До исправления Sentry нельзя
+считать полным каналом регистрации ошибок. После исправления сначала нужны
+регрессии для обычной ошибки, шума и события без exception; затем отдельная
+контролируемая проверка доставки с проверенными DSN/release. Наличие DSN
+не подтверждает доставку или настройку alerts.

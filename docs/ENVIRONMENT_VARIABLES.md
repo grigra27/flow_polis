@@ -1,745 +1,155 @@
-# Environment Variables Documentation
-
-This document provides comprehensive documentation for all environment variables used in the Insurance Broker System.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Environment Files](#environment-files)
-- [Variable Reference](#variable-reference)
-- [Security Best Practices](#security-best-practices)
-- [Setup Instructions](#setup-instructions)
-
-## Overview
-
-The application uses environment variables to manage configuration across different environments (development, production). This approach follows the [12-factor app methodology](https://12factor.net/config) and ensures:
-
-- **Security**: Sensitive data (passwords, API keys) are never committed to version control
-- **Flexibility**: Easy configuration changes without code modifications
-- **Environment Separation**: Different settings for development and production
-
-## Environment Files
-
-### Development Environment
-
-**File**: `.env` (created from `.env.example`)
-
-Used for local development with SQLite database and console email backend.
-
-```bash
-cp .env.example .env
-# Edit .env with your local settings
-```
-
-### Production Environment
-
-**Files**:
-- `.env.prod` (created from `.env.prod.example`)
-- `.env.prod.db` (created from `.env.prod.db.example`)
-
-Used for production deployment with PostgreSQL, Redis, and real SMTP email.
-
-```bash
-cp .env.prod.example .env.prod
-cp .env.prod.db.example .env.prod.db
-# Edit both files with your production settings
-```
-
-⚠️ **IMPORTANT**: Never commit `.env`, `.env.prod`, or `.env.prod.db` to version control!
-
-## Variable Reference
-
-### Django Core Settings
-
-#### `SECRET_KEY` (Required)
-
-**Purpose**: Cryptographic signing key for Django security features (sessions, CSRF, password reset tokens)
-
-**Development**: Any string (insecure key is acceptable)
-```
-SECRET_KEY=django-insecure-dev-key-change-in-production
-```
-
-**Production**: Strong random 50+ character string
-```bash
-# Generate using:
-python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-```
-
-**Example**:
-```
-SECRET_KEY=django-insecure-a8f#2k9$mxp@4v7n!q3w&e5r^t6y*u8i(o0p)
-```
-
-**Security**: Must be kept secret. Changing this will invalidate all sessions and signed data.
-
----
-
-#### `DEBUG` (Required)
-
-**Purpose**: Enables/disables Django debug mode
-
-**Development**: `True`
-**Production**: `False` (MUST be False for security)
-
-**Values**: `True` or `False`
-
-**Impact**:
-- When `True`: Shows detailed error pages with stack traces, uses SQLite by default
-- When `False`: Shows generic error pages, requires proper logging configuration
-
-**Security**: NEVER set to `True` in production - exposes sensitive information!
-
----
-
-#### `ALLOWED_HOSTS` (Required)
-
-**Purpose**: List of host/domain names that Django will serve
-
-**Development**:
-```
-ALLOWED_HOSTS=localhost,127.0.0.1
-```
-
-**Production**:
-```
-ALLOWED_HOSTS=onbr.site,www.onbr.site
-```
-
-**Format**: Comma-separated list of domains (no spaces)
-
-**Security**: Django will reject requests with Host headers not in this list (prevents Host header attacks)
-
----
-
-### Database Configuration
-
-#### `DB_NAME` (Required for Production)
-
-**Purpose**: PostgreSQL database name
-
-**Development**: Leave empty (uses SQLite)
-```
-DB_NAME=
-```
-
-**Production**:
-```
-DB_NAME=insurance_broker_prod
-```
-
----
-
-#### `DB_USER` (Required for Production)
-
-**Purpose**: PostgreSQL username
-
-**Development**: Leave empty
-```
-DB_USER=
-```
-
-**Production**:
-```
-DB_USER=postgres
-```
-
-**Note**: Can use a different user than `postgres` for better security
-
----
-
-#### `DB_PASSWORD` (Required for Production)
-
-**Purpose**: PostgreSQL password
-
-**Development**: Leave empty
-```
-DB_PASSWORD=
-```
-
-**Production**: Strong random password
-```bash
-# Generate using:
-python -c 'import secrets; print(secrets.token_urlsafe(32))'
-```
-
-**Example**:
-```
-DB_PASSWORD=xK9mP2nQ5rT8wY3zA6bC9dF2gH5jK8lM
-```
-
-**Security**:
-- Must match `POSTGRES_PASSWORD` in `.env.prod.db`
-- Use at least 20 characters
-- Include uppercase, lowercase, numbers, and special characters
-- Never use default passwords like 'postgres' or 'password'
-
----
-
-#### `DB_HOST` (Required for Production)
-
-**Purpose**: PostgreSQL server hostname
-
-**Development**: Leave empty
-```
-DB_HOST=
-```
-
-**Production** (Docker):
-```
-DB_HOST=db
-```
-
-**Note**: In Docker Compose, `db` is the service name of the PostgreSQL container
-
----
-
-#### `DB_PORT` (Required for Production)
-
-**Purpose**: PostgreSQL server port
-
-**Development**: Leave empty
-```
-DB_PORT=
-```
-
-**Production**:
-```
-DB_PORT=5432
-```
-
-**Note**: 5432 is the default PostgreSQL port
-
----
-
-### Celery Configuration
-
-#### `CELERY_BROKER_URL` (Required for Background Tasks)
-
-**Purpose**: Redis connection URL for Celery message broker
-
-**Development**:
-```
-CELERY_BROKER_URL=redis://localhost:6379/0
-```
-
-**Production** (Docker):
-```
-CELERY_BROKER_URL=redis://redis:6379/0
-```
-
-**Format**: `redis://[host]:[port]/[db_number]`
-
----
-
-#### `CELERY_RESULT_BACKEND` (Required for Background Tasks)
-
-**Purpose**: Redis connection URL for storing Celery task results
-
-**Development**:
-```
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-```
-
-**Production** (Docker):
-```
-CELERY_RESULT_BACKEND=redis://redis:6379/0
-```
-
----
-
-### Email Configuration
-
-#### `EMAIL_BACKEND` (Required)
-
-**Purpose**: Django email backend class
-
-**Development** (prints emails to console):
-```
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-```
-
-**Production** (sends real emails via SMTP):
-```
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-```
-
-**Other Options**:
-- `django.core.mail.backends.filebased.EmailBackend` - saves emails to files
-- `django.core.mail.backends.dummy.EmailBackend` - discards emails (testing)
-
----
-
-#### `EMAIL_HOST` (Required for Production)
-
-**Purpose**: SMTP server hostname
-
-**Common Values**:
-- Gmail: `smtp.gmail.com`
-- Outlook: `smtp-mail.outlook.com`
-- SendGrid: `smtp.sendgrid.net`
-- Mailgun: `smtp.mailgun.org`
-
-**Example**:
-```
-EMAIL_HOST=smtp.gmail.com
-```
-
----
-
-#### `EMAIL_PORT` (Required for Production)
-
-**Purpose**: SMTP server port
-
-**Common Values**:
-- `587` - TLS (recommended)
-- `465` - SSL
-- `25` - Unencrypted (not recommended)
-
-**Example**:
-```
-EMAIL_PORT=587
-```
-
----
-
-#### `EMAIL_USE_TLS` (Required for Production)
-
-**Purpose**: Enable TLS encryption for SMTP
-
-**Values**: `True` or `False`
-
-**Recommended**:
-```
-EMAIL_USE_TLS=True
-```
-
----
-
-#### `EMAIL_HOST_USER` (Required for Production)
-
-**Purpose**: SMTP authentication username (usually your email address)
-
-**Example**:
-```
-EMAIL_HOST_USER=your-email@gmail.com
-```
-
----
-
-#### `EMAIL_HOST_PASSWORD` (Required for Production)
-
-**Purpose**: SMTP authentication password
-
-**Gmail Users**: Use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password
-
-**Example**:
-```
-EMAIL_HOST_PASSWORD=abcd efgh ijkl mnop
-```
-
-**Security**: Keep this secret! Never commit to version control.
-
----
-
-#### `DEFAULT_FROM_EMAIL` (Optional)
-
-**Purpose**: Default "from" email address for outgoing emails
-
-**Example**:
-```
-DEFAULT_FROM_EMAIL=noreply@onbr.site
-```
-
----
-
-### Security Settings (Production Only)
-
-#### `SECURE_SSL_REDIRECT` (Production)
-
-**Purpose**: Redirect all HTTP requests to HTTPS
-
-**Production**:
-```
-SECURE_SSL_REDIRECT=True
-```
-
-**Note**: Only enable after SSL certificate is configured
-
----
-
-#### `SECURE_HSTS_SECONDS` (Production)
-
-**Purpose**: HTTP Strict Transport Security (HSTS) max-age in seconds
-
-**Production**:
-```
-SECURE_HSTS_SECONDS=31536000
-```
-
-**Note**: 31536000 = 1 year. Tells browsers to only use HTTPS for this domain.
-
----
-
-#### `SECURE_HSTS_INCLUDE_SUBDOMAINS` (Production)
-
-**Purpose**: Apply HSTS to all subdomains
-
-**Production**:
-```
-SECURE_HSTS_INCLUDE_SUBDOMAINS=True
-```
-
----
-
-#### `SECURE_HSTS_PRELOAD` (Production)
-
-**Purpose**: Allow domain to be included in browser HSTS preload lists
-
-**Production**:
-```
-SECURE_HSTS_PRELOAD=True
-```
-
----
-
-#### `SESSION_COOKIE_SECURE` (Production)
-
-**Purpose**: Only send session cookies over HTTPS
-
-**Production**:
-```
-SESSION_COOKIE_SECURE=True
-```
-
----
-
-#### `CSRF_COOKIE_SECURE` (Production)
-
-**Purpose**: Only send CSRF cookies over HTTPS
-
-**Production**:
-```
-CSRF_COOKIE_SECURE=True
-```
-
----
-
-#### `SECURE_CONTENT_TYPE_NOSNIFF` (Production)
-
-**Purpose**: Prevent browsers from MIME-sniffing
-
-**Production**:
-```
-SECURE_CONTENT_TYPE_NOSNIFF=True
-```
-
----
-
-#### `SECURE_BROWSER_XSS_FILTER` (Production)
-
-**Purpose**: Enable browser XSS filtering
-
-**Production**:
-```
-SECURE_BROWSER_XSS_FILTER=True
-```
-
----
-
-#### `X_FRAME_OPTIONS` (Production)
-
-**Purpose**: Prevent clickjacking attacks
-
-**Production**:
-```
-X_FRAME_OPTIONS=DENY
-```
-
-**Values**: `DENY`, `SAMEORIGIN`, or `ALLOW-FROM uri`
-
----
-
-### Static and Media Files
-
-#### `STATIC_ROOT` (Production)
-
-**Purpose**: Absolute path where static files are collected
-
-**Production** (Docker):
-```
-STATIC_ROOT=/app/staticfiles
-```
-
----
-
-#### `MEDIA_ROOT` (Production)
-
-**Purpose**: Absolute path where user-uploaded files are stored
-
-**Production** (Docker):
-```
-MEDIA_ROOT=/app/media
-```
-
----
-
-#### `STATIC_URL` (Optional)
-
-**Purpose**: URL prefix for static files
-
-**Default**:
-```
-STATIC_URL=/static/
-```
-
----
-
-#### `MEDIA_URL` (Optional)
-
-**Purpose**: URL prefix for media files
-
-**Default**:
-```
-MEDIA_URL=/media/
-```
-
----
-
-### Logging Configuration
-
-#### `LOG_LEVEL` (Optional)
-
-**Purpose**: Minimum logging level
-
-**Values**: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
-
-**Development**: `DEBUG`
-**Production**: `INFO` or `WARNING`
-
-**Example**:
-```
-LOG_LEVEL=INFO
-```
-
----
-
-### PostgreSQL Container Variables (.env.prod.db)
-
-These variables are used by the PostgreSQL Docker container and must match the database settings in `.env.prod`.
-
-#### `POSTGRES_DB` (Required)
-
-**Purpose**: Database name to create
-
-**Must Match**: `DB_NAME` in `.env.prod`
-
-**Example**:
-```
-POSTGRES_DB=insurance_broker_prod
-```
-
----
-
-#### `POSTGRES_USER` (Required)
-
-**Purpose**: PostgreSQL superuser name
-
-**Must Match**: `DB_USER` in `.env.prod`
-
-**Example**:
-```
-POSTGRES_USER=postgres
-```
-
----
-
-#### `POSTGRES_PASSWORD` (Required)
-
-**Purpose**: PostgreSQL superuser password
-
-**Must Match**: `DB_PASSWORD` in `.env.prod`
-
-**Example**:
-```
-POSTGRES_PASSWORD=xK9mP2nQ5rT8wY3zA6bC9dF2gH5jK8lM
-```
-
----
-
-## Security Best Practices
-
-### 1. Never Commit Secrets
-
-✅ **DO**:
-- Use `.env.example` files with placeholder values
-- Add `.env`, `.env.prod`, `.env.prod.db` to `.gitignore`
-- Document required variables without exposing actual values
-
-❌ **DON'T**:
-- Commit files containing real passwords, API keys, or secret keys
-- Share `.env` files via email or chat
-- Store secrets in code comments
-
-### 2. Use Strong Passwords
-
-✅ **DO**:
-- Generate random passwords with at least 20 characters
-- Use a mix of uppercase, lowercase, numbers, and special characters
-- Use different passwords for different services
-
-❌ **DON'T**:
-- Use default passwords like 'postgres', 'admin', 'password'
-- Reuse passwords across environments
-- Use dictionary words or personal information
-
-### 3. Rotate Secrets Regularly
-
-- Change `SECRET_KEY` if compromised
-- Rotate database passwords periodically
-- Update API keys when team members leave
-
-### 4. Limit Access
-
-- Only share production credentials with authorized personnel
-- Use GitHub Secrets for CI/CD (never hardcode in workflows)
-- Consider using a secrets management service (AWS Secrets Manager, HashiCorp Vault)
-
-### 5. Production Checklist
-
-Before deploying to production, verify:
-
-- [ ] `DEBUG=False`
-- [ ] Strong `SECRET_KEY` (50+ random characters)
-- [ ] Strong `DB_PASSWORD` (20+ random characters)
-- [ ] `ALLOWED_HOSTS` includes only your domains
-- [ ] All security settings enabled (`SECURE_SSL_REDIRECT`, etc.)
-- [ ] Real SMTP credentials configured
-- [ ] `.env.prod` and `.env.prod.db` are in `.gitignore`
-- [ ] No secrets committed to version control
-
-## Setup Instructions
-
-### Development Setup
-
-1. Copy the example file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` with your local settings (usually defaults are fine)
-
-3. Run migrations:
-   ```bash
-   python manage.py migrate
-   ```
-
-4. Start development server:
-   ```bash
-   python manage.py runserver
-   ```
-
-### Production Setup
-
-1. Copy the example files:
-   ```bash
-   cp .env.prod.example .env.prod
-   cp .env.prod.db.example .env.prod.db
-   ```
-
-2. Generate a strong secret key:
-   ```bash
-   python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-   ```
-
-3. Generate a strong database password:
-   ```bash
-   python -c 'import secrets; print(secrets.token_urlsafe(32))'
-   ```
-
-4. Edit `.env.prod`:
-   - Set `SECRET_KEY` to the generated value
-   - Set `DEBUG=False`
-   - Set `ALLOWED_HOSTS` to your domain(s)
-   - Set `DB_PASSWORD` to the generated password
-   - Configure email settings with your SMTP credentials
-   - Enable all security settings
-
-5. Edit `.env.prod.db`:
-   - Set `POSTGRES_PASSWORD` to the SAME password as `DB_PASSWORD` in `.env.prod`
-   - Ensure `POSTGRES_DB` matches `DB_NAME`
-   - Ensure `POSTGRES_USER` matches `DB_USER`
-
-6. Verify files are in `.gitignore`:
-   ```bash
-   git check-ignore .env.prod .env.prod.db
-   ```
-   Should output both filenames.
-
-7. Deploy using Docker Compose:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-### GitHub Actions Setup
-
-For CI/CD, add these secrets to your GitHub repository:
-
-1. Go to repository Settings → Secrets and variables → Actions
-2. Add the following secrets:
-   - `SSH_PRIVATE_KEY` - SSH key for connecting to your server
-   - `DROPLET_HOST` - Your server IP address
-   - `DROPLET_USER` - SSH username (usually `root` or `ubuntu`)
-   - `SECRET_KEY` - Django secret key
-   - `DB_PASSWORD` - Database password
-   - `EMAIL_HOST_PASSWORD` - SMTP password
-
-Never hardcode these values in `.github/workflows/` files!
-
-## Troubleshooting
-
-### "SECRET_KEY not found"
-
-**Problem**: Django can't find the SECRET_KEY environment variable
-
-**Solution**:
-1. Ensure `.env` or `.env.prod` file exists
-2. Check the file contains `SECRET_KEY=...`
-3. Restart your application/container
-
-### "Database connection failed"
-
-**Problem**: Can't connect to PostgreSQL
-
-**Solution**:
-1. Verify `DB_PASSWORD` in `.env.prod` matches `POSTGRES_PASSWORD` in `.env.prod.db`
-2. Check `DB_HOST=db` (the Docker service name)
-3. Ensure PostgreSQL container is running: `docker-compose ps`
-
-### "ALLOWED_HOSTS validation failed"
-
-**Problem**: Django rejects requests with "Invalid HTTP_HOST header"
-
-**Solution**:
-1. Add your domain to `ALLOWED_HOSTS` in `.env.prod`
-2. Format: `ALLOWED_HOSTS=domain1.com,domain2.com` (no spaces)
-3. Restart the application
-
-### "Email not sending"
-
-**Problem**: Emails aren't being sent in production
-
-**Solution**:
-1. Check `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`
-2. Verify SMTP credentials are correct
-3. For Gmail, use an App Password, not your regular password
-4. Check firewall allows outbound connections on port 587
-5. View logs: `docker-compose logs web`
-
-## Additional Resources
-
-- [Django Settings Documentation](https://docs.djangoproject.com/en/4.2/ref/settings/)
-- [12-Factor App Config](https://12factor.net/config)
-- [Django Security Checklist](https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/)
-- [PostgreSQL Environment Variables](https://www.postgresql.org/docs/current/libpq-envars.html)
-- [Celery Configuration](https://docs.celeryproject.org/en/stable/userguide/configuration.html)
+# Переменные окружения
+
+Сверено по обращениям к конфигурации в исходном коде 2026-11-11.
+Таблица ниже содержит **значения по умолчанию в коде**, а не секреты и не
+эффективное окружение production. При проверке реальные `.env` не читались.
+
+## Источники и приоритет
+
+Django читает process environment и локальный `.env` через python-decouple;
+переменная процесса имеет приоритет. В обычных тестах `get_runtime_config`
+для критичных DB/секретных значений читает только `os.environ`, а не `.env`.
+`config.test_settings` задаёт отдельную SQLite и тестовое хранилище.
+
+Production использует **один `.env.prod`**. Compose передаёт его контейнерам
+и подставляет `POSTGRES_DB/USER/PASSWORD` в `DB_NAME/USER/PASSWORD` приложений.
+`DB_HOST=db`, `DB_PORT=5432` заданы в Compose. Источник interpolation задаётся
+контроллером через `--env-file`; для ручных shell-скриптов может понадобиться
+экспорт переменных. Смотрите [точную команду Compose](DEPLOYMENT.md).
+Старый отдельный `.env.prod.db` текущим production Compose не используется.
+
+При `DEBUG=False` startup проверяет `SECRET_KEY`, `DB_NAME`, `DB_USER`,
+`DB_PASSWORD`, `ALLOWED_HOSTS`. DB-поля и ALLOWED_HOSTS должны присутствовать
+в окружении процесса. Dev fallback SECRET_KEY не годится для production.
+Непустой DB_NAME выбирает PostgreSQL; пустой — SQLite.
+
+## Параметры, которые читает Python
+
+| Переменная | Назначение | Default в коде | Преобразование | Источник |
+|---|---|---|---|---|
+| `SECRET_KEY` | Подпись Django | `небезопасная dev-заглушка` | `строка` | [config/settings.py:25](../config/settings.py#L25) |
+| `DEBUG` | Режим разработки | `True` | `bool` | [config/settings.py:26](../config/settings.py#L26) |
+| `ALLOWED_HOSTS` | Разрешённые Host | `localhost,127.0.0.1` | `Csv()` | [config/settings.py:27](../config/settings.py#L27) |
+| `SECRET_KEY_FALLBACKS_JSON` | JSON-массив прежних ключей для плановой ротации | `[]` | `строка` | [config/settings.py:43](../config/settings.py#L43) |
+| `SENTRY_DSN` | Подключение Sentry | `пусто` | `строка` | [config/settings.py:60](../config/settings.py#L60) |
+| `SENTRY_RELEASE` | Метка релиза Sentry | `unknown` | `строка` | [config/settings.py:90](../config/settings.py#L90) |
+| `DB_NAME` | Пусто → SQLite, иначе PostgreSQL | `пусто` | `строка` | [config/settings.py:236](../config/settings.py#L236) |
+| `DB_USER` | Роль PostgreSQL | `postgres` | `строка` | [config/settings.py:243](../config/settings.py#L243) |
+| `DB_PASSWORD` | Пароль роли | `пусто` | `строка` | [config/settings.py:244](../config/settings.py#L244) |
+| `DB_HOST` | Адрес PostgreSQL | `localhost` | `строка` | [config/settings.py:245](../config/settings.py#L245) |
+| `DB_PORT` | Порт PostgreSQL | `5432` | `строка` | [config/settings.py:246](../config/settings.py#L246) |
+| `BACKUP_BASE_DIR` | Базовый каталог поиска копий приложением | `пусто` | `строка` | [config/settings.py:307](../config/settings.py#L307) |
+| `BACKUP_DB_DIR` | Явный каталог DB-копий для приложения | `пусто` | `строка` | [config/settings.py:308](../config/settings.py#L308) |
+| `BACKUP_MEDIA_DIR` | Явный каталог media-копий для приложения | `пусто` | `строка` | [config/settings.py:309](../config/settings.py#L309) |
+| `CELERY_BROKER_URL` | Broker фоновых задач | `redis://localhost:6379/0` | `строка` | [config/settings.py:315](../config/settings.py#L315) |
+| `CELERY_RESULT_BACKEND` | Хранилище результатов Celery | `redis://localhost:6379/0` | `строка` | [config/settings.py:316](../config/settings.py#L316) |
+| `EMAIL_BACKEND` | Общая Django-почта, отдельно от communications | `django.core.mail.backends.console.EmailBackend` | `строка` | [config/settings.py:328](../config/settings.py#L328) |
+| `EMAIL_HOST` | SMTP общей Django-почты | `smtp.gmail.com` | `строка` | [config/settings.py:331](../config/settings.py#L331) |
+| `EMAIL_PORT` | SMTP-порт Django | `587` | `int` | [config/settings.py:332](../config/settings.py#L332) |
+| `EMAIL_USE_TLS` | STARTTLS общей Django-почты | `True` | `bool` | [config/settings.py:333](../config/settings.py#L333) |
+| `EMAIL_HOST_USER` | Django SMTP login | `пусто` | `строка` | [config/settings.py:334](../config/settings.py#L334) |
+| `EMAIL_HOST_PASSWORD` | Django SMTP password | `пусто` | `строка` | [config/settings.py:335](../config/settings.py#L335) |
+| `COMMUNICATIONS_EMAIL_ENABLED` | Включить бизнес-отправку | `False` | `bool` | [config/settings.py:344](../config/settings.py#L344) |
+| `COMMUNICATIONS_DEFAULT_ACCOUNT` | Код основного MailAccount | `billing` | `строка` | [config/settings.py:347](../config/settings.py#L347) |
+| `COMMUNICATIONS_SMTP_HOST` | SMTP бизнес-писем | `пусто` | `строка` | [config/settings.py:350](../config/settings.py#L350) |
+| `COMMUNICATIONS_SMTP_PORT` | SMTP-порт бизнес-писем | `465` | `int` | [config/settings.py:351](../config/settings.py#L351) |
+| `COMMUNICATIONS_SMTP_USE_TLS` | STARTTLS; не включать вместе с SSL | `False` | `bool` | [config/settings.py:352](../config/settings.py#L352) |
+| `COMMUNICATIONS_SMTP_USE_SSL` | Implicit TLS; не включать вместе с STARTTLS | `True` | `bool` | [config/settings.py:355](../config/settings.py#L355) |
+| `COMMUNICATIONS_SMTP_USERNAME` | SMTP login бизнес-писем | `пусто` | `строка` | [config/settings.py:358](../config/settings.py#L358) |
+| `COMMUNICATIONS_SMTP_PASSWORD` | SMTP password бизнес-писем | `пусто` | `строка` | [config/settings.py:359](../config/settings.py#L359) |
+| `COMMUNICATIONS_FROM_EMAIL` | Адрес отправителя; fallback на SMTP username | `пусто` | `строка` | [config/settings.py:360](../config/settings.py#L360) |
+| `COMMUNICATIONS_FROM_NAME` | Отображаемое имя отправителя | `пусто` | `строка` | [config/settings.py:361](../config/settings.py#L361) |
+| `COMMUNICATIONS_MESSAGE_ID_DOMAIN` | Домен Message-ID; fallback из адреса отправителя | `пусто` | `строка` | [config/settings.py:362](../config/settings.py#L362) |
+| `COMMUNICATIONS_ATTACHMENT_MAX_SIZE_MB` | Максимум МБ на одно вложение | `10` | `int` | [config/settings.py:365](../config/settings.py#L365) |
+| `COMMUNICATIONS_SEND_TIMEOUT` | SMTP timeout в секундах | `30` | `int` | [config/settings.py:368](../config/settings.py#L368) |
+| `COMMUNICATIONS_BCC_EMAILS` | BCC через запятую/точку с запятой | `пусто` | `строка` | [config/settings.py:375](../config/settings.py#L375) |
+| `COMMUNICATIONS_RESTRICT_TO_SUPERUSER` | Ограничить UI отправки суперпользователями | `True` | `bool` | [config/settings.py:378](../config/settings.py#L378) |
+| `BILLING_AUTO_UPDATE_TASK_ON_EMAIL_SENT` | Продвигать статус задачи после sent | `True` | `bool` | [config/settings.py:385](../config/settings.py#L385) |
+| `SECURE_SSL_REDIRECT` | HTTPS redirect в Django | `True` | `bool` | [config/settings.py:506](../config/settings.py#L506) |
+| `SECURE_HSTS_SECONDS` | HSTS Django, секунды | `31536000` | `int` | [config/settings.py:520](../config/settings.py#L520) |
+| `FLOW_HANDOFF_ENABLED` | Включить UI перехода из InsFlow | `False` | `bool` | [config/settings.py:562](../config/settings.py#L562) |
+| `FLOW_SERVICE_TOKEN` | Общий служебный Bearer-токен InsFlow | `пусто` | `строка` | [config/settings.py:563](../config/settings.py#L563) |
+| `FLOW_ZS_BASE_URL` | Сервер источника сводов | `https://zs.insflow.ru` | `строка` | [config/settings.py:564](../config/settings.py#L564) |
+| `TELEGRAM_BOT_TOKEN` | Доступ к боту | `пусто` | `строка` | [apps/core/notifications.py:180](../apps/core/notifications.py#L180) |
+| `TELEGRAM_CHAT_ID` | Чат получателя | `пусто` | `строка` | [apps/core/notifications.py:181](../apps/core/notifications.py#L181) |
+| `TELEGRAM_ENABLED` | Включить Telegram | `False` | `bool` | [apps/core/notifications.py:182](../apps/core/notifications.py#L182) |
+| `TELEGRAM_SOCKS5_PROXY` | SOCKS5 host:port для Python и bash | `пусто` | `строка` | [apps/core/notifications.py:183](../apps/core/notifications.py#L183) |
+| `VK_COMMUNITY_TOKEN` | Токен сообщества VK | `пусто` | `строка` | [apps/core/notifications.py:361](../apps/core/notifications.py#L361) |
+| `VK_USER_ID` | Получатель VK | `пусто` | `строка` | [apps/core/notifications.py:362](../apps/core/notifications.py#L362) |
+| `VK_ENABLED` | Включить VK | `False` | `bool` | [apps/core/notifications.py:363](../apps/core/notifications.py#L363) |
+| `TELEGRAM_ERROR_RATE_LIMIT` | Общий часовой лимит Python-алертов | `10` | `int` | [apps/core/telegram_handler.py:70](../apps/core/telegram_handler.py#L70) |
+| `TELEGRAM_ERROR_MESSAGE_LIMIT` | Бюджет текста ошибки, символы | `500` | `int` | [apps/core/telegram_handler.py:73](../apps/core/telegram_handler.py#L73) |
+| `TELEGRAM_EXCEPTION_MESSAGE_LIMIT` | Бюджет исключения, символы | `700` | `int` | [apps/core/telegram_handler.py:76](../apps/core/telegram_handler.py#L76) |
+| `TELEGRAM_TRACEBACK_LIMIT` | Бюджет traceback, символы | `2500` | `int` | [apps/core/telegram_handler.py:79](../apps/core/telegram_handler.py#L79) |
+| `TELEGRAM_MESSAGE_LIMIT` | Консервативный бюджет Telegram-сообщения | `3900` | `int` | [apps/core/telegram_handler.py:83](../apps/core/telegram_handler.py#L83) |
+
+Часть defaults вычисляется дополнительно: FROM_EMAIL почтового контура может
+подставиться из SMTP username; домен Message-ID — из адреса отправителя.
+`SECRET_KEY_FALLBACKS_JSON` должен быть JSON-массивом непустых строк.
+Почтовые флаги и их эффекты описаны в
+[EMAIL_COMMUNICATIONS_SETUP.md](EMAIL_COMMUNICATIONS_SETUP.md), уведомления —
+в [NOTIFICATIONS_PIPELINE.md](NOTIFICATIONS_PIPELINE.md).
+
+## Параметры Compose, bash и CI
+
+| Переменная | Назначение / значение по умолчанию | Источник |
+|---|---|---|
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Инициализация PostgreSQL и маппинг в `DB_*`; реальные значения задаёт администратор | [Compose](../docker-compose.prod.yml), [пример](../.env.prod.example) |
+| `DEPLOY_SSH_PRIVATE_KEY` | Отдельный приватный ключ CI | [workflow](../.github/workflows/deploy.yml) |
+| `DEPLOY_SSH_KNOWN_HOSTS` | Проверенная host key с alias `onlinepolis-production` | [workflow](../.github/workflows/deploy.yml) |
+| `DROPLET_HOST` | Адрес сервера | [workflow](../.github/workflows/deploy.yml) |
+| `SSH_PORT` | SSH-порт, default `22` | [workflow](../.github/workflows/deploy.yml) |
+| `TELEGRAM_UPLOAD_FILES` | Загружать файлы bash-библиотекой, default `true` | [telegram-config.sh](../scripts/telegram-config.sh) |
+| `TELEGRAM_MAX_FILE_SIZE` | Лимит bash-загрузки Telegram, default `45` МБ | [telegram-config.sh](../scripts/telegram-config.sh) |
+
+Токены, получатели и SOCKS5 общие с Python-параметрами выше.
+Установка доступа CI — в [SECURITY.md](SECURITY.md).
+
+## Параметры бэкапов
+
+Источники — [backup-db-telegram.sh](../scripts/backup-db-telegram.sh),
+[backup-media-telegram.sh](../scripts/backup-media-telegram.sh) и
+[backup-status.sh](../scripts/backup-status.sh).
+
+| Переменная | Default / смысл |
+|---|---|
+| `BACKUP_DIR` | `~/insurance_broker_backups/database` для БД, `~/insurance_broker_backups/media` для media |
+| `DB_CONTAINER`, `DB_NAME`, `DB_USER` | Для host-скрипта БД: `insurance_broker_db`, `insurance_broker_prod`, `postgres`; это отдельные defaults от Django |
+| `MEDIA_VOLUME` | `insurance_broker_media_volume` |
+| `MIN_BACKUP_BYTES` | `10240`: нижняя граница размера сжатого DB-дампа |
+| `RETENTION_DAYS` | `30` для БД, `28` для media |
+| `MIN_RETAINED_BACKUPS` | `5` для БД, `4` для media независимо от возраста |
+| `PRINT_ONLY` | `false`; `true` включает просмотр действий cleanup без удаления |
+| `DB_REQUIRED_STAGES`, `MEDIA_REQUIRED_STAGES` | Обязательные этапы конкретного типа; fallback на `REQUIRED_STAGES` |
+| `REQUIRED_STAGES` | Общий fallback, при отсутствии — `created,verified` |
+
+Процедуры проверки, retention и восстановления остаются в
+[BACKUP_RESTORE.md](BACKUP_RESTORE.md).
+
+Bash-библиотека уведомлений сама загружает `.env.prod`, затем `.env`, а затем
+применяет defaults. Если существуют оба файла, значения из `.env` загружаются
+последними. Внешний shell override одноимённого параметра также может быть
+перезаписан файлом: это не тот же приоритет, что у python-decouple.
+Не делайте вывод об отключении отправки только по env-префиксу команды.
+
+## Что не настраивается одноимённой env-переменной
+
+В текущем settings.py не читаются одноимённые env-переменные:
+`DEFAULT_FROM_EMAIL`, `LOG_LEVEL`, `STATIC_ROOT`, `MEDIA_ROOT`, `STATIC_URL`,
+`MEDIA_URL`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`,
+`SECURE_HSTS_INCLUDE_SUBDOMAINS`, `SECURE_HSTS_PRELOAD`, `X_FRAME_OPTIONS` и
+другие фиксированные security-параметры. Примеры `.env.example` и
+`.env.prod.example` очищены от таких неработающих переключателей.
+Эффективное значение фиксированных параметров задаёт Python
+или Nginx. Запись в `.env` без обращения из кода ничего не переключает.
+
+`ALLIANCE_BACKUP_MANAGER_ID` и `ALLIANCE_BRANCH_EXTRA_EMAILS` — константы
+settings.py, не env. `EMAIL_USE_LOCALTIME=True` также задано в коде.
+`EMAIL_*` Django и `COMMUNICATIONS_*` — разные почтовые контуры.
+
+## Применение изменений
+
+Не выводите секреты для проверки. Изменение `.env.prod` требует пересоздания
+app-контейнеров: restart не заменяет их environment. Порядок, смена пароля
+существующей роли PostgreSQL и временные fallback keys описаны в
+[SECRETS_ROTATION.md](SECRETS_ROTATION.md). Обычный CI-релиз не редактирует env.

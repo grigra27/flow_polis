@@ -1,7 +1,7 @@
 """
 URL configuration for insurance_broker project.
 """
-from apps.policies.flow_api import link_status
+from apps.policies.flow_api import batch_link_status, link_status
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -9,6 +9,11 @@ from django.conf.urls.static import static
 from apps.policies import flow_views
 
 urlpatterns = [
+    path(
+        "internal/flow/v1/summaries/links/",
+        batch_link_status,
+        name="flow-batch-link-status",
+    ),
     path(
         "internal/flow/v1/summaries/<int:summary_id>/links/",
         link_status,

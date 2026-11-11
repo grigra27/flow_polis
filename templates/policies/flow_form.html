@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Оформление полиса из свода{% endblock %}
+{% block extra_css %}
+{{ media.css }}
+<link rel="stylesheet" href="{% static 'policies/css/flow_form.css' %}?v=2026-11-11">
+{% endblock %}
+{% block content %}
+<div class="flow-registration">
+    <div class="flow-heading">
+        <div>
+            <a class="flow-back" href="{{ flow_review_url }}">← К оформлению по своду</a>
+            <h1>Оформление полиса{% if flow_slot %} <span>· объект {{ flow_slot }} из {{ flow_snapshot.source_object_count }}</span>{% endif %}</h1>
+            <p>{{ flow_snapshot.client_name }} · {{ flow_snapshot.insurance_type }}</p>
+        </div>
+        <a class="btn btn-outline-secondary" href="{{ flow_source_url }}">Открыть свод ЗС № {{ flow_snapshot.summary_id }}</a>
+    </div>
+    <form method="post" id="{{ opts.model_name }}_form" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% for hidden in adminform.form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% if errors %}
+            <div class="alert alert-danger" role="alert">Проверьте отмеченные поля. Введённые данные сохранены в форме.</div>
+        {% endif %}
+        {{ adminform.form.non_field_errors }}
+        <div class="flow-layout">
+            <div class="flow-main">
+                {% for fieldset in adminform %}
+                    {% if fieldset.name != "Статусы" and fieldset.name != "Системная информация" and fieldset.name != "Дополнительная информация" %}
+                        <section class="flow-section">
+                            <h2>{{ fieldset.name }}</h2>
+                            {% include "policies/flow_fieldset.html" %}
+                        </section>
+                    {% endif %}
+                {% endfor %}
+                {% for inline_admin_formset in inline_admin_formsets %}
+                    <section class="flow-section flow-inline">
+                        <div class="flow-inline-heading">
+                            <h2>{{ inline_admin_formset.opts.verbose_name_plural|capfirst }}</h2>
+                            {% if inline_admin_formset.formset.prefix == "payment_schedule" %}
+                                <label class="flow-check flow-extra-toggle"><input type="checkbox" data-flow-extra-payments> Дополнительные поля платежей</label>
+                            {% endif %}
+                        </div>
+                        {% include inline_admin_formset.opts.template %}
+                    </section>
+                {% endfor %}
+                {% for fieldset in adminform %}
+                    {% if fieldset.name == "Статусы" or fieldset.name == "Системная информация" or fieldset.name == "Дополнительная информация" %}
+                        <details class="flow-section flow-additional">
+                            <summary>{{ fieldset.name }}</summary>
+                            {% include "policies/flow_fieldset.html" %}
+                        </details>
+                    {% endif %}
+                {% endfor %}
+                {% if request.flow_finance_mismatches %}
+                    <section class="flow-section">
+                        <h2>Расхождения со сводом</h2>
+                        <ul>{% for mismatch in request.flow_finance_mismatches %}<li>{{ mismatch }}</li>{% endfor %}</ul>
+                        <label class="flow-check"><input type="checkbox" name="_flow_actual" value="yes"{% if flow_actual_checked %} checked{% endif %}> Подтверждаю суммы по выданному полису</label>
+                    </section>
+                {% endif %}
+                <div class="flow-savebar">
+                    {% if flow_has_next %}<button class="btn btn-primary" type="submit" name="_flow_next" value="yes">Сохранить и оформить следующий</button>{% endif %}
+                    <button class="btn {% if flow_has_next %}btn-outline-secondary{% else %}btn-primary{% endif %}" type="submit">Сохранить полис и связать со сводом</button>
+                </div>
+            </div>
+            <aside class="flow-sidebar">
+                <section class="flow-section" id="flow-policy-source">
+                    <div class="flow-source-heading">
+                        <h2>Из акцептованного свода</h2>
+                        <a href="{{ flow_source_url }}">ЗС № {{ flow_snapshot.summary_id }} ↗</a>
+                    </div>
+                    <dl class="flow-source-data">
+                        <div><dt>Страховщик</dt><dd>{{ flow_snapshot.selected_company }}</dd></div>
+                        <div><dt>Объект</dt><dd>{{ flow_snapshot.property_description }}{% if flow_snapshot.property_year %}, {{ flow_snapshot.property_year }} г.{% endif %}</dd></div>
+                        <div><dt>Вариант</dt><dd>{{ flow_snapshot.variant }} · {{ flow_snapshot.insurance_period }}</dd></div>
+                        {% if flow_snapshot.lease_start_date or flow_snapshot.lease_end_date %}<div><dt>Договор лизинга</dt><dd>{{ flow_snapshot.lease_start_date|default:"—" }} – {{ flow_snapshot.lease_end_date|default:"—" }}</dd></div>{% endif %}
+                        {% if flow_group %}<div><dt>Группа ДФА</dt><dd>{{ flow_group.dfa }} · объекты {{ flow_group.first_slot }}–{{ flow_group.last_slot }}</dd></div>{% endif %}
+                    </dl>
+                    <div class="flow-source-offers">
+                        {% for offer in flow_snapshot.offers %}
+                            <div><span>{{ offer.year }} год</span><strong>{{ offer.premium|floatformat:"2g" }} ₽</strong><small>Страховая сумма {{ offer.insurance_sum|floatformat:"2g" }} ₽ · {{ offer.installments }} взн.</small></div>
+                        {% endfor %}
+                    </div>
+                    {% if flow_warnings %}<ul class="flow-warnings">{% for warning in flow_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+                    {% if flow_extras %}
+                        <details class="flow-source-extras">
+                            <summary>Условия и примечания</summary>
+                            <dl>{% for label, value in flow_extras %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+                        </details>
+                    {% endif %}
+                </section>
+                {% if flow_group %}
+                    <section class="flow-section">
+                        <h2>Условия на один объект</h2>
+                        {% if flow_group.template_policy_number %}<p class="flow-help">Применены подтверждённые условия полиса {{ flow_group.template_policy_number }}.</p>{% endif %}
+                        <label class="flow-check"><input type="checkbox" name="_flow_template" value="yes"{% if flow_template_checked %} checked{% endif %}> Использовать условия этого полиса и график на один объект для остальных позиций группы ДФА</label>
+                        <p class="flow-help">Номер полиса, VIN и описание каждого объекта заполняются отдельно.</p>
+                    </section>
+                {% endif %}
+            </aside>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% url 'admin:jsi18n' %}"></script>
+{{ media.js }}
+<script id="django-admin-form-add-constants" data-model-name="{{ opts.model_name }}" src="{% static 'admin/js/change_form.js' %}" async></script>
+<script>
+document.querySelectorAll('[data-flow-extra-payments]').forEach(function (toggle) {
+    var section = toggle.closest('.flow-inline');
+    if (section.querySelector('.field-paid_date .errorlist, .field-insurer_date .errorlist, .field-alliance_paid .errorlist, .field-payment_info .errorlist')) {
+        toggle.checked = true;
+    }
+    function showExtraFields() {
+        toggle.closest('.flow-inline').classList.toggle('flow-show-extra', toggle.checked);
+    }
+    showExtraFields();
+    toggle.addEventListener('change', showExtraFields);
+});
+</script>
+{% endblock %}

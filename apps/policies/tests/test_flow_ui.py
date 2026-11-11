@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 
-from apps.policies.models import FlowPolicyLink, Policy
+from apps.policies.models import FlowPolicyLink, FlowPolicySource, Policy
 
 
 @pytest.fixture
@@ -290,6 +290,119 @@ def test_split_mode_requires_manager_amounts_and_resumes(admin_client, source):
             ).status_code
             == 409
         )
+
+
+def test_save_and_next_for_eighteen_objects(admin_client, source, policy_factory):
+    source["source_object_count"] = 18
+    group = FlowPolicySource.objects.create(
+        summary_id=source["summary_id"], mode="separate", total=18
+    )
+    reference = policy_factory(dfa_number="FINAL-3", policy_number="EXTERNAL")
+
+    def fill_slot(slot):
+        policy = policy_factory(
+            policy_number=f"GROUP-{slot}",
+            dfa_number=source["dfa_number"],
+            client=reference.client,
+            insurer=reference.insurer,
+            branch=reference.branch,
+            insurance_type=reference.insurance_type,
+        )
+        group.links.create(
+            slot=slot,
+            policy=policy,
+            revision=source["revision"],
+            created_from_summary=True,
+        )
+
+    for slot in range(1, 15):
+        fill_slot(slot)
+    review = open_review(admin_client, source)
+    assert not admin_client.get(review).context["candidates"]
+    with patch(
+        "apps.policies.flow_views.flow_client.fetch_snapshot", return_value=source
+    ):
+        form15 = admin_client.post(review, {"action": "new", "slot": 15}).url
+        data = admin_post_values(admin_client, form15)
+        data.update(_flow_next="yes", policy_number="GROUP-15", vin_number="TESTVIN15")
+        for index in range(2):
+            data[f"payment_schedule-{index}-amount"] = "12"
+            data[f"payment_schedule-{index}-insurance_sum"] = "100"
+
+        open_drafts = set(admin_client.session["flow_policy_drafts"])
+        invalid = admin_client.post(form15, dict(data, policy_number=""))
+        assert (
+            invalid.status_code == 200
+            and "policy_number" in invalid.context["adminform"].form.errors
+        )
+        assert set(admin_client.session["flow_policy_drafts"]) == open_drafts
+        assert group.links.count() == 14
+
+        data["dfa_number"] = reference.dfa_number
+        confirm = admin_client.post(form15, data)
+        assert confirm.context["mark"] == str(reference.pk)
+        assert ("_flow_next", "yes") in confirm.context["hidden"]
+        confirmed = dict(
+            confirm.context["hidden"], _flow_confirm=confirm.context["mark"]
+        )
+        form16 = admin_client.post(form15, confirmed).url
+        assert admin_client.post(form15, confirmed).url == form16
+        assert group.links.count() == 15
+        assert group.links.get(slot=15).policy.dfa_number == "FINAL-3"
+
+        next_page = admin_client.get(form16)
+        assert next_page.context["flow_slot"] == 16
+        assert next_page.context["flow_has_next"]
+        initial = next_page.context["adminform"].form.initial
+        assert initial["dfa_number"] == source["dfa_number"]
+        assert not initial.get("policy_number") and not initial.get("vin_number")
+        form16_data = admin_post_values(admin_client, form16)
+        assert not form16_data.get("payment_schedule-0-amount")
+        assert not form16_data.get("payment_schedule-0-insurance_sum")
+
+        # Другой менеджер оформил № 17, пока первый заполнял № 16.
+        fill_slot(17)
+        data.update(policy_number="GROUP-16", dfa_number=source["dfa_number"])
+        form18 = admin_client.post(form16, data).url
+        last = admin_client.get(form18)
+        assert last.context["flow_slot"] == 18
+        assert b'name="_flow_next"' not in last.content
+        assert "Сохранить полис и связать со сводом" in last.content.decode()
+        # Старая страница могла ещё показывать «следующий» перед сохранением соседа.
+        data["policy_number"] = "GROUP-18"
+        finished = admin_client.post(form18, data)
+        assert finished.url == reverse(
+            "policies:detail", args=[group.links.get(slot=18).policy_id]
+        )
+        assert admin_client.post(form18, data).url == finished.url
+    assert group.links.count() == 18
+    assert Policy.objects.count() == 19  # 18 позиций и ранее существующий кандидат.
+
+
+def test_save_and_next_can_confirm_an_existing_policy(
+    admin_client, source, policy_factory
+):
+    source["source_object_count"] = 2
+    review = open_review(admin_client, source)
+    with patch(
+        "apps.policies.flow_views.flow_client.fetch_snapshot", return_value=source
+    ):
+        first = admin_client.post(review, {"action": "new", "slot": 1}).url
+        existing = policy_factory(dfa_number="FINAL-2")
+        data = admin_post_values(admin_client, first)
+        data.update(dfa_number=existing.dfa_number, _flow_next="yes")
+        confirm = admin_client.post(first, data)
+        assert confirm.context["mark"] == str(existing.pk)
+        values = dict(
+            confirm.context["hidden"],
+            _flow_link=existing.pk,
+            _flow_confirm=confirm.context["mark"],
+        )
+        second = admin_client.post(first, values).url
+    assert admin_client.get(second).context["flow_slot"] == 2
+    link = FlowPolicyLink.objects.get()
+    assert link.slot == 1 and link.policy == existing and not link.created_from_summary
+    assert Policy.objects.count() == 1
 
 
 def test_stale_terms_keep_manual_number_vin_and_dates(admin_client, source):

@@ -2,5 +2,6 @@
 {% block content %}
 <h1>Оформление из ЗС</h1>
 <p role="alert">{{ error }}</p>
+{% if form_url %}<p><a href="{{ form_url }}">Вернуться к заполненной форме</a> · <a href="{{ review_url }}">Проверить план свода</a></p>{% endif %}
 <a href="{% url 'policies:list' %}">К журналу полисов</a>
 {% endblock %}

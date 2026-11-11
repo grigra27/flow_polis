@@ -1,55 +1,91 @@
 {% extends "base.html" %}
-{% block title %}Оформление полиса из ЗС{% endblock %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_form.css' %}?v=2026-11-11">{% endblock %}
+{% block title %}Оформление из свода № {{ source.summary_id }}{% endblock %}
 {% block content %}
-<h1>Оформление полиса из свода № {{ source.summary_id }}</h1>
-<p>{{ source.client_name }} · ИНН {{ source.client_inn }} · {{ source.selected_company }} · {{ source.insurance_type }}</p>
-<p>{{ source.property_description }}{% if source.property_year %}, {{ source.property_year }} г.{% endif %}</p>
+<div class="flow-registration"><header class="flow-heading">
+    <div><h1 class="h2">Оформление полисов по своду № {{ source.summary_id }}</h1>
+    <p class="mb-1">{{ source.client_name }} · ИНН {{ source.client_inn }}</p>
+    <p class="mb-0 text-body-secondary">{{ source.selected_company }} · {{ source.insurance_type }} · {{ source.property_description }}{% if source.property_year %}, {{ source.property_year }} г.{% endif %}</p></div>
+    <a class="btn btn-outline-secondary" href="{{ source_url }}">Открыть свод ЗС № {{ source.summary_id }}</a>
+</header>
+{% if error %}<div class="alert alert-warning" role="alert">{{ error }}</div>{% endif %}
 {% if draft.previous %}
-<div class="alert alert-warning">
-<h2 class="h5">Условия акцепта обновились</h2>
-<table class="table"><thead><tr><th></th><th>До изменения</th><th>Сейчас в ЗС</th></tr></thead>
+<section class="alert alert-warning"><h2 class="h5">Условия акцепта обновились</h2>
+<table class="table"><thead><tr><th>Данные</th><th>До изменения</th><th>Сейчас в ЗС</th></tr></thead>
 <tbody>{% for label, before, after in changes %}<tr><th>{{ label }}</th><td>{{ before|default_if_none:"—" }}</td><td>{{ after|default_if_none:"—" }}</td></tr>{% endfor %}</tbody></table>
-{% if draft.edits %}Введённые реквизиты и правки взносов будут подставлены при оформлении той же позиции.{% endif %}</div>
+{% if draft.edits %}Введённые реквизиты и правки взносов будут подставлены при оформлении той же позиции.{% endif %}</section>
 {% endif %}
-{% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
-{% if links %}
-<h2 class="h5">Связанные полисы</h2>
-<ul>{% for link in links %}<li><a href="{% url 'policies:detail' link.policy_id %}">{{ link.policy.policy_number }}</a>{% if link.slot %} · объект {{ link.slot }} из {{ total }}{% endif %}</li>{% endfor %}</ul>
-{% endif %}
-{% if allow_common or slots %}
-<form method="post" class="mb-3">{% csrf_token %}
-<label for="search-dfa">ДФА для поиска совпадений</label>
-<input id="search-dfa" name="dfa" maxlength="100" value="{{ draft.dfa }}">
-<button class="btn btn-outline-secondary" name="action" value="search">Проверить номер</button>
-</form>
-<form method="post">{% csrf_token %}
-<input type="hidden" name="candidates" value="{{ candidate_mark }}">
-{% if total > 1 %}
-<label for="flow-slot">Оформление {{ total }} одинаковых объектов</label>
-<select id="flow-slot" name="slot" required>
-<option value="">Выберите объект или общий полис</option>
-{% if allow_common %}<option value="0">Один полис на все объекты</option>{% endif %}
-{% for slot in slots %}<option value="{{ slot }}">Отдельный полис на объект {{ slot }} из {{ total }}</option>{% endfor %}
-</select>
-{% else %}<input type="hidden" name="slot" value="0">{% endif %}
-{% if candidates %}
-<h2 class="h5 mt-3">Полисы по этому ДФА</h2>
-<table class="table"><thead><tr><th>Выбор</th><th>Полис</th><th>Клиент</th><th>Страховщик и вид</th><th>Объект</th><th>Действие договора</th></tr></thead><tbody>
-{% for p in candidates %}<tr>
-<td><input type="radio" aria-label="Выбрать полис {{ p.policy_number }}" name="policy_id" value="{{ p.pk }}"></td>
-<td><a target="_blank" rel="noopener" href="{% url 'policies:detail' p.pk %}">{{ p.policy_number }}</a>{% for existing in p.flow_links.all %}<br><small>Связан со сводом № {{ existing.source_id }}{% if existing.slot %}, объект {{ existing.slot }}{% endif %}</small>{% endfor %}</td>
-<td>{{ p.client }}<br>{{ p.client.client_inn|default:"" }}</td><td>{{ p.insurer }}<br>{{ p.insurance_type }}</td>
-<td>{{ p.property_description }}<br>{{ p.vin_number }}</td><td>{{ p.start_date|date:"d.m.Y" }} – {{ p.end_date|date:"d.m.Y" }}<br>{% if p.is_in_force %}В силе{% else %}Вне срока или закрыт{% endif %}</td>
-</tr>{% endfor %}
-</tbody></table>
-{% if can_link %}<button class="btn btn-primary" name="action" value="link">Связать выбранный полис</button>{% endif %}
-{% else %}<p>Совпадений по указанному ДФА нет.</p>{% endif %}
-{% if can_create %}
-{% if source.variant and source.offers %}
-<button class="btn {% if candidates %}btn-outline-primary{% else %}btn-primary{% endif %}" name="action" value="new">{% if candidates %}Создать отдельный полис{% else %}Открыть форму нового полиса{% endif %}</button>
-{% else %}<p class="mt-2">Для расчёта премии <a href="{{ variant_url }}">укажите принятый вариант в ЗС</a> и снова откройте оформление из свода.</p>{% endif %}
-{% endif %}
-{% if not can_create and not can_link %}<p>Для оформления требуется право на создание или привязку полиса.</p>{% endif %}
-</form>
-{% endif %}
+<div class="flow-layout">
+ <div class="flow-main">
+ {% if allow_common or slots %}
+ <section class="flow-section"><div>
+ <h2 class="h5">{% if total > 1 %}Выбор объекта{% else %}Оформление полиса{% endif %}</h2>
+ <form method="post">{% csrf_token %}<input type="hidden" name="candidates" value="{{ candidate_mark }}">
+ {% if total > 1 %}
+ <div class="d-flex align-items-end gap-2 mb-3 flex-wrap">
+  <div class="flex-grow-1"><label class="form-label" for="flow-slot">Позиция из {{ total }}</label>
+  <select class="form-select" id="flow-slot" name="slot" required>
+   <option value="">Выберите объект или общий полис</option>
+   {% if allow_common %}<option value="0">Один полис на все объекты</option>{% endif %}
+   {% for slot in slots %}<option value="{{ slot }}"{% if selected_slot == slot %} selected{% endif %}>Отдельный полис на объект {{ slot }} из {{ total }}</option>{% endfor %}
+  </select></div>
+  {% if groups %}<button class="btn btn-outline-secondary" name="action" value="select">Показать ДФА позиции</button>{% endif %}
+ </div>
+ {% else %}<input type="hidden" name="slot" value="0">{% endif %}
+ {% if candidates %}
+ <h3 class="h6 mt-4">Полисы по этому ДФА · {{ search_dfa }}</h3>
+ <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Выбор</th><th>Полис и клиент</th><th>Страхование и объект</th><th>Срок</th></tr></thead><tbody>
+ {% for p in candidates %}<tr>
+ <td><input class="form-check-input" type="radio" aria-label="Выбрать полис {{ p.policy_number }}" name="policy_id" value="{{ p.pk }}"></td>
+ <td><a href="{% url 'policies:detail' p.pk %}" target="_blank" rel="noopener">{{ p.policy_number }}</a><div>{{ p.client }}</div><small>{{ p.client.client_inn|default:"" }}</small>
+ {% for existing in p.flow_links.all %}<div><small>Связан со сводом № {{ existing.source_id }}</small></div>{% endfor %}</td>
+ <td>{{ p.insurer }} · {{ p.insurance_type }}<div>{{ p.property_description }} {{ p.vin_number }}</div></td>
+ <td>{{ p.start_date|date:"d.m.Y" }} – {{ p.end_date|date:"d.m.Y" }}<div>{% if p.is_in_force %}В силе{% else %}Вне срока или закрыт{% endif %}</div></td>
+ </tr>{% endfor %}</tbody></table></div>
+ {% if can_link %}<button class="btn btn-primary" name="action" value="link">Связать выбранный полис</button>{% endif %}
+ {% else %}<p class="text-body-secondary">По ДФА {{ search_dfa|default:"—" }} доступных для привязки полисов нет.</p>{% endif %}
+ {% if can_create %}{% if source.variant and source.offers %}
+ <button class="btn {% if candidates %}btn-outline-primary{% else %}btn-primary{% endif %}" name="action" value="new">{% if candidates %}Создать отдельный полис{% else %}Открыть форму нового полиса{% endif %}</button>
+ {% else %}<p>Для расчёта премии <a href="{{ variant_url }}">укажите принятый вариант в ЗС</a> и снова откройте оформление из свода.</p>{% endif %}{% endif %}
+ </form>
+ {% if not has_selected_group %}
+ <details class="mt-3"><summary>Проверить другой ДФА</summary><form method="post" class="d-flex gap-2 align-items-end mt-2">{% csrf_token %}
+ <div><label for="search-dfa" class="form-label">ДФА для поиска совпадений</label><input class="form-control" id="search-dfa" name="dfa" maxlength="100" value="{{ draft.dfa }}"></div>
+ <button class="btn btn-outline-secondary" name="action" value="search">Проверить номер</button></form></details>
+ {% endif %}
+ </div></section>
+ {% endif %}
+ {% if total > 1 and can_create and slots %}
+ <section class="flow-section"><div><h2 class="h5">Группы ДФА</h2>
+ {% if groups %}<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Объекты</th><th>Конечный ДФА</th><th>Условия на один объект</th><th></th></tr></thead><tbody>
+ {% for g in groups %}<tr><td>{{ g.first_slot }}–{{ g.last_slot }}</td><td>{{ g.dfa }}</td><td>{% if g.revision != source.revision %}<strong>Требуют подтверждения</strong>{% elif g.template_policy_number %}Полис {{ g.template_policy_number }}{% else %}По документу объекта{% endif %}</td>
+ <td><form method="post">{% csrf_token %}<input type="hidden" name="action" value="remove-group"><input type="hidden" name="range_start" value="{{ g.first_slot }}"><input type="hidden" name="range_end" value="{{ g.last_slot }}"><input type="hidden" name="plan_version" value="{{ plan_version }}">
+ <button class="btn btn-sm btn-link link-secondary" title="Убрать настройку диапазона {{ g.first_slot }}–{{ g.last_slot }}">Убрать</button></form></td></tr>
+ {% endfor %}</tbody></table></div>{% endif %}
+ <p class="text-body-secondary">Укажите, какие позиции относятся к одному договору. Для одной позиции введите её номер в оба поля.</p>
+ <form method="post" class="row g-3">{% csrf_token %}<input type="hidden" name="plan_version" value="{{ plan_version }}">
+ <div class="col-sm-2"><label for="range-start" class="form-label">С позиции</label><input class="form-control" type="number" id="range-start" name="range_start" min="1" max="{{ total }}" required></div>
+ <div class="col-sm-2"><label for="range-end" class="form-label">По позицию</label><input class="form-control" type="number" id="range-end" name="range_end" min="1" max="{{ total }}" required></div>
+ <div class="col-sm-8"><label for="group-dfa" class="form-label">Окончательный ДФА</label><input class="form-control" id="group-dfa" name="group_dfa" maxlength="100" required></div>
+ {% if links %}<div class="col-12"><label class="form-label" for="template-policy">Образец условий на один объект</label>
+ <select class="form-select" name="template_policy_id" id="template-policy"><option value="">Оставить текущие условия диапазона</option>
+ {% for link in links %}{% if link.revision == source.revision %}<option value="{{ link.policy_id }}">{{ link.policy.policy_number }} · объект {{ link.slot }} · ДФА {{ link.policy.dfa_number }}</option>{% endif %}{% endfor %}</select>
+ <div class="mt-3" id="sample-preview" role="status" aria-live="polite"></div>
+ <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="confirm_template" value="yes"> Подтверждаю общие условия и график выбранного полиса на один объект</label>
+ </div>{% endif %}
+ <div class="col-12"><button class="btn btn-outline-primary" name="action" value="plan">Сохранить диапазон</button></div>
+ </form></div></section>
+ {% endif %}
+ </div>
+ <aside class="flow-sidebar"><section class="flow-section"><div>
+ <h2 class="h5">Связанные полисы</h2>
+ {% if total > 1 %}<p>Оформлено {{ links|length }} из {{ total }}{% if links.0.slot == 0 %} · общий полис{% endif %}</p>{% endif %}
+ {% if links %}<details {% if links|length < 6 %}open{% endif %}><summary>Показать полисы ({{ links|length }})</summary><ol class="list-unstyled mt-2 mb-0">{% for link in links %}<li class="py-1 border-bottom"><a href="{% url 'policies:detail' link.policy_id %}">{{ link.policy.policy_number }}</a>{% if link.slot %}<div class="small text-body-secondary">Объект {{ link.slot }} из {{ total }} · ДФА {{ link.policy.dfa_number }}</div>{% endif %}</li>{% endfor %}</ol></details>
+ {% else %}<p class="text-body-secondary mb-0">По этому своду пока нет связанных полисов.</p>{% endif %}
+ </div></section></aside>
+</div>
+</div>
 {% endblock %}
+
+{% block extra_js %}<script src="{% static 'policies/js/flow_sample.js' %}" defer></script>{% endblock %}

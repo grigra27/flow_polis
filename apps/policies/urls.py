@@ -1,10 +1,11 @@
 from django.urls import path
-from . import views
+from . import flow_views, views
 from apps.billing import views as billing_views
 
 app_name = "policies"
 
 urlpatterns = [
+    path("from-zs/add/", flow_views.add, name="flow-add"),
     path("", views.PolicyListView.as_view(), name="list"),
     path("<int:pk>/", views.PolicyDetailView.as_view(), name="detail"),
     path("payments/", views.PaymentScheduleListView.as_view(), name="payments"),

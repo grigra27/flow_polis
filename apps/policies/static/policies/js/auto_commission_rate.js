@@ -21,6 +21,8 @@
         // Последняя полученная ставка: по ней КВ пересчитывается и при вводе
         // премии уже после выбора СК.
         var currentKvPercent = null;
+        var flowForm = false;
+        var pendingKvRows = new Set();
 
         $(document).ready(function() {
             initAutoCommissionRate();
@@ -36,7 +38,8 @@
                 return;
             }
 
-            if (document.getElementById("flow-policy-source") && $insurerField.val() && $insuranceTypeField.val()) {
+            flowForm = Boolean(document.getElementById("flow-policy-source"));
+            if (flowForm && $insurerField.val() && $insuranceTypeField.val()) {
                 updateCommissionRates(false);
             }
 
@@ -51,10 +54,20 @@
 
             // Премия введена или изменена после выбора СК — пересчитать КВ строки.
             $(document).on('input change', '.dynamic-payment_schedule input[name$="-amount"]', function() {
+                var $row = $(this).closest('.dynamic-payment_schedule');
+                if (flowForm) {
+                    pendingKvRows.add($row.get(0));
+                    // Пока ставка загружается, пустое поле поручает расчёт серверу.
+                    $row.find('input[name$="-kv_rub"]').val('');
+                }
                 if (currentKvPercent === null) {
                     return;
                 }
-                recalculateKvRub($(this).closest('.dynamic-payment_schedule'), currentKvPercent);
+                recalculateKvRub($row, currentKvPercent);
+                pendingKvRows.delete($row.get(0));
+            });
+            $(document).on('input change', '.dynamic-payment_schedule input[name$="-kv_rub"]', function() {
+                pendingKvRows.delete($(this).closest('.dynamic-payment_schedule').get(0));
             });
 
             // Also handle when new payment rows are added
@@ -73,6 +86,18 @@
             var insurerId = $insurerField.val();
             var insuranceTypeId = $insuranceTypeField.val();
 
+            if (flowForm) {
+                currentKvPercent = null;
+                if (applyToExisting !== false) {
+                    $('.dynamic-payment_schedule').each(function() {
+                        var $row = $(this);
+                        if (!$row.hasClass('empty-form') && !$row.find('input[name$="-DELETE"]').prop('checked')) {
+                            pendingKvRows.add(this);
+                            $row.find('input[name$="-kv_rub"]').val('');
+                        }
+                    });
+                }
+            }
             // Both fields must be selected
             if (!insurerId || !insuranceTypeId) {
                 currentKvPercent = null;
@@ -92,6 +117,13 @@
                     if ($('#id_insurer').val() !== insurerId || $('#id_insurance_type').val() !== insuranceTypeId) return;
                     if (response.success) {
                         currentKvPercent = response.kv_percent;
+                        if (flowForm) {
+                            pendingKvRows.forEach(function(row) {
+                                recalculateKvRub($(row), currentKvPercent);
+                            });
+                            pendingKvRows.clear();
+                            return;
+                        }
                         // ЗС уже заполнила форму, в том числе сохранённые правки менеджера.
                         if (applyToExisting === false) return;
                         applyCommissionRateToAllRows(
@@ -156,6 +188,10 @@
             var amount = parseFloat($amountField.val());
             var kvPercentValue = parseFloat(kvPercent);
 
+            if (flowForm && (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(kvPercentValue))) {
+                $kvRubField.val('');
+                return;
+            }
             if (isNaN(amount) || isNaN(kvPercentValue)) {
                 return;
             }

@@ -812,6 +812,9 @@ class FlowPolicySource(models.Model):
         max_length=8, choices=[("common", "Один полис"), ("separate", "По единицам")]
     )
     total = models.PositiveIntegerField("Количество одинаковых объектов")
+    groups = models.JSONField(
+        "Группы ДФА и подтверждённые условия", default=list, db_default=[]
+    )
 
 
 class FlowPolicyLink(models.Model):
@@ -828,6 +831,17 @@ class FlowPolicyLink(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
     created_from_summary = models.BooleanField("Полис создан из свода")
+
+    @property
+    def source_url(self):
+        return f"{settings.FLOW_ZS_BASE_URL.rstrip('/')}/summaries/{self.source_id}/"
+
+    @property
+    def source_label(self):
+        label = f"Свод ЗС № {self.source_id}"
+        if self.slot:
+            return f"{label} · объект {self.slot} из {self.source.total}"
+        return label
 
     class Meta:
         permissions = [

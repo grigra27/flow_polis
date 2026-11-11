@@ -1,0 +1,79 @@
+.flow-registration { max-width: 1520px; margin: 0 auto; }
+.flow-heading { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; margin-bottom: 1.4rem; }
+.flow-heading h1 { margin: .45rem 0; font-size: 1.7rem; font-weight: 700; }
+.flow-heading h1 span { font-weight: 400; color: #546376; }
+.flow-heading p { margin: 0; color: #546376; }
+.flow-back { color: #445c79; font-size: .88rem; text-decoration: none; }
+.flow-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 1.5rem; }
+.flow-main, .flow-sidebar { min-width: 0; }
+.flow-sidebar { position: sticky; top: 5rem; }
+.flow-section { background: #fff; border: 1px solid #dce3eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+.flow-section h2 { margin: 0 0 1.1rem; font-size: 1.05rem; font-weight: 650; }
+.flow-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.2rem; }
+.flow-field { min-width: 0; }
+.flow-field--wide { grid-column: 1 / -1; }
+.flow-field > label { display: block; margin-bottom: .4rem; font-size: .88rem; font-weight: 600; }
+.flow-required { color: #b82e40; }
+.flow-field input:not([type=checkbox]), .flow-field select, .flow-field textarea {
+    width: 100%; max-width: 100%; min-height: 40px; padding: .5rem .65rem;
+    border: 1px solid #becbd8; border-radius: 6px; background: #fff; color: #1e293b;
+}
+.flow-field textarea { height: 90px; }
+.flow-field input[type=checkbox] { width: 1rem; height: 1rem; }
+.flow-field input:focus-visible, .flow-field select:focus-visible, .flow-field textarea:focus-visible { outline: 2px solid #234d78; outline-offset: 2px; }
+.flow-field .related-widget-wrapper { display: flex; align-items: center; gap: .4rem; }
+.flow-field .related-widget-wrapper select { flex: 1; min-width: 0; }
+.flow-field .related-widget-wrapper-link { flex: 0 0 auto; }
+.flow-field .related-widget-wrapper-link img { width: 16px; height: 16px; }
+.flow-field .select2-container { min-width: 0; flex: 1; width: auto !important; }
+.flow-field .select2-container .select2-selection--single { min-height: 40px; padding: .3rem 0; border: 1px solid #becbd8; border-radius: 6px; background: #fff; }
+.flow-field .select2-container .select2-selection--single .select2-selection__arrow { top: .4rem; }
+.select2-container--admin-autocomplete .select2-dropdown { background: #fff; border-color: #becbd8; color: #1e293b; }
+.select2-container--admin-autocomplete .select2-results__option--highlighted[aria-selected] { background: #224f7c; color: #fff; }
+.flow-help { margin-top: .45rem; font-size: .8rem; line-height: 1.5; color: #5c6b7d; }
+.flow-check { display: flex; align-items: start; gap: .55rem; font-size: .88rem; line-height: 1.5; }
+.flow-check input { flex: 0 0 auto; margin-top: .25rem; }
+.flow-field .errorlist, .flow-registration > form > .errorlist { padding-left: 1.2rem; color: #b42339; font-size: .85rem; margin: .4rem 0; }
+.flow-field--invalid input, .flow-field--invalid select, .flow-field--invalid textarea { border-color: #b42339; }
+.flow-additional summary { font-size: 1rem; font-weight: 600; }
+.flow-additional .flow-fields { margin-top: 1rem; }
+.flow-inline-heading { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.flow-inline-heading h2 { margin-bottom: .75rem; }
+.flow-inline .inline-heading { display: none; }
+.flow-inline .inline-group fieldset { min-width: 0; }
+.flow-inline .tabular { overflow-x: auto; }
+.flow-inline table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.flow-inline th, .flow-inline td { padding: .65rem .4rem; border-bottom: 1px solid #e5eaf0; vertical-align: top; }
+.flow-inline th { font-size: .75rem; font-weight: 600; color: #546376; background: #f5f7fa; }
+.flow-inline .original { width: 0; padding: 0; }
+.flow-inline td.original p { display: none; }
+.flow-inline input:not([type=checkbox]), .flow-inline select, .flow-inline textarea { width: 100%; min-width: 75px; max-width: 170px; min-height: 36px; padding: .4rem; border: 1px solid #becbd8; border-radius: 5px; }
+.flow-inline td.field-year_number input, .flow-inline td.field-installment_number input { min-width: 48px; width: 60px; }
+.flow-inline :is(.field-paid_date, .column-paid_date, .field-insurer_date, .column-insurer_date, .field-alliance_paid, .column-alliance_paid, .field-payment_info, .column-payment_info) { display: none; }
+.flow-inline.flow-show-extra :is(.field-paid_date, .column-paid_date, .field-insurer_date, .column-insurer_date, .field-alliance_paid, .column-alliance_paid, .field-payment_info, .column-payment_info) { display: table-cell; }
+.flow-inline .datetime { white-space: nowrap; margin: 0; }
+.flow-inline .datetimeshortcuts { display: none; }
+.flow-inline .add-row a { display: inline-block; margin: .4rem 0; }
+.flow-inline .empty-form { display: none; }
+.flow-inline .errorlist, .flow-inline .errornote { color: #b42339; font-size: .8rem; }
+.flow-inline .inline-deletelink { padding: .4rem; }
+.flow-savebar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: .7rem; padding: 1rem; border: 1px solid #dce3eb; border-radius: 10px; background: #fff; box-shadow: 0 -4px 16px rgba(27,45,67,.06); z-index: 10; }
+.flow-source-heading { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; justify-content: space-between; margin-bottom: 1rem; }
+.flow-source-heading h2 { margin: 0; }
+.flow-source-heading a { font-size: .82rem; }
+.flow-source-data { margin: 0; }
+.flow-source-data div { margin: .7rem 0; }
+.flow-source-data dt { color: #64748b; font-size: .76rem; font-weight: 400; }
+.flow-source-data dd { margin: .15rem 0 0; font-size: .88rem; }
+.flow-source-offers > div { display: grid; grid-template-columns: 1fr auto; gap: .3rem; padding: .65rem 0; border-top: 1px solid #e5eaf0; font-size: .88rem; }
+.flow-source-offers small { grid-column: 1 / -1; color: #64748b; font-size: .76rem; }
+.flow-warnings { padding-left: 1rem; margin: .9rem 0 0; color: #885d10; font-size: .8rem; }
+.flow-source-extras { margin-top: .9rem; font-size: .82rem; }
+.flow-source-extras dl { margin-top: .7rem; }
+.flow-source-extras dd { margin: .25rem 0 .7rem; }
+@media (max-width: 991px) {
+    .flow-layout { grid-template-columns: 1fr; }
+    .flow-sidebar { position: static; grid-row: 1; }
+    .flow-heading { align-items: start; flex-direction: column; }
+    .flow-fields { grid-template-columns: 1fr; }
+}

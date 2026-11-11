@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Sum
 from django.forms.models import BaseInlineFormSet
 from django.template.response import TemplateResponse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.contrib.admin import SimpleListFilter
 from django.shortcuts import redirect
 from django.urls import path, reverse
@@ -199,7 +199,7 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
 # скрипта меняйте версию, иначе браузеры сотрудников возьмут старый файл.
 # Полный путь: static() закодировал бы «?» в %3F.
 AUTO_COMMISSION_RATE_JS = (
-    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-09"
+    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-11"
 )
 
 
@@ -337,7 +337,7 @@ class PolicyAdmin(admin.ModelAdmin):
         "branch",
         "leasing_manager",
     ]
-    readonly_fields = ["created_at", "updated_at"]
+    readonly_fields = ["created_at", "updated_at", "flow_provenance"]
     actions = ["copy_policy"]
 
     fieldsets = (
@@ -391,6 +391,32 @@ class PolicyAdmin(admin.ModelAdmin):
     )
 
     inlines = [PaymentScheduleInline, PolicyInfoInline]
+
+    def get_fieldsets(self, request, obj=None):
+        sections = super().get_fieldsets(request, obj)
+        if obj is None or not obj.flow_links.exists():
+            return sections
+        result = []
+        for title, options in sections:
+            fields = list(options.get("fields", ()))
+            if "dfa_number" in fields:
+                fields.insert(fields.index("dfa_number") + 1, "flow_provenance")
+                options = dict(options, fields=fields)
+            result.append((title, options))
+        return result
+
+    @admin.display(description="Источник оформления")
+    def flow_provenance(self, obj):
+        return format_html_join(
+            " · ",
+            '<a href="{}">{}</a>',
+            (
+                (link.source_url, link.source_label)
+                for link in obj.flow_links.select_related("source").order_by(
+                    "source_id"
+                )
+            ),
+        )
 
     class Media:
         js = (
@@ -496,7 +522,7 @@ class PolicyAdmin(admin.ModelAdmin):
             context["accept_import_parsed_rows"] = self._build_accept_parsed_rows(
                 payload
             )
-        return super().render_change_form(
+        response = super().render_change_form(
             request,
             context,
             add=add,
@@ -504,6 +530,9 @@ class PolicyAdmin(admin.ModelAdmin):
             form_url=form_url,
             obj=obj,
         )
+        if hasattr(request, "flow_source"):
+            response.template_name = "policies/flow_form.html"
+        return response
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)

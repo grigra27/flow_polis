@@ -1,28 +1,69 @@
+import json
 import secrets
 
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 
 from .models import FlowPolicySource
+
+
+def service_authorized(request):
+    token = settings.FLOW_SERVICE_TOKEN
+    return token and secrets.compare_digest(
+        request.headers.get("Authorization", "").encode(), f"Bearer {token}".encode()
+    )
+
+
+def statuses(summary_ids):
+    result = {pk: {"mode": None, "links": [], "total": 0} for pk in summary_ids}
+    rows = (
+        FlowPolicySource.objects.filter(pk__in=summary_ids)
+        .order_by("pk", "links__slot")
+        .values_list(
+            "pk",
+            "mode",
+            "total",
+            "links__slot",
+            "links__policy_id",
+            "links__policy__policy_number",
+        )
+    )
+    for source_id, mode, total, slot, pk, number in rows:
+        item = result[source_id]
+        item.update(mode=mode, total=total)
+        if pk is not None:
+            item["links"].append(
+                {"position": slot or 1, "policy_id": pk, "policy_number": number}
+            )
+    return result
 
 
 @require_GET
 @never_cache
 def link_status(request, summary_id):
-    token = settings.FLOW_SERVICE_TOKEN
-    if not token or not secrets.compare_digest(
-        request.headers.get("Authorization", "").encode(), f"Bearer {token}".encode()
-    ):
+    if not service_authorized(request):
         return JsonResponse({"error": "unauthorized"}, status=401)
-    source = FlowPolicySource.objects.filter(pk=summary_id).first()
-    if source is None:
-        return JsonResponse({"mode": None, "links": [], "total": 0})
-    links = [
-        {"position": slot or 1, "policy_id": pk, "policy_number": number}
-        for slot, pk, number in source.links.order_by("slot").values_list(
-            "slot", "policy_id", "policy__policy_number"
-        )
-    ]
-    return JsonResponse({"mode": source.mode, "total": source.total, "links": links})
+    return JsonResponse(statuses([summary_id])[summary_id])
+
+
+@csrf_exempt
+@require_POST
+@never_cache
+def batch_link_status(request):
+    if not service_authorized(request):
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    try:
+        data = json.loads(request.body)
+        ids = data["summary_ids"]
+        if (
+            not isinstance(ids, list)
+            or len(ids) > 100
+            or any(type(pk) is not int or not 1 <= pk < 2**63 for pk in ids)
+        ):
+            raise ValueError
+    except (ValueError, TypeError, KeyError, UnicodeDecodeError):
+        return JsonResponse({"error": "invalid_summary_ids"}, status=400)
+    return JsonResponse({"summaries": statuses(ids)})

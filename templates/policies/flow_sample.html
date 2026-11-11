@@ -1,0 +1,11 @@
+<p class="mb-2"><a href="{% url 'policies:detail' policy.pk %}" target="_blank" rel="noopener">{{ policy.policy_number }}</a> · {{ policy.insurer }} · {{ policy.insurance_type }}</p>
+<dl class="row small mb-1">
+ <dt class="col-sm-4">Лизингополучатель</dt><dd class="col-sm-8">{{ policy.client }}</dd>
+ <dt class="col-sm-4">Страхователь</dt><dd class="col-sm-8">{{ policy.policyholder|default:"—" }}</dd>
+ <dt class="col-sm-4">Филиал и менеджер</dt><dd class="col-sm-8">{{ policy.branch }} · {{ policy.leasing_manager|default:"—" }}</dd>
+ <dt class="col-sm-4">Даты страхования</dt><dd class="col-sm-8">{{ policy.start_date|date:"d.m.Y" }} – {{ policy.end_date|date:"d.m.Y" }}</dd>
+ <dt class="col-sm-4">Франшиза</dt><dd class="col-sm-8">{{ policy.franchise }} ₽</dd>
+</dl>
+<div class="table-responsive"><table class="table table-sm small mb-0">
+<thead><tr><th>Год / взнос</th><th>Срок уплаты</th><th>Страховая сумма, ₽</th><th>Взнос на один объект, ₽</th></tr></thead><tbody>
+{% for p in policy.payment_schedule.all %}<tr><td>{{ p.year_number }} / {{ p.installment_number }}</td><td>{{ p.due_date|date:"d.m.Y" }}</td><td>{{ p.insurance_sum|default_if_none:"—" }}</td><td>{{ p.amount }}</td></tr>{% endfor %}</tbody></table></div>

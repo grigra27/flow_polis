@@ -1,0 +1,17 @@
+<div class="flow-fields">
+    {% for line in fieldset %}
+        {% for field in line %}
+            <div class="flow-field form-row{% if field.field.errors %} flow-field--invalid{% endif %}{% if field.field.name == 'property_description' or field.field.name == 'info3' or field.field.name == 'info4' %} flow-field--wide{% endif %}">
+                {% if field.is_checkbox %}
+                    <label class="flow-check">{{ field.field }} <span>{{ field.field.label }}</span></label>
+                {% else %}
+                    <label for="{{ field.field.id_for_label }}">{{ field.field.label }}{% if field.field.field.required %}<span class="flow-required" aria-label="обязательное поле"> *</span>{% endif %}</label>
+                    {% if field.is_readonly %}<div>{{ field.contents }}</div>{% else %}{{ field.field }}{% endif %}
+                {% endif %}
+                {{ field.field.errors }}
+                {% if field.field.help_text %}<div class="flow-help">{{ field.field.help_text|safe }}</div>{% endif %}
+                {% if field.field.name == "dfa_number" and flow_group %}<div class="flow-help">ДФА назначен этой группе. <a href="{{ flow_review_url }}">Изменить распределение</a></div>{% endif %}
+            </div>
+        {% endfor %}
+    {% endfor %}
+</div>

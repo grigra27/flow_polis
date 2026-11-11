@@ -15,6 +15,7 @@ from apps.insurers.models import (
 from apps.policies.flow_permissions import require_access
 from apps.policies.models import FlowPolicyLink, FlowPolicySource, Policy
 from .flow_client import FlowError
+from . import flow_groups
 
 
 TYPE_NAMES = {
@@ -33,13 +34,15 @@ def normalize_dfa(value):
     return re.sub(rf"\s*[{re.escape(DASHES)}]\s*", "-", text)
 
 
-def candidate_policies(dfa_number):
+def candidate_policies(dfa_number, *, exclude_summary_id=None):
     qs = Policy.objects.select_related(
         "client", "insurer", "branch", "insurance_type"
     ).order_by("-start_date", "-pk")
     normalized = normalize_dfa(dfa_number)
     if not normalized:
         return qs.none()
+    if exclude_summary_id is not None:
+        qs = qs.exclude(flow_links__source_id=exclude_summary_id)
     # Only presentation characters are interchangeable. Keep suffixes and leading zeroes.
     pattern = "".join(
         rf"\s*[{re.escape(DASHES)}]\s*"
@@ -177,7 +180,7 @@ def prepare_initial(snapshot, *, slot=0, insurer_id=None, insurance_type_id=None
         warns.append("Франшиза меняется по годам. Уточните значение для полиса.")
     separate = slot > 0 and snapshot["source_object_count"] > 1
     if separate:
-        warns.append("Введите страховые суммы и премии этой единицы по документу.")
+        warns.append("Страховые суммы и премии указываются на один объект.")
     return {
         "policy": p,
         "payments": _schedule(snapshot["offers"], rate, separate),
@@ -188,7 +191,15 @@ def prepare_initial(snapshot, *, slot=0, insurer_id=None, insurance_type_id=None
 
 @transaction.atomic
 def save_linked_policy(
-    snapshot, slot, user, *, create_policy=None, existing_policy=None, dfa_number=None
+    snapshot,
+    slot,
+    user,
+    *,
+    create_policy=None,
+    existing_policy=None,
+    dfa_number=None,
+    group_version=None,
+    confirm_template=False,
 ):
     """Callback writes the policy AND its schedule inside the same transaction.
 
@@ -207,6 +218,9 @@ def save_linked_policy(
     source, _ = FlowPolicySource.objects.select_for_update().get_or_create(
         pk=snapshot["summary_id"], defaults={"total": total, "mode": mode}
     )
+    if source.total != total and not source.links.exists():
+        source.total, source.mode, source.groups = total, mode, []
+        source.save(update_fields=["groups", "total", "mode"])
     if source.mode != mode or source.total != total:
         raise FlowError(
             "Количество объектов или способ оформления изменились. Откройте свод повторно."
@@ -214,6 +228,21 @@ def save_linked_policy(
     link = links_for(source.pk).filter(slot=slot).first()
     if link:
         return link.policy, False
+    group = flow_groups.group_for(source.groups, slot)
+    if group and group["revision"] != snapshot["revision"]:
+        raise FlowError(
+            "Условия акцепта обновились. Подтвердите диапазон ДФА в плане свода."
+        )
+    if (group["version"] if group else None) != group_version:
+        raise FlowError("План этой позиции обновился. Вернитесь к оформлению из свода.")
+    if group and normalize_dfa(dfa_number) != normalize_dfa(group["dfa"]):
+        raise FlowError(
+            "Конечный ДФА не совпадает с назначенным диапазону. Проверьте план свода."
+        )
+    if confirm_template and (not group or existing_policy is not None):
+        raise FlowError(
+            "Образец нового полиса можно сохранить для назначенной группы ДФА."
+        )
     if existing_policy is None:
         if snapshot["variant"] not in (1, 2) or not snapshot["offers"]:
             raise FlowError("Сначала выберите и сохраните вариант предложения в ЗС.")
@@ -239,4 +268,7 @@ def save_linked_policy(
         created_by=user,
         created_from_summary=existing_policy is None,
     )
+    if confirm_template:
+        flow_groups.set_template(group, policy, snapshot)
+        source.save(update_fields=["groups"])
     return policy, True

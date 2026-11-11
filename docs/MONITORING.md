@@ -108,24 +108,24 @@ SDK использует production/development по DEBUG, `sample_rate=1.0`,
 `send_default_pii=False`, `attach_stacktrace=True`, `max_breadcrumbs=50`.
 Project alerts в интерфейсе Sentry репозиторием не управляются.
 
-Текущий callback инвертирует результат predicate:
+В SDK напрямую передаётся `_sentry_before_send`, определённый до инициализации.
+Он следует [контракту Sentry](https://docs.sentry.io/platforms/python/configuration/filtering/#using-before-send):
+возвращает исходное событие для отправки или `None` для отбрасывания.
 
-```python
-before_send=lambda event, hint: (
-    event if not _should_filter_sentry_event(event, hint) else None
-)
-```
+- Отбрасывает `DisallowedHost`, `SuspiciousOperation`, `PermissionDenied`
+  и исключения с сообщениями `broken pipe`, `connection reset by peer`,
+  `client disconnected` без учёта регистра.
+- Сохраняет остальные ошибки, включая реальный отказ соединения,
+  а также сообщения без exception и с пустым `exc_info`.
+- Не изменяет содержимое сохраняемого события.
 
-Predicate возвращает `False` для `DisallowedHost`, `SuspiciousOperation`,
-`PermissionDenied`, сообщений `broken pipe`, `connection reset by peer`,
-`client disconnected`; в остальных случаях — `True`.
-**Поэтому этот шум сохраняется, а обычные ошибки и события без `exc_info`
-отбрасываются.** Это противоположно комментариям о подавлении шума.
-Поведение подтверждено изолированным вызовом функции/callback без SDK и доставки.
+Ранее условие было инвертировано (B-15). Исправление проверяется в
+[test_sentry_filter.py](../config/tests/test_sentry_filter.py): тесты получают
+callback из фактических параметров инициализации и проверяют как его результат,
+так и envelopes настоящего SDK 2.19.2 через transport в памяти. Сетевые
+соединения в этих тестах запрещены; тестовые события получателям не отправляются.
 
-Исправление ведётся как B-15 в [бэклоге](BACKLOG.md); Python-код фильтра
-в рамках актуализации документов не менялся. До исправления Sentry нельзя
-считать полным каналом регистрации ошибок. После исправления сначала нужны
-регрессии для обычной ошибки, шума и события без exception; затем отдельная
-контролируемая проверка доставки с проверенными DSN/release. Наличие DSN
-не подтверждает доставку или настройку alerts.
+Состояние выкладки и оставшаяся production-проверка — в
+[BACKLOG.md](BACKLOG.md). После выкладки отдельно проверяются эффективные DSN/release
+и получение согласованного тестового события в нужном проекте Sentry.
+Наличие DSN не подтверждает доставку или настройку alerts.

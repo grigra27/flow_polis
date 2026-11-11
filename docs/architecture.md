@@ -80,7 +80,7 @@
 - `django-auditlog` фиксирует изменения; `daily_digest` формирует отчёт по ним.
 - Логи проходят `SensitiveDataFilter`; ошибки передаются общему контуру
   Telegram/VK. [Уведомления](NOTIFICATIONS_PIPELINE.md).
-- Sentry включается DSN, но текущий фильтр требует внимания:
+- Sentry включается DSN; callback сохраняет ошибки и отбрасывает известный шум:
   [фактическое поведение](MONITORING.md#sentry).
 - Media обслуживаются через проверку авторизации, кроме трёх каталогов
   изображений справочников; [Nginx и media](DNS_SSL_SETUP.md).

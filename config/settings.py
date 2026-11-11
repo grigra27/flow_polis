@@ -54,6 +54,32 @@ def _secret_key_fallbacks():
 SECRET_KEY_FALLBACKS = _secret_key_fallbacks()
 
 
+def _sentry_before_send(event, hint):
+    """Drop known noise and preserve other events using Sentry's callback contract."""
+    exc_info = (hint or {}).get("exc_info")
+    if exc_info:
+        exc_type, exc_value, _ = exc_info
+        if exc_type is not None and exc_type.__name__ in (
+            "DisallowedHost",
+            "SuspiciousOperation",
+            "PermissionDenied",
+        ):
+            return None
+
+        message = str(exc_value).lower()
+        if any(
+            noise in message
+            for noise in (
+                "broken pipe",
+                "connection reset by peer",
+                "client disconnected",
+            )
+        ):
+            return None
+
+    return event
+
+
 # Sentry Configuration for Error Monitoring
 # В тестах Sentry не инициализируем: иначе ожидаемые logger.exception из
 # тестов ошибочных сценариев уходят в боевой проект Sentry (DSN из .env).
@@ -91,40 +117,8 @@ if SENTRY_DSN:
         # Additional options
         attach_stacktrace=True,
         max_breadcrumbs=50,
-        # Filter out some common errors
-        before_send=lambda event, hint: (
-            event if not _should_filter_sentry_event(event, hint) else None
-        ),
+        before_send=_sentry_before_send,
     )
-
-
-def _should_filter_sentry_event(event, hint):
-    """
-    Filter out common errors that we don't want to track in Sentry
-    """
-    if "exc_info" in hint:
-        exc_type, exc_value, tb = hint["exc_info"]
-
-        # Filter out common Django errors that are not actionable
-        if exc_type.__name__ in [
-            "DisallowedHost",  # Invalid Host header
-            "SuspiciousOperation",  # CSRF, etc.
-            "PermissionDenied",  # 403 errors
-        ]:
-            return False
-
-        # Filter out specific error messages
-        error_message = str(exc_value).lower()
-        filtered_messages = [
-            "broken pipe",
-            "connection reset by peer",
-            "client disconnected",
-        ]
-
-        if any(msg in error_message for msg in filtered_messages):
-            return False
-
-    return True
 
 
 # Production environment checks

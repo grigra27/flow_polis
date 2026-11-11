@@ -1,0 +1,48 @@
+.flow-source-card {
+    --source-color: #0b7a75;
+    overflow: hidden;
+}
+
+.flow-source-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .25rem .75rem;
+    padding: .55rem 1rem;
+    background: var(--source-color);
+    color: #fff;
+}
+
+.flow-source-card__header h2 {
+    margin: 0;
+    color: inherit;
+    font-size: 1.15rem;
+    font-weight: 400;
+    letter-spacing: -.025em;
+}
+
+.flow-source-card__header h2 b { font-weight: 750; }
+.flow-source-card__header h2 span { opacity: .75; }
+.flow-source-card__header small { font-size: .75rem; }
+.flow-source-card__list { list-style: none; margin: 0; padding: 0 1rem; }
+.flow-source-card__list li { padding: .85rem 0; }
+.flow-source-card__list li + li { border-top: 1px solid var(--app-color-border); }
+.flow-source-card__list h3 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+.flow-source-card__list p { margin: .2rem 0 .65rem; color: var(--app-color-text-muted); font-size: .875rem; }
+
+.flow-source-card a.flow-source-card__open {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .5rem .85rem;
+    border-radius: var(--app-radius-sm);
+    background: var(--source-color);
+    color: #fff;
+    font-size: .9rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.flow-source-card a.flow-source-card__open:hover { background: #075c58; }
+.flow-source-card a.flow-source-card__open:focus-visible { outline: 3px solid #075c58; outline-offset: 2px; }

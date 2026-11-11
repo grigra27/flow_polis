@@ -1,0 +1,19 @@
+.summary-policies { color: var(--app-color-text); }
+.summary-policies-back, .summary-policies-more { display: inline-block; margin: .5rem 0 1rem; }
+.summary-policies h1 { margin: 0; color: var(--app-color-primary); font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 700; }
+.summary-policies header p { margin: .4rem 0 1.25rem; color: var(--app-color-text-muted); }
+.summary-policies-table { overflow-x: auto; border: 1px solid var(--app-color-border); border-radius: var(--app-radius-md); background: var(--app-color-surface); }
+.summary-policies table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; text-align: left; }
+.summary-policies th, .summary-policies td { padding: .75rem 1rem; overflow-wrap: anywhere; vertical-align: middle; }
+.summary-policies th { background: var(--app-color-surface-muted); color: var(--app-color-text-muted); font-size: .76rem; letter-spacing: .035em; text-transform: uppercase; }
+.summary-policies td { border-top: 1px solid var(--app-color-border); }
+.summary-policies tbody tr:hover { background: var(--app-color-row-hover); }
+.summary-policies th:nth-child(1) { width: 23%; }
+.summary-policies th:nth-child(2) { width: 10%; }
+.summary-policies th:nth-child(4) { width: 21%; }
+.summary-policies a { color: var(--app-color-primary); font-weight: 600; }
+.summary-policies small { display: block; color: var(--app-color-text-muted); }
+@media (max-width: 600px) {
+    .summary-policies th, .summary-policies td { padding: .55rem .45rem; }
+    .summary-policies table { font-size: .85rem; }
+}

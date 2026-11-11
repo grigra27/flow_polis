@@ -198,6 +198,7 @@ def test_status_batch_shows_empty_plan_and_existing_link(
                 "position": 2,
                 "policy_id": policy.pk,
                 "policy_number": policy.policy_number,
+                "in_force": True,
             }
         ],
     }

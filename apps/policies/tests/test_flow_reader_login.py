@@ -40,6 +40,7 @@ def test_portfolio_reader_returns_to_policy_without_handoff_permissions(
         "https://testserver/policies/1/",
         "/admin/",
         "/policies/1/?next=untrusted",
+        "/policies/by-summary/100/?in_force=1&next=untrusted",
         "/flow/from-zs/?continue=not-in-session",
     ],
 )

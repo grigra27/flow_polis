@@ -5,6 +5,10 @@
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
+{% block extra_css %}
+    {% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
@@ -23,8 +27,9 @@
             <i class="bi bi-pencil"></i> Редактировать
         </a>
         {% endif %}
-        <a href="{% url 'policies:list' %}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Назад к списку
+        <a href="{% if group_url %}{{ group_url }}{% else %}{% url 'policies:list' %}{% endif %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            {% if group_url %}К полисам по своду № {{ group_summary_id }}{% else %}Назад к списку{% endif %}
         </a>
     </div>
 </div>
@@ -45,9 +50,6 @@
                     <div class="col-md-6">
                         <strong>Номер ДФА:</strong><br>
                         {{ policy.dfa_number|default:"—" }}
-                        {% for link in flow_links %}
-                        <div class="mt-1"><a href="{{ link.source_url }}">{{ link.source_label }}</a></div>
-                        {% endfor %}
                     </div>
                 </div>
                 <div class="row mb-3">
@@ -344,6 +346,24 @@
                 </p>
             </div>
         </div>
+
+        {% if flow_links %}
+        <section class="card mb-4 flow-source-card" aria-labelledby="flow-source-brand">
+            <header class="flow-source-card__header">
+                <h2 id="flow-source-brand"><b>флоу</b> <span aria-hidden="true">//</span> заявки</h2>
+                <small>{{ flow_zs_host }}</small>
+            </header>
+            <ul class="flow-source-card__list">
+                {% for link in flow_links %}
+                <li>
+                    <h3>Свод № {{ link.source_id }}</h3>
+                    <p>{% if link.slot and link.source.total > 1 %}Объект {{ link.slot }} из {{ link.source.total }}{% elif link.source.total > 1 %}Общий полис · Объектов в своде: {{ link.source.total }}{% elif link.created_from_summary %}Полис оформлен из этого свода{% else %}Полис связан с этим сводом{% endif %}</p>
+                    <a class="flow-source-card__open" href="{{ link.source_url }}" aria-label="Открыть свод: {{ link.source_label }}">Открыть свод <span aria-hidden="true">↗</span></a>
+                </li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% endif %}
 
         <!-- Financial Info -->
         <div class="card mb-4">

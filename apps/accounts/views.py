@@ -1,3 +1,6 @@
+import re
+from urllib.parse import urlsplit
+
 from django.shortcuts import render
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import Resolver404, resolve, reverse, reverse_lazy
@@ -25,15 +28,30 @@ class CustomLoginView(LoginView):
             target == continuation_url(key) for key in pending_tickets(self.request)
         ):
             return target
-        # Ссылка из свода ведёт на обычную карточку портфеля, в том числе у читателя.
+        # Читатель может перейти из ЗС в карточку или в список полисов свода.
         if target.startswith("/") and not target.startswith("//"):
+            parsed = urlsplit(target)
             try:
-                matched = resolve(target)
+                matched = resolve(parsed.path)
             except Resolver404:
                 pass
             else:
-                if matched.view_name == "policies:detail":
-                    return reverse("policies:detail", kwargs=matched.kwargs)
+                if not parsed.fragment and matched.view_name in (
+                    "policies:detail",
+                    "policies:by-summary",
+                ):
+                    path = reverse(matched.view_name, kwargs=matched.kwargs)
+                    if not parsed.query:
+                        return path
+                    if (
+                        matched.view_name == "policies:by-summary"
+                        and parsed.query == "in_force=1"
+                    ):
+                        return path + "?in_force=1"
+                    if matched.view_name == "policies:detail" and re.fullmatch(
+                        r"from_summary=[1-9][0-9]{0,18}(?:&in_force=1)?", parsed.query
+                    ):
+                        return path + "?" + parsed.query
         return reverse_lazy("core:dashboard")
 
 

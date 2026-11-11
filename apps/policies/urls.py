@@ -6,6 +6,11 @@ app_name = "policies"
 
 urlpatterns = [
     path("from-zs/add/", flow_views.add, name="flow-add"),
+    path(
+        "by-summary/<int:summary_id>/",
+        views.PoliciesBySummaryView.as_view(),
+        name="by-summary",
+    ),
     path("", views.PolicyListView.as_view(), name="list"),
     path("<int:pk>/", views.PolicyDetailView.as_view(), name="detail"),
     path("payments/", views.PaymentScheduleListView.as_view(), name="payments"),

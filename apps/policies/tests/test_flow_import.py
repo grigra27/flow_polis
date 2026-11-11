@@ -165,7 +165,14 @@ def test_status_is_authenticated_and_does_not_disclose_policy_details(
     assert resp.json() == {
         "total": 1,
         "mode": "common",
-        "links": [{"position": 1, "policy_number": p.policy_number, "policy_id": p.pk}],
+        "links": [
+            {
+                "position": 1,
+                "policy_number": p.policy_number,
+                "policy_id": p.pk,
+                "in_force": True,
+            }
+        ],
     }
     assert "no-store" in resp["Cache-Control"]
     with override_settings(FLOW_HANDOFF_ENABLED=False):

@@ -1,8 +1,14 @@
+from urllib.parse import urlsplit
+
+from django.conf import settings
+from django.urls import reverse
+from django.utils import timezone
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_filters.views import FilterView
 from django.db.models import Q
-from .models import Policy, PaymentSchedule
+from .models import FlowPolicySource, Policy, PaymentSchedule, in_force_q
+from .flow_views import source_url
 from .filters import PolicyFilter
 
 
@@ -130,6 +136,44 @@ class PolicyListView(LoginRequiredMixin, FilterView):
         return context
 
 
+class PoliciesBySummaryView(LoginRequiredMixin, DetailView):
+    model = FlowPolicySource
+    queryset = FlowPolicySource.objects.only("summary_id", "total", "mode")
+    pk_url_kwarg = "summary_id"
+    context_object_name = "source"
+    template_name = "policies/policies_by_summary.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        source = self.object
+        only_in_force = self.request.GET.get("in_force") == "1"
+        links = list(
+            source.links.select_related("policy__client")
+            .annotate(in_force=in_force_q(timezone.localdate(), prefix="policy__"))
+            .only(
+                "slot",
+                "source_id",
+                "policy__policy_number",
+                "policy__dfa_number",
+                "policy__property_description",
+                "policy__vin_number",
+                "policy__client__client_name",
+            )
+            .order_by("slot", "pk")
+        )
+        clients = {link.policy.client.client_name for link in links}
+        in_force_links = [link for link in links if link.in_force]
+        context.update(
+            links=in_force_links if only_in_force else links,
+            only_in_force=only_in_force,
+            total_links=len(links),
+            in_force_count=len(in_force_links),
+            client_name=next(iter(clients)) if len(clients) == 1 else None,
+            source_url=source_url(source.pk),
+        )
+        return context
+
+
 class PolicyDetailView(LoginRequiredMixin, DetailView):
     model = Policy
     template_name = "policies/policy_detail.html"
@@ -153,9 +197,23 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         policy = self.object
-        context["flow_links"] = policy.flow_links.select_related("source").order_by(
-            "source_id", "slot"
+        links = list(
+            policy.flow_links.select_related("source").order_by("source_id", "slot")
         )
+        context["flow_links"] = links
+        context["flow_zs_host"] = urlsplit(settings.FLOW_ZS_BASE_URL).hostname
+        origin = self.request.GET.get("from_summary")
+        for link in links:
+            if str(link.source_id) == origin:
+                context["group_summary_id"] = link.source_id
+                context["group_url"] = reverse(
+                    "policies:by-summary",
+                    args=[link.source_id],
+                    query={"in_force": "1"}
+                    if self.request.GET.get("in_force") == "1"
+                    else None,
+                )
+                break
         context["info1_tags"] = policy.info_tags.filter(info_field=1).select_related(
             "tag"
         )

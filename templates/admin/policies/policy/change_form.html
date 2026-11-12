@@ -1,5 +1,9 @@
 {% extends "admin/change_form.html" %}
+{% load static %}
 {% load policies_admin %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/staff_admin_forms.css' %}">{% endblock %}
+{% block bodyclass %}{{ block.super }} staff-admin{% endblock %}
 
 {% block content %}
 {% if accept_import_parsed_rows %}

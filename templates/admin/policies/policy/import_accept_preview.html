@@ -1,5 +1,9 @@
 {% extends "admin/base_site.html" %}
+{% load static %}
 {% load i18n admin_urls %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/staff_admin_forms.css' %}">{% endblock %}
+{% block bodyclass %}{{ block.super }} staff-admin{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -22,6 +26,7 @@
 
     <div class="module">
         <h2>Что будет подставлено</h2>
+        <div class="staff-table-scroll">
         <table>
             <thead>
                 <tr>
@@ -40,10 +45,12 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="module">
         <h2>Распознанные данные</h2>
+        <div class="staff-table-scroll">
         <table>
             <tbody>
                 {% for label, value in parsed_rows %}
@@ -54,6 +61,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="submit-row">

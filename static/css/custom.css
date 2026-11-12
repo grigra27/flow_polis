@@ -86,10 +86,16 @@ body {
     padding-inline: var(--app-page-gutter);
 }
 
+.app-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 .app-navbar-sticky .navbar-brand {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
+    min-height: 44px;
     margin-right: clamp(1rem, 1.7vw, 1.75rem);
     color: var(--app-color-primary-strong);
     font-size: 1.3rem;
@@ -114,6 +120,70 @@ body {
 }
 
 .app-brand-mark::before { content: "ф//"; }
+
+.app-service-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 44px;
+    padding: 0 0.2rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--app-color-text-muted);
+}
+
+.app-service-toggle:hover,
+.app-service-toggle[aria-expanded="true"] {
+    background: var(--app-color-primary-soft);
+}
+
+.app-service-toggle::after {
+    content: "";
+    width: 0.42rem;
+    height: 0.42rem;
+    margin-bottom: 0.2rem;
+    border: solid currentColor;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.app-service-toggle[aria-expanded="true"]::after {
+    margin-bottom: -0.2rem;
+    transform: rotate(225deg);
+}
+
+.app-service-menu {
+    --bs-dropdown-min-width: 13.25rem;
+    --bs-dropdown-spacer: 0.4rem;
+    --bs-dropdown-link-hover-bg: var(--app-color-row-hover);
+    padding: 0.4rem;
+}
+
+.app-service-menu .dropdown-item,
+.app-service-current {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.45rem 0.7rem;
+    border-radius: 9px;
+    color: var(--app-color-text);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.app-service-current { background: var(--app-color-primary-soft); }
+
+.app-service-menu .app-brand-mark {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+    font-size: 0.75rem;
+    box-shadow: none;
+}
+
+.app-brand-mark--requests { background: linear-gradient(120deg, #18345a, #0b7a75); }
 
 .app-nav-sections {
     flex-wrap: wrap;
@@ -227,6 +297,7 @@ body {
 }
 
 .app-navbar-sticky a:focus-visible,
+.app-service-toggle:focus-visible,
 .ecosystem-strip a:focus-visible {
     outline: 2px solid var(--app-color-action);
     outline-offset: -2px;
@@ -244,7 +315,7 @@ body {
 
 @media (min-width: 992px) and (max-width: 1279.98px) {
     .app-navbar-sticky > .container-fluid { padding-inline: 1rem; }
-    .app-navbar-sticky .navbar-brand { font-size: 1.12rem; margin-right: 0.65rem; gap: 0.4rem; }
+    .app-navbar-sticky .navbar-brand { font-size: 1.12rem; margin-right: 0.65rem; }
 }
 
 footer.bg-light {

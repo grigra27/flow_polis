@@ -1,0 +1,273 @@
+@import url("../../policies/css/list.css");
+
+.billing-workspace {
+    --journal-ink: #172e49;
+    --journal-muted: #52677e;
+    --journal-line: #e0e8f0;
+    --journal-tint: #f5f8fc;
+    --v2-title: var(--journal-ink);
+    --v2-muted: var(--journal-muted);
+    --v2-border: var(--journal-line);
+    --v2-accent: var(--app-color-action);
+    --v2-card-bg: white;
+    max-width: 1720px;
+    margin: 0 auto;
+    padding-inline: max(0px, calc(var(--app-page-gutter) - 1.5rem));
+    font-family: var(--app-interface-font);
+    color: var(--journal-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.billing-workspace .mgr-page-header { align-items: flex-start; }
+.mgr-page-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    width: 100%;
+}
+.mgr-page-subtitle {
+    max-width: 720px;
+    margin-top: 0.5rem;
+    color: var(--journal-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+.mgr-faq-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--journal-muted);
+    font-size: 1rem;
+    vertical-align: middle;
+}
+.mgr-faq-btn:hover { background: #e8f0fb; color: var(--app-color-action); }
+.mgr-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+    color: var(--journal-muted);
+    font-size: 0.77rem;
+}
+.mgr-breadcrumb a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: inherit;
+    text-decoration: none;
+}
+.mgr-breadcrumb a:hover { color: var(--app-color-action); }
+.mgr-breadcrumb .sep { color: #a3b3c5; }
+.mgr-breadcrumb .current { color: var(--journal-ink); font-weight: 600; }
+
+.billing-workspace .mgr-section {
+    margin-bottom: 1rem;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.billing-workspace .mgr-section-head {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 0.8rem 1.1rem;
+    font-size: 0.86rem;
+}
+.billing-workspace .mgr-section-head-title { flex-wrap: wrap; }
+.mgr-section-body { padding: 1rem 1.1rem; }
+.billing-list .mgr-section--filters {
+    position: relative;
+    z-index: 5;
+    margin-bottom: 0;
+    overflow: visible;
+    border-radius: 16px 16px 0 0;
+}
+.billing-list .mgr-section--filters .mgr-section-head {
+    padding-bottom: 0;
+    border-bottom: 0;
+    font-size: 0.82rem;
+}
+.billing-list .mgr-section--filters .mgr-section-body { padding-top: 0.7rem; }
+.billing-list .mgr-section--filters + .mgr-section { border-radius: 0 0 16px 16px; }
+.billing-workspace .pl-pagination { margin-bottom: 1rem; border-top: 0; }
+.billing-workspace .pl-page-btn.disabled { pointer-events: none; }
+.billing-workspace .btn-pl-apply:disabled { opacity: 0.55; cursor: wait; }
+
+/* All existing month totals remain visible, in a compact two-column grid. */
+.bil-periods {
+    display: flex;
+    gap: 0.55rem;
+    min-width: 0;
+    margin-bottom: 1.1rem;
+    padding: 2px 1px 0.45rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.bil-period {
+    flex: 1 0 206px;
+    padding: 0.8rem;
+    border: 1px solid var(--journal-line);
+    border-radius: 12px;
+    background: white;
+    color: var(--journal-ink);
+    box-shadow: var(--app-shadow-sm);
+    text-decoration: none;
+}
+.bil-period:hover { border-color: #9eb8d5; color: var(--app-color-action); }
+.bil-period.active {
+    border-color: #8ab1df;
+    background: #edf4fd;
+    box-shadow: inset 0 3px 0 var(--app-color-action);
+    color: var(--app-color-action);
+}
+.bil-period-name { margin-bottom: 0.6rem; font-size: 0.87rem; font-weight: 650; }
+.bil-period-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem; }
+.bil-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.35rem 0.4rem;
+    border-radius: 6px;
+    background: var(--journal-tint);
+    color: var(--journal-muted);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.bil-chip-label { font-size: 0.62rem; font-weight: 550; }
+.bil-chip-num { color: var(--journal-ink); font-size: 0.86rem; font-weight: 700; }
+.bil-chip--warn { background: #fff0f0; color: #b91c1c; }
+.bil-chip--warn .bil-chip-num { color: #b91c1c; }
+.bil-chip--info { background: #e8f1ff; color: #1d4ed8; }
+.bil-chip--info .bil-chip-num { color: #1d4ed8; }
+.bil-chip--ok { background: #eaf8ef; color: #15803d; }
+.bil-chip--ok .bil-chip-num { color: #15803d; }
+
+.billing-workspace .pl-filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.7rem;
+}
+.billing-workspace .pl-filter-item { flex: 0 1 160px; }
+.billing-workspace .pl-filter-item--insurer { flex: 0 1 210px; }
+.billing-workspace .pl-filter-item--search { flex: 1 1 230px; }
+.billing-workspace .pl-filter-actions { gap: 0.7rem; }
+.pl-multiselect { position: relative; width: 100%; }
+.pl-multiselect__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    height: 36px;
+    padding: 0 0.6rem;
+    border: 1px solid #cfdae7;
+    border-radius: 8px;
+    background: white;
+    font-size: 0.83rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+.pl-multiselect__summary::-webkit-details-marker { display: none; }
+.pl-multiselect__summary .bi { font-size: 0.65rem; color: var(--journal-muted); }
+.pl-multiselect__summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-multiselect[open] .pl-multiselect__summary { border-color: var(--app-color-action); }
+.pl-multiselect__menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    z-index: 25;
+    min-width: 260px;
+    width: 100%;
+    padding: 0.55rem;
+    border: 1px solid #cfdae7;
+    border-radius: 10px;
+    background: white;
+    box-shadow: var(--app-shadow-md);
+}
+.pl-multiselect__actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid var(--journal-line);
+}
+.pl-multiselect__action {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-color-action);
+    font-size: 0.77rem;
+    font-weight: 600;
+}
+.pl-multiselect__action:hover { text-decoration: underline; }
+.pl-multiselect__options { display: grid; gap: 0.15rem; max-height: 210px; overflow-y: auto; }
+.pl-multiselect__option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.4rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+.pl-multiselect__option:hover { background: var(--journal-tint); }
+.billing-workspace .pl-multiselect input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    margin-top: 0.2rem;
+    padding: 0;
+    accent-color: var(--app-color-action);
+}
+.pl-multiselect__empty { padding: 0.4rem; color: var(--journal-muted); font-size: 0.82rem; }
+
+.billing-workspace .mgr-table td { padding: 0.7rem 0.65rem; }
+.billing-workspace .mgr-table th { padding-inline: 0.65rem; }
+.billing-workspace .mgr-table :is(th, td):first-child { padding-left: 1.1rem; }
+.billing-workspace .mgr-table :is(th, td):last-child { padding-right: 1.1rem; }
+.bil-policy-line { line-height: 1.45; overflow-wrap: anywhere; }
+.bil-policy-line a { color: var(--app-color-action); text-decoration: none; }
+.bil-policy-line a:hover { text-decoration: underline; }
+.bil-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.bil-status--to_request { background: #fee2e2; color: #b91c1c; }
+.bil-status--requested { background: #dbeafe; color: #1d4ed8; }
+.bil-status--sent_to_leasing { background: #dcfce7; color: #15803d; }
+.tbl-badge--dfa { background: #fef3c7; color: #92400e; }
+.billing-workspace :is(a, button, input, select, textarea, summary, tr[tabindex]):focus-visible {
+    outline: 2px solid var(--app-color-action);
+    outline-offset: -2px;
+}
+.billing-workspace .modal-content { border: 1px solid var(--journal-line); border-radius: 16px; }
+.billing-workspace .modal-header { padding: 1.1rem 1.25rem; border-color: var(--journal-line); }
+.billing-workspace .modal-title { color: var(--journal-ink); font-size: 1.1rem; font-weight: 650; }
+.billing-workspace .modal-body { padding: 1.25rem; font-size: 0.9rem; line-height: 1.6; }
+.billing-workspace .modal-footer { border-color: var(--journal-line); }
+
+@media (max-width: 1100px) {
+    .billing-workspace .pl-filter-item--search { flex-basis: 260px; }
+}
+@media (max-width: 767.98px) {
+    .mgr-page-header-row { flex-direction: column; gap: 1rem; }
+    .billing-workspace .pl-filter-item,
+    .billing-workspace .pl-filter-item--insurer { flex: 1 1 calc(50% - 0.7rem); }
+    .billing-workspace .pl-filter-item--search { flex-basis: 100%; }
+    .billing-workspace .pl-filter-actions { width: 100%; margin-left: 0; justify-content: space-between; }
+    .billing-workspace .pl-filter-result { white-space: normal; }
+    .bil-period { flex: 0 0 206px; }
+}

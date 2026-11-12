@@ -1,0 +1,28 @@
+@import url("./workspace.css");
+
+.mgr-page-actions { flex: 0 0 340px; }
+.mgr-shortcuts-card { padding: .8rem .9rem; border: 1px solid var(--journal-line); border-radius: 12px; background: white; }
+.mgr-shortcuts-title { display: flex; align-items: center; gap: .35rem; margin-bottom: .5rem; color: var(--journal-muted); font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.mgr-shortcuts-buttons { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; }
+.btn-mgr-group { display: inline-flex; align-items: center; min-height: 32px; padding: .35rem .7rem; border: 1px solid #cedae7; border-radius: 8px; background: white; color: var(--app-color-primary); font-size: .8rem; font-weight: 600; text-decoration: none; }
+.btn-mgr-group:hover { border-color: #9eb8d5; background: var(--journal-tint); color: var(--app-color-primary); }
+.btn-mgr-group.active { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; }
+.mgr-shortcuts-note { display: grid; gap: .2rem; color: var(--journal-muted); font-size: .69rem; line-height: 1.4; }
+.mgr-shortcuts-note strong { font-weight: 600; }
+.billing-period-list .mgr-table { min-width: 70rem; }
+.billing-period-list .mgr-table td:nth-child(2),
+.billing-period-list .mgr-table td:nth-child(3),
+.billing-period-list .mgr-table td:nth-child(7) { white-space: nowrap; }
+.billing-period-list .mgr-table td:nth-child(5) { min-width: 175px; }
+.billing-period-list .mgr-table td:nth-child(6) { min-width: 150px; }
+.billing-period-list .mgr-table td:last-child { min-width: 150px; overflow-wrap: anywhere; }
+.billing-period-list .mgr-table tr.tbl-row-nobroker td { background: #f3f4f6; color: #4b5563; }
+.billing-period-list .mgr-table tr.tbl-row-nobroker:hover td { background: #e5e7eb; }
+.bil-deadline-col { background: #fff8ee; color: #6f4f13; font-weight: 650; }
+.billing-period-list .mgr-table th.bil-deadline-col { background: #fff8ee; color: #7a5a1f; }
+.billing-period-list .mgr-table tr:hover td.bil-deadline-col { background: #fff3df; }
+.bil-warning { margin-top: .25rem; color: #a45b08; font-size: .73rem; font-weight: 600; }
+
+@media (max-width: 767.98px) {
+    .mgr-page-actions { flex: none; width: 100%; }
+}

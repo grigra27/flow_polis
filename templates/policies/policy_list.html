@@ -1,578 +1,14 @@
 {% extends 'base.html' %}
-{% load insurer_tags %}
+{% load static insurer_tags %}
 
 {% block title %}Полисы{% endblock %}
 
 {% block extra_css %}
-<style>
-    :root {
-        --v2-bg: #f3f7fc;
-        --v2-card-bg: #ffffff;
-        --v2-border: #dbe5f1;
-        --v2-title: #17324f;
-        --v2-muted: #5d748d;
-        --v2-accent: #1565c0;
-    }
-
-    /* Root wrapper */
-    .mgr-root {
-        background: linear-gradient(180deg, #f8fbff 0%, var(--v2-bg) 100%);
-        border: 1px solid var(--v2-border);
-        border-radius: 16px;
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
-    }
-
-    /* Page header */
-    .mgr-page-header {
-        padding-bottom: 1rem;
-        margin-bottom: 1.25rem;
-        border-bottom: 1px solid var(--v2-border);
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    .mgr-page-kicker {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        color: var(--v2-muted);
-        margin-bottom: 0.2rem;
-    }
-    .mgr-page-title {
-        font-size: 1.45rem;
-        font-weight: 800;
-        color: var(--v2-title);
-        margin: 0;
-        line-height: 1.25;
-    }
-    .mgr-header-actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-shrink: 0;
-        flex-wrap: wrap;
-        align-items: flex-start;
-    }
-    .btn-mgr-primary {
-        background: var(--v2-accent);
-        border: none;
-        color: #fff;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.45rem 0.9rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        text-decoration: none;
-        transition: background 0.15s;
-    }
-    .btn-mgr-primary:hover {
-        background: #0d47a1;
-        color: #fff;
-        text-decoration: none;
-    }
-    .btn-mgr-secondary {
-        background: #fff;
-        border: 1px solid var(--v2-border);
-        color: var(--v2-title);
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.45rem 0.9rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        text-decoration: none;
-        transition: border-color 0.15s, color 0.15s;
-    }
-    .btn-mgr-secondary:hover {
-        border-color: var(--v2-accent);
-        color: var(--v2-accent);
-        text-decoration: none;
-    }
-
-    /* Branch tabs */
-    .pl-branch-tabs {
-        display: flex;
-        gap: 0.35rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.25rem;
-    }
-    .pl-branch-tab {
-        background: var(--v2-card-bg);
-        border: 1px solid var(--v2-border);
-        border-radius: 10px;
-        padding: 0.6rem 1.2rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: var(--v2-muted);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        transition: border-color 0.15s, background 0.15s, color 0.15s;
-    }
-    .pl-branch-tab:hover {
-        border-color: var(--v2-accent);
-        background: #eff5ff;
-        color: var(--v2-accent);
-        text-decoration: none;
-    }
-    .pl-branch-tab.active {
-        background: var(--v2-accent);
-        border-color: var(--v2-accent);
-        color: #fff;
-    }
-    .pl-branch-tab.active:hover {
-        background: #0d47a1;
-        border-color: #0d47a1;
-        color: #fff;
-    }
-
-    /* Section card */
-    .mgr-section {
-        border: 1px solid var(--v2-border);
-        border-radius: 12px;
-        background: var(--v2-card-bg);
-        box-shadow: 0 2px 10px rgba(14,28,46,0.05);
-        margin-bottom: 1rem;
-        overflow: hidden;
-    }
-    .mgr-section-head {
-        background: #1e3a5f;
-        padding: 0.65rem 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-    }
-    .mgr-section-head-title {
-        font-size: 0.82rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #e8f3ff;
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-    }
-    .mgr-section-head-badge {
-        font-size: 0.75rem;
-        font-weight: 600;
-        background: rgba(255,255,255,0.15);
-        color: #e8f3ff;
-        border-radius: 999px;
-        padding: 0.15rem 0.6rem;
-    }
-    .mgr-section-body {
-        padding: 0.9rem 1rem;
-    }
-
-    /* Filter form */
-    .mgr-section--filters .mgr-section-head {
-        padding: 0.58rem 0.8rem;
-    }
-    .mgr-section--filters .mgr-section-body {
-        padding: 0.55rem 0.72rem 0.6rem;
-    }
-    .pl-filter-form {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 0.24rem 0.36rem;
-        max-width: 1380px;
-    }
-    .pl-filter-item {
-        flex: 0 1 152px;
-        width: 152px;
-    }
-    .pl-filter-item--search {
-        flex: 0 1 390px;
-        width: 390px;
-    }
-    .pl-filter-item--date {
-        flex: 0 1 268px;
-        width: 268px;
-    }
-    .pl-filter-row-break {
-        flex-basis: 100%;
-        width: 100%;
-        height: 0;
-    }
-    .pl-filter-label {
-        font-size: 0.69rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--v2-muted);
-        margin-bottom: 0.08rem;
-        display: block;
-    }
-    .pl-filter-form input[type="text"],
-    .pl-filter-form input[type="search"],
-    .pl-filter-form input[type="date"],
-    .pl-filter-form select {
-        width: 100% !important;
-        min-width: 0;
-        height: 29px;
-        border: 1px solid #c8d5e6;
-        border-radius: 7px;
-        padding: 0.14rem 0.38rem;
-        background: #fff;
-        color: var(--v2-title);
-        font-size: 0.89rem;
-        line-height: 1.2;
-    }
-    .pl-filter-form input:focus,
-    .pl-filter-form select:focus {
-        outline: none;
-        border-color: var(--v2-accent);
-        box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.1);
-    }
-    .pl-date-range-box {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        gap: 0.18rem;
-        align-items: end;
-    }
-    .pl-date-range-sep {
-        color: var(--v2-muted);
-        font-size: 0.68rem;
-        padding-bottom: 0.18rem;
-    }
-    .mgr-section--filters .pl-active-filters {
-        padding: 0.34rem 0.52rem;
-        margin-bottom: 0.32rem;
-        border-radius: 8px;
-    }
-    .mgr-section--filters .pl-active-filters-head {
-        margin-bottom: 0.2rem;
-    }
-    .mgr-section--filters .pl-active-filters-title {
-        font-size: 0.78rem;
-    }
-    .mgr-section--filters .pl-filter-chip {
-        font-size: 0.86rem;
-        padding: 0.18rem 0.46rem;
-    }
-    .pl-active-filters {
-        border: 1px dashed #c7dbf8;
-        background: #f7fbff;
-        border-radius: 10px;
-        padding: 0.65rem 0.75rem;
-        margin-bottom: 0.8rem;
-    }
-    .pl-active-filters-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        margin-bottom: 0.45rem;
-    }
-    .pl-active-filters-title {
-        font-size: 0.76rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #1d4ed8;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-    }
-    .pl-clear-all {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--v2-accent);
-        text-decoration: none;
-    }
-    .pl-clear-all:hover { color: #0d47a1; text-decoration: underline; }
-    .pl-active-filters-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-    }
-    .pl-filter-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        background: #e8f1ff;
-        color: #17324f;
-        border: 1px solid #c7dbf8;
-        border-radius: 999px;
-        padding: 0.2rem 0.55rem;
-        font-size: 0.8rem;
-        line-height: 1.2;
-    }
-    .pl-filter-chip-label { font-weight: 700; }
-    .pl-filter-chip-remove {
-        color: #4b5563;
-        text-decoration: none;
-        font-weight: 700;
-        font-size: 0.86rem;
-        line-height: 1;
-        margin-left: 0.1rem;
-    }
-    .pl-filter-chip-remove:hover { color: #b91c1c; text-decoration: none; }
-    .pl-filter-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.42rem;
-        align-items: center;
-        flex-wrap: nowrap;
-        margin-top: 0;
-        margin-left: auto;
-    }
-    .pl-filter-buttons {
-        display: flex;
-        align-items: center;
-        gap: 0.44rem;
-        flex-wrap: nowrap;
-    }
-    .pl-filter-result {
-        font-size: 0.92rem;
-        color: #3d5f7d;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.36rem;
-        white-space: nowrap;
-    }
-    .pl-filter-result strong {
-        color: var(--v2-title);
-        font-weight: 700;
-    }
-    .btn-pl-apply {
-        background: var(--v2-accent);
-        border: none;
-        color: #fff;
-        font-size: 0.92rem;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.3rem 0.74rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-    .btn-pl-apply:hover { background: #0d47a1; color: #fff; }
-    .btn-pl-reset {
-        background: var(--v2-card-bg);
-        border: 1px solid var(--v2-border);
-        color: var(--v2-title);
-        font-size: 0.92rem;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.3rem 0.74rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        text-decoration: none;
-        transition: border-color 0.15s, background 0.15s;
-    }
-    .btn-pl-reset:hover {
-        border-color: var(--v2-accent);
-        background: #eff5ff;
-        color: var(--v2-accent);
-        text-decoration: none;
-    }
-
-    /* Table */
-    .mgr-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.95rem;
-    }
-    .mgr-table thead tr {
-        border-bottom: 2px solid var(--v2-border);
-    }
-    .mgr-table th {
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--v2-muted);
-        padding: 0.5rem 0.6rem;
-        white-space: nowrap;
-    }
-    .mgr-table td {
-        padding: 0.55rem 0.6rem;
-        border-bottom: 1px solid #f0f5fc;
-        vertical-align: middle;
-        color: var(--v2-title);
-    }
-    .mgr-table tbody tr:last-child td { border-bottom: none; }
-    .mgr-table tbody tr.tbl-row-clickable {
-        cursor: pointer;
-        transition: background 0.1s;
-    }
-    .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
-
-    .mgr-table tbody tr.tbl-row-terminated { opacity: 0.65; }
-
-    .tbl-badge {
-        font-size: 0.72rem;
-        font-weight: 600;
-        border-radius: 999px;
-        padding: 0.15rem 0.55rem;
-        white-space: nowrap;
-    }
-    .tbl-badge--closed   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-    .tbl-badge--nobroker { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
-    .tbl-badge--info     { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-
-    /* Edit button in table */
-    .btn-tbl-edit {
-        background: #fef3c7;
-        border: 1px solid #fde68a;
-        color: #92400e;
-        font-size: 0.78rem;
-        font-weight: 600;
-        border-radius: 7px;
-        padding: 0.25rem 0.55rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        text-decoration: none;
-        transition: background 0.15s;
-    }
-    .btn-tbl-edit:hover {
-        background: #fde68a;
-        color: #78350f;
-        text-decoration: none;
-    }
-
-    /* Pagination */
-    .pl-pagination {
-        display: flex;
-        justify-content: center;
-        gap: 0.3rem;
-        padding-top: 1rem;
-        flex-wrap: wrap;
-    }
-    .pl-page-btn {
-        background: var(--v2-card-bg);
-        border: 1px solid var(--v2-border);
-        color: var(--v2-title);
-        border-radius: 8px;
-        padding: 0.35rem 0.65rem;
-        font-size: 0.82rem;
-        font-weight: 600;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        transition: border-color 0.15s, background 0.15s;
-        min-width: 2rem;
-        justify-content: center;
-    }
-    .pl-page-btn:hover {
-        border-color: var(--v2-accent);
-        background: #eff5ff;
-        color: var(--v2-accent);
-        text-decoration: none;
-    }
-    .pl-page-btn.active {
-        background: var(--v2-accent);
-        border-color: var(--v2-accent);
-        color: #fff;
-        cursor: default;
-    }
-    .pl-page-btn.disabled {
-        opacity: 0.4;
-        pointer-events: none;
-    }
-    .pl-page-ellipsis {
-        padding: 0.35rem 0.4rem;
-        font-size: 0.82rem;
-        color: var(--v2-muted);
-        display: inline-flex;
-        align-items: center;
-    }
-
-    /* Empty state */
-    .pl-empty {
-        text-align: center;
-        padding: 2.5rem 1rem;
-        color: var(--v2-muted);
-        font-size: 0.9rem;
-    }
-    .pl-empty i {
-        font-size: 2rem;
-        display: block;
-        margin-bottom: 0.5rem;
-        opacity: 0.4;
-    }
-    @media (max-width: 1320px) {
-        .pl-filter-form {
-            max-width: 100%;
-        }
-        .pl-filter-item {
-            flex-basis: 138px;
-            width: 138px;
-        }
-        .pl-filter-item--search {
-            flex-basis: 312px;
-            width: 312px;
-        }
-        .pl-filter-item--date {
-            flex-basis: 244px;
-            width: 244px;
-        }
-    }
-    @media (max-width: 1024px) {
-        .pl-filter-item {
-            flex-basis: 168px;
-            width: 168px;
-        }
-        .pl-filter-item--search,
-        .pl-filter-item--date {
-            flex-basis: 100%;
-            width: 100%;
-        }
-        .pl-filter-row-break {
-            display: none;
-        }
-        .pl-filter-actions {
-            margin-left: 0;
-        }
-    }
-    @media (max-width: 768px) {
-        .mgr-section--filters .mgr-section-body {
-            padding: 0.55rem 0.62rem 0.62rem;
-        }
-        .pl-filter-actions {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0.7rem;
-        }
-        .pl-filter-buttons {
-            width: 100%;
-            justify-content: flex-end;
-        }
-        .pl-date-range-box {
-            grid-template-columns: 1fr;
-        }
-        .pl-date-range-sep {
-            display: none;
-        }
-    }
-    @media (max-width: 576px) {
-        .pl-filter-buttons {
-            justify-content: stretch;
-        }
-        .btn-pl-apply,
-        .btn-pl-reset {
-            width: 100%;
-            justify-content: center;
-        }
-    }
-</style>
+<link rel="stylesheet" href="{% static 'policies/css/policy_list.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="mgr-root">
+<div class="mgr-root policy-journal">
 
     <!-- Page header -->
     <div class="mgr-page-header">
@@ -616,9 +52,6 @@
 
     <!-- Filters -->
     <div class="mgr-section mgr-section--filters">
-        <div class="mgr-section-head">
-            <span class="mgr-section-head-title"><i class="bi bi-funnel"></i> Фильтры</span>
-        </div>
         <div class="mgr-section-body">
             {% if active_filters or request.GET.start_date_from or request.GET.start_date_to or request.GET.end_date_from or request.GET.end_date_to %}
             <div class="pl-active-filters">
@@ -662,75 +95,82 @@
             </div>
             {% endif %}
             <form method="get" class="pl-filter-form">
-                <div class="pl-filter-item pl-filter-item--search">
-                    <label class="pl-filter-label">Поиск</label>
-                    <input type="text"
-                           name="search"
-                           value="{{ request.GET.search }}"
-                           placeholder="Номер полиса / Номер ДФА / Клиент / VIN">
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Страховщик</label>
-                    {{ filter.form.insurer }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Филиал</label>
-                    {{ filter.form.branch }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Вид страхования</label>
-                    {{ filter.form.insurance_type }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">ОСАГО</label>
-                    {{ filter.form.osago }}
-                </div>
-                <div class="pl-filter-item pl-filter-item--date">
-                    <label class="pl-filter-label">Дата начала</label>
-                    <div class="pl-date-range-box">
-                        {{ filter.form.start_date_from }}
-                        <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
-                        {{ filter.form.start_date_to }}
+                <div class="pl-filter-toolbar">
+                    <div class="pl-filter-item pl-filter-item--search">
+                        <label class="pl-filter-label" for="policy-search">Поиск</label>
+                        <input type="text"
+                               id="policy-search" name="search"
+                               value="{{ request.GET.search }}"
+                               placeholder="Номер полиса / Номер ДФА / Клиент / VIN">
+                    </div>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.insurer.id_for_label }}">Страховщик</label>
+                        {{ filter.form.insurer }}
+                    </div>
+                    <button type="button" class="pl-filter-toggle" aria-expanded="true"
+                            aria-controls="policy-filter-fields" disabled>
+                        <i class="bi bi-funnel" aria-hidden="true"></i> Фильтры
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <div class="pl-filter-actions">
+                        <div class="pl-filter-result">
+                            <i class="bi bi-list-check"></i>
+                            Найдено: <strong>{{ policies_count }}</strong>
+                        </div>
+                        <div class="pl-filter-buttons">
+                            <button type="submit" class="btn-pl-apply">
+                                <i class="bi bi-search"></i> Применить
+                            </button>
+                            <a href="{% url 'policies:list' %}" class="btn-pl-reset">
+                                <i class="bi bi-x-circle"></i> Сбросить
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <div class="pl-filter-item pl-filter-item--date">
-                    <label class="pl-filter-label">Дата окончания</label>
-                    <div class="pl-date-range-box">
-                        {{ filter.form.end_date_from }}
-                        <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
-                        {{ filter.form.end_date_to }}
+                <div id="policy-filter-fields" class="pl-filter-fields">
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.branch.id_for_label }}">Филиал</label>
+                        {{ filter.form.branch }}
                     </div>
-                </div>
-                <div class="pl-filter-row-break"></div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Полис активен</label>
-                    {{ filter.form.policy_active }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">ДФА активен</label>
-                    {{ filter.form.dfa_active }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Полис подгружен</label>
-                    {{ filter.form.policy_uploaded }}
-                </div>
-                <div class="pl-filter-item">
-                    <label class="pl-filter-label">Участие брокера</label>
-                    {{ filter.form.broker_participation }}
-                </div>
-
-                <div class="pl-filter-actions">
-                    <div class="pl-filter-result">
-                        <i class="bi bi-list-check"></i>
-                        Найдено: <strong>{{ policies_count }}</strong>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.insurance_type.id_for_label }}">Вид страхования</label>
+                        {{ filter.form.insurance_type }}
                     </div>
-                    <div class="pl-filter-buttons">
-                        <button type="submit" class="btn-pl-apply">
-                            <i class="bi bi-search"></i> Применить
-                        </button>
-                        <a href="{% url 'policies:list' %}" class="btn-pl-reset">
-                            <i class="bi bi-x-circle"></i> Сбросить
-                        </a>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.osago.id_for_label }}">ОСАГО</label>
+                        {{ filter.form.osago }}
+                    </div>
+                    <div class="pl-filter-item pl-filter-item--date">
+                        <label class="pl-filter-label" for="{{ filter.form.start_date_from.id_for_label }}">Дата начала</label>
+                        <div class="pl-date-range-box">
+                            {{ filter.form.start_date_from }}
+                            <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
+                            {{ filter.form.start_date_to }}
+                        </div>
+                    </div>
+                    <div class="pl-filter-item pl-filter-item--date">
+                        <label class="pl-filter-label" for="{{ filter.form.end_date_from.id_for_label }}">Дата окончания</label>
+                        <div class="pl-date-range-box">
+                            {{ filter.form.end_date_from }}
+                            <span class="pl-date-range-sep"><i class="bi bi-arrow-left-right"></i></span>
+                            {{ filter.form.end_date_to }}
+                        </div>
+                    </div>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.policy_active.id_for_label }}">Полис активен</label>
+                        {{ filter.form.policy_active }}
+                    </div>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.dfa_active.id_for_label }}">ДФА активен</label>
+                        {{ filter.form.dfa_active }}
+                    </div>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.policy_uploaded.id_for_label }}">Полис подгружен</label>
+                        {{ filter.form.policy_uploaded }}
+                    </div>
+                    <div class="pl-filter-item">
+                        <label class="pl-filter-label" for="{{ filter.form.broker_participation.id_for_label }}">Участие брокера</label>
+                        {{ filter.form.broker_participation }}
                     </div>
                 </div>
             </form>
@@ -745,7 +185,7 @@
             <span class="mgr-section-head-badge">{{ page_obj.paginator.count }}</span>
             {% endif %}
         </div>
-        <div class="mgr-section-body" style="padding: 0 0 0.9rem;">
+        <div class="mgr-section-body">
             <div class="table-responsive">
                 <table class="mgr-table">
                     <thead>
@@ -887,12 +327,27 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function () {
+    const filterToggle = document.querySelector('.pl-filter-toggle');
+    const filterFields = document.getElementById('policy-filter-fields');
+
+    function showFilterFields(expanded) {
+        filterFields.hidden = !expanded;
+        filterToggle.setAttribute('aria-expanded', String(expanded));
+    }
+
+    const hasSelection = Array.from(filterFields.querySelectorAll('input, select'))
+        .some(field => field.value !== '' && field.value !== 'unknown');
+    showFilterFields(hasSelection);
+    filterToggle.disabled = false;
+    filterToggle.addEventListener('click', () => showFilterFields(filterFields.hidden));
+    filterFields.addEventListener('invalid', () => showFilterFields(true), true);
+
     document.querySelectorAll('.tbl-row-clickable').forEach(function(row) {
         row.addEventListener('click', function() {
             window.location.href = this.dataset.href;
         });
     });
-});
+})();
 </script>
 {% endblock %}

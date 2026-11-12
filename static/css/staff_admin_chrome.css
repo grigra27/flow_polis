@@ -1,0 +1,98 @@
+@import url("staff_admin_forms.css?v=2026-11-12-admin");
+
+body.staff-admin #content { box-sizing: border-box; width: 100%; max-width: 1720px; min-width: 0; margin-inline: auto; padding: 1.5rem 2rem; }
+body.staff-admin #header { gap: 1rem; padding: 1.1rem 2rem; }
+.staff-admin #branding { min-width: 0; }
+.staff-admin #site-name { line-height: 1.3; }
+.staff-admin .module table tbody tr:not(.selected) { background: var(--staff-card); }
+.staff-admin #user-tools { flex-shrink: 0; }
+.staff-admin #nav-sidebar { box-sizing: border-box; padding: .6rem .7rem; background: var(--staff-card); }
+.staff-admin #nav-filter { min-height: 36px; margin: 0 0 .8rem; padding: .5rem .6rem; border-radius: 8px; background: var(--staff-tint); font-size: .76rem; }
+.staff-admin #nav-sidebar .module { margin-bottom: .8rem; border: 0; border-radius: 8px; box-shadow: none; }
+.staff-admin #nav-sidebar .module caption { padding: .65rem .6rem; border: 0; border-radius: 8px; background: var(--staff-tint); font-size: .76rem; font-weight: 650; }
+.staff-admin #nav-sidebar .module :is(th, td) { padding: .5rem .5rem; border-color: var(--staff-line); font-size: .74rem; line-height: 1.4; }
+.staff-admin #nav-sidebar .module a { text-decoration: none; }
+.staff-admin #nav-sidebar .current-app .section { color: var(--link-fg); }
+.staff-admin #nav-sidebar .current-model { background: var(--selected-bg); }
+.staff-admin .object-tools { display: flex; float: none; flex-wrap: wrap; justify-content: flex-end; height: auto; min-height: 32px; gap: .5rem; margin: 0 0 1rem; }
+.staff-admin .object-tools li { margin: 0; padding: 0; }
+.staff-admin .object-tools a { box-sizing: border-box; min-height: 32px; padding: .5rem .75rem; border-radius: 8px; font-size: .76rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.staff-admin .object-tools a.addlink { padding-right: 1.7rem; border-color: var(--button-bg); background-color: var(--button-bg); color: white; }
+.staff-admin .object-tools a.addlink:hover { background-color: var(--button-hover-bg); }
+.staff-admin .object-tools a.historylink { background: var(--staff-card); }
+.staff-admin.dashboard #content { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.25rem; }
+.staff-admin.dashboard #content > :is(h1, h2) { grid-column: 1 / -1; margin: 0; }
+.staff-admin.dashboard #content > br { display: none; }
+.staff-admin.dashboard #content-main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1rem; float: none; width: auto; }
+.staff-admin.dashboard #content-main > .module { min-width: 0; margin: 0; }
+.staff-admin.dashboard .module table { width: 100%; }
+.staff-admin.dashboard .module :is(th, td) { padding: .7rem .8rem; border-color: var(--staff-line); font-size: .8rem; line-height: 1.45; }
+.staff-admin.dashboard .module caption { text-align: left; }
+.staff-admin.dashboard .module caption a { font-size: .88rem; }
+.staff-admin.dashboard #content-related { box-sizing: border-box; width: auto; min-width: 0; margin: 0; padding: 0; background: transparent; }
+.staff-admin #content-related .module { margin: 0; }
+.staff-admin #content-related h2 { margin: 0; padding: 1rem; color: var(--staff-ink); font-size: 1rem; }
+.staff-admin #content-related h3 { padding: 0 1rem; color: var(--staff-muted); font-size: .8rem; }
+.staff-admin #content-related :is(p, .actionlist) { padding-inline: 1rem; font-size: .8rem; line-height: 1.5; }
+.staff-admin #content-related .actionlist li { margin-bottom: .7rem; padding-bottom: .7rem; border-bottom: 1px solid var(--staff-line); }
+.staff-admin.change-list #changelist { gap: 1.25rem; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.staff-admin .changelist-form-container { border: 1px solid var(--staff-line); border-radius: 16px; background: var(--staff-card); box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.staff-admin #toolbar { margin: 0; padding: 1rem; border: 0; border-bottom: 1px solid var(--staff-line); border-radius: 16px 16px 0 0; background: var(--staff-card); }
+.staff-admin #changelist-search > div { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.staff-admin #toolbar #searchbar { flex: 1; min-width: 100px; max-width: 28rem; height: 36px; padding: .5rem .6rem; border-color: var(--staff-line); border-radius: 8px; font-size: .82rem; }
+.staff-admin #toolbar form input[type="submit"] { min-height: 36px; padding: .5rem .75rem; border-color: var(--button-bg); border-radius: 9px; background: var(--button-bg); color: white; box-shadow: none; font-weight: 600; }
+.staff-admin #changelist .actions { box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; max-width: 100%; gap: .55rem; padding: .9rem 1rem; border-color: var(--staff-line); background: var(--staff-card); color: var(--staff-muted); font-size: .78rem; }
+.staff-admin #changelist .actions label { display: inline-flex; flex-wrap: wrap; align-items: center; min-width: 0; max-width: 100%; gap: .5rem; font-size: .78rem; }
+.staff-admin #changelist .actions :is(select, button) { box-sizing: border-box; min-height: 34px; margin: 0; padding: .4rem .6rem; border: 1px solid var(--staff-line); border-radius: 8px; background: var(--staff-card); color: var(--staff-ink); font-family: inherit; font-size: .78rem; }
+.staff-admin #changelist .actions .action-counter { margin: 0; font-size: .75rem; }
+.staff-admin #result_list thead th { border-color: var(--staff-line); background: var(--staff-tint); color: var(--staff-muted); font-size: .67rem; font-weight: 650; }
+.staff-admin #result_list thead th .text :is(a, span) { padding: .7rem .6rem; }
+.staff-admin #result_list :is(td, tbody th) { padding: .7rem .6rem; border-color: var(--staff-line); font-size: .8rem; line-height: 1.45; }
+.staff-admin #result_list tbody tr:hover { background: var(--staff-tint); }
+.staff-admin #changelist .paginator { padding: 1rem; border: 0; border-top: 1px solid var(--staff-line); border-radius: 0 0 16px 16px; background: var(--staff-card); font-size: .78rem; line-height: 2; }
+.staff-admin #changelist .paginator a { border-radius: 6px; }
+.staff-admin #changelist-filter { box-sizing: border-box; flex-basis: 240px; min-width: 0; margin: 0; border: 1px solid var(--staff-line); border-radius: 14px; background: var(--staff-card); box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.staff-admin #changelist-filter h2 { margin: 0 0 .8rem; padding: .9rem 1rem; border-bottom: 1px solid var(--staff-line); border-radius: 14px 14px 0 0; color: var(--staff-ink); font-size: .88rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.staff-admin #changelist-filter :is(h3, details summary) { padding-inline: 1rem; color: var(--staff-ink); font-size: .78rem; font-weight: 600; }
+.staff-admin #changelist-filter li { margin-block: .2rem; font-size: .77rem; line-height: 1.5; }
+.staff-admin #changelist-filter li.selected { border-left: 3px solid var(--link-fg); background: var(--selected-bg); }
+.staff-admin #changelist-filter li.selected a { color: var(--link-fg); font-weight: 600; }
+.staff-admin #changelist .toplinks { padding: .8rem 1rem; border-color: var(--staff-line); background: var(--staff-card); font-size: .78rem; }
+.staff-admin #change-history { display: block; max-width: 100%; overflow-x: auto; }
+.staff-admin #change-history :is(th, td) { padding: .75rem; border-color: var(--staff-line); font-size: .82rem; }
+.staff-admin .selector-available-title, .staff-admin .selector-chosen-title { border-color: var(--staff-line); border-radius: 10px 10px 0 0; background: var(--staff-tint); color: var(--staff-ink); }
+.staff-admin .selector-chosen-title label { color: var(--staff-ink); }
+.staff-admin .selector .helptext { color: var(--staff-muted); }
+.staff-admin .selector-chosen .list-footer-display { border-color: var(--staff-line); background: var(--staff-tint); color: var(--staff-ink); }
+.staff-admin :is(.calendarbox, .clockbox) { border: 1px solid var(--staff-line); border-radius: 12px; background: var(--staff-card); box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+.staff-admin .calendar table { background: var(--staff-card); }
+.staff-admin .calendar caption, .staff-admin .calendarbox h2 { padding: .6rem; border-radius: 12px 12px 0 0; background: var(--staff-tint); color: var(--staff-ink); }
+.staff-admin .calendar-cancel { background: var(--staff-tint); }
+.staff-admin .calendar-cancel a { background: transparent; color: var(--link-fg); }
+.staff-admin .calendar-cancel a:hover { background: var(--selected-bg); color: var(--link-fg); }
+.staff-admin ul.messagelist li { border-bottom: 1px solid var(--staff-line); font-family: inherit; font-size: .82rem; }
+.staff-admin.delete-confirmation #content { line-height: 1.6; }
+.staff-admin.delete-confirmation #content li { overflow-wrap: anywhere; }
+.staff-admin.delete-confirmation .cancel-link { padding: .6rem .85rem; border: 1px solid var(--staff-line); border-radius: 9px; background: var(--staff-card); color: var(--staff-ink); font-size: .82rem; }
+.staff-admin.login #container { box-sizing: border-box; width: min(460px, calc(100% - 2rem)); margin: 8vh auto; border: 1px solid var(--staff-line); border-radius: 18px; background: var(--staff-card); box-shadow: 0 8px 32px rgba(15,23,42,.08); }
+.staff-admin.login #header { border-radius: 18px 18px 0 0; }
+.staff-admin.login #content { padding: 1.5rem; }
+.staff-admin.login .form-row input { width: 100%; min-height: 40px; }
+.staff-admin.login .submit-row { margin: 1rem 0 0; padding: 0; border: 0; background: transparent; }
+.staff-admin.login .submit-row input { width: 100%; }
+@media (max-width: 1199.98px) {
+    .staff-admin.dashboard #content-main { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1024px) {
+    body.staff-admin #header { align-items: flex-start; }
+    .staff-admin #user-tools { flex-shrink: 1; }
+    .staff-admin.dashboard #content { grid-template-columns: minmax(0, 1fr); }
+    .staff-admin.change-list #changelist { flex-direction: column; }
+    .staff-admin #changelist-filter { flex-basis: auto; width: 100%; }
+    .staff-admin .changelist-form-container { box-sizing: border-box; width: 100%; }
+}
+@media (max-width: 767.98px) {
+    body.staff-admin #content, body.staff-admin #header { padding: 1rem; }
+    .staff-admin .object-tools { float: none; margin: 0 0 1rem; }
+    .staff-admin #changelist .actions select { max-width: 100%; }
+}

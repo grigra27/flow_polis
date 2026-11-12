@@ -1,0 +1,174 @@
+.policy-detail {
+    --policy-ink: #172e49;
+    --policy-muted: #52677e;
+    --policy-line: #e0e8f0;
+    --policy-tint: #f5f8fc;
+    max-width: 1720px;
+    margin: 0 auto;
+    padding-inline: max(0px, calc(var(--app-page-gutter) - 1.5rem));
+    color: var(--policy-ink);
+    font-family: var(--app-interface-font);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.policy-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0.35rem 0 1.25rem;
+}
+.policy-page-title {
+    flex: 1 1 600px;
+    min-width: 0;
+    margin: 0;
+    color: var(--policy-ink);
+    font-size: clamp(1.6rem, 2.4vw, 2.15rem);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.04em;
+    overflow-wrap: anywhere;
+}
+.policy-page-title .badge { vertical-align: middle; letter-spacing: 0; }
+.policy-page-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.policy-detail .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 36px;
+    padding: 0.45rem 0.75rem;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+.policy-page-actions .btn-warning {
+    border-color: var(--app-color-action);
+    background: var(--app-color-action);
+    color: white;
+}
+.policy-page-actions .btn-warning:hover { border-color: #104f98; background: #104f98; }
+.policy-page-actions .btn-secondary {
+    border-color: #cedae7;
+    background: white;
+    color: var(--app-color-primary);
+}
+.policy-page-actions .btn-secondary:hover { border-color: #9eb8d5; background: var(--policy-tint); }
+
+.policy-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    align-items: start;
+    gap: 1.25rem;
+    margin: 0;
+}
+.policy-layout > :is(.policy-main, .policy-sidebar) { width: auto; min-width: 0; padding: 0; }
+.policy-detail .card {
+    min-width: 0;
+    border-color: var(--policy-line);
+    border-radius: 16px;
+    background: white;
+    box-shadow: var(--app-shadow-sm);
+    overflow: hidden;
+}
+.policy-detail .card-header {
+    padding: 0.9rem 1.1rem;
+    border-color: var(--policy-line);
+    background: white;
+    color: var(--app-color-primary);
+}
+.policy-detail .card-header h5 { font-size: 0.95rem; font-weight: 650; }
+.policy-detail .card-body { padding: 1.1rem; overflow-wrap: anywhere; }
+.policy-detail .badge { padding: 0.28rem 0.45rem; border-radius: 6px; font-size: 0.71rem; font-weight: 600; line-height: 1.35; }
+.policy-detail .card-body a:not(.btn) { color: var(--app-color-action); text-decoration: none; }
+.policy-detail .card-body a:not(.btn):hover { text-decoration: underline; }
+.policy-facts .card-body strong,
+.policy-sidebar .card-body > p > strong,
+.policy-additional .card-body > div > strong {
+    display: inline-block;
+    margin-bottom: 0.25rem;
+    color: var(--policy-muted);
+    font-size: 0.76rem;
+    font-weight: 550;
+}
+.policy-facts .card-body > .row:last-child { margin-bottom: 0 !important; }
+.policy-facts code { padding: 0.18rem 0.4rem; border-radius: 5px; background: var(--policy-tint); color: var(--app-color-primary); font-size: 0.8rem; }
+.policy-facts :is(.insurer-logo, .insurance-type-icon, .branch-logo) { vertical-align: middle; }
+.policy-period { border-color: var(--policy-line) !important; background: var(--policy-tint); }
+.policy-period h6 { color: var(--policy-muted); font-size: 0.78rem; }
+.policy-period .fs-6 { color: var(--policy-ink); font-weight: 650; }
+
+/* The nine existing payment columns and their expandable rows are retained. */
+.policy-detail .policy-schedule > .card-body { padding: 0; }
+.policy-schedule .table-responsive { border-radius: 0 0 16px 16px; }
+.policy-schedule .table { min-width: 48rem; margin-bottom: 0; color: var(--policy-ink); font-size: 0.8rem; }
+.policy-schedule .table th {
+    padding: 0.65rem 0.5rem;
+    border-color: var(--policy-line);
+    background: var(--policy-tint);
+    color: var(--policy-muted);
+    font-size: 0.67rem;
+    font-weight: 650;
+    line-height: 1.4;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    white-space: normal;
+}
+.policy-schedule .table td { padding: 0.7rem 0.5rem; border-color: #e7edf3; color: var(--policy-ink); }
+.policy-schedule .table :is(th, td):first-child { padding-left: 1.1rem; }
+.policy-schedule .table :is(th, td):last-child { padding-right: 1.1rem; }
+.policy-schedule .payment-row td:nth-child(n+2):nth-child(-n+7) { white-space: nowrap; }
+.policy-schedule .payment-row td:last-child { min-width: 95px; overflow-wrap: anywhere; }
+.policy-schedule .payment-row .badge { max-width: 120px; white-space: normal; text-align: left; }
+.policy-schedule .payment-row small { font-size: 0.75rem; }
+.policy-schedule .payment-row:not(.table-cancelled):hover > td { --bs-table-bg: var(--app-color-row-hover); }
+.policy-schedule .toggle-icon { display: inline-block; color: var(--policy-muted); transition: transform 0.2s; }
+.policy-schedule .payment-row:has(+ tr.show) .toggle-icon { transform: rotate(90deg); }
+.policy-schedule .collapse strong { color: var(--policy-muted); font-weight: 550; }
+.policy-schedule .collapse small { font-size: 0.8rem; }
+.policy-schedule .btn-warning { border-color: #f6dfa5; background: #fff6db; color: #805a13; }
+.policy-schedule .btn-warning:hover { background: #ffe9ad; }
+
+.policy-statuses .card-body { padding-block: 0.4rem; }
+.policy-statuses .card-body > p {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem 0.6rem;
+    margin: 0;
+    padding-block: 0.7rem;
+    border-bottom: 1px solid var(--policy-line);
+}
+.policy-statuses .card-body > p:last-child { border-bottom: 0; }
+.policy-statuses .card-body > p > strong { margin-bottom: 0; }
+.policy-statuses .card-body > p > br { display: none; }
+.policy-statuses .card-body > p > small { grid-column: 1 / -1; }
+.policy-finance .text-primary { color: var(--app-color-action) !important; font-weight: 700; }
+.policy-rates { margin-top: 1rem; padding: 0.9rem; border: 1px solid var(--policy-line); border-radius: 10px; background: var(--policy-tint); }
+.policy-rates-title { color: var(--policy-ink); font-size: 0.83rem; font-weight: 650; }
+.policy-rates .table { margin-bottom: 0; table-layout: fixed; background: white; font-size: 0.83rem; }
+.policy-rates .table th { padding: 0.6rem; border-color: var(--policy-line); background: var(--policy-tint); color: var(--policy-muted); font-size: 0.72rem; font-weight: 600; }
+.policy-rates .table td { padding: 0.6rem; border-color: var(--policy-line); color: var(--policy-ink); }
+.policy-rates .table td:last-child { color: var(--app-color-action); font-weight: 600; }
+.policy-rate-current { --bs-table-bg: #edf4fd; }
+.policy-rate-marker { margin-left: 0.3rem; color: var(--app-color-action); font-size: 0.7rem; }
+.policy-rate-current-label { margin-left: 0.2rem; color: var(--policy-muted); font-size: 0.7rem; }
+.policy-additional .badge { max-width: 100%; margin-bottom: 0.25rem; white-space: normal; text-align: left; }
+.policy-detail :is(a, button, input):focus-visible { outline: 2px solid var(--app-color-action); outline-offset: 2px; }
+
+@media (max-width: 1199.98px) {
+    .policy-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; }
+}
+@media (max-width: 991.98px) {
+    .policy-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 575.98px) {
+    .policy-page-actions { width: 100%; }
+    .policy-page-actions .btn { flex: 1 1 auto; white-space: normal; }
+    .policy-facts .card-body > .row > .col-md-6 + .col-md-6 { margin-top: 1rem; }
+}

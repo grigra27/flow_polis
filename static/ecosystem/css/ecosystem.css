@@ -1,0 +1,68 @@
+.ecosystem-page {
+    --v2-bg: #f5f8fc;
+    --v2-card-bg: white;
+    --v2-border: #e0e8f0;
+    --v2-title: #172e49;
+    --v2-muted: #52677e;
+    --v2-accent: #1565c0;
+    max-width: 1720px;
+    margin: 0 auto;
+    padding-inline: max(0px, calc(var(--app-page-gutter) - 1.5rem));
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--v2-title);
+    font-family: var(--app-interface-font);
+    font-variant-numeric: tabular-nums;
+}
+:is(.mgr-root, .cli-root, .ins-root, .br-root).ecosystem-page { padding-block: 0; }
+.ecosystem-page :is(.mgr-page-header, .cli-page-header, .ins-page-header, .br-page-header) { margin: .35rem 0 1.25rem; padding: 0; border: 0; gap: 1rem; }
+.ecosystem-page :is(.mgr-page-title, .cli-page-title, .ins-page-title, .br-page-title) { margin: 0; color: var(--v2-title); font-size: clamp(1.6rem, 2.4vw, 2.15rem); font-weight: 700; line-height: 1.2; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.ecosystem-page .mgr-page-title :is(.branch-with-logo, .insurer-with-logo) { font-size: inherit; }
+.ecosystem-page .mgr-page-title :is(.branch-with-logo, .insurer-with-logo) > span:last-child { color: inherit; font-size: inherit; }
+.ecosystem-page :is(.mgr-page-kicker, .cli-page-kicker, .ins-page-kicker, .br-page-kicker) { font-size: .75rem; font-weight: 600; }
+.ecosystem-page :is(.cli-search-panel, .mgr-search-panel, .br-search-panel, .ins-search-panel) { border-radius: 14px; padding: .9rem 1.1rem; box-shadow: var(--app-shadow-sm); }
+.ecosystem-page :is(input, select) { font-family: inherit; font-size: .83rem; border-radius: 8px; }
+.ecosystem-page :is(.btn-cli-search, .btn-mgr-search, .btn-br-search, .btn-ins-search, .btn-br-apply) { min-height: 36px; border-radius: 9px; background: var(--v2-accent); color: white; font-size: .82rem; font-weight: 600; }
+.ecosystem-page :is(.btn-cli-search, .btn-mgr-search, .btn-br-search, .btn-ins-search, .btn-br-apply):hover { background: #104f98; }
+.ecosystem-page :is(.mgr-card, .cli-card, .br-card, .ins-card) { border: 1px solid var(--v2-border); border-radius: 14px; box-shadow: var(--app-shadow-sm); background: white; }
+.ecosystem-page :is(.mgr-card, .cli-card, .br-card, .ins-card):hover { border-color: #9eb8d5; box-shadow: var(--app-shadow-md); transform: none; }
+.ecosystem-page :is(.mgr-card-name, .cli-card-name, .br-card-name, .ins-card-name) { font-size: .95rem; font-weight: 650; }
+.ecosystem-page :is(.mgr-contact-row, .mgr-card-contacts, .cli-card-altname) { overflow-wrap: anywhere; }
+.ecosystem-page .mgr-section { border-radius: 16px; box-shadow: var(--app-shadow-sm); }
+.ecosystem-page .mgr-section-head { padding: .8rem 1.1rem; border-bottom: 1px solid var(--v2-border); background: white; }
+.ecosystem-page .mgr-section-head-title { color: var(--app-color-primary); font-size: .86rem; font-weight: 650; text-transform: none; letter-spacing: 0; }
+.ecosystem-page .mgr-section-head-badge { border-radius: 7px; background: var(--app-color-primary-soft); color: var(--app-color-primary); }
+.ecosystem-page :is(.btn-mgr-back, .btn-mgr-edit, .btn-br-reset, .btn-ins-reset) { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 36px; padding: .45rem .75rem; border: 1px solid #cedae7; border-radius: 9px; background: white; color: var(--app-color-primary); font-size: .82rem; font-weight: 600; }
+.ecosystem-page :is(.btn-mgr-back, .btn-br-reset, .btn-ins-reset):hover { background: #f5f8fc; border-color: #9eb8d5; }
+.ecosystem-page .btn-mgr-edit { border-color: var(--v2-accent); background: var(--v2-accent); color: white; }
+.ecosystem-page .btn-mgr-edit:hover { background: #104f98; color: white; }
+.ecosystem-page :is(.mgr-info-label, .mgr-stat-label) { font-size: .72rem; font-weight: 550; }
+.ecosystem-page :is(.mgr-info-value, .mgr-stat-value) { color: var(--v2-title); }
+.ecosystem-page :is(.mgr-stat-card, .br-overview-card) { border-radius: 10px; border-color: var(--v2-border); background: #f8fafd; box-shadow: none; }
+.ecosystem-page .mgr-table { font-size: .83rem; line-height: 1.45; }
+.ecosystem-page .mgr-table th { padding: .65rem .5rem; border-color: var(--v2-border); background: #f5f8fc; color: var(--v2-muted); font-size: .67rem; letter-spacing: .035em; white-space: normal; }
+.ecosystem-page .mgr-table td { padding: .65rem .5rem; border-color: #e7edf3; overflow-wrap: anywhere; }
+.ecosystem-page .mgr-table td:first-child { font-weight: 600; }
+.ecosystem-manager-detail .mgr-table td:nth-child(7) { white-space: nowrap; }
+.ecosystem-page :is(.tbl-badge, .mgr-badge, .cli-badge, .ins-badge, .br-badge) { border-radius: 6px; font-size: .71rem; font-weight: 600; }
+.ecosystem-page :is(.br-badge--broker, .ins-badge--broker) { background: #ede9fe; color: #6d28d9; }
+.ecosystem-page :is(.mgr-page-btn, .cli-page-btn, .br-page-btn, .ins-page-btn) { min-height: 32px; border-radius: 8px; font-size: .8rem; }
+.ecosystem-page :is(.mgr-count-pill, .cli-count-pill, .ins-count-pill, .br-count-pill) { border-radius: 7px; background: #e8f0fb; color: var(--app-color-primary); font-size: .78rem; }
+.ecosystem-page :is(a, button, input, select, tr[tabindex]):focus-visible { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
+.ecosystem-page .ecosystem-hub-shell { max-width: 1080px; margin-top: 1rem; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.ecosystem-page .ecosystem-hub-grid { gap: 1.1rem; }
+.ecosystem-page .ecosystem-hub-tile { padding: 1.5rem; border: 1px solid var(--v2-border); border-radius: 16px; background: white; box-shadow: var(--app-shadow-sm); }
+.ecosystem-page .ecosystem-hub-tile:hover { border-color: #9eb8d5; box-shadow: var(--app-shadow-md); transform: none; }
+.ecosystem-page .ecosystem-hub-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; margin-bottom: 1rem; border: 0; border-radius: 11px; background: #e8f0fb; color: var(--v2-accent); font-size: 1.1rem; }
+.ecosystem-page .ecosystem-hub-title { font-size: 1.15rem; font-weight: 650; }
+.ecosystem-page .ecosystem-hub-description { color: var(--v2-muted); font-size: .88rem; line-height: 1.5; }
+.ecosystem-page .ecosystem-hub-meta { border-radius: 7px; background: #edf3fb; color: var(--app-color-primary); font-size: .78rem; }
+@media (min-width: 1200px) {
+    .ecosystem-page > .row.g-3 > .col-lg-4 { width: 330px; }
+    .ecosystem-page > .row.g-3 > .col-lg-8 { width: calc(100% - 330px); }
+}
+@media (max-width: 767.98px) {
+    .ecosystem-page :is(.mgr-page-header, .br-page-header, .ins-page-header, .cli-page-header) { align-items: flex-start; }
+    .ecosystem-page :is(.mgr-section, .cli-card, .mgr-card, .ins-card, .br-card) { min-width: 0; }
+}

@@ -6,12 +6,14 @@
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
 {% block extra_css %}
+    <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}">
     {% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">
+<div class="policy-detail">
+<div class="policy-page-header">
+    <h1 class="policy-page-title">
         Полис {{ policy.policy_number }}
         {% if policy.is_osago %}<span class="badge bg-primary-subtle text-primary-emphasis">ОСАГО</span>{% endif %}
         {% if not policy.policy_active %}
@@ -21,9 +23,9 @@
             <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
         {% endif %}
     </h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
+    <div class="policy-page-actions">
         {% if can_edit %}
-        <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-warning me-2">
+        <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-warning">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
         {% endif %}
@@ -34,10 +36,10 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row policy-layout">
     <!-- Main Info -->
-    <div class="col-md-8">
-        <div class="card mb-4">
+    <div class="col-md-8 policy-main">
+        <div class="card mb-4 policy-facts">
             <div class="card-header">
                 <h5 class="mb-0">Основная информация</h5>
             </div>
@@ -113,7 +115,7 @@
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="border rounded p-3">
+                        <div class="border rounded p-3 policy-period">
                             <h6 class="mb-3 fw-bold border-bottom pb-2">
                                 <i class="bi bi-calendar-range"></i> Период страхования
                             </h6>
@@ -132,7 +134,7 @@
         </div>
 
         <!-- Payment Schedule -->
-        <div class="card mb-4">
+        <div class="card mb-4 policy-schedule">
             <div class="card-header">
                 <h5 class="mb-0">График платежей</h5>
             </div>
@@ -260,18 +262,6 @@
             </div>
         </div>
 
-        <style>
-            .payment-row:hover {
-                background-color: #f8f9fa;
-            }
-            .toggle-icon {
-                transition: transform 0.2s;
-            }
-            .payment-row[aria-expanded="true"] .toggle-icon {
-                transform: rotate(90deg);
-            }
-        </style>
-
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const paymentRows = document.querySelectorAll('.payment-row');
@@ -292,9 +282,9 @@
     </div>
 
     <!-- Sidebar -->
-    <div class="col-md-4">
+    <div class="col-md-4 policy-sidebar">
         <!-- Status -->
-        <div class="card mb-4">
+        <div class="card mb-4 policy-statuses">
             <div class="card-header">
                 <h5 class="mb-0">Статусы</h5>
             </div>
@@ -366,7 +356,7 @@
         {% endif %}
 
         <!-- Financial Info -->
-        <div class="card mb-4">
+        <div class="card mb-4 policy-finance">
             <div class="card-header">
                 <h5 class="mb-0">Финансовая информация</h5>
             </div>
@@ -381,9 +371,9 @@
 
                 <!-- Rates by Year -->
                 {% if rates_by_year %}
-                <div class="mt-3 pt-3 border-top" style="background-color: #f8f9fa; padding: 1rem; border-radius: 0.375rem;">
+                <div class="policy-rates">
                     <p class="mb-2">
-                        <strong style="color: #495057; font-size: 1.05rem;">Тариф по годам страхования</strong>
+                        <strong class="policy-rates-title">Тариф по годам страхования</strong>
                     </p>
                     <p class="mb-3">
                         <small class="text-muted" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="Тариф рассчитывается как сумма всех страховых премий соответствующего года страхования, разделенная на страховую сумму. Страховая сумма берется из первого платежа внутри года страхования. Расчет выполняется только для тех лет, где в базе есть первый платеж (№1) внутри года.">
@@ -391,24 +381,24 @@
                         </small>
                     </p>
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" style="background-color: white; table-layout: fixed;">
-                            <thead style="background-color: #e9ecef;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
                                 <tr>
-                                    <th style="color: #495057; font-weight: 600; padding: 0.75rem; width: 40%;">Год</th>
-                                    <th style="color: #495057; font-weight: 600; padding: 0.75rem; width: 60%;">Тариф, %</th>
+                                    <th style="width: 40%;">Год</th>
+                                    <th style="width: 60%;">Тариф, %</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for year_data in rates_by_year %}
-                                <tr {% if year_data.is_current %}style="background-color: #f0f8ff;"{% endif %}>
-                                    <td style="padding: 0.65rem; color: #212529; width: 40%;">
+                                <tr{% if year_data.is_current %} class="policy-rate-current"{% endif %}>
+                                    <td style="width: 40%;">
                                         {{ year_data.year_number }}
                                         {% if year_data.is_current %}
-                                            <span style="color: #0d6efd; font-size: 0.85rem; margin-left: 0.3rem;">◆</span>
-                                            <small style="color: #6c757d; font-size: 0.75rem; margin-left: 0.2rem;">(текущ.)</small>
+                                            <span class="policy-rate-marker">◆</span>
+                                            <small class="policy-rate-current-label">(текущ.)</small>
                                         {% endif %}
                                     </td>
-                                    <td style="padding: 0.65rem; color: #0d6efd; font-weight: 500; width: 60%;">{{ year_data.rate|floatformat:2 }}%</td>
+                                    <td style="width: 60%;">{{ year_data.rate|floatformat:2 }}%</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -421,7 +411,7 @@
 
         <!-- Additional Info -->
         {% if info1_tags or info2_tags or policy.info3 or policy.info4 %}
-        <div class="card mb-4">
+        <div class="card mb-4 policy-additional">
             <div class="card-header">
                 <h5 class="mb-0">Дополнительная информация</h5>
             </div>
@@ -465,5 +455,6 @@
         </div>
         {% endif %}
     </div>
+</div>
 </div>
 {% endblock %}

@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load insurer_tags %}
 {% load l10n %}
 
 {% block title %}Экосистема{% endblock %}
 
+{% block extra_css %}<link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}">{% endblock %}
+
 {% block content %}
-<div class="ecosystem-hub-page">
+<div class="ecosystem-hub-page ecosystem-page">
     <div class="ecosystem-hub-shell mx-auto">
         <div class="ecosystem-hub-grid">
             <a href="{% url 'insurers:branches_list' %}" class="ecosystem-hub-tile">

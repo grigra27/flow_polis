@@ -1,0 +1,68 @@
+@font-face {
+    font-family: Onest;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../../fonts/onest/onest-cyrillic-wght-normal.woff2") format("woff2");
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+    font-family: Onest;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../../fonts/onest/onest-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+FEFF, U+FFFD;
+}
+.account-page, .account-blocked {
+    --v2-border: #e0e8f0;
+    --v2-title: #172e49;
+    --v2-muted: #52677e;
+    --v2-accent: #1565c0;
+    --primary-color: #1565c0;
+    font-family: Onest, "Segoe UI", system-ui, sans-serif;
+    color: #172e49;
+    font-variant-numeric: tabular-nums;
+}
+.account-page { background: #f5f7fb; }
+.account-login .portal-shell { border-color: #e0e8f0; border-radius: 18px; box-shadow: 0 8px 32px rgba(15,23,42,.08); animation: none; }
+.account-login .portal-brand { background: #1e3a5f; }
+.account-login .brand-cell { border-color: rgba(232,243,255,.18); background: rgba(255,255,255,.05); }
+.account-login :is(.brand-title, .auth-title) { font-weight: 700; letter-spacing: -.035em; }
+.account-login .auth-title { font-size: 1.85rem; }
+.account-login :is(.brand-kicker, .auth-kicker) { font-size: .7rem; font-weight: 550; }
+.account-login .auth-subtitle { font-size: .87rem; line-height: 1.6; }
+.account-login .form-label { color: #52677e; font-size: .77rem; font-weight: 550; }
+.account-login .form-control { border-color: #cfdae7; border-radius: 8px; background: white; font-family: inherit; font-size: .87rem; }
+.account-login .btn-login { border: 1px solid #1565c0; border-radius: 9px; background: #1565c0; font-family: inherit; font-size: .87rem; letter-spacing: 0; }
+.account-login .btn-login:hover { transform: none; background: #104f98; box-shadow: none; filter: none; }
+.account-login .auth-chip { border-radius: 6px; background: #edf3fb; font-size: .7rem; }
+.account-denied .access-denied-container { max-width: 580px; animation: none; }
+.account-denied .access-denied-card { border: 1px solid #e0e8f0; border-radius: 18px; box-shadow: 0 8px 32px rgba(15,23,42,.08); }
+.account-denied .access-denied-header { padding: 2rem 2rem 1.5rem; border-bottom: 1px solid #e0e8f0; background: white; color: #172e49; }
+.account-denied .access-denied-header .icon { display: inline-grid; place-items: center; width: 56px; height: 56px; margin-bottom: 1rem; border-radius: 14px; background: #e8f0fb; color: #1565c0; font-size: 1.6rem; animation: none; }
+.account-denied .access-denied-header h1 { font-size: 2rem; letter-spacing: -.04em; }
+.account-denied .access-denied-header p { color: #52677e; font-size: .8rem; }
+.account-denied .access-denied-body { padding: 1.75rem 2rem; }
+.account-denied .message-box { padding: 1rem; margin-bottom: 1rem; border: 1px solid #f2c8cd; border-radius: 10px; background: #fff5f6; }
+.account-denied .message-box h2 { font-size: .95rem; }
+.account-denied .message-box p { color: #52677e; font-size: .85rem; }
+.account-denied .info-box { padding: 1rem; margin-bottom: 1.5rem; border: 1px solid #d8e5f5; border-radius: 10px; background: #f3f7fd; }
+.account-denied .info-box p { color: #52677e; font-size: .82rem; }
+.account-denied .btn-dashboard { min-height: 40px; padding: .65rem .85rem; border: 1px solid #1565c0; border-radius: 9px; background: #1565c0; font-size: .85rem; text-transform: none; letter-spacing: 0; }
+.account-denied .btn-dashboard:hover { transform: none; background: #104f98; box-shadow: none; }
+.account-denied .access-denied-footer { color: #52677e; font-size: .75rem; }
+.account-blocked { max-width: 960px; }
+.account-blocked > .row > div { width: 100%; max-width: 680px; }
+.account-blocked .card.border-danger { border: 1px solid #e0e8f0 !important; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.account-blocked .card-header.bg-danger { padding: 1rem 1.25rem; border-color: #e0e8f0; border-radius: 16px 16px 0 0; background: white !important; color: #172e49 !important; }
+.account-blocked .card-header h4 { font-size: 1.2rem; font-weight: 650; letter-spacing: -.025em; }
+.account-blocked .card-body { padding: 1.25rem; font-size: .87rem; line-height: 1.6; }
+.account-blocked .alert-danger { border-color: #f2c8cd; border-radius: 10px; background: #fff5f6; color: #9f2335; }
+.account-blocked .card-footer { padding: 1rem 1.25rem; border-color: #e0e8f0; border-radius: 0 0 16px 16px; background: #f8fafd; }
+.account-blocked .btn { min-height: 36px; padding: .45rem .75rem; border-color: #cedae7; border-radius: 9px; background: white; color: #1e3a5f; font-size: .82rem; font-weight: 600; }
+:is(.account-page, .account-blocked) :is(a, button, input):focus-visible { outline: 2px solid #1565c0; outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    .account-denied .access-denied-body { padding: 1.25rem; }
+    .account-denied .access-denied-header { padding: 1.5rem 1.25rem; }
+}

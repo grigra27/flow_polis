@@ -1,0 +1,54 @@
+:is(.flow-registration, .summary-policies, .flow-state) {
+    max-width: 1720px;
+    margin-inline: auto;
+    padding-inline: max(0px, calc(var(--app-page-gutter) - 1.5rem));
+    color: #172e49;
+    font-family: var(--app-interface-font);
+    font-variant-numeric: tabular-nums;
+}
+.flow-heading { margin: .35rem 0 1.25rem; }
+.flow-heading h1, .summary-policies h1, .flow-state h1 { color: #172e49; font-size: clamp(1.6rem, 2.4vw, 2.15rem); font-weight: 700; line-height: 1.2; letter-spacing: -.04em; }
+.flow-heading h1 span { font-size: .72em; }
+.flow-heading p { font-size: .87rem; line-height: 1.5; }
+.flow-back, .summary-policies-back { font-size: .82rem; }
+.flow-section { border-color: #e0e8f0; border-radius: 16px; box-shadow: var(--app-shadow-sm); }
+.flow-section h2 { color: #1e3a5f; font-size: .95rem; }
+.flow-field > label, .flow-registration .form-label { color: #52677e; font-size: .77rem; font-weight: 550; }
+.flow-field :is(input:not([type=checkbox]), select, textarea), .flow-registration :is(.form-control, .form-select) { border-color: #cfdae7; border-radius: 8px; font-family: inherit; font-size: .83rem; }
+.flow-field .select2-container .select2-selection--single { border-color: #cfdae7; border-radius: 8px; }
+.flow-help { color: #52677e; font-size: .75rem; }
+.flow-check { font-size: .82rem; }
+.flow-registration .table, .flow-inline table { font-size: .83rem; }
+.flow-registration :is(.table th, .flow-inline th) { background: #f5f8fc; color: #52677e; font-size: .7rem; font-weight: 600; }
+.flow-registration .table > :not(caption) > * > * { padding: .65rem .5rem; border-color: #e7edf3; }
+.flow-inline input:not([type=checkbox]), .flow-inline select, .flow-inline textarea { border-color: #cfdae7; border-radius: 7px; font-family: inherit; font-size: .82rem; }
+.flow-inline textarea { height: 4.5rem; resize: vertical; }
+.flow-savebar { border-color: #e0e8f0; border-radius: 14px; box-shadow: 0 -2px 12px rgba(15,23,42,.05); }
+:is(.flow-registration, .flow-state) .btn { min-height: 36px; padding: .45rem .75rem; border-radius: 9px; font-size: .82rem; font-weight: 600; }
+.flow-registration .btn-sm { min-height: 30px; padding: .35rem .55rem; font-size: .76rem; }
+#flow-policy-source { border-color: #c8e6e3; background: #f3fbfa; }
+.flow-sidebar :is(.flow-source-data dt, .flow-source-offers small) { color: #527572; }
+.flow-source-data dd, .flow-source-offers > div { font-size: .83rem; }
+.flow-source-data dd { overflow-wrap: anywhere; }
+.flow-source-offers > div { border-color: #d9eae8; }
+.summary-policies header p { color: #52677e; font-size: .87rem; }
+.summary-policies-table { border-color: #e0e8f0; border-radius: 16px; box-shadow: var(--app-shadow-sm); }
+.summary-policies table { font-size: .83rem; }
+.summary-policies th { background: #f5f8fc; color: #52677e; font-size: .67rem; }
+.summary-policies td { border-color: #e7edf3; }
+.flow-state { max-width: 1120px; padding: 1.5rem; border: 1px solid #e0e8f0; border-radius: 16px; background: white; box-shadow: var(--app-shadow-sm); }
+.flow-state h1 { margin: 0 0 1rem; }
+.flow-state p { color: #52677e; font-size: .9rem; line-height: 1.6; }
+.flow-state ul { display: grid; gap: .85rem; margin: 1rem 0; padding: 0; list-style: none; }
+.flow-state li { padding: 1rem; border: 1px solid #e0e8f0; border-radius: 12px; background: #f8fafd; font-size: .87rem; line-height: 1.7; overflow-wrap: anywhere; }
+.flow-state li .btn { margin: .3rem .5rem; }
+.flow-state > a:last-child { display: inline-block; margin-top: 1rem; font-size: .83rem; font-weight: 600; }
+:is(.flow-registration, .summary-policies, .flow-state) :is(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid #1565c0; outline-offset: 2px; }
+@media (min-width: 1200px) {
+    .flow-layout { grid-template-columns: minmax(0, 1fr) 330px; }
+}
+@media (max-width: 767.98px) {
+    .flow-section, .flow-state { padding: 1rem; }
+    .flow-state h1 { overflow-wrap: anywhere; }
+    .flow-state li .btn { margin: .5rem 0 0; }
+}

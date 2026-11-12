@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_form.css' %}?v=2026-11-11">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_form.css' %}?v=2026-11-11">
+<link rel="stylesheet" href="{% static 'policies/css/flow_refresh.css' %}">{% endblock %}
 {% block title %}Оформление из свода № {{ source.summary_id }}{% endblock %}
 {% block content %}
 <div class="flow-registration"><header class="flow-heading">

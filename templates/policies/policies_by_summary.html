@@ -2,7 +2,8 @@
 {% load static insurer_tags l10n %}
 
 {% block title %}Полисы по своду № {{ source.pk }}{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/summary_list.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/summary_list.css' %}">
+<link rel="stylesheet" href="{% static 'policies/css/flow_refresh.css' %}">{% endblock %}
 
 {% block content %}
 <section class="summary-policies" aria-labelledby="summary-policies-heading">

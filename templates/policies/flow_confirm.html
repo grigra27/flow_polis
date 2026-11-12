@@ -1,5 +1,8 @@
 {% extends "base.html" %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_refresh.css' %}">{% endblock %}
 {% block content %}
+<section class="flow-state">
 <h1>Проверьте совпадения по ДФА {{ dfa }}</h1>
 {% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
 <p>{% if candidates %}По указанному ДФА найдены полисы.{% else %}Совпадений по указанному ДФА больше нет.{% endif %} Введённая карточка и график сохранены в форме.</p>
@@ -13,4 +16,5 @@
 <button type="submit" class="btn btn-primary">Создать отдельный полис с введёнными данными</button>
 </form>
 <a href="{{ review_url }}">К подбору по ДФА</a>
+</section>
 {% endblock %}

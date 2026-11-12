@@ -1,0 +1,61 @@
+.exp-root.export-page {
+    --v2-bg: #f5f8fc;
+    --v2-border: #e0e8f0;
+    --v2-title: #172e49;
+    --v2-muted: #52677e;
+    max-width: 1720px;
+    margin: 0 auto;
+    padding: 0 max(0px, calc(var(--app-page-gutter) - 1.5rem));
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-family: var(--app-interface-font);
+    font-variant-numeric: tabular-nums;
+}
+.export-page .exp-page-header { margin: .35rem 0 1.25rem; padding: 0; border: 0; flex-wrap: wrap; }
+.export-page .exp-page-title { font-size: clamp(1.6rem, 2.4vw, 2.15rem); font-weight: 700; line-height: 1.2; letter-spacing: -.04em; }
+.export-page .exp-page-kicker { font-size: .75rem; font-weight: 600; }
+.export-page .exp-section-head { padding: .9rem 1.1rem; border-color: var(--v2-border); border-radius: 16px 16px 0 0; background: white; }
+.export-page .exp-section-head-title { color: var(--app-color-primary); font-size: .95rem; font-weight: 650; }
+.export-page .exp-section-head-sub { color: var(--v2-muted); font-size: .83rem; }
+.export-page .exp-section-head--backup { background: white; border-color: var(--v2-border); }
+.export-page .exp-section-head--backup .exp-section-head-title { color: var(--app-color-primary); }
+.export-page .exp-section-head--backup .exp-section-head-sub { color: var(--v2-muted); }
+.export-page .exp-section-body { padding: 1.1rem; border-color: var(--v2-border); border-radius: 0 0 16px 16px; background: white; }
+.export-page .exp-card { border-left-width: 2px; border-radius: 12px; box-shadow: var(--app-shadow-sm); }
+.export-page .exp-card-title { font-size: 1.02rem; font-weight: 650; color: var(--v2-title); }
+.export-page :is(.exp-card-kicker, .exp-form-label) { font-size: .73rem; font-weight: 600; }
+.export-page .exp-card-desc { font-size: .85rem; line-height: 1.5; }
+.export-page :is(.exp-feat, .exp-section-badge) { border-radius: 6px; font-size: .72rem; }
+.export-page :is(.exp-step, .exp-templates-panel, .exp-custom-card, .exp-tmpl-panel) { border-color: var(--v2-border); border-radius: 16px; box-shadow: var(--app-shadow-sm); }
+.export-page .exp-step-head { padding: .9rem 1.1rem; border-color: var(--v2-border); background: white; }
+.export-page .exp-step-title { font-size: .95rem; font-weight: 650; }
+.export-page .exp-step-num { padding: .2rem .5rem; border-radius: 6px; background: var(--app-color-primary); font-size: .75rem; }
+.export-page .exp-step-body { padding: 1.1rem; }
+.export-page .exp-step .form-label { color: var(--v2-muted); font-size: .75rem; font-weight: 550; }
+.export-page .exp-step :is(.form-control, .form-select) { min-height: 36px; font-size: .83rem; border-color: #cfdae7; border-radius: 8px; }
+.export-page .exp-step h6 { font-size: .73rem; font-weight: 600; }
+.export-page .exp-step .form-check-label { font-size: .83rem; }
+.export-page :is(.btn-exp-primary, .btn-exp-secondary, .btn-exp-back) { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 36px; padding: .45rem .75rem; border-radius: 9px; font-size: .82rem; font-weight: 600; line-height: 1.25; }
+.export-page .exp-card .btn-exp-primary,
+.export-page .btn-exp-primary { border: 1px solid var(--v2-accent); background: var(--v2-accent); color: white; }
+.export-page .exp-card .btn-exp-primary:hover,
+.export-page .btn-exp-primary:hover { background: #104f98; color: white; }
+.export-page :is(.btn-exp-secondary, .btn-exp-back) { border-color: #cedae7; background: white; color: var(--app-color-primary); }
+.export-page :is(.exp-date-input, .exp-select, .exp-input) { min-height: 36px; border-radius: 8px; border-color: #cfdae7; font-family: inherit; font-size: .83rem; }
+.export-page .sortable-list { border-width: 1px; border-color: #cfdae7; background: #f5f8fc; }
+.export-page .sortable-item { border-radius: 8px; font-size: .83rem; }
+.export-page :is(a, button, input, select, textarea):focus-visible { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
+.export-page .modal-content { border-color: var(--v2-border); border-radius: 16px; }
+.export-page .modal-title { color: var(--v2-title); font-size: 1.05rem; font-weight: 650; }
+.export-page .modal-body { color: var(--v2-title); font-size: .88rem; line-height: 1.6; }
+.export-page :is(.exp-templates-head, .exp-tmpl-head) { padding: .9rem 1rem; border-color: var(--v2-border); background: white; color: var(--app-color-primary); }
+.export-page .exp-sidebar { border-radius: 16px; box-shadow: var(--app-shadow-sm); }
+.export-page .exp-sidebar-head { padding: .9rem 1rem; border-color: var(--v2-border); background: white; }
+.export-page .exp-sidebar-title { font-size: .9rem; font-weight: 650; }
+.export-page .exp-modal-header { background: white; color: var(--v2-title); }
+.export-page .exp-modal-header .btn-close { filter: none; }
+@media (max-width: 767.98px) {
+    .export-page .exp-section-head { flex-wrap: wrap; }
+    .export-page :is(.exp-section-body, .exp-step-body) { padding: .9rem; }
+}

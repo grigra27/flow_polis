@@ -180,7 +180,9 @@ body {
 .ecosystem-strip {
     top: var(--app-navbar-height, 68px);
     z-index: 1028;
-    background: #f5f8fc;
+    border-bottom-color: #b9cde6;
+    background: linear-gradient(90deg, #e1ecfa, #edf3fc);
+    box-shadow: 0 3px 8px rgba(30, 58, 95, 0.06);
 }
 
 .ecosystem-strip .container-fluid { padding-block: 0.4rem; }
@@ -199,24 +201,34 @@ body {
     align-items: center;
     flex-shrink: 0;
     gap: 0.4rem;
-    padding: 0.35rem 0.75rem;
+    padding: 0.42rem 0.9rem;
     border-radius: 8px;
-    color: #4c5f75;
+    color: #294867;
     font-size: 0.82rem;
     font-weight: 600;
     text-decoration: none;
 }
 
-.ecosystem-strip-link:hover,
-.ecosystem-strip-link.active {
-    background: #e2ecf8;
+.ecosystem-strip-link:hover {
+    background: #cfdff4;
     color: var(--app-color-primary);
+}
+
+.ecosystem-strip-link.active {
+    background: var(--app-color-action);
+    color: white;
+    box-shadow: 0 2px 5px rgba(21, 101, 192, 0.18);
 }
 
 .app-navbar-sticky a:focus-visible,
 .ecosystem-strip a:focus-visible {
     outline: 2px solid var(--app-color-action);
     outline-offset: -2px;
+}
+
+.ecosystem-strip-link.active:focus-visible {
+    outline-color: white;
+    outline-offset: -3px;
 }
 
 @media (min-width: 992px) and (max-width: 1199.98px) {

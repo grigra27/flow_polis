@@ -1,0 +1,175 @@
+@import url("./list.css");
+
+.payment-list {
+    --v2-muted: var(--journal-muted);
+}
+
+.payment-list-card {
+    overflow: hidden;
+    border: 1px solid var(--journal-line);
+    border-radius: 16px;
+    background: white;
+    box-shadow: var(--app-shadow-sm);
+}
+
+.payment-list .mgr-section {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.payment-list .mgr-section--filters .mgr-section-head {
+    padding-bottom: 0;
+    border-bottom: 0;
+    font-size: 0.82rem;
+}
+
+.payment-list .pl-filter-form {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding: 0.7rem 1.1rem 0.9rem;
+}
+
+.payment-list .pl-filter-item { flex: 0 1 120px; }
+.payment-list .pl-filter-item--insurer { flex: 1 1 190px; max-width: 270px; }
+.payment-list .pl-filter-item--date { flex-basis: 145px; }
+
+.pl-status-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.8rem 1.1rem;
+    border-block: 1px solid var(--journal-line);
+    background: #fbfcfe;
+}
+
+.pl-status-btn {
+    --status-ink: #1e3a5f;
+    --status-surface: white;
+    --status-border: #d4dfeb;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--status-border);
+    border-radius: 9px;
+    background: var(--status-surface);
+    color: var(--status-ink);
+    font-size: 0.79rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.pl-status-btn--approved {
+    --status-ink: #15803d;
+    --status-surface: #f0fdf4;
+    --status-border: #bbf7d0;
+}
+
+.pl-status-btn--paid {
+    --status-ink: #1d4ed8;
+    --status-surface: #eff5ff;
+    --status-border: #bfdbfe;
+}
+
+.pl-status-btn--overdue {
+    --status-ink: #b91c1c;
+    --status-surface: #fff5f5;
+    --status-border: #fecaca;
+}
+
+.pl-status-btn--upcoming {
+    --status-ink: #a45b08;
+    --status-surface: #fffbeb;
+    --status-border: #f6dfa5;
+}
+
+.pl-status-btn--future {
+    --status-ink: #0369a1;
+    --status-surface: #f0f9ff;
+    --status-border: #bae6fd;
+}
+
+.pl-status-btn:hover {
+    border-color: var(--status-ink);
+    color: var(--status-ink);
+}
+
+.pl-status-btn.active {
+    border-color: var(--status-ink);
+    background: var(--status-ink);
+    color: white;
+}
+
+.pl-status-divider {
+    width: 1px;
+    height: 24px;
+    margin-inline: 0.15rem;
+    background: var(--journal-line);
+}
+
+.pl-hint-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-left: auto;
+    color: var(--journal-muted);
+    font-size: 0.78rem;
+    cursor: help;
+}
+
+.pl-hint-link:hover { color: var(--app-color-action); }
+
+.pl-date-alert {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.6rem 1.1rem;
+    border-bottom: 1px solid #d4e4f6;
+    background: #eff5ff;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+}
+
+.payment-list .mgr-table td:first-child {
+    width: 13%;
+    min-width: 10rem;
+    color: var(--app-color-primary);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.payment-list .mgr-table td:nth-child(2) { min-width: 7.75rem; }
+.payment-list .mgr-table td:nth-child(3) { min-width: 10rem; }
+.payment-list .mgr-table td:nth-child(4),
+.payment-list .mgr-table td:nth-child(9) { overflow-wrap: anywhere; }
+.payment-list .mgr-table td:nth-child(5),
+.payment-list .mgr-table td:nth-child(6) { white-space: nowrap; }
+.payment-list .mgr-table td:nth-child(6),
+.payment-list .mgr-table th:nth-child(6) { text-align: right; }
+.payment-list .mgr-table .tbl-row-cancelled { opacity: 0.68; }
+
+.tbl-badge--approved { background: #dcfce7; color: #15803d; }
+.tbl-badge--paid { background: #dbeafe; color: #1d4ed8; }
+.tbl-badge--cancelled,
+.tbl-badge--overdue { background: #fee2e2; color: #b91c1c; }
+.tbl-badge--pending { background: #fef3c7; color: #92400e; }
+
+@media (max-width: 1100px) {
+    .payment-list .pl-filter-item--insurer { max-width: none; }
+    .pl-status-divider { display: none; }
+}
+
+@media (max-width: 767.98px) {
+    .payment-list .pl-filter-item,
+    .payment-list .pl-filter-item--date { flex: 1 1 calc(50% - 0.65rem); }
+    .payment-list .pl-filter-item--insurer { flex-basis: 100%; }
+    .payment-list .pl-filter-actions { width: 100%; justify-content: space-between; }
+    .pl-hint-link { margin-left: 0; }
+}

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load currency_filters %}
+{% load currency_filters static %}
 
 {% block title %}Распределение портфеля{% endblock %}
 
@@ -393,6 +393,7 @@
         .ps-pie-wrap { order: 2; }
     }
 </style>
+<link rel="stylesheet" href="{% static 'reports/css/property_screen.css' %}" media="screen">
 {% endblock %}
 
 {% block content %}

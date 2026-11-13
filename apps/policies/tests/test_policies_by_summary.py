@@ -160,7 +160,9 @@ def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
 ):
     settings.FLOW_ZS_BASE_URL = "https://zs.example"
     url = reverse("policies:detail", args=[sample_policy.pk])
-    assert 'id="flow-source-brand"' not in reader.get(url).content.decode()
+    unlinked = reader.get(url).content.decode()
+    assert 'id="flow-source-brand"' not in unlinked
+    assert "policy-overview--linked" not in unlinked
     second = FlowPolicySource.objects.create(summary_id=438, mode="common", total=1)
     first_link = group.links.create(
         slot=7, policy=sample_policy, revision="r", created_from_summary=True
@@ -169,10 +171,13 @@ def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
         slot=0, policy=sample_policy, revision="r", created_from_summary=False
     )
     content = reader.get(url).content.decode()
+    assert "policy-overview--linked" in content
     assert (
-        content.index("Статусы")
+        content.index('id="statuses-title"')
         < content.index('id="flow-source-brand"')
-        < content.index("Финансовая информация")
+        < content.index('id="schedule-title"')
+        < content.index('id="info-title"')
+        < content.index('id="finance-title"')
     )
     assert (
         content.count(first_link.source_url)

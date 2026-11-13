@@ -4,8 +4,8 @@
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.2">
-{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
+<link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.4">
+{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-13.4">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -27,11 +27,11 @@
         </div>
     </header>
 
-    <div class="policy-overview">
+    <div class="policy-overview{% if flow_links %} policy-overview--linked{% endif %}">
         <section class="policy-panel policy-facts" aria-labelledby="facts-title">
             <h2 class="panel-heading" id="facts-title"><i class="bi bi-file-text" aria-hidden="true"></i>Основная информация</h2>
             <dl class="facts-grid">
-                <div><dt>Лизингополучатель</dt><dd><a href="{% url 'clients:detail' policy.client_id %}">{{ policy.client.client_name }}</a></dd></div>
+                <div class="policy-lessee"><dt>Лизингополучатель</dt><dd><a href="{% url 'clients:detail' policy.client_id %}">{{ policy.client.client_name }}</a></dd></div>
                 <div><dt>Страхователь</dt><dd>{% if policy.policyholder_id %}<a href="{% url 'clients:detail' policy.policyholder_id %}">{{ policy.policyholder.client_name }}</a>{% else %}—{% endif %}</dd></div>
                 <div><dt>Номер ДФА</dt><dd>{{ policy.dfa_number|default:"—" }}
                     {% if policy.dfa_number %}{% include "policies/includes/policy_copy_button.html" with value=policy.dfa_number label="Скопировать номер ДФА" only %}{% endif %}
@@ -85,12 +85,44 @@
             <ul class="flow-source-card__list">
                 {% for link in flow_links %}
                 <li>
-                    <h3>Свод № {{ link.source_id }}</h3>
+                    <h3>Свод № {{ link.source_id|unlocalize }}</h3>
                     <p>{% if link.slot and link.source.total > 1 %}Объект {{ link.slot }} из {{ link.source.total }}{% elif link.source.total > 1 %}Общий полис · Объектов в своде: {{ link.source.total }}{% elif link.created_from_summary %}Полис оформлен из этого свода{% else %}Полис связан с этим сводом{% endif %}</p>
                     <a class="flow-source-card__open" href="{{ link.source_url }}" aria-label="Открыть свод: {{ link.source_label }}">Открыть свод <span aria-hidden="true">↗</span></a>
                 </li>
                 {% endfor %}
             </ul>
+        </section>
+        {% endif %}
+    </div>
+
+    {% include "policies/includes/policy_card_schedule.html" %}
+
+    <div class="policy-supplement">
+        {% if info1_tags or info2_tags or policy.info3 or policy.info4 or can_edit_policy %}
+        <section class="policy-panel policy-additional" aria-labelledby="info-title">
+            <h2 class="panel-heading" id="info-title"><i class="bi bi-journal-text" aria-hidden="true"></i>Дополнительная информация</h2>
+            <div class="info-fields">
+                {% if info1_tags or info2_tags %}
+                <div class="info-row">
+                    {% if info1_tags %}<div class="info-field"><h3>Инфо 1</h3><ul class="policy-tags">{% for info in info1_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>{% endif %}
+                    {% if info2_tags %}<div class="info-field"><h3>Инфо 2</h3><ul class="policy-tags">{% for info in info2_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>{% endif %}
+                </div>
+                {% endif %}
+                {% if policy.info3 or policy.info4 or can_edit_policy %}
+                <div class="info-row">
+                    {% if policy.info3 or can_edit_policy %}
+                    <div class="info-field" id="policy-note">
+                        <div class="note-heading"><h3>Инфо 3 <small>· в журнале</small></h3>
+                            {% if can_edit_policy %}<button type="button" class="card-field-action" data-edit-target="note-editor" aria-controls="note-editor" aria-expanded="false"><i class="bi bi-pencil" aria-hidden="true"></i> {% if policy.info3 %}Изменить<span class="visually-hidden"> заметку</span>{% else %}Добавить заметку{% endif %}</button>{% endif %}
+                        </div>
+                        {% if policy.info3 %}<p class="policy-multiline">{{ policy.info3 }}</p>{% endif %}
+                        {% if can_edit_policy %}{% include "policies/includes/policy_field_editor.html" with field="info3" panel_id="note-editor" anchor="policy-note" label="Текст заметки" %}{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if policy.info4 %}<div class="info-field"><h3>Инфо 4 <small>· в карточке</small></h3><p class="policy-multiline">{{ policy.info4 }}</p></div>{% endif %}
+                </div>
+                {% endif %}
+            </div>
         </section>
         {% endif %}
 
@@ -102,42 +134,18 @@
                     {% if not policy.is_osago %}<div><dt>Франшиза</dt><dd>{{ policy.franchise|rub }} ₽</dd></div>{% endif %}
                 </dl>
                 {% if rates_by_year %}
-                <h3 class="rates-title">Тариф по годам страхования
-                    <button type="button" class="policy-icon-action" aria-label="Пояснение к расчёту тарифа" data-bs-toggle="tooltip" title="Тариф — сумма премий за страховой год, делённая на страховую сумму из первого взноса этого года. В расчёт входят годы, для которых указан взнос № 1."><i class="bi bi-info-circle" aria-hidden="true"></i></button>
-                </h3>
-                <dl class="rates-list">
-                    {% for year in rates_by_year %}<div><dt>{{ year.year_number }}-й год {% if year.is_current %}<span>текущий</span>{% endif %}</dt><dd>{{ year.rate|floatformat:2 }}%</dd></div>{% endfor %}
-                </dl>
+                <div class="policy-rates">
+                    <h3 class="rates-title">Тариф по годам страхования
+                        <button type="button" class="policy-icon-action" aria-label="Пояснение к расчёту тарифа" data-bs-toggle="tooltip" title="Тариф — сумма премий за страховой год, делённая на страховую сумму из первого взноса этого года. В расчёт входят годы, для которых указан взнос № 1."><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                    </h3>
+                    <dl class="rates-list">
+                        {% for year in rates_by_year %}<div><dt>{{ year.year_number }}-й год {% if year.is_current %}<span>текущий</span>{% endif %}</dt><dd>{{ year.rate|floatformat:2 }}%</dd></div>{% endfor %}
+                    </dl>
+                </div>
                 {% endif %}
             </div>
         </section>
     </div>
-
-    {% if info1_tags or info2_tags or policy.info3 or policy.info4 or can_edit_policy %}
-    <section class="policy-panel policy-additional" aria-labelledby="info-title">
-        <h2 id="info-title"><i class="bi bi-journal-text" aria-hidden="true"></i>Дополнительная информация</h2>
-        <div class="info-fields">
-            {% if info1_tags %}
-            <div class="info-field"><h3>Инфо 1</h3><ul class="policy-tags">{% for info in info1_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>
-            {% endif %}
-            {% if info2_tags %}
-            <div class="info-field"><h3>Инфо 2</h3><ul class="policy-tags">{% for info in info2_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>
-            {% endif %}
-            {% if policy.info3 or can_edit_policy %}
-            <div class="info-field" id="policy-note">
-                <div class="note-heading"><h3>Инфо 3 <small>· в журнале</small></h3>
-                    {% if can_edit_policy %}<button type="button" class="card-field-action" data-edit-target="note-editor" aria-controls="note-editor" aria-expanded="false"><i class="bi bi-pencil" aria-hidden="true"></i> {% if policy.info3 %}Изменить<span class="visually-hidden"> заметку</span>{% else %}Добавить заметку{% endif %}</button>{% endif %}
-                </div>
-                {% if policy.info3 %}<p class="policy-multiline">{{ policy.info3 }}</p>{% endif %}
-                {% if can_edit_policy %}{% include "policies/includes/policy_field_editor.html" with field="info3" panel_id="note-editor" anchor="policy-note" label="Текст заметки" %}{% endif %}
-            </div>
-            {% endif %}
-            {% if policy.info4 %}<div class="info-field"><h3>Инфо 4 <small>· в карточке</small></h3><p class="policy-multiline">{{ policy.info4 }}</p></div>{% endif %}
-        </div>
-    </section>
-    {% endif %}
-
-    {% include "policies/includes/policy_card_schedule.html" %}
 </div>
 {% endblock %}
 

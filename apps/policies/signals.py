@@ -62,8 +62,8 @@ def calculate_commission(sender, instance, **kwargs):
         if not instance.commission_rate:
             return
 
-        # Импорт из свода позволяет подтвердить отличающуюся от расчёта КВ.
-        if not instance.pk and getattr(instance, "_flow_explicit_commission", False):
+        # В предзаполненной форме сотрудник может подтвердить индивидуальную КВ.
+        if not instance.pk and getattr(instance, "_explicit_commission", False):
             return
         if not instance.pk:
             try:

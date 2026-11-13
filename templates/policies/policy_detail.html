@@ -21,6 +21,10 @@
         </div>
         <div class="policy-page-actions">
             <a href="{{ back_url }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ back_label }}</a>
+            {% if can_create_from_policy %}
+            {% if policy.is_osago %}{% url 'admin:policies_osagopolicy_add' as template_add_url %}{% else %}{% url 'admin:policies_policy_add' as template_add_url %}{% endif %}
+            <a href="{{ template_add_url }}?from_policy={{ policy.pk|unlocalize }}" class="btn btn-outline-primary"><i class="bi bi-files" aria-hidden="true"></i> Создать по образцу</a>
+            {% endif %}
             {% if can_edit_policy %}
             <a href="{% url 'admin:policies_policy_change' policy.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-warning"><i class="bi bi-pencil" aria-hidden="true"></i> Редактировать</a>
             {% endif %}

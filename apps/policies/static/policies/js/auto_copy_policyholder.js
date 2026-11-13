@@ -22,7 +22,7 @@
         }
 
         // В форме из ЗС сторона берётся из принятой заявки или выбирается менеджером.
-        if (document.getElementById("flow-policy-source")) return;
+        if (document.querySelector("#flow-policy-source, [data-policy-template]")) return;
 
         // Prevent double initialization
         if (initialized) {

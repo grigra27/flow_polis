@@ -21,7 +21,7 @@
         // Последняя полученная ставка: по ней КВ пересчитывается и при вводе
         // премии уже после выбора СК.
         var currentKvPercent = null;
-        var flowForm = false;
+        var prefilledForm = false;
         var pendingKvRows = new Set();
 
         $(document).ready(function() {
@@ -38,8 +38,8 @@
                 return;
             }
 
-            flowForm = Boolean(document.getElementById("flow-policy-source"));
-            if (flowForm && $insurerField.val() && $insuranceTypeField.val()) {
+            prefilledForm = Boolean(document.querySelector("#flow-policy-source, [data-policy-template]"));
+            if (prefilledForm && $insurerField.val() && $insuranceTypeField.val()) {
                 updateCommissionRates(false);
             }
 
@@ -55,7 +55,7 @@
             // Премия введена или изменена после выбора СК — пересчитать КВ строки.
             $(document).on('input change', '.dynamic-payment_schedule input[name$="-amount"]', function() {
                 var $row = $(this).closest('.dynamic-payment_schedule');
-                if (flowForm) {
+                if (prefilledForm) {
                     pendingKvRows.add($row.get(0));
                     // Пока ставка загружается, пустое поле поручает расчёт серверу.
                     $row.find('input[name$="-kv_rub"]').val('');
@@ -86,7 +86,7 @@
             var insurerId = $insurerField.val();
             var insuranceTypeId = $insuranceTypeField.val();
 
-            if (flowForm) {
+            if (prefilledForm) {
                 currentKvPercent = null;
                 if (applyToExisting !== false) {
                     $('.dynamic-payment_schedule').each(function() {
@@ -117,7 +117,7 @@
                     if ($('#id_insurer').val() !== insurerId || $('#id_insurance_type').val() !== insuranceTypeId) return;
                     if (response.success) {
                         currentKvPercent = response.kv_percent;
-                        if (flowForm) {
+                        if (prefilledForm) {
                             pendingKvRows.forEach(function(row) {
                                 recalculateKvRub($(row), currentKvPercent);
                             });
@@ -188,7 +188,7 @@
             var amount = parseFloat($amountField.val());
             var kvPercentValue = parseFloat(kvPercent);
 
-            if (flowForm && (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(kvPercentValue))) {
+            if (prefilledForm && (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(kvPercentValue))) {
                 $kvRubField.val('');
                 return;
             }

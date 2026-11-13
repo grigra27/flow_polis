@@ -9,7 +9,8 @@ from django.forms.models import BaseInlineFormSet
 from django.template.response import TemplateResponse
 from django.utils.html import format_html, format_html_join
 from django.contrib.admin import SimpleListFilter
-from django.shortcuts import redirect
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
 from urllib.parse import urlencode
 from decimal import Decimal
@@ -21,6 +22,7 @@ from . import flow_views
 from .forms import AcceptUploadForm
 from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
 from .navigation import journal_origin, policy_card_url
+from .services.policy_template import can_create_from_policy, policy_template_initial
 from .services.accept_parser import parse_accept_file
 from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
@@ -84,10 +86,14 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
     вылетал из save() и пользователь получал HTTP 500.
     """
 
+    def __init__(self, *args, allow_commission_override=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allow_commission_override = allow_commission_override
+
     def _construct_form(self, i, **kwargs):
         form = super()._construct_form(i, **kwargs)
         form.instance._date_sequence_checked_by_formset = True
-        if hasattr(self, "flow_request") and "kv_rub" in form.fields:
+        if self.allow_commission_override and "kv_rub" in form.fields:
             form.fields["kv_rub"].required = False
             form.fields["kv_rub"].widget.attrs["placeholder"] = "По ставке"
             if "kv_rub" not in form.initial:
@@ -135,10 +141,10 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
             self._check_flow_amounts(rows)
 
     def save_new(self, form, commit=True):
-        if hasattr(self, "flow_request"):
+        if self.allow_commission_override:
             payment = form.instance
             # Оставленная пустой сумма рассчитывается по ставке. Введённый ноль тоже является выбором.
-            payment._flow_explicit_commission = payment.kv_rub is not None
+            payment._explicit_commission = payment.kv_rub is not None
             if payment.kv_rub is None:
                 payment.kv_rub = Decimal("0")
         return super().save_new(form, commit)
@@ -200,7 +206,7 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
 # скрипта меняйте версию, иначе браузеры сотрудников возьмут старый файл.
 # Полный путь: static() закодировал бы «?» в %3F.
 AUTO_COMMISSION_RATE_JS = (
-    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-11"
+    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-13.2"
 )
 
 
@@ -237,6 +243,8 @@ class PaymentScheduleInline(admin.TabularInline):
     def get_extra(self, request, obj=None, **kwargs):
         if hasattr(request, "flow_initial"):
             return len(request.flow_initial["payments"])
+        if hasattr(request, "template_payments"):
+            return max(1, len(request.template_payments))
         return super().get_extra(request, obj, **kwargs)
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -422,7 +430,7 @@ class PolicyAdmin(admin.ModelAdmin):
 
     class Media:
         js = (
-            f"{settings.STATIC_URL}policies/js/auto_copy_policyholder.js?v=2026-11-09",
+            f"{settings.STATIC_URL}policies/js/auto_copy_policyholder.js?v=2026-11-13",
         )
         css = {"all": ("policies/css/auto_copy_policyholder.css",)}
 
@@ -446,6 +454,45 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def add_view(self, request, form_url="", extra_context=None):
         add = super().add_view
+        if "from_policy" in request.GET:
+            if "flow_draft" in request.GET or "accept_token" in request.GET:
+                raise Http404
+            if not can_create_from_policy(request.user):
+                raise PermissionDenied
+            source_id = request.GET["from_policy"]
+            if (
+                not source_id.isascii()
+                or not source_id.isdecimal()
+                or len(source_id) > 19
+            ):
+                raise Http404
+            source = get_object_or_404(
+                self.filter_portfolio(Policy.objects.all()), pk=source_id
+            )
+            request.template_source = source
+            if request.method == "GET":
+                request.template_initial = policy_template_initial(source)
+                request.template_payments = list(
+                    source.payment_schedule.order_by(
+                        "year_number", "installment_number"
+                    ).values(
+                        "year_number",
+                        "installment_number",
+                        "due_date",
+                        "insurance_sum",
+                        "amount",
+                        "kv_rub",
+                    )
+                )
+            return add(
+                request,
+                form_url,
+                {
+                    **(extra_context or {}),
+                    "template_source": source,
+                    "title": "Создать полис по образцу",
+                },
+            )
         if "flow_draft" not in request.GET:
             return add(request, form_url, extra_context)
         if self.osago_section:
@@ -541,6 +588,8 @@ class PolicyAdmin(admin.ModelAdmin):
         return response
 
     def get_changeform_initial_data(self, request):
+        if hasattr(request, "template_initial"):
+            return request.template_initial
         initial = super().get_changeform_initial_data(request)
         if hasattr(request, "flow_initial"):
             initial.update(request.flow_initial["policy"])
@@ -552,6 +601,12 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def get_formset_kwargs(self, request, obj, inline, prefix):
         kwargs = super().get_formset_kwargs(request, obj, inline, prefix)
+        if inline.model is PaymentSchedule and (
+            hasattr(request, "flow_initial") or hasattr(request, "template_source")
+        ):
+            kwargs["allow_commission_override"] = True
+            if hasattr(request, "template_payments"):
+                kwargs["initial"] = request.template_payments
         if hasattr(request, "flow_initial"):
             if request.method == "GET":
                 if inline.model is PaymentSchedule:
@@ -769,108 +824,21 @@ class PolicyAdmin(admin.ModelAdmin):
 
     dfa_status.short_description = "Статус ДФА"
 
-    @admin.action(description="Копировать выбранный полис с графиком платежей")
+    def has_create_from_policy_permission(self, request):
+        return can_create_from_policy(request.user)
+
+    @admin.action(permissions=["create_from_policy"], description="Создать по образцу")
     def copy_policy(self, request, queryset):
-        """
-        Copy selected policy with all related data (payment schedule and info tags).
-
-        This action creates a complete copy of the selected policy including:
-        - All policy fields (with "-COPY" suffix added to policy numbers)
-        - All payment schedule entries
-        - All info tags
-
-        The new policy is saved immediately and the user is redirected to edit it.
-        """
-        from django.contrib import messages
-        from datetime import datetime
-
-        # Get the first policy to copy
-        policy = queryset.first()
-
-        if not policy:
-            self.message_user(
-                request, "Не выбран полис для копирования", messages.ERROR
-            )
+        sources = list(queryset.values_list("pk", flat=True)[:2])
+        if len(sources) != 1:
+            self.message_user(request, "Выберите один полис-образец.", messages.WARNING)
             return
-
-        try:
-            # Create a copy of the policy
-            # Add timestamp to make policy number unique
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-
-            new_policy = Policy.objects.create(
-                policy_number=f"{policy.policy_number}-COPY-{timestamp}",
-                dfa_number=f"{policy.dfa_number}-COPY-{timestamp}"
-                if policy.dfa_number
-                else "",
-                client=policy.client,
-                policyholder=policy.policyholder,
-                insurer=policy.insurer,
-                property_description=policy.property_description,
-                property_year=policy.property_year,
-                start_date=policy.start_date,
-                end_date=policy.end_date,
-                insurance_type=policy.insurance_type,
-                branch=policy.branch,
-                leasing_manager=policy.leasing_manager,
-                franchise=policy.franchise,
-                info3=policy.info3,
-                info4=policy.info4,
-                policy_active=policy.policy_active,
-                dfa_active=policy.dfa_active,
-                policy_uploaded=policy.policy_uploaded,
-                broker_participation=policy.broker_participation,
-                renewal_to_old_dfa=policy.renewal_to_old_dfa,
+        return redirect(
+            reverse(
+                "admin:" + self._admin_url_name("add"),
+                query={"from_policy": sources[0]},
             )
-
-            # Copy payment schedule
-            payment_count = 0
-            for payment in policy.payment_schedule.all():
-                PaymentSchedule.objects.create(
-                    policy=new_policy,
-                    year_number=payment.year_number,
-                    installment_number=payment.installment_number,
-                    due_date=payment.due_date,
-                    amount=payment.amount,
-                    insurance_sum=payment.insurance_sum,
-                    commission_rate=payment.commission_rate,  # Копируем commission_rate
-                    kv_rub=payment.kv_rub,
-                    paid_date=payment.paid_date,
-                    insurer_date=payment.insurer_date,
-                    alliance_paid=payment.alliance_paid,
-                    payment_info=payment.payment_info,
-                )
-                payment_count += 1
-
-            # Copy info tags
-            info_count = 0
-            for info in policy.info_tags.all():
-                PolicyInfo.objects.create(
-                    policy=new_policy,
-                    tag=info.tag,
-                    info_field=info.info_field,
-                )
-                info_count += 1
-
-            # Show success message
-            message = f'Полис "{policy.policy_number}" успешно скопирован. '
-            message += (
-                f"Скопировано платежей: {payment_count}, инфо-меток: {info_count}."
-            )
-            self.message_user(request, message, messages.SUCCESS)
-
-            # Redirect to edit the new policy
-            change_url = reverse(
-                f"admin:{self.opts.app_label}_{self.opts.model_name}_change",
-                args=[new_policy.id],
-            )
-            return redirect(change_url)
-
-        except Exception as e:
-            self.message_user(
-                request, f"Ошибка при копировании полиса: {str(e)}", messages.ERROR
-            )
-            return
+        )
 
 
 class OsagoPolicyForm(forms.ModelForm):

@@ -34,6 +34,10 @@
 
 {% block form_top %}
 {{ block.super }}
+{% if template_source %}
+<p data-policy-template>Образец — <a href="{% url 'policies:detail' template_source.pk %}">полис {{ template_source.policy_number }}</a>.
+Введите новый номер, проверьте объект, сроки и договорные даты взносов.</p>
+{% endif %}
 {% if show_schedule_shortcut %}
     <p><a href="#payment_schedule-group">Перейти к графику платежей</a></p>
 {% endif %}

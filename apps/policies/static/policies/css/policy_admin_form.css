@@ -14,7 +14,7 @@
     padding: .6rem 1rem;
 }
 .staff-admin .policy-fields > .form-row.hidden { display: none; }
-.staff-admin .policy-fields .flex-container:not(.checkbox-row) {
+.staff-admin .policy-fields .flex-container:not(.checkbox-row, .form-multiline) {
     flex-direction: column;
     align-items: stretch;
     gap: .22rem;
@@ -33,6 +33,22 @@
 .staff-admin .policy-fields :is(input.vTextField, textarea) { box-sizing: border-box; width: 100%; max-width: 38rem; }
 .staff-admin .policy-fields textarea { height: 4rem; }
 .staff-admin .policy-fields .errorlist { margin-inline-start: 0; }
+.staff-admin .policy-fields > .field-start_date.field-end_date { grid-column: 1 / -1; }
+.staff-admin .policy-fields .form-multiline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem 2rem;
+    align-items: end;
+}
+.staff-admin .policy-fields .form-multiline > div { min-width: 0; padding-bottom: 0; }
+.staff-admin .policy-fields .form-multiline .fieldBox { margin: 0; }
+.staff-admin .policy-statuses > .form-row { border-bottom: 0; }
+.staff-admin .policy-statuses .form-multiline {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: .75rem;
+}
+.staff-admin .policy-statuses .fieldBox.field-dfa_active { margin-top: .55rem; }
 @media (min-width: 1024px) {
     .staff-admin :is(#policy_form, #osagopolicy_form) .submit-row {
         position: sticky;
@@ -46,4 +62,7 @@
 }
 @media (max-width: 900px) {
     .staff-admin .policy-fields { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+    .staff-admin .policy-fields .form-multiline { grid-template-columns: minmax(0, 1fr); }
 }

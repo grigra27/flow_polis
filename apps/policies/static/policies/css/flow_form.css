@@ -10,6 +10,10 @@
 .flow-section { background: #fff; border: 1px solid #dce3eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
 .flow-section h2 { margin: 0 0 1.1rem; font-size: 1.05rem; font-weight: 650; }
 .flow-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.2rem; }
+.flow-status-column { display: grid; align-content: start; gap: .75rem; }
+@media (min-width: 601px) {
+    .flow-fields.flow-field--wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .flow-field { min-width: 0; }
 .flow-field--wide { grid-column: 1 / -1; }
 .flow-field > label { display: block; margin-bottom: .4rem; font-size: .88rem; font-weight: 600; }

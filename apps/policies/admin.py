@@ -315,8 +315,7 @@ def policy_fieldsets(*, osago=False):
             "dfa_number",
             "insurer",
             "insurance_type",
-            "start_date",
-            "end_date",
+            ("start_date", "end_date"),
         ),
     }
     if osago:
@@ -342,15 +341,15 @@ def policy_fieldsets(*, osago=False):
         (
             "Статусы",
             {
-                "classes": ("policy-fields", "policy-secondary"),
+                "classes": ("policy-fields", "policy-secondary", "policy-statuses"),
                 "fields": (
-                    "policy_active",
-                    "termination_date",
-                    "dfa_active",
-                    "dfa_deactivation_date",
-                    "policy_uploaded",
-                    "broker_participation",
-                    "renewal_to_old_dfa",
+                    (
+                        "policy_active",
+                        "termination_date",
+                        "dfa_active",
+                        "dfa_deactivation_date",
+                    ),
+                    ("policy_uploaded", "renewal_to_old_dfa", "broker_participation"),
                 ),
             },
         ),
@@ -431,7 +430,7 @@ class PolicyAdmin(admin.ModelAdmin):
         for title, options in sections:
             fields = list(options.get("fields", ()))
             if "dfa_number" in fields:
-                fields.insert(fields.index("dfa_number") + 1, "flow_provenance")
+                fields.append("flow_provenance")
                 options = dict(options, fields=fields)
             result.append((title, options))
         return result

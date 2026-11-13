@@ -1,5 +1,8 @@
 <div class="flow-fields">
     {% for line in fieldset %}
+        {% if line.fields|length > 1 %}
+        <div class="{% if 'policy-statuses' in fieldset.classes %}flow-status-column{% else %}flow-fields flow-field--wide{% endif %}">
+        {% endif %}
         {% for field in line %}
             <div class="flow-field form-row{% if field.field.errors %} flow-field--invalid{% endif %}{% if field.field.name == 'property_description' or field.field.name == 'info3' or field.field.name == 'info4' %} flow-field--wide{% endif %}">
                 {% if field.is_checkbox %}
@@ -13,5 +16,6 @@
                 {% if field.field.name == "dfa_number" and flow_group %}<div class="flow-help">ДФА назначен этой группе. <a href="{{ flow_review_url }}">Изменить распределение</a></div>{% endif %}
             </div>
         {% endfor %}
+        {% if line.fields|length > 1 %}</div>{% endif %}
     {% endfor %}
 </div>

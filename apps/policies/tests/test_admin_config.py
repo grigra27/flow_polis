@@ -241,10 +241,17 @@ def test_full_form_renders_all_fields_once_in_work_order(
         'id="id_insurer"',
         'id="id_insurance_type"',
         'id="id_start_date"',
+        'id="id_end_date"',
         'id="id_client"',
         'id="id_property_description"',
         'id="payment_schedule-group"',
         'id="id_policy_active"',
+        'id="id_termination_date"',
+        'id="id_dfa_active"',
+        'id="id_dfa_deactivation_date"',
+        'id="id_policy_uploaded"',
+        'id="id_renewal_to_old_dfa"',
+        'id="id_broker_participation"',
         'id="id_info3"',
         'id="info_tags-group"',
     )
@@ -252,4 +259,9 @@ def test_full_form_renders_all_fields_once_in_work_order(
         html.index(marker) for marker in order
     )
     assert "Источник оформления" in html
+    assert 'class="form-row field-start_date field-end_date"' in html
+    assert (
+        'class="form-row field-policy_uploaded field-renewal_to_old_dfa field-broker_participation"'
+        in html
+    )
     assert ('id="id_franchise"' in html) == (not osago)

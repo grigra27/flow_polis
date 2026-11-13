@@ -307,6 +307,70 @@ class PolicyInfoInline(admin.TabularInline):
     autocomplete_fields = ["tag"]
 
 
+def policy_fieldsets(*, osago=False):
+    contract = {
+        "classes": ("policy-fields",),
+        "fields": (
+            "policy_number",
+            "dfa_number",
+            "insurer",
+            "insurance_type",
+            "start_date",
+            "end_date",
+        ),
+    }
+    if osago:
+        contract["description"] = "ОСАГО: один платёж, срок не больше года."
+    else:
+        contract["fields"] += ("franchise",)
+    return (
+        ("Условия страхования", contract),
+        (
+            "Стороны и филиал",
+            {
+                "classes": ("policy-fields",),
+                "fields": ("client", "policyholder", "branch", "leasing_manager"),
+            },
+        ),
+        (
+            "Объект страхования",
+            {
+                "classes": ("policy-fields",),
+                "fields": ("property_description", "property_year", "vin_number"),
+            },
+        ),
+        (
+            "Статусы",
+            {
+                "classes": ("policy-fields", "policy-secondary"),
+                "fields": (
+                    "policy_active",
+                    "termination_date",
+                    "dfa_active",
+                    "dfa_deactivation_date",
+                    "policy_uploaded",
+                    "broker_participation",
+                    "renewal_to_old_dfa",
+                ),
+            },
+        ),
+        (
+            "Дополнительная информация",
+            {
+                "classes": ("policy-fields", "policy-secondary"),
+                "fields": ("info3", "info4"),
+            },
+        ),
+        (
+            "Системная информация",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse", "policy-secondary"),
+            },
+        ),
+    )
+
+
 @admin.register(Policy)
 class PolicyAdmin(admin.ModelAdmin):
     # Раздел «Полисы» — портфель без ОСАГО; ОСАГО заводится и правится
@@ -355,55 +419,7 @@ class PolicyAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at", "flow_provenance"]
     actions = ["copy_policy"]
 
-    fieldsets = (
-        (
-            "Основная информация",
-            {
-                "fields": (
-                    "policy_number",
-                    "dfa_number",
-                    "client",
-                    "policyholder",
-                    "branch",
-                    "leasing_manager",
-                )
-            },
-        ),
-        (
-            "Детали страхования",
-            {
-                "fields": (
-                    "insurance_type",
-                    "property_description",
-                    "property_year",
-                    "vin_number",
-                    "franchise",
-                    "start_date",
-                    "end_date",
-                )
-            },
-        ),
-        ("Дополнительная информация", {"fields": ("info3", "info4")}),
-        (
-            "Статусы",
-            {
-                "fields": (
-                    "policy_active",
-                    "termination_date",
-                    "dfa_active",
-                    "dfa_deactivation_date",
-                    "policy_uploaded",
-                    "broker_participation",
-                    "renewal_to_old_dfa",
-                )
-            },
-        ),
-        (
-            "Системная информация",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
-        ),
-        ("Страховщик", {"fields": ("insurer",)}),
-    )
+    fieldsets = policy_fieldsets()
 
     inlines = [PaymentScheduleInline, PolicyInfoInline]
 
@@ -915,57 +931,8 @@ class OsagoPolicyAdmin(PolicyAdmin):
         "branch",
         "leasing_manager",
     ]
-    fieldsets = (
-        (
-            "Основная информация",
-            {
-                "fields": (
-                    "policy_number",
-                    "dfa_number",
-                    "client",
-                    "policyholder",
-                    "branch",
-                    "leasing_manager",
-                )
-            },
-        ),
-        (
-            "Детали страхования",
-            {
-                "fields": (
-                    "insurance_type",
-                    "property_description",
-                    "property_year",
-                    "vin_number",
-                    "start_date",
-                    "end_date",
-                ),
-                "description": (
-                    "ОСАГО: срок не больше года, без франшизы и страховой суммы."
-                ),
-            },
-        ),
-        ("Дополнительная информация", {"fields": ("info3", "info4")}),
-        (
-            "Статусы",
-            {
-                "fields": (
-                    "policy_active",
-                    "termination_date",
-                    "dfa_active",
-                    "dfa_deactivation_date",
-                    "policy_uploaded",
-                    "broker_participation",
-                    "renewal_to_old_dfa",
-                )
-            },
-        ),
-        (
-            "Системная информация",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
-        ),
-        ("Страховщик", {"fields": ("insurer",)}),
-    )
+    fieldsets = policy_fieldsets(osago=True)
+
     inlines = [OsagoPaymentInline, PolicyInfoInline]
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

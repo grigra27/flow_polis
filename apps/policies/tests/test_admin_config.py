@@ -209,3 +209,47 @@ class TestPolicyAdminConfig:
         assert front_btn in content
         assert 'class="default" name="_save_and_open_front"' in content
         assert content.find(front_btn) < content.find(save_btn)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("osago", [False, True])
+def test_full_form_renders_all_fields_once_in_work_order(
+    admin_client, sample_policy, osago
+):
+    from apps.insurers.models import InsuranceType
+    from apps.policies.models import FlowPolicySource
+
+    if osago:
+        sample_policy.insurance_type = InsuranceType.objects.create(
+            name="ОСАГО", is_osago=True
+        )
+        sample_policy.save()
+    source = FlowPolicySource.objects.create(summary_id=301, mode="single", total=1)
+    source.links.create(
+        policy=sample_policy, slot=0, revision="1", created_from_summary=False
+    )
+    section = "osagopolicy" if osago else "policy"
+    response = admin_client.get(
+        reverse(f"admin:policies_{section}_change", args=[sample_policy.pk])
+    )
+    assert response.status_code == 200
+    html = response.content.decode()
+    for field in response.context["adminform"].form:
+        assert html.count(f'id="{field.auto_id}"') == 1, field.name
+    order = (
+        'id="id_policy_number"',
+        'id="id_insurer"',
+        'id="id_insurance_type"',
+        'id="id_start_date"',
+        'id="id_client"',
+        'id="id_property_description"',
+        'id="payment_schedule-group"',
+        'id="id_policy_active"',
+        'id="id_info3"',
+        'id="info_tags-group"',
+    )
+    assert [html.index(marker) for marker in order] == sorted(
+        html.index(marker) for marker in order
+    )
+    assert "Источник оформления" in html
+    assert ('id="id_franchise"' in html) == (not osago)

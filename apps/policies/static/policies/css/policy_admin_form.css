@@ -1,0 +1,49 @@
+/* Полные формы полиса и ОСАГО используют штатные виджеты и сообщения Django. */
+.staff-admin .policy-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+}
+.staff-admin .policy-fields > :is(h2, .description, .field-property_description, .field-flow_provenance) {
+    grid-column: 1 / -1;
+}
+.staff-admin .policy-fields > .description { padding: .65rem 1rem; }
+.staff-admin .policy-fields > .form-row {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: .6rem 1rem;
+}
+.staff-admin .policy-fields > .form-row.hidden { display: none; }
+.staff-admin .policy-fields .flex-container:not(.checkbox-row) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .22rem;
+}
+.staff-admin .policy-fields .flex-container > label {
+    float: none;
+    box-sizing: border-box;
+    width: auto;
+    padding: 0;
+}
+.staff-admin .policy-fields .checkbox-row { align-items: center; gap: .45rem; }
+.staff-admin .policy-fields .checkbox-row label { margin: 0; }
+.staff-admin .policy-fields :is(.help, .readonly) { margin-inline: 0; padding-inline: 0; }
+.staff-admin .policy-fields .related-widget-wrapper { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem; }
+.staff-admin .policy-fields .select2-container { flex: 1 1 9rem; min-width: 0 !important; max-width: 32rem; }
+.staff-admin .policy-fields :is(input.vTextField, textarea) { box-sizing: border-box; width: 100%; max-width: 38rem; }
+.staff-admin .policy-fields textarea { height: 4rem; }
+.staff-admin .policy-fields .errorlist { margin-inline-start: 0; }
+@media (min-width: 1024px) {
+    .staff-admin :is(#policy_form, #osagopolicy_form) .submit-row {
+        position: sticky;
+        bottom: .3rem;
+        z-index: 5;
+        box-shadow: 0 -2px 10px rgb(21 45 72 / 10%);
+    }
+    .staff-admin :is(#policy_form, #osagopolicy_form) :is(input, select, textarea) {
+        scroll-margin-bottom: 5rem;
+    }
+}
+@media (max-width: 900px) {
+    .staff-admin .policy-fields { grid-template-columns: minmax(0, 1fr); }
+}

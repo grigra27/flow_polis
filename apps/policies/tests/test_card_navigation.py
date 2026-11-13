@@ -3,6 +3,7 @@ from urllib.parse import urlencode, urlsplit
 
 import pytest
 from django.urls import reverse
+from django.forms.models import model_to_dict
 
 
 class PageLinks(HTMLParser):
@@ -84,3 +85,73 @@ def test_policy_editor_keeps_origin_only_for_return_to_card(
         detail = client.get(card, {"journal": invalid})
         assert detail.context["back_url"] == reverse("policies:list")
         assert not urlsplit(PageLinks(detail).by_class["btn-warning"][0]).query
+
+
+@pytest.mark.django_db
+def test_full_payment_editor_round_trip(client, admin_user, sample_payment):
+    client.force_login(admin_user)
+    payment = sample_payment
+    journal = reverse("policies:payments", query={"status": "all"})
+    listing = PageLinks(client.get(journal)).by_class
+    direct_edit = listing["btn-tbl-edit"][0]
+    origin = f"{journal}#payment-{payment.pk}"
+    assert client.get(direct_edit).context["payment_back_url"] == origin
+    card = client.get(listing["journal-record"][0])
+    edit = next(
+        href
+        for href in PageLinks(card).by_class["btn-warning"]
+        if "/paymentschedule/" in href
+    )
+    response = client.get(edit)
+    back = response.context["payment_back_url"]
+    assert back == listing["journal-record"][0]
+    assert response.content.decode().count("Вернуться без сохранения") == 2
+    payload = {
+        key: value
+        for key, value in model_to_dict(payment).items()
+        if value is not None and value is not False
+    }
+    payload.update(payment_info="Проверено", _save_and_open_front="1")
+    invalid = client.post(edit, {**payload, "amount": ""})
+    assert invalid.status_code == 200
+    assert invalid.context["payment_back_url"] == back
+    result = client.post(edit, payload)
+    assert result.status_code == 302
+    assert result.url == back
+    payment.refresh_from_db()
+    assert payment.payment_info == "Проверено"
+    opened = client.get(result.url)
+    assert opened.context["open_payment"] == str(payment.pk)
+    assert opened.context["back_url"] == origin
+    assert f'class="collapse show" id="payment-{payment.pk}"' in opened.content.decode()
+    del payload["_save_and_open_front"]
+    normal = client.post(edit, {**payload, "_save": "1"})
+    assert normal.url == reverse("admin:policies_paymentschedule_changelist")
+
+
+@pytest.mark.django_db
+def test_direct_payment_editor_and_popup(client, admin_user, sample_payment):
+    client.force_login(admin_user)
+    edit = reverse("admin:policies_paymentschedule_change", args=[sample_payment.pk])
+    back = client.get(edit).context["payment_back_url"]
+    assert back == reverse(
+        "policies:detail",
+        args=[sample_payment.policy_id],
+        query={"payment": sample_payment.pk},
+        fragment=f"installment-{sample_payment.pk}",
+    )
+    popup = client.get(edit, {"_popup": "1"})
+    assert "_save_and_open_front" not in popup.content.decode()
+    assert "Вернуться без сохранения" not in popup.content.decode()
+
+
+@pytest.mark.django_db
+def test_osago_editor_has_front_save_button(
+    client, admin_user, policy_factory, insurance_type_factory
+):
+    client.force_login(admin_user)
+    policy = policy_factory(
+        insurance_type=insurance_type_factory(name="ОСАГО", is_osago=True)
+    )
+    form = client.get(reverse("admin:policies_osagopolicy_change", args=[policy.pk]))
+    assert 'name="_save_and_open_front"' in form.content.decode()

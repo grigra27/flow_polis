@@ -227,6 +227,7 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             else journal_label(journal)
         )
         context["card_query"] = urlencode(navigation)
+        context["open_payment"] = self.request.GET.get("payment", "")
         context["info1_tags"] = policy.info_tags.filter(info_field=1).select_related(
             "tag"
         )

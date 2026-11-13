@@ -36,8 +36,13 @@ def card_params(params):
     return {}
 
 
-def policy_card_url(policy_id, params):
-    return reverse("policies:detail", args=[policy_id], query=card_params(params))
+def policy_card_url(policy_id, params, payment_id=None):
+    query = card_params(params)
+    fragment = None
+    if payment_id is not None:
+        query["payment"] = payment_id
+        fragment = f"installment-{payment_id}"
+    return reverse("policies:detail", args=[policy_id], query=query, fragment=fragment)
 
 
 def journal_label(origin):

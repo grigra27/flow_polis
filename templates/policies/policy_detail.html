@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load currency_filters %}
 {% load insurer_tags %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
@@ -156,7 +156,7 @@
                         </thead>
                         <tbody>
                             {% for payment in policy.payment_schedule.all %}
-                            <tr style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.id }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
+                            <tr id="installment-{{ payment.pk|unlocalize }}" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
                                 <td>
                                     <i class="bi bi-chevron-right toggle-icon"></i>
                                 </td>
@@ -194,7 +194,7 @@
                                     <small>{{ payment.payment_info|truncatewords:10|default:"—" }}</small>
                                 </td>
                             </tr>
-                            <tr class="collapse" id="payment-{{ payment.id }}">
+                            <tr class="collapse{% if open_payment == payment.pk|stringformat:'s' %} show{% endif %}" id="payment-{{ payment.pk|unlocalize }}">
                                 <td colspan="9" class="bg-light">
                                     <div class="p-3">
                                         <div class="row">
@@ -243,7 +243,7 @@
                                         {% endif %}
                                         {% if can_edit %}
                                         <div class="mt-2">
-                                            <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}" class="btn btn-sm btn-warning">
+                                            <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-sm btn-warning">
                                                 <i class="bi bi-pencil"></i> Редактировать
                                             </a>
                                         </div>

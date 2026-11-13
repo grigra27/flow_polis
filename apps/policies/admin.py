@@ -20,7 +20,7 @@ from apps.insurers.models import InsuranceType, get_osago_insurance_type
 from . import flow_views
 from .forms import AcceptUploadForm
 from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
-from .navigation import policy_card_url
+from .navigation import journal_origin, policy_card_url
 from .services.accept_parser import parse_accept_file
 from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
@@ -1004,6 +1004,23 @@ class OsagoPolicyAdmin(PolicyAdmin):
 
 @admin.register(PaymentSchedule)
 class PaymentScheduleAdmin(admin.ModelAdmin):
+    change_form_template = "admin/policies/paymentschedule/change_form.html"
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        if change and obj is not None:
+            back = policy_card_url(obj.policy_id, request.GET, obj.pk)
+            if request.GET.get("entry") == "journal":
+                back = journal_origin(request.GET.get("journal", "")) or back
+            context["payment_back_url"] = back
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def response_change(self, request, obj):
+        if "_save_and_open_front" in request.POST and IS_POPUP_VAR not in request.POST:
+            return redirect(policy_card_url(obj.policy_id, request.GET, obj.pk))
+        return super().response_change(request, obj)
+
     list_display = [
         "policy",
         "year_number",

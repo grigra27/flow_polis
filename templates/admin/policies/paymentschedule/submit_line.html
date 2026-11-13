@@ -1,0 +1,9 @@
+{% extends "admin/submit_line.html" %}
+
+{% block submit-row %}
+    {% if payment_back_url and not is_popup and show_save %}
+        <input type="submit" name="_save_and_open_front" value="Сохранить и открыть карточку полиса">
+    {% endif %}
+    {{ block.super }}
+    {% if payment_back_url and not is_popup %}<a class="closelink" href="{{ payment_back_url }}">Вернуться без сохранения</a>{% endif %}
+{% endblock %}

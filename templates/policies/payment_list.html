@@ -204,9 +204,9 @@
                         {% for payment in payments %}
                         {% journal_return_query 'payment' payment.pk as origin %}
                         <tr id="payment-{{ payment.pk|unlocalize }}" class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
-                            data-href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}">
+                            data-href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}&amp;payment={{ payment.pk|unlocalize }}#installment-{{ payment.pk|unlocalize }}">
                             <td style="padding-left:1rem;">
-                                <a class="journal-record" href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}">{{ payment.policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
+                                <a class="journal-record" href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}&amp;payment={{ payment.pk|unlocalize }}#installment-{{ payment.pk|unlocalize }}">{{ payment.policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
                                 {% if not payment.policy.broker_participation %}
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
@@ -244,7 +244,7 @@
                             </td>
                             {% if can_edit %}
                             <td onclick="event.stopPropagation();">
-                                <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}" class="btn-tbl-edit">
+                                <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}?{{ origin }}&amp;entry=journal" class="btn-tbl-edit" aria-label="Редактировать платёж {{ payment.year_number }}/{{ payment.installment_number }}">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                             </td>

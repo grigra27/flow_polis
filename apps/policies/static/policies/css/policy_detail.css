@@ -34,6 +34,8 @@
 }
 .policy-page-title .badge { vertical-align: middle; letter-spacing: 0; }
 .policy-page-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.payment-row { scroll-margin-top: 7rem; }
+.payment-row:target { outline: 2px solid var(--app-color-action); outline-offset: -2px; }
 .policy-detail .btn {
     display: inline-flex;
     align-items: center;

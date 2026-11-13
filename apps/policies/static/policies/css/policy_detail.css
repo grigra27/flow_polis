@@ -101,13 +101,9 @@
 
 .policy-overview {
     display: grid;
-    grid-template-areas: "facts statuses";
-    grid-template-columns: minmax(0, 3fr) minmax(235px, 0.85fr);
-    gap: var(--policy-gap);
-}
-.policy-overview--linked {
-    grid-template-areas: "facts statuses source";
+    grid-template-areas: "facts statuses sidebar";
     grid-template-columns: minmax(0, 2.5fr) minmax(245px, 0.85fr) minmax(245px, 0.85fr);
+    gap: var(--policy-gap);
 }
 .policy-facts { grid-area: facts; display: flex; flex-direction: column; border-color: #c8d9e9; }
 .policy-facts .panel-heading {
@@ -130,21 +126,44 @@
 .facts-grid dd { margin-top: 0.22rem; font-size: 1rem; font-weight: 550; line-height: 1.35; }
 .policy-lessee dt { color: #364f68; font-weight: 650; }
 .policy-lessee dd { font-size: 1.15rem; font-weight: 750; line-height: 1.2; }
-.policy-facts a, .detail-edit { color: #155b9d; text-decoration: none; }
-.policy-facts a:hover, .detail-edit:hover, .card-field-action:hover { text-decoration: underline; }
-.policy-facts :is(.insurer-with-logo, .insurance-type-with-icon, .branch-with-logo) { max-width: 100%; }
+.policy-facts a, .policy-contacts a, .detail-edit { color: #155b9d; text-decoration: none; }
+.policy-facts a:hover, .policy-contacts a:hover, .detail-edit:hover, .card-field-action:hover { text-decoration: underline; }
+.policy-facts :is(.insurer-with-logo, .insurance-type-with-icon), .policy-contacts .branch-with-logo { max-width: 100%; }
 .policy-facts code { color: #243e5b; font-size: 0.94rem; }
 .facts-grid time { white-space: nowrap; }
-.policy-contacts {
+.policy-object-actions { padding: 0.75rem 1.25rem; border-top: 1px solid var(--policy-rule); }
+.policy-sidebar {
+    grid-area: sidebar;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem clamp(1rem, 3vw, 3.5rem);
-    padding: 0.65rem 1.25rem;
-    border-top: 1px solid var(--policy-rule);
+    flex-direction: column;
+    align-self: start;
+    min-width: 0;
+    gap: var(--policy-gap);
 }
-.policy-contacts > div { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
-.policy-contacts img { object-fit: contain; }
-.policy-contacts dd { font-size: 0.91rem; }
+.policy-contact-card { background: #edf5ff; border-color: #a8c7ed; }
+.policy-contact-card .panel-heading {
+    padding: 0.75rem var(--policy-pad);
+    border-bottom-color: #164e98;
+    border-radius: 12px 12px 0 0;
+    background: #164e98;
+    color: white;
+    font-weight: 700;
+}
+.policy-contact-card .panel-heading > .bi { color: inherit; }
+.policy-contacts { display: grid; gap: 0.7rem; padding: 0.8rem var(--policy-pad); }
+.policy-contacts > div { display: grid; gap: 0.25rem; min-width: 0; }
+.policy-contacts > div + div { padding-top: 0.7rem; border-top: 1px solid #c2d7f0; }
+.policy-contacts dt { color: #254d7b; font-size: 0.84rem; font-weight: 650; }
+.policy-contacts a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    color: #124d8d;
+    font-size: 1.08rem;
+    font-weight: 750;
+}
+.policy-contacts img { flex: none; object-fit: contain; }
 .status-list {
     display: flex;
     flex: 1;
@@ -299,15 +318,13 @@
     .policy-page-header { margin-bottom: 0.7rem; }
     .policy-detail .panel-heading { padding-block: 0.65rem; }
     .facts-grid { padding-block: 0.85rem; row-gap: 0.75rem; }
-    .policy-contacts { padding-block: 0.5rem; }
 }
 @media (max-width: 1199.98px) {
-    .policy-overview--linked { grid-template-areas: "facts facts" "statuses source"; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .policy-overview { grid-template-areas: "facts facts" "statuses sidebar"; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767.98px) {
     .policy-detail { padding-inline: 0; }
-    .policy-overview { grid-template-areas: "facts" "statuses"; grid-template-columns: minmax(0, 1fr); }
-    .policy-overview--linked { grid-template-areas: "facts" "statuses" "source"; }
+    .policy-overview { grid-template-areas: "facts" "statuses" "sidebar"; grid-template-columns: minmax(0, 1fr); }
     .facts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .policy-supplement { grid-template-columns: minmax(0, 1fr); }
 }

@@ -1,7 +1,5 @@
 .flow-source-card {
     --source-color: #0b7a75;
-    grid-area: source;
-    align-self: start;
     overflow: hidden;
 }
 

@@ -163,7 +163,6 @@ def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
     url = reverse("policies:detail", args=[sample_policy.pk])
     unlinked = reader.get(url).content.decode()
     assert 'id="flow-source-brand"' not in unlinked
-    assert "policy-overview--linked" not in unlinked
     second = FlowPolicySource.objects.create(summary_id=438, mode="common", total=5)
     first_link = group.links.create(
         slot=7, policy=sample_policy, revision="r", created_from_summary=True
@@ -172,7 +171,6 @@ def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
         slot=0, policy=sample_policy, revision="r", created_from_summary=False
     )
     content = reader.get(url).content.decode()
-    assert "policy-overview--linked" in content
     assert (
         content.index('id="statuses-title"')
         < content.index('id="flow-source-brand"')

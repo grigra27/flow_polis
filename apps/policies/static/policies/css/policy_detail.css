@@ -1,214 +1,275 @@
 .policy-detail {
-    --policy-ink: #172e49;
     --policy-muted: #52677e;
-    --policy-line: #e0e8f0;
-    --policy-tint: #f5f8fc;
-    max-width: 1720px;
+    --policy-line: #dce5ee;
+    --policy-rule: #e6ecf2;
+    --policy-tint: #f3f7fc;
+    --policy-gap: 0.875rem;
+    --policy-pad: 1.05rem;
     margin: 0 auto;
     padding-inline: max(0px, calc(var(--app-page-gutter) - 1.5rem));
-    color: var(--policy-ink);
-    font-family: var(--app-interface-font);
+    font: 0.875rem/1.42 var(--app-interface-font);
     font-variant-numeric: tabular-nums;
-    font-size: 0.875rem;
-    line-height: 1.5;
+    color: var(--app-color-primary-strong);
 }
-
-.policy-page-header {
+.policy-detail :is(h1, h2, h3, p, dl, dd, ul) { margin: 0; }
+.policy-detail :is(a, button, select, input, textarea):focus-visible {
+    outline: 2px solid var(--app-color-action);
+    outline-offset: 2px;
+}
+.policy-detail dt { color: var(--policy-muted); font-size: 0.79rem; font-weight: 450; }
+.policy-detail dd { min-width: 0; overflow-wrap: anywhere; }
+.policy-multiline { white-space: pre-wrap; overflow-wrap: anywhere; }
+.policy-detail :is(.policy-panel, .policy-title-group) { min-width: 0; }
+.policy-panel {
+    background: white;
+    border: 1px solid var(--policy-line);
+    border-radius: 13px;
+    box-shadow: var(--app-shadow-sm);
+}
+.policy-detail .panel-heading, .policy-schedule h2, .policy-additional h2 {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin: 0.35rem 0 1.25rem;
-}
-.policy-page-title {
-    flex: 1 1 600px;
-    min-width: 0;
-    margin: 0;
-    color: var(--policy-ink);
-    font-size: clamp(1.6rem, 2.4vw, 2.15rem);
-    font-weight: 700;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--app-color-primary);
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.025em;
     line-height: 1.25;
-    letter-spacing: -0.04em;
-    overflow-wrap: anywhere;
 }
-.policy-page-title .badge { vertical-align: middle; letter-spacing: 0; }
-.policy-page-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.payment-row { scroll-margin-top: 7rem; }
-.payment-row:target { outline: 2px solid var(--app-color-action); outline-offset: -2px; }
+.policy-detail .panel-heading {
+    padding: 0.83rem var(--policy-pad);
+    border-bottom: 1px solid var(--policy-rule);
+}
+.policy-detail h2 > .bi { flex: none; color: #5a7794; font-size: 1rem; }
+.policy-page-header, .policy-page-actions, .policy-title-group, .card-date-controls, .card-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.policy-page-header { justify-content: space-between; margin-bottom: 1rem; }
+.policy-title-group h1 {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1.2;
+}
 .policy-detail .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    min-height: 36px;
-    padding: 0.45rem 0.75rem;
-    border-radius: 9px;
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    line-height: 1.25;
+    min-height: 35px;
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    font: 600 0.82rem/1.3 var(--app-interface-font);
 }
-.policy-page-actions .btn-warning {
-    border-color: var(--app-color-action);
-    background: var(--app-color-action);
+.policy-page-actions .btn-warning, .policy-detail .btn-primary {
     color: white;
+    background: var(--app-color-action);
+    border-color: var(--app-color-action);
 }
-.policy-page-actions .btn-warning:hover { border-color: #104f98; background: #104f98; }
-.policy-page-actions .btn-secondary {
-    border-color: #cedae7;
-    background: white;
-    color: var(--app-color-primary);
-}
-.policy-page-actions .btn-secondary:hover { border-color: #9eb8d5; background: var(--policy-tint); }
-
-.policy-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 330px;
-    align-items: start;
-    gap: 1.25rem;
-    margin: 0;
-}
-.policy-layout > :is(.policy-main, .policy-sidebar) { width: auto; min-width: 0; padding: 0; }
-.policy-detail .card {
-    min-width: 0;
-    border-color: var(--policy-line);
-    border-radius: 16px;
-    background: white;
-    box-shadow: var(--app-shadow-sm);
-    overflow: hidden;
-}
-.policy-detail .card-header {
-    padding: 0.9rem 1.1rem;
-    border-color: var(--policy-line);
-    background: white;
-    color: var(--app-color-primary);
-}
-.policy-detail .card-header h5 { font-size: 0.95rem; font-weight: 650; }
-.policy-detail .card-body { padding: 1.1rem; overflow-wrap: anywhere; }
-.policy-detail .badge { padding: 0.28rem 0.45rem; border-radius: 6px; font-size: 0.71rem; font-weight: 600; line-height: 1.35; }
-.policy-detail .card-body a:not(.btn) { color: var(--app-color-action); text-decoration: none; }
-.policy-detail .card-body a:not(.btn):hover { text-decoration: underline; }
-.policy-facts .card-body strong,
-.policy-sidebar .card-body > p > strong,
-.policy-additional .card-body > div > strong {
-    display: inline-block;
-    margin-bottom: 0.25rem;
-    color: var(--policy-muted);
-    font-size: 0.76rem;
-    font-weight: 550;
-}
-.policy-facts .card-body > .row:last-child { margin-bottom: 0 !important; }
-.policy-facts code { padding: 0.18rem 0.4rem; border-radius: 5px; background: var(--policy-tint); color: var(--app-color-primary); font-size: 0.8rem; }
-.policy-facts :is(.insurer-logo, .insurance-type-icon, .branch-logo) { vertical-align: middle; }
-.policy-period { border-color: var(--policy-line) !important; background: var(--policy-tint); }
-.policy-period h6 { color: var(--policy-muted); font-size: 0.78rem; }
-.policy-period .fs-6 { color: var(--policy-ink); font-weight: 650; }
-
-/* The nine existing payment columns and their expandable rows are retained. */
-.policy-detail .policy-schedule > .card-body { padding: 0; }
-.policy-schedule .table-responsive { border-radius: 0 0 16px 16px; }
-.policy-schedule .table { min-width: 48rem; margin-bottom: 0; color: var(--policy-ink); font-size: 0.8rem; }
-.policy-schedule .table th {
-    padding: 0.65rem 0.5rem;
-    border-color: var(--policy-line);
-    background: var(--policy-tint);
-    color: var(--policy-muted);
-    font-size: 0.67rem;
-    font-weight: 650;
-    line-height: 1.4;
-    letter-spacing: 0.035em;
-    text-transform: uppercase;
-    white-space: normal;
-}
-.policy-schedule .table td { padding: 0.7rem 0.5rem; border-color: #e7edf3; color: var(--policy-ink); }
-.policy-schedule .table :is(th, td):first-child { padding-left: 1.1rem; }
-.policy-schedule .table :is(th, td):last-child { padding-right: 1.1rem; }
-.policy-schedule .payment-row td:nth-child(n+2):nth-child(-n+7) { white-space: nowrap; }
-.policy-schedule .payment-row td:last-child { min-width: 95px; overflow-wrap: anywhere; }
-.policy-schedule .payment-row .badge { max-width: 120px; white-space: normal; text-align: left; }
-.policy-schedule .payment-row small { font-size: 0.75rem; }
-.policy-schedule .payment-row:not(.table-cancelled):hover > td { --bs-table-bg: var(--app-color-row-hover); }
-.policy-schedule .toggle-icon { display: inline-block; color: var(--policy-muted); transition: transform 0.2s; }
-.policy-schedule .payment-row { cursor: pointer; }
-.payment-toggle, .card-field-action {
+.policy-page-actions .btn-warning:hover, .policy-detail .btn-primary:hover { background: #104f98; }
+.policy-detail .btn-outline-secondary { color: #314e6c; background: white; border-color: #cfdce8; }
+.policy-detail .btn-outline-secondary:hover { background: var(--policy-tint); border-color: #9eb8d5; }
+.policy-icon-action, .payment-toggle, .card-field-action {
     border: 0;
     background: transparent;
     color: var(--app-color-action);
     font: inherit;
 }
-.payment-toggle { padding: .3rem; }
-.payment-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
-.payment-date {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: .5rem;
-    margin-top: .25rem;
-    font-size: .76rem;
-    white-space: nowrap;
-}
-.payment-date > span { color: var(--policy-muted); }
-.card-field-action { padding: .15rem 0; font-weight: 600; }
-.card-field-action:hover { text-decoration: underline; }
-.policy-schedule .date-editor-row td { background: var(--policy-tint); }
-.card-date-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
-.card-date-controls label { font-weight: 600; }
-.card-date-controls input { width: 10rem; min-height: 36px; }
-.card-edit-error { color: #a12d29; margin: .5rem 0 0; }
-.card-edit-error:empty { display: none; }
-.policy-note-heading, .card-edit-actions {
-    display: flex;
+.policy-detail .policy-icon-action {
+    display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: .5rem;
+    justify-content: center;
+    width: 23px;
+    height: 23px;
+    padding: 0;
+    border-radius: 4px;
+    vertical-align: middle;
+    font-size: 0.78rem;
+    color: #607b96;
+    text-decoration: none;
 }
-.policy-note-heading { justify-content: space-between; margin-bottom: .35rem; }
-.upload-edit-button { grid-column: 1 / -1; justify-self: end; }
-.policy-field-editor { background: var(--policy-tint); border-radius: 8px; padding: .75rem; }
-.policy-field-editor label { display: block; font-weight: 600; margin-bottom: .35rem; }
-.policy-field-editor .card-edit-actions { margin-top: .5rem; }
-.policy-detail :is(#policy-note, #policy-uploaded) { scroll-margin-top: 7rem; }
-.policy-schedule .collapse strong { color: var(--policy-muted); font-weight: 550; }
-.policy-schedule .collapse small { font-size: 0.8rem; }
-.policy-schedule .btn-warning { border-color: #f6dfa5; background: #fff6db; color: #805a13; }
-.policy-schedule .btn-warning:hover { background: #ffe9ad; }
+.policy-detail .policy-icon-action:hover { background: #e9f1fa; color: var(--app-color-action); }
+.policy-title-group .policy-icon-action { width: 28px; height: 28px; font-size: 1rem; }
+.copy-result { font-size: 0.78rem; color: var(--policy-muted); }
+.copy-result:empty { display: none; }
 
-.policy-statuses .card-body { padding-block: 0.4rem; }
-.policy-statuses .card-body > p {
+.policy-overview {
+    display: grid;
+    grid-template-areas: "facts statuses finance";
+    grid-template-columns: minmax(0, 2.16fr) minmax(235px, 0.82fr) minmax(245px, 0.85fr);
+    gap: var(--policy-gap);
+}
+.policy-facts { grid-area: facts; display: flex; flex-direction: column; }
+.policy-statuses { grid-area: statuses; display: flex; flex-direction: column; }
+.policy-finance { grid-area: finance; display: flex; flex-direction: column; }
+.policy-overview .flow-source-card { grid-column: 1 / -1; }
+.policy-detail .flow-source-card__list { margin: 0; }
+.facts-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 0.85rem 1rem;
+    flex: 1;
+    align-content: space-between;
+    padding: 0.85rem var(--policy-pad);
+}
+.facts-grid dd { margin-top: 0.2rem; font-weight: 530; line-height: 1.38; }
+.policy-facts a, .detail-edit { color: #155b9d; text-decoration: none; }
+.policy-facts a:hover, .detail-edit:hover, .card-field-action:hover { text-decoration: underline; }
+.policy-facts :is(.insurer-with-logo, .insurance-type-with-icon, .branch-with-logo) { max-width: 100%; }
+.policy-facts code { color: #243e5b; font-size: 0.84rem; }
+.facts-grid time { white-space: nowrap; }
+.policy-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem clamp(1rem, 3vw, 3.5rem);
+    padding: 0.55rem var(--policy-pad);
+    border-top: 1px solid var(--policy-rule);
+}
+.policy-contacts > div { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.policy-contacts img { object-fit: contain; }
+.policy-contacts dd { font-size: 0.85rem; }
+.status-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 0.2rem var(--policy-pad);
+}
+.status-list > div {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.35rem 0.6rem;
-    margin: 0;
-    padding-block: 0.7rem;
-    border-bottom: 1px solid var(--policy-line);
+    gap: 0.2rem 0.5rem;
+    flex: 1;
+    padding-block: 0.45rem;
 }
-.policy-statuses .card-body > p:last-child { border-bottom: 0; }
-.policy-statuses .card-body > p > strong { margin-bottom: 0; }
-.policy-statuses .card-body > p > br { display: none; }
-.policy-statuses .card-body > p > small { grid-column: 1 / -1; }
-.policy-finance .text-primary { color: var(--app-color-action) !important; font-weight: 700; }
-.policy-rates { margin-top: 1rem; padding: 0.9rem; border: 1px solid var(--policy-line); border-radius: 10px; background: var(--policy-tint); }
-.policy-rates-title { color: var(--policy-ink); font-size: 0.83rem; font-weight: 650; }
-.policy-rates .table { margin-bottom: 0; table-layout: fixed; background: white; font-size: 0.83rem; }
-.policy-rates .table th { padding: 0.6rem; border-color: var(--policy-line); background: var(--policy-tint); color: var(--policy-muted); font-size: 0.72rem; font-weight: 600; }
-.policy-rates .table td { padding: 0.6rem; border-color: var(--policy-line); color: var(--policy-ink); }
-.policy-rates .table td:last-child { color: var(--app-color-action); font-weight: 600; }
-.policy-rate-current { --bs-table-bg: #edf4fd; }
-.policy-rate-marker { margin-left: 0.3rem; color: var(--app-color-action); font-size: 0.7rem; }
-.policy-rate-current-label { margin-left: 0.2rem; color: var(--policy-muted); font-size: 0.7rem; }
-.policy-additional .badge { max-width: 100%; margin-bottom: 0.25rem; white-space: normal; text-align: left; }
-.policy-detail :is(a, button, input):focus-visible { outline: 2px solid var(--app-color-action); outline-offset: 2px; }
+.status-list > div + div, .rates-list > div { border-top: 1px solid var(--policy-rule); }
+.status-list dt { font-size: 0.84rem; color: #354b62; line-height: 1.3; }
+.status-list dd { text-align: right; }
+.status-list dd > small { display: block; grid-column: 1 / -1; text-align: left; color: var(--policy-muted); }
+.status-list > div:has(dd > small) dd, .status-list #policy-uploaded dd { display: contents; }
+.status-list > div:has(dd > small) dd > span { justify-self: end; }
+.upload-mark { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.3rem; }
+.status-list :is(.status-yes, .status-no, .status-danger) {
+    display: inline-block;
+    padding: 0.08rem 0.42rem;
+    border-radius: 5px;
+    font-size: 0.77rem;
+    font-weight: 600;
+}
+.status-yes { color: #265f48; background: #e8f3ed; }
+.status-yes::before { content: "✓ "; }
+.status-no { color: #536578; background: #eef2f6; }
+.status-danger { color: #903f33; background: #faeae8; }
+.finance-body { flex: 1; display: flex; flex-direction: column; padding: 0.8rem var(--policy-pad); }
+.finance-amounts { display: flex; flex-wrap: wrap; gap: 0.35rem 0.85rem; justify-content: space-between; }
+.finance-amounts dd { margin-top: 0.18rem; font-weight: 600; }
+.finance-amounts > :first-child dd { font-size: clamp(1.25rem, 1.7vw, 1.7rem); line-height: 1.25; letter-spacing: -0.035em; font-weight: 680; }
+.finance-amounts small { font-size: 0.76em; }
+.policy-finance .rates-title { font-size: 0.79rem; font-weight: 550; color: var(--policy-muted); margin: 0.7rem 0 0.25rem; }
+.rates-list { flex: 1; display: flex; flex-direction: column; }
+.rates-list > div { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-block: 0.3rem; }
+.rates-list > div:only-child { flex: none; }
+.rates-list dt { color: inherit; }
+.rates-list dt span { padding: 2px 5px; margin-left: 3px; color: #1c5a92; font-size: 0.68rem; background: #eaf2fa; border-radius: 4px; }
+.rates-list dd { font-weight: 620; }
 
-@media (max-width: 1199.98px) {
-    .policy-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; }
+.policy-additional, .policy-schedule { margin-top: var(--policy-gap); }
+.policy-additional {
+    display: grid;
+    grid-template-columns: minmax(145px, 14%) minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem var(--policy-pad);
 }
-@media (max-width: 991.98px) {
-    .policy-layout { grid-template-columns: minmax(0, 1fr); }
+.policy-additional h2 { font-size: 0.96rem; }
+.info-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem 1rem; }
+.info-field { min-width: 0; padding-inline-start: 1rem; border-left: 1px solid var(--policy-line); }
+.info-field:only-child { grid-column: 1 / -1; }
+.info-field h3 { font-size: 0.85rem; font-weight: 650; }
+.info-field h3 small { font-size: 0.77rem; color: var(--policy-muted); font-weight: 450; }
+.info-field > p, .policy-tags { margin-top: 0.25rem; font-size: 0.85rem; }
+.note-heading, .policy-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.65rem; }
+.note-heading .card-field-action { padding: 0; font-size: 0.76rem; font-weight: 560; }
+.info-field .policy-tags { list-style: none; padding: 0; margin-top: 0.3rem; }
+.policy-tags li { padding: 0.1rem 0.5rem; border-radius: 4px; background: #eaf2fa; color: #26577d; overflow-wrap: anywhere; }
+.schedule-header, .schedule-header > div, .schedule-footer, .paid-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.8rem; }
+.schedule-header, .schedule-footer { padding: 0.72rem var(--policy-pad); justify-content: space-between; }
+.schedule-header > div > span, .paid-summary, .schedule-footer { font-size: 0.79rem; color: var(--policy-muted); }
+.paid-summary { gap: 0.35rem; }
+.paid-summary::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #51967b; }
+.paid-summary b { font-weight: 615; color: #2c435a; }
+.paid-summary > span { color: #8d9fb0; }
+.policy-schedule .table-responsive { position: relative; }
+.schedule-table { width: 100%; min-width: 73rem; border-collapse: collapse; line-height: 1.33; }
+.schedule-table th, .schedule-table td { padding: 0.44rem 0.6rem; border-bottom: 1px solid var(--policy-rule); vertical-align: middle; }
+.schedule-table :is(th, td):first-child { padding-inline-start: var(--policy-pad); }
+.schedule-table th { color: var(--policy-muted); font-weight: 560; font-size: 0.77rem; background: var(--policy-tint); border-top: 1px solid var(--policy-line); }
+.schedule-table .num { text-align: right; white-space: nowrap; }
+.schedule-table .num strong { font-weight: 620; }
+.schedule-table .schedule-date, .schedule-table .payment-date, .payment-toggle { white-space: nowrap; }
+.schedule-table .schedule-note { min-width: 7rem; max-width: 24rem; font-size: 0.82rem; }
+.schedule-table .row-action { width: 2.25rem; text-align: center; }
+.payment-row { cursor: pointer; scroll-margin-top: 7rem; }
+.payment-row:target { outline: 2px solid var(--app-color-action); outline-offset: -2px; }
+.payment-row:hover { background: var(--app-color-row-hover); }
+.payment-row.payment-next { background: #edf4fd; box-shadow: inset 3px 0 #3979bf; }
+.payment-next .schedule-date { font-weight: 650; }
+.payment-row.year-start td { border-top: 2px solid #cfdae6; }
+.payment-row.table-cancelled { background: var(--app-color-danger-soft); }
+.payment-toggle { display: inline-flex; align-items: center; gap: 0.25rem; color: inherit; padding: 0; }
+.payment-toggle i { font-size: 0.62rem; color: var(--policy-muted); }
+.payment-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+.pay-status { font-size: 0.78rem; font-weight: 550; }
+.pay-status.approved { color: #286a50; }
+.pay-status.paid { color: #175b99; }
+.pay-status.expected { color: #6c654f; }
+.pay-status.expected i { color: #927025; }
+.pay-status.overdue, .pay-status.cancelled, .rate-difference, .card-edit-error { color: #9b392d; }
+.base-rate { display: block; font-size: 0.73rem; color: var(--policy-muted); }
+.payment-date { font-size: 0.85rem; padding: 0.12rem 0.18rem; border-radius: 4px; }
+.payment-date:hover, .payment-date:focus-visible { background: #e4eef9; }
+.payment-date.date-empty { min-width: 2.3rem; text-align: left; color: var(--policy-muted); }
+.payment-date.date-empty:not(:has(.date-prompt)):is(:hover, :focus-visible) {
+    color: var(--app-color-action);
+    text-decoration: underline;
+}
+.date-prompt { color: var(--app-color-action); font-weight: 580; }
+.schedule-footer { padding-block: 0.55rem; font-size: 0.76rem; }
+.schedule-footer i { font-style: normal; margin: 0 0.2rem; }
+.schedule-empty { text-align: center; color: var(--policy-muted); }
+.schedule-table :is(.collapse, .collapsing, .date-editor-row) > td { padding: 0.8rem var(--policy-pad); background: var(--policy-tint); }
+.payment-details { display: flex; flex-wrap: wrap; gap: 0.6rem 1.8rem; }
+.detail-edit, .policy-detail .detail-note { display: inline-block; margin-top: 0.5rem; font-size: 0.83rem; }
+.policy-detail .detail-note { display: block; }
+.policy-field-editor { margin-top: 0.4rem; padding: 0.75rem; border-radius: 7px; background: var(--policy-tint); text-align: left; }
+.status-list .policy-field-editor { grid-column: 1 / -1; }
+.policy-field-editor label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+.card-date-controls label { font-weight: 600; }
+.card-date-controls input { width: 10rem; min-height: 35px; }
+.card-edit-actions { margin-top: 0.5rem; }
+.policy-detail .card-edit-error:not(:empty) { margin-top: 0.5rem; }
+.policy-detail :is(#policy-uploaded, #policy-note) { scroll-margin-top: 7rem; }
+@media (min-width: 1100px) and (max-height: 800px) {
+    .policy-detail { --policy-gap: 0.68rem; }
+    .policy-page-header { margin-bottom: 0.7rem; }
+    .policy-detail .panel-heading { padding-block: 0.65rem; }
+    .facts-grid { padding-block: 0.6rem; row-gap: 0.55rem; }
+    .policy-contacts, .policy-additional { padding-block: 0.5rem; }
+}
+@media (max-width: 1199.98px) {
+    .policy-overview { grid-template-areas: "facts facts" "statuses finance"; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+    .policy-detail { padding-inline: 0; }
+    .facts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .policy-additional { grid-template-columns: 1fr; gap: 0.65rem; }
 }
 @media (max-width: 575.98px) {
-    .policy-page-actions { width: 100%; }
-    .policy-page-actions .btn { flex: 1 1 auto; white-space: normal; }
-    .policy-facts .card-body > .row > .col-md-6 + .col-md-6 { margin-top: 1rem; }
+    .policy-overview { grid-template-areas: "facts" "statuses" "finance"; grid-template-columns: minmax(0, 1fr); }
+    .facts-grid, .info-fields { grid-template-columns: minmax(0, 1fr); }
+    .info-field { padding-inline-start: 0; border: 0; }
 }

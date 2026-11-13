@@ -194,7 +194,7 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
                 "insurance_type",
                 "leasing_manager",
             )
-            .prefetch_related("payment_schedule__commission_rate", "info_tags__tag")
+            .prefetch_related("payment_schedule", "info_tags__tag")
         )
 
     def get_context_data(self, **kwargs):
@@ -234,11 +234,24 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             self.request.user, PaymentSchedule
         )
         context["card_today"] = timezone.localdate().isoformat()
-        context["info1_tags"] = policy.info_tags.filter(info_field=1).select_related(
-            "tag"
+        tags = list(policy.info_tags.all())
+        context["info1_tags"] = [info for info in tags if info.info_field == 1]
+        context["info2_tags"] = [info for info in tags if info.info_field == 2]
+
+        payments = list(policy.payment_schedule.all())
+        paid = [payment for payment in payments if payment.is_paid]
+        next_payment = min(
+            (p for p in payments if not p.is_paid and not p.is_cancelled),
+            key=lambda p: (p.due_date, p.year_number, p.installment_number),
+            default=None,
         )
-        context["info2_tags"] = policy.info_tags.filter(info_field=2).select_related(
-            "tag"
+        context.update(
+            payments=payments,
+            payment_year_count=len({p.year_number for p in payments}),
+            premium_total=sum(p.amount for p in payments),
+            paid_count=len(paid),
+            paid_total=sum(p.amount for p in paid),
+            next_payment=next_payment,
         )
 
         # Get commission rate for this policy's insurer and insurance type

@@ -3,6 +3,20 @@
     let activeButton;
     let pending = false;
 
+    card.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(button => {
+        window.bootstrap?.Tooltip.getOrCreateInstance(button);
+    });
+
+    async function copyField(button) {
+        const result = card.querySelector('.copy-result');
+        try {
+            await navigator.clipboard.writeText(button.dataset.copyValue);
+            result.textContent = 'Скопировано';
+        } catch {
+            result.textContent = 'Не удалось скопировать. Выделите значение и скопируйте вручную.';
+        }
+    }
+
     function closeEditor(restoreFocus) {
         if (!activeButton) return;
         document.getElementById(activeButton.dataset.editTarget).hidden = true;
@@ -33,7 +47,9 @@
 
     card.addEventListener('click', event => {
         const button = event.target.closest('button');
-        if (button?.hasAttribute('data-edit-target')) {
+        if (button?.hasAttribute('data-copy-value')) {
+            copyField(button);
+        } else if (button?.hasAttribute('data-edit-target')) {
             if (!pending) openEditor(button);
         } else if (button?.hasAttribute('data-edit-cancel')) {
             if (!pending) closeEditor(true);

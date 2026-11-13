@@ -1,370 +1,83 @@
 {% extends 'base.html' %}
-{% load currency_filters %}
-{% load insurer_tags %}
-{% load static l10n %}
+{% load currency_filters insurer_tags static l10n %}
 
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
 {% block extra_css %}
-    <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13">
-    {% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
+<link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.2">
+{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="policy-detail">
-<div class="policy-page-header">
-    <h1 class="policy-page-title">
-        Полис {{ policy.policy_number }}
-        {% if policy.is_osago %}<span class="badge bg-primary-subtle text-primary-emphasis">ОСАГО</span>{% endif %}
-        {% if not policy.policy_active %}
-            <span class="badge bg-danger" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
-        {% endif %}
-        {% if not policy.broker_participation %}
-            <span class="badge bg-secondary" title="Без участия брокера">Без брокера</span>
-        {% endif %}
-    </h1>
-    <div class="policy-page-actions">
-        {% if can_edit_policy %}
-        <a href="{% url 'admin:policies_policy_change' policy.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-warning">
-            <i class="bi bi-pencil"></i> Редактировать
-        </a>
-        {% endif %}
-        <a href="{{ back_url }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left" aria-hidden="true"></i>
-            {{ back_label }}
-        </a>
-    </div>
-</div>
-
-<div class="row policy-layout">
-    <!-- Main Info -->
-    <div class="col-md-8 policy-main">
-        <div class="card mb-4 policy-facts">
-            <div class="card-header">
-                <h5 class="mb-0">Основная информация</h5>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Номер полиса:</strong><br>
-                        {{ policy.policy_number }}
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Номер ДФА:</strong><br>
-                        {{ policy.dfa_number|default:"—" }}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Лизингополучатель:</strong><br>
-                        <a href="{% url 'clients:detail' policy.client.pk %}">{{ policy.client.client_name }}</a>
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Страхователь:</strong><br>
-                        {% if policy.policyholder %}
-                            <a href="{% url 'clients:detail' policy.policyholder.pk %}">{{ policy.policyholder.client_name }}</a>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Страховщик:</strong><br>
-                        <a href="{% url 'insurers:detail' policy.insurer.pk %}" style="text-decoration: none;">
-                            {% insurer_logo policy.insurer size='medium' %}
-                        </a>
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Вид страхования:</strong><br>
-                        {% insurance_type_icon policy.insurance_type size='medium' %}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Филиал:</strong><br>
-                        <a href="{% url 'insurers:branch_detail' policy.branch.pk %}" class="text-decoration-none">
-                            {% branch_logo policy.branch size='medium' %}
-                        </a>
-                        <div class="mt-3">
-                            <strong>Менеджер:</strong><br>
-                            {% if policy.leasing_manager %}
-                                <a href="{% url 'insurers:manager_detail' policy.leasing_manager.pk %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
-                                    <img src="{% static 'images/alliance-logo.png' %}" alt="Allianz Leasing" title="Менеджер Allianz Leasing" style="width:18px;height:18px;object-fit:contain;vertical-align:-3px;">
-                                    <span>{{ policy.leasing_manager }}</span>
-                                </a>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </div>
-                        <div class="mt-3">
-                            <strong>Описание объекта страхования:</strong><br>
-                            <div style="word-wrap: break-word; white-space: pre-wrap;">{{ policy.property_description }}</div>
-                            {% if policy.property_year %}
-                            <div class="mt-2">
-                                <strong>Год выпуска:</strong><br>
-                                {{ policy.property_year }}
-                            </div>
-                            {% endif %}
-                            {% if policy.vin_number %}
-                            <div class="mt-2">
-                                <strong>Идентификатор (обычно VIN):</strong><br>
-                                <code>{{ policy.vin_number }}</code>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="border rounded p-3 policy-period">
-                            <h6 class="mb-3 fw-bold border-bottom pb-2">
-                                <i class="bi bi-calendar-range"></i> Период страхования
-                            </h6>
-                            <div class="mb-2">
-                                <strong>Начало:</strong><br>
-                                <span class="fs-6">{{ policy.start_date|date:"d.m.Y" }}</span>
-                            </div>
-                            <div class="mb-0">
-                                <strong>Окончание:</strong><br>
-                                <span class="fs-6">{{ policy.end_date|date:"d.m.Y" }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <header class="policy-page-header">
+        <div class="policy-title-group">
+            <h1>Полис {{ policy.policy_number }}</h1>
+            {% include "policies/includes/policy_copy_button.html" with value=policy.policy_number label="Скопировать номер полиса" only %}
+            {% if policy.is_osago %}<span class="badge bg-primary-subtle text-primary-emphasis">ОСАГО</span>{% endif %}
+            {% if not policy.policy_active %}<span class="badge bg-danger" title="Расторгнут{% if policy.termination_date %} {{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>{% endif %}
+            {% if not policy.broker_participation %}<span class="badge bg-secondary">Без брокера</span>{% endif %}
+            <span role="status" class="copy-result"></span>
         </div>
-
-        <!-- Payment Schedule -->
-        <div class="card mb-4 policy-schedule">
-            <div class="card-header">
-                <h5 class="mb-0">График платежей</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th style="width: 30px;"></th>
-                                <th>Год/№</th>
-                                <th>СС, ₽</th>
-                                <th>СП, ₽</th>
-                                <th>КВ, %</th>
-                                <th>КВ, ₽</th>
-                                <th>Дата по договору</th>
-                                <th>Статус и даты</th>
-                                <th>Примечание</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for payment in policy.payment_schedule.all %}
-                            <tr id="installment-{{ payment.pk|unlocalize }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
-                                <td>
-                                    <button type="button" class="payment-toggle" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" aria-controls="payment-{{ payment.pk|unlocalize }}" aria-expanded="{% if open_payment == payment.pk|stringformat:'s' %}true{% else %}false{% endif %}" aria-label="Подробности взноса {{ payment.year_number }}/{{ payment.installment_number }}"><i class="bi bi-chevron-right toggle-icon" aria-hidden="true"></i></button>
-                                </td>
-                                <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
-                                <td>{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub }}{% else %}—{% endif %}</td>
-                                <td><strong>{{ payment.amount|rub }}</strong></td>
-                                <td>
-                                    {% if payment.amount and payment.amount > 0 %}
-                                        <span class="{% if commission_rate and payment.kv_percent_actual|floatformat:0 != commission_rate.kv_percent|floatformat:0 %}text-danger{% endif %}">
-                                            {{ payment.kv_percent_actual|floatformat:0 }}%
-                                        </span>
-                                        {% if commission_rate and payment.kv_percent_actual|floatformat:0 != commission_rate.kv_percent|floatformat:0 %}
-                                            <br><small class="text-muted" title="Ставка комиссии из справочника">(ставка: {{ commission_rate.kv_percent|floatformat:0 }}%)</small>
-                                        {% endif %}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                                <td>{{ payment.kv_rub|rub }}</td>
-                                <td>{{ payment.due_date|date:"d.m.Y" }}</td>
-                                <td>
-                                    {% if payment.is_approved %}
-                                        <span class="badge bg-success">Акт согласован СК</span>
-                                    {% elif payment.is_paid %}
-                                        <span class="badge bg-primary">Оплачен</span>
-                                    {% elif payment.is_cancelled %}
-                                        <span class="badge bg-danger">Отменен</span>
-                                    {% elif payment.is_overdue %}
-                                        <span class="badge bg-danger">Не оплачен</span>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark">Ожидается</span>
-                                    {% endif %}
-                                    {% include "policies/includes/payment_date.html" with field="paid_date" label="Оплата" full_label="Фактическая дата оплаты" value=payment.paid_date %}
-                                    {% include "policies/includes/payment_date.html" with field="insurer_date" label="Акт СК" full_label="Дата согласования акта с СК" value=payment.insurer_date %}
-                                </td>
-                                <td>
-                                    <small>{{ payment.payment_info|truncatewords:10|default:"—" }}</small>
-                                </td>
-                            </tr>
-                            {% if can_edit_payment %}
-                            <tr id="date-edit-{{ payment.pk|unlocalize }}" class="date-editor-row" hidden>
-                                <td colspan="9">
-                                    <form method="post" class="card-edit-form" data-date-editor>
-                                        {% csrf_token %}
-                                        <input type="hidden" name="original">
-                                        <div class="card-date-controls">
-                                            <label for="date-value-{{ payment.pk|unlocalize }}" data-date-label></label>
-                                            <input id="date-value-{{ payment.pk|unlocalize }}" class="form-control form-control-sm" name="value" type="date" aria-describedby="date-error-{{ payment.pk|unlocalize }}">
-                                            <button type="button" class="btn btn-outline-secondary" data-today="{{ card_today }}">Сегодня</button>
-                                            <button class="btn btn-primary" type="submit">Сохранить</button>
-                                            <button type="button" class="btn btn-outline-secondary" data-edit-cancel>Отмена</button>
-                                        </div>
-                                        <p id="date-error-{{ payment.pk|unlocalize }}" class="card-edit-error" role="alert"></p>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endif %}
-                            <tr class="collapse{% if open_payment == payment.pk|stringformat:'s' %} show{% endif %}" id="payment-{{ payment.pk|unlocalize }}">
-                                <td colspan="9" class="bg-light">
-                                    <div class="p-3">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <small><strong>Дата платежа (по договору):</strong></small><br>
-                                                <small>{{ payment.due_date|date:"d.m.Y" }}</small>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <small><strong>Фактическая дата оплаты:</strong></small><br>
-                                                <small>{{ payment.paid_date|date:"d.m.Y"|default:"—" }}</small>
-                                            </div>
-                                        </div>
-                                        <div class="row mt-2">
-                                            <div class="col-md-6">
-                                                <small><strong>Дата согласования акта с СК:</strong></small><br>
-                                                <small>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</small>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <small><strong>Ставка комиссии (базовая):</strong></small><br>
-                                                <small>
-                                                    {% if commission_rate %}
-                                                        {{ commission_rate }}
-                                                    {% else %}
-                                                        —
-                                                    {% endif %}
-                                                </small>
-                                            </div>
-                                        </div>
-                                        <div class="row mt-2">
-                                            <div class="col-md-6">
-                                                <small><strong>Оплатил Альянс:</strong></small><br>
-                                                {% if payment.alliance_paid %}
-                                                    <span class="badge bg-info text-dark"><i class="bi bi-check-circle"></i> Да</span>
-                                                {% else %}
-                                                    <span class="badge bg-light text-dark border"><i class="bi bi-x-circle"></i> Нет</span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        {% if payment.payment_info %}
-                                        <div class="row mt-2">
-                                            <div class="col-md-12">
-                                                <small><strong>Дополнительная информация:</strong></small><br>
-                                                <small>{{ payment.payment_info }}</small>
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                        {% if can_edit_payment %}
-                                        <div class="mt-2">
-                                            <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-sm btn-warning">
-                                                <i class="bi bi-pencil"></i> Редактировать
-                                            </a>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="9" class="text-center text-muted">График платежей не заполнен</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="policy-page-actions">
+            <a href="{{ back_url }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ back_label }}</a>
+            {% if can_edit_policy %}
+            <a href="{% url 'admin:policies_policy_change' policy.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-warning"><i class="bi bi-pencil" aria-hidden="true"></i> Редактировать</a>
+            {% endif %}
         </div>
+    </header>
 
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const paymentRows = document.querySelectorAll('.payment-row');
-                paymentRows.forEach(row => {
-                    row.addEventListener('click', function() {
-                        const isExpanded = this.getAttribute('aria-expanded') === 'true';
-                        this.setAttribute('aria-expanded', !isExpanded);
-                    });
-                });
+    <div class="policy-overview">
+        <section class="policy-panel policy-facts" aria-labelledby="facts-title">
+            <h2 class="panel-heading" id="facts-title"><i class="bi bi-file-text" aria-hidden="true"></i>Основная информация</h2>
+            <dl class="facts-grid">
+                <div><dt>Лизингополучатель</dt><dd><a href="{% url 'clients:detail' policy.client_id %}">{{ policy.client.client_name }}</a></dd></div>
+                <div><dt>Страхователь</dt><dd>{% if policy.policyholder_id %}<a href="{% url 'clients:detail' policy.policyholder_id %}">{{ policy.policyholder.client_name }}</a>{% else %}—{% endif %}</dd></div>
+                <div><dt>Номер ДФА</dt><dd>{{ policy.dfa_number|default:"—" }}
+                    {% if policy.dfa_number %}{% include "policies/includes/policy_copy_button.html" with value=policy.dfa_number label="Скопировать номер ДФА" only %}{% endif %}
+                </dd></div>
+                <div><dt>Страховщик</dt><dd><a href="{% url 'insurers:detail' policy.insurer_id %}">{% insurer_logo policy.insurer size='small' %}</a></dd></div>
+                <div><dt>Вид страхования</dt><dd>{% insurance_type_icon policy.insurance_type size='small' %}</dd></div>
+                <div><dt>Период страхования</dt><dd><time datetime="{{ policy.start_date|date:'Y-m-d' }}" title="Начало">{{ policy.start_date|date:"d.m.Y" }}</time> — <time datetime="{{ policy.end_date|date:'Y-m-d' }}" title="Окончание">{{ policy.end_date|date:"d.m.Y" }}</time></dd></div>
+                <div><dt>Описание объекта страхования</dt><dd class="policy-multiline">{{ policy.property_description|default:"—" }}</dd></div>
+                <div><dt>Идентификатор (обычно VIN)</dt><dd>{% if policy.vin_number %}
+                    <code>{{ policy.vin_number }}</code> {% include "policies/includes/policy_copy_button.html" with value=policy.vin_number label="Скопировать идентификатор" only %}
+                    {% else %}—{% endif %}
+                </dd></div>
+                <div><dt>Год выпуска</dt><dd>{{ policy.property_year|default_if_none:"—"|unlocalize }}</dd></div>
+            </dl>
+            <dl class="policy-contacts">
+                <div><dt>Филиал</dt><dd><a href="{% url 'insurers:branch_detail' policy.branch_id %}">{% branch_logo policy.branch size='small' %}</a></dd></div>
+                <div><dt>Менеджер</dt><dd>{% if policy.leasing_manager_id %}
+                    <a href="{% url 'insurers:manager_detail' policy.leasing_manager_id %}"><img src="{% static 'images/alliance-logo.png' %}" alt="" title="Менеджер Allianz Leasing" width="19" height="19"> {{ policy.leasing_manager }}</a>
+                    {% else %}—{% endif %}
+                </dd></div>
+            </dl>
+        </section>
 
-                // Initialize Bootstrap tooltips
-                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-                var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                    return new bootstrap.Tooltip(tooltipTriggerEl);
-                });
-            });
-        </script>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="col-md-4 policy-sidebar">
-        <!-- Status -->
-        <div class="card mb-4 policy-statuses">
-            <div class="card-header">
-                <h5 class="mb-0">Статусы</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Полис активен:</strong><br>
-                {% if policy.policy_active %}
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
-                {% else %}
-                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Нет (расторгнут)</span>
-                    {% if policy.termination_date %}
-                        <br><small class="text-muted">Дата расторжения: {{ policy.termination_date|date:"d.m.Y" }}</small>
-                    {% endif %}
-                {% endif %}
-                </p>
-
-                <p><strong>ДФА активен:</strong><br>
-                {% if policy.dfa_active %}
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
-                {% else %}
-                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Нет</span>
-                    {% if policy.dfa_deactivation_date %}
-                        <br><small class="text-muted">Дата деактивации ДФА: {{ policy.dfa_deactivation_date|date:"d.m.Y" }}</small>
-                    {% endif %}
-                {% endif %}
-                </p>
-
-                <p id="policy-uploaded"><strong>Полис подгружен:</strong><br>
-                {% if policy.policy_uploaded %}
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
-                {% else %}
-                    <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
-                {% endif %}
-                {% if can_edit_policy %}
-                    <button type="button" class="card-field-action upload-edit-button" data-edit-target="upload-editor" aria-controls="upload-editor" aria-expanded="false">Изменить отметку</button>
-                {% endif %}
-                </p>
-                {% if can_edit_policy %}
-                    {% include "policies/includes/policy_field_editor.html" with field="policy_uploaded" panel_id="upload-editor" anchor="policy-uploaded" label="Полис подгружен" %}
-                {% endif %}
-
-                <p><strong>Участие брокера:</strong><br>
-                {% if policy.broker_participation %}
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
-                {% else %}
-                    <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Нет (без брокера)</span>
-                {% endif %}
-                </p>
-
-                <p class="mb-0"><strong>Перезаключение (к старому ДФА):</strong><br>
-                {% if policy.renewal_to_old_dfa %}
-                    <span class="badge bg-info text-dark"><i class="bi bi-check-circle"></i> Да</span>
-                {% else %}
-                    <span class="badge bg-light text-dark border"><i class="bi bi-x-circle"></i> Нет</span>
-                {% endif %}
-                </p>
-            </div>
-        </div>
+        <section class="policy-panel policy-statuses" aria-labelledby="statuses-title">
+            <h2 class="panel-heading" id="statuses-title"><i class="bi bi-check2-square" aria-hidden="true"></i>Статусы</h2>
+            <dl class="status-list">
+                <div><dt>Полис активен</dt><dd>
+                    {% if policy.policy_active %}<span class="status-yes">Да</span>{% else %}<span class="status-danger">Нет (расторгнут)</span>{% if policy.termination_date %}<small>Дата расторжения {{ policy.termination_date|date:"d.m.Y" }}</small>{% endif %}{% endif %}
+                </dd></div>
+                <div><dt>ДФА активен</dt><dd>
+                    {% if policy.dfa_active %}<span class="status-yes">Да</span>{% else %}<span class="status-danger">Нет</span>{% if policy.dfa_deactivation_date %}<small>Дата деактивации ДФА {{ policy.dfa_deactivation_date|date:"d.m.Y" }}</small>{% endif %}{% endif %}
+                </dd></div>
+                <div id="policy-uploaded"><dt>Полис подгружен</dt><dd>
+                    <span class="upload-mark">
+                        {% if can_edit_policy %}<button type="button" data-edit-target="upload-editor" aria-controls="upload-editor" aria-expanded="false" class="policy-icon-action" aria-label="Изменить отметку" title="Изменить отметку"><i class="bi bi-pencil" aria-hidden="true"></i></button>{% endif %}
+                        {% if policy.policy_uploaded %}<span class="status-yes">Да</span>{% else %}<span class="status-danger">Нет</span>{% endif %}
+                    </span>
+                    {% if can_edit_policy %}{% include "policies/includes/policy_field_editor.html" with field="policy_uploaded" panel_id="upload-editor" anchor="policy-uploaded" label="Полис подгружен" %}{% endif %}
+                </dd></div>
+                <div><dt>Участие брокера</dt><dd>{% if policy.broker_participation %}<span class="status-yes">Да</span>{% else %}<span class="status-no">Нет (без брокера)</span>{% endif %}</dd></div>
+                <div><dt>Перезаключение к старому ДФА</dt><dd>{% if policy.renewal_to_old_dfa %}<span class="status-yes">Да</span>{% else %}<span class="status-no">Нет</span>{% endif %}</dd></div>
+            </dl>
+        </section>
 
         {% if flow_links %}
-        <section class="card mb-4 flow-source-card" aria-labelledby="flow-source-brand">
+        <section class="policy-panel flow-source-card" aria-labelledby="flow-source-brand">
             <header class="flow-source-card__header">
                 <h2 id="flow-source-brand"><b>флоу</b> <span aria-hidden="true">//</span> заявки</h2>
                 <small>{{ flow_zs_host }}</small>
@@ -381,120 +94,53 @@
         </section>
         {% endif %}
 
-        <!-- Financial Info -->
-        <div class="card mb-4 policy-finance">
-            <div class="card-header">
-                <h5 class="mb-0">Финансовая информация</h5>
-            </div>
-            <div class="card-body">
-                {% if not policy.is_osago %}
-                <p><strong>Франшиза:</strong><br>
-                {{ policy.franchise|rub }}</p>
-                {% endif %}
-
-                <p><strong>Общая премия:</strong><br>
-                <span class="text-primary fs-5">{{ policy.premium_total|rub }}</span></p>
-
-                <!-- Rates by Year -->
+        <section class="policy-panel policy-finance" aria-labelledby="finance-title">
+            <h2 class="panel-heading" id="finance-title"><i class="bi bi-wallet2" aria-hidden="true"></i>Финансовая информация</h2>
+            <div class="finance-body">
+                <dl class="finance-amounts">
+                    <div><dt>Общая премия</dt><dd>{{ premium_total|rub }} <small>₽</small></dd></div>
+                    {% if not policy.is_osago %}<div><dt>Франшиза</dt><dd>{{ policy.franchise|rub }} ₽</dd></div>{% endif %}
+                </dl>
                 {% if rates_by_year %}
-                <div class="policy-rates">
-                    <p class="mb-2">
-                        <strong class="policy-rates-title">Тариф по годам страхования</strong>
-                    </p>
-                    <p class="mb-3">
-                        <small class="text-muted" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="Тариф рассчитывается как сумма всех страховых премий соответствующего года страхования, разделенная на страховую сумму. Страховая сумма берется из первого платежа внутри года страхования. Расчет выполняется только для тех лет, где в базе есть первый платеж (№1) внутри года.">
-                            <i class="bi bi-info-circle"></i> Пояснение
-                        </small>
-                    </p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40%;">Год</th>
-                                    <th style="width: 60%;">Тариф, %</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for year_data in rates_by_year %}
-                                <tr{% if year_data.is_current %} class="policy-rate-current"{% endif %}>
-                                    <td style="width: 40%;">
-                                        {{ year_data.year_number }}
-                                        {% if year_data.is_current %}
-                                            <span class="policy-rate-marker">◆</span>
-                                            <small class="policy-rate-current-label">(текущ.)</small>
-                                        {% endif %}
-                                    </td>
-                                    <td style="width: 60%;">{{ year_data.rate|floatformat:2 }}%</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <h3 class="rates-title">Тариф по годам страхования
+                    <button type="button" class="policy-icon-action" aria-label="Пояснение к расчёту тарифа" data-bs-toggle="tooltip" title="Тариф — сумма премий за страховой год, делённая на страховую сумму из первого взноса этого года. В расчёт входят годы, для которых указан взнос № 1."><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                </h3>
+                <dl class="rates-list">
+                    {% for year in rates_by_year %}<div><dt>{{ year.year_number }}-й год {% if year.is_current %}<span>текущий</span>{% endif %}</dt><dd>{{ year.rate|floatformat:2 }}%</dd></div>{% endfor %}
+                </dl>
                 {% endif %}
             </div>
-        </div>
-
-        <!-- Additional Info -->
-        {% if info1_tags or info2_tags or policy.info3 or policy.info4 or can_edit_policy %}
-        <div class="card mb-4 policy-additional">
-            <div class="card-header">
-                <h5 class="mb-0">Дополнительная информация</h5>
-            </div>
-            <div class="card-body">
-                <!-- Info 1 -->
-                {% if info1_tags %}
-                <div class="mb-3 pb-3 border-bottom">
-                    <strong>Инфо 1:</strong><br>
-                    {% for info in info1_tags %}
-                    <span class="badge bg-info me-1">{{ info.tag.name }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <!-- Info 2 -->
-                {% if info2_tags %}
-                <div class="mb-3 pb-3 border-bottom">
-                    <strong>Инфо 2:</strong><br>
-                    {% for info in info2_tags %}
-                    <span class="badge bg-secondary me-1">{{ info.tag.name }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <!-- Info 3 -->
-                {% if policy.info3 or can_edit_policy %}
-                <div class="mb-3 pb-3 border-bottom" id="policy-note">
-                    <div class="policy-note-heading">
-                        <strong>Инфо 3</strong>
-                        {% if can_edit_policy %}
-                            <button type="button" class="card-field-action" data-edit-target="note-editor" aria-controls="note-editor" aria-expanded="false">
-                                {% if policy.info3 %}<i class="bi bi-pencil" aria-hidden="true"></i> Изменить заметку{% else %}+ Добавить заметку{% endif %}
-                            </button>
-                        {% endif %}
-                    </div>
-                    {% if policy.info3 %}{{ policy.info3|linebreaks }}{% endif %}
-                    {% if can_edit_policy %}
-                        {% include "policies/includes/policy_field_editor.html" with field="info3" panel_id="note-editor" anchor="policy-note" label="Текст заметки" %}
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <!-- Info 4 -->
-                {% if policy.info4 %}
-                <div class="mb-0">
-                    <strong>Инфо 4:</strong><br>
-                    {{ policy.info4|linebreaks }}
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
+        </section>
     </div>
-</div>
+
+    {% if info1_tags or info2_tags or policy.info3 or policy.info4 or can_edit_policy %}
+    <section class="policy-panel policy-additional" aria-labelledby="info-title">
+        <h2 id="info-title"><i class="bi bi-journal-text" aria-hidden="true"></i>Дополнительная информация</h2>
+        <div class="info-fields">
+            {% if info1_tags %}
+            <div class="info-field"><h3>Инфо 1</h3><ul class="policy-tags">{% for info in info1_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>
+            {% endif %}
+            {% if info2_tags %}
+            <div class="info-field"><h3>Инфо 2</h3><ul class="policy-tags">{% for info in info2_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>
+            {% endif %}
+            {% if policy.info3 or can_edit_policy %}
+            <div class="info-field" id="policy-note">
+                <div class="note-heading"><h3>Инфо 3 <small>· в журнале</small></h3>
+                    {% if can_edit_policy %}<button type="button" class="card-field-action" data-edit-target="note-editor" aria-controls="note-editor" aria-expanded="false"><i class="bi bi-pencil" aria-hidden="true"></i> {% if policy.info3 %}Изменить<span class="visually-hidden"> заметку</span>{% else %}Добавить заметку{% endif %}</button>{% endif %}
+                </div>
+                {% if policy.info3 %}<p class="policy-multiline">{{ policy.info3 }}</p>{% endif %}
+                {% if can_edit_policy %}{% include "policies/includes/policy_field_editor.html" with field="info3" panel_id="note-editor" anchor="policy-note" label="Текст заметки" %}{% endif %}
+            </div>
+            {% endif %}
+            {% if policy.info4 %}<div class="info-field"><h3>Инфо 4 <small>· в карточке</small></h3><p class="policy-multiline">{{ policy.info4 }}</p></div>{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% include "policies/includes/policy_card_schedule.html" %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'policies/js/card_edits.js' %}"></script>
+<script src="{% static 'policies/js/card_edits.js' %}?v=2026-11-13.2"></script>
 {% endblock %}

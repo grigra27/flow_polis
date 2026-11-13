@@ -27,6 +27,83 @@ def regular_user(db):
 class TestPolicyDetailView:
     """Tests for PolicyDetailView displaying insurance_sum."""
 
+    def test_both_tag_groups_can_display_the_same_tag(
+        self, client, regular_user, sample_policy
+    ):
+        from apps.insurers.models import InfoTag
+        from apps.policies.models import PolicyInfo
+
+        tag = InfoTag.objects.create(name="Перенайм")
+        for group in (1, 2):
+            PolicyInfo.objects.create(policy=sample_policy, tag=tag, info_field=group)
+        client.force_login(regular_user)
+        url = reverse("policies:detail", args=[sample_policy.pk])
+        html = client.get(url).content.decode()
+        assert html.count("<li>Перенайм</li>") == 2
+        for group in (1, 2):
+            assert re.search(
+                rf"<h3>Инфо {group}</h3>\s*<ul[^>]*><li>Перенайм</li>", html
+            )
+
+    def test_schedule_progress_and_next_installment(
+        self, client, regular_user, sample_policy, payment_schedule_factory
+    ):
+        today = timezone.localdate()
+        payment_schedule_factory(
+            policy=sample_policy,
+            year_number=4,
+            due_date=today,
+            paid_date=today,
+            amount=Decimal("125.34"),
+        )
+        upcoming = payment_schedule_factory(
+            policy=sample_policy,
+            year_number=4,
+            installment_number=2,
+            due_date=today + timedelta(days=10),
+            amount=Decimal("75.11"),
+        )
+        client.force_login(regular_user)
+        url = reverse("policies:detail", args=[sample_policy.pk])
+        card = client.get(url)
+        assert card.context["paid_count"] == 1
+        assert card.context["paid_total"] == Decimal("125.34")
+        assert card.context["premium_total"] == Decimal("200.45")
+        assert card.context["next_payment"] == upcoming
+        assert "4-й год" in card.content.decode()
+
+        sample_policy.policy_active = False
+        sample_policy.termination_date = today
+        sample_policy.save()
+        assert client.get(url).context["next_payment"] is None
+
+    def test_commission_rounding_to_kopecks_is_not_a_rate_difference(
+        self,
+        client,
+        regular_user,
+        sample_policy,
+        payment_schedule_factory,
+        commission_rate_factory,
+    ):
+        rate = commission_rate_factory(
+            insurer=sample_policy.insurer,
+            insurance_type=sample_policy.insurance_type,
+            kv_percent=Decimal("25.00"),
+        )
+        payment = payment_schedule_factory(
+            policy=sample_policy,
+            commission_rate=rate,
+            amount=Decimal("33917.13"),
+        )
+        client.force_login(regular_user)
+        url = reverse("policies:detail", args=[sample_policy.pk])
+        payment.refresh_from_db()
+        assert payment.kv_rub == Decimal("8479.28")
+        assert 'class="rate-difference"' not in client.get(url).content.decode()
+        payment.kv_rub = Decimal("8500.00")
+        payment.save()
+        assert 'class="rate-difference"' in client.get(url).content.decode()
+
     def test_insurance_sum_displayed_in_payment_table(
         self, client, regular_user, sample_policy, sample_payment
     ):

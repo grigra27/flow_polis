@@ -1,0 +1,96 @@
+{% load currency_filters insurer_tags l10n %}
+<section class="policy-panel policy-schedule" aria-labelledby="schedule-title">
+    <div class="schedule-header">
+        <div><h2 id="schedule-title"><i class="bi bi-calendar3" aria-hidden="true"></i>График платежей</h2>
+            {% if payments %}<span>{{ payments|length }} {{ payments|length|ru_pluralize:"взнос,взноса,взносов" }} · {% if payment_year_count == 1 %}{{ payments.0.year_number }}-й год{% else %}{{ payment_year_count }} {{ payment_year_count|ru_pluralize:"год,года,лет" }}{% endif %}</span>{% endif %}
+        </div>
+        {% if payments %}<span class="paid-summary">Оплачено <b>{{ paid_count }} из {{ payments|length }}</b> <span aria-hidden="true">/</span> <b>{{ paid_total|rub }} ₽</b></span>{% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="schedule-table">
+            <thead><tr>
+                <th scope="col">Год / взнос</th><th scope="col" class="num" title="Страховая сумма">СС, ₽</th><th scope="col" class="num" title="Страховая премия">СП, ₽</th>
+                <th scope="col" class="num">КВ, %</th><th scope="col" class="num">КВ, ₽</th>
+                <th scope="col">Дата по<br>договору</th><th scope="col">Статус</th>
+                <th scope="col">Фактическая<br>оплата</th><th scope="col" title="Дата согласования акта с СК">Акт СК</th>
+                <th scope="col">Оплатил<br>Альянс</th><th scope="col" class="schedule-note">Примечание</th>
+                <th scope="col" class="row-action"><span class="visually-hidden">Действия</span></th>
+            </tr></thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr id="installment-{{ payment.pk|unlocalize }}" class="payment-row{% if payment.pk == next_payment.pk %} payment-next{% endif %}{% if payment.is_cancelled %} table-cancelled{% endif %}{% ifchanged payment.year_number %}{% if not forloop.first %} year-start{% endif %}{% endifchanged %}">
+                    <td>
+                        <button type="button" class="payment-toggle" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" aria-controls="payment-{{ payment.pk|unlocalize }}" aria-expanded="{% if open_payment == payment.pk|stringformat:'s' %}true{% else %}false{% endif %}" aria-label="Подробности взноса {{ payment.year_number }}/{{ payment.installment_number }}">
+                            <i class="bi bi-chevron-right" aria-hidden="true"></i> {{ payment.year_number }} / {{ payment.installment_number }}
+                        </button>
+                    </td>
+                    <td class="num">{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub }}{% else %}—{% endif %}</td>
+                    <td class="num"><strong>{{ payment.amount|rub }}</strong></td>
+                    <td class="num">{% if payment.amount > 0 %}
+                        {% with actual=payment.kv_percent_actual|floatformat:"2u" base=commission_rate.kv_percent|floatformat:"2u" %}
+                        <span{% if commission_rate and actual != base %} class="rate-difference"{% endif %}>{{ actual|floatformat:"-2" }}%</span>
+                        {% if commission_rate and actual != base %}<small class="base-rate">Ставка {{ base|floatformat:"-2" }}%</small>{% endif %}
+                        {% endwith %}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="num">{{ payment.kv_rub|rub }}</td>
+                    <td class="schedule-date">{{ payment.due_date|date:"d.m.Y" }}</td>
+                    <td>
+                        {% if payment.is_approved %}<span class="pay-status approved"><i class="bi bi-check-circle" aria-hidden="true"></i> Акт согласован СК</span>
+                        {% elif payment.is_paid %}<span class="pay-status paid"><i class="bi bi-check2-circle" aria-hidden="true"></i> Оплачен</span>
+                        {% elif payment.is_cancelled %}<span class="pay-status cancelled"><i class="bi bi-x-circle" aria-hidden="true"></i> Отменен</span>
+                        {% elif payment.is_overdue %}<span class="pay-status overdue"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Не оплачен</span>
+                        {% else %}<span class="pay-status expected"><i class="bi bi-clock" aria-hidden="true"></i> Ожидается</span>{% endif %}
+                    </td>
+                    <td>{% include "policies/includes/payment_date.html" with field="paid_date" full_label="Фактическая дата оплаты" value=payment.paid_date %}</td>
+                    <td>{% include "policies/includes/payment_date.html" with field="insurer_date" full_label="Дата согласования акта с СК" value=payment.insurer_date %}</td>
+                    <td>{% if payment.alliance_paid %}Да{% else %}Нет{% endif %}</td>
+                    <td class="schedule-note policy-multiline">{{ payment.payment_info|default:"—" }}</td>
+                    <td class="row-action">
+                        {% if can_edit_payment %}<a class="policy-icon-action btn-warning" href="{% url 'admin:policies_paymentschedule_change' payment.pk %}{% if card_query %}?{{ card_query }}{% endif %}" aria-label="Редактировать взнос {{ payment.year_number }}/{{ payment.installment_number }}" title="Редактировать взнос"><i class="bi bi-pencil" aria-hidden="true"></i></a>{% endif %}
+                    </td>
+                </tr>
+                {% if can_edit_payment %}
+                <tr id="date-edit-{{ payment.pk|unlocalize }}" class="date-editor-row" hidden>
+                    <td colspan="12">
+                        <form method="post" class="card-edit-form" data-date-editor>
+                            {% csrf_token %}
+                            <input type="hidden" name="original">
+                            <div class="card-date-controls">
+                                <label for="date-value-{{ payment.pk|unlocalize }}" data-date-label></label>
+                                <input id="date-value-{{ payment.pk|unlocalize }}" class="form-control form-control-sm" name="value" type="date" aria-describedby="date-error-{{ payment.pk|unlocalize }}">
+                                <button type="button" class="btn btn-outline-secondary" data-today="{{ card_today }}">Сегодня</button>
+                                <button class="btn btn-primary" type="submit">Сохранить</button>
+                                <button type="button" class="btn btn-outline-secondary" data-edit-cancel>Отмена</button>
+                            </div>
+                            <p id="date-error-{{ payment.pk|unlocalize }}" class="card-edit-error" role="alert"></p>
+                        </form>
+                    </td>
+                </tr>
+                {% endif %}
+                <tr class="collapse{% if open_payment == payment.pk|stringformat:'s' %} show{% endif %}" id="payment-{{ payment.pk|unlocalize }}">
+                    <td colspan="12">
+                        <dl class="payment-details">
+                            <div><dt>Дата платежа (по договору)</dt><dd>{{ payment.due_date|date:"d.m.Y" }}</dd></div>
+                            <div><dt>Фактическая дата оплаты</dt><dd>{{ payment.paid_date|date:"d.m.Y"|default:"—" }}</dd></div>
+                            <div><dt>Дата согласования акта с СК</dt><dd>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</dd></div>
+                            <div><dt>Ставка комиссии (базовая)</dt><dd>{% if commission_rate %}{{ policy.insurer }} · {{ policy.insurance_type }} · {{ commission_rate.kv_percent|floatformat:"-2" }}%{% else %}—{% endif %}</dd></div>
+                            <div><dt>Оплатил Альянс</dt><dd>{{ payment.alliance_paid|yesno:"Да,Нет" }}</dd></div>
+                        </dl>
+                        {% if payment.payment_info %}<p class="detail-note"><b>Дополнительная информация</b><br><span class="policy-multiline">{{ payment.payment_info }}</span></p>{% endif %}
+                        {% if can_edit_payment %}<a class="detail-edit" href="{% url 'admin:policies_paymentschedule_change' payment.pk %}{% if card_query %}?{{ card_query }}{% endif %}"><i class="bi bi-pencil" aria-hidden="true"></i> Редактировать взнос</a>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="12" class="schedule-empty">График платежей не заполнен</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if payments %}
+    <div class="schedule-footer">
+        <span>СС — страховая сумма <i>·</i> СП — страховая премия <i>·</i> КВ — комиссия</span>
+        <span>Базовая ставка КВ <b>{% if commission_rate %}{{ commission_rate.kv_percent|floatformat:"-2" }}%{% else %}—{% endif %}</b></span>
+    </div>
+    {% endif %}
+</section>

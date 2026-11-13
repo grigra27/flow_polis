@@ -16,11 +16,13 @@
         const panel = document.getElementById(button.dataset.editTarget);
         const form = panel.querySelector('form');
         form.reset();
-        form.action = button.dataset.dateUrl;
-        form.querySelector('[data-date-label]').textContent = button.dataset.label;
-        form.elements.original.value = button.dataset.value;
-        form.elements.value.value = button.dataset.value;
-        form.elements.value.required = !button.dataset.value;
+        if (form.hasAttribute('data-date-editor')) {
+            form.action = button.dataset.dateUrl;
+            form.querySelector('[data-date-label]').textContent = button.dataset.label;
+            form.elements.value.value = button.dataset.value;
+            form.elements.value.required = !button.dataset.value;
+        }
+        form.elements.original.value = form.elements.value.value;
         form.querySelector('[role="alert"]').textContent = '';
         form.elements.value.removeAttribute('aria-invalid');
         panel.hidden = false;
@@ -66,9 +68,8 @@
                 form.elements.value.focus();
                 return;
             }
-            const target = activeButton.closest('tr');
             const url = new URL(window.location.href);
-            url.hash = target.id;
+            url.hash = form.dataset.returnAnchor || activeButton.closest('tr').id;
             window.history.replaceState(null, '', url);
             window.location.reload();
         } catch {

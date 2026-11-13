@@ -18,6 +18,11 @@ urlpatterns = [
         card_edits.update_payment_date,
         name="update_payment_date",
     ),
+    path(
+        "<int:pk>/fields/<str:field>/",
+        card_edits.update_policy_field,
+        name="update_policy_field",
+    ),
     path("payments/", views.PaymentScheduleListView.as_view(), name="payments"),
     path(
         "payments/scheduled/",

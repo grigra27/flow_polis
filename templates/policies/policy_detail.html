@@ -24,7 +24,7 @@
         {% endif %}
     </h1>
     <div class="policy-page-actions">
-        {% if can_edit %}
+        {% if can_edit_policy %}
         <a href="{% url 'admin:policies_policy_change' policy.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-warning">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
@@ -331,13 +331,19 @@
                 {% endif %}
                 </p>
 
-                <p><strong>Полис подгружен:</strong><br>
+                <p id="policy-uploaded"><strong>Полис подгружен:</strong><br>
                 {% if policy.policy_uploaded %}
                     <span class="badge bg-success"><i class="bi bi-check-circle"></i> Да</span>
                 {% else %}
                     <span class="badge bg-danger"><i class="bi bi-cloud-upload"></i> Нет</span>
                 {% endif %}
+                {% if can_edit_policy %}
+                    <button type="button" class="card-field-action upload-edit-button" data-edit-target="upload-editor" aria-controls="upload-editor" aria-expanded="false">Изменить отметку</button>
+                {% endif %}
                 </p>
+                {% if can_edit_policy %}
+                    {% include "policies/includes/policy_field_editor.html" with field="policy_uploaded" panel_id="upload-editor" anchor="policy-uploaded" label="Полис подгружен" %}
+                {% endif %}
 
                 <p><strong>Участие брокера:</strong><br>
                 {% if policy.broker_participation %}
@@ -430,7 +436,7 @@
         </div>
 
         <!-- Additional Info -->
-        {% if info1_tags or info2_tags or policy.info3 or policy.info4 %}
+        {% if info1_tags or info2_tags or policy.info3 or policy.info4 or can_edit_policy %}
         <div class="card mb-4 policy-additional">
             <div class="card-header">
                 <h5 class="mb-0">Дополнительная информация</h5>
@@ -457,10 +463,20 @@
                 {% endif %}
 
                 <!-- Info 3 -->
-                {% if policy.info3 %}
-                <div class="mb-3 pb-3 border-bottom">
-                    <strong>Инфо 3:</strong><br>
-                    {{ policy.info3|linebreaks }}
+                {% if policy.info3 or can_edit_policy %}
+                <div class="mb-3 pb-3 border-bottom" id="policy-note">
+                    <div class="policy-note-heading">
+                        <strong>Инфо 3</strong>
+                        {% if can_edit_policy %}
+                            <button type="button" class="card-field-action" data-edit-target="note-editor" aria-controls="note-editor" aria-expanded="false">
+                                {% if policy.info3 %}<i class="bi bi-pencil" aria-hidden="true"></i> Изменить заметку{% else %}+ Добавить заметку{% endif %}
+                            </button>
+                        {% endif %}
+                    </div>
+                    {% if policy.info3 %}{{ policy.info3|linebreaks }}{% endif %}
+                    {% if can_edit_policy %}
+                        {% include "policies/includes/policy_field_editor.html" with field="info3" panel_id="note-editor" anchor="policy-note" label="Текст заметки" %}
+                    {% endif %}
                 </div>
                 {% endif %}
 

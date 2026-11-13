@@ -146,3 +146,105 @@ def test_date_order_at_both_neighbors(
     )
     payments[1].refresh_from_db()
     assert getattr(payments[1], field) == payments[1].due_date
+
+
+def policy_field_url(policy, field):
+    return reverse("policies:update_policy_field", args=[policy.pk, field])
+
+
+@pytest.mark.django_db
+def test_empty_policy_note_permission_audit_and_conflict(
+    client, operator, sample_policy
+):
+    policy = sample_policy
+    policy.info3 = policy.info4 = ""
+    policy.save()
+    editor = operator("change_policy")
+    client.force_login(editor)
+    card = client.get(reverse("policies:detail", args=[policy.pk])).content.decode()
+    assert "Добавить заметку" in card and "Изменить отметку" in card
+    assert "data-date-url=" not in card
+    note = policy_field_url(policy, "info3")
+    text = "Первая строка\r\nВторая & <проверка>"
+    assert (
+        client.post(
+            note, {"original": "", "value": text, "policy_uploaded": "yes"}
+        ).status_code
+        == 204
+    )
+    policy.refresh_from_db()
+    assert policy.info3 == text.replace("\r\n", "\n") and not policy.policy_uploaded
+    log = (
+        LogEntry.objects.get_for_object(policy)
+        .filter(actor=editor, action=LogEntry.Action.UPDATE)
+        .get()
+    )
+    assert log.changes["info3"] == ["", policy.info3]
+    assert (
+        client.post(note, {"original": "", "value": "Устаревшее значение"}).status_code
+        == 409
+    )
+    assert client.post(note, {"original": text, "value": ""}).status_code == 204
+    policy.refresh_from_db()
+    assert policy.info3 == ""
+
+
+@pytest.mark.django_db
+def test_upload_mark_is_explicit_idempotent_and_separate(
+    client, operator, sample_policy
+):
+    policy = sample_policy
+    editor = operator("change_policy")
+    client.force_login(editor)
+    url = policy_field_url(policy, "policy_uploaded")
+    old_note = policy.info3
+    assert client.get(url).status_code == 405
+    assert client.post(url, {"original": "no", "value": "maybe"}).status_code == 422
+    assert client.post(url, {"original": "no"}).status_code == 400
+    assert (
+        client.post(
+            policy_field_url(policy, "policy_number"),
+            {"original": "", "value": "OTHER"},
+        ).status_code
+        == 400
+    )
+    for _ in range(2):
+        assert (
+            client.post(
+                url, {"original": "no", "value": "yes", "info3": ""}
+            ).status_code
+            == 204
+        )
+    policy.refresh_from_db()
+    assert policy.policy_uploaded and policy.info3 == old_note
+    log = (
+        LogEntry.objects.get_for_object(policy)
+        .filter(actor=editor, action=LogEntry.Action.UPDATE)
+        .get()
+    )
+    assert "policy_uploaded" in log.changes and "info3" not in log.changes
+    assert client.post(url, {"original": "no", "value": "no"}).status_code == 409
+    assert client.post(url, {"original": "yes", "value": "no"}).status_code == 204
+    policy.refresh_from_db()
+    assert not policy.policy_uploaded
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "staff,permission", [(False, "change_policy"), (True, "change_paymentschedule")]
+)
+def test_policy_controls_require_policy_permission(
+    client, operator, sample_payment, staff, permission
+):
+    policy = sample_payment.policy
+    client.force_login(operator(permission, staff=staff))
+    card = client.get(reverse("policies:detail", args=[policy.pk])).content.decode()
+    assert "Изменить отметку" not in card and "Изменить заметку" not in card
+    assert ("data-date-url=" in card) is staff
+    for field in ("info3", "policy_uploaded"):
+        assert (
+            client.post(
+                policy_field_url(policy, field), {"original": "", "value": "yes"}
+            ).status_code
+            == 403
+        )

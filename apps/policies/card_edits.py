@@ -5,9 +5,10 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
-from .models import PaymentSchedule
+from .models import PaymentSchedule, Policy
 
 
 def can_edit_card_field(user, model):
@@ -19,10 +20,14 @@ def can_edit_card_field(user, model):
 
 
 def check_original(request, current, proposed):
-    """Повтор сохранения идемпотентен; чужую более свежую правку показываем оператору."""
+    """Повторное сохранение идемпотентно. Сообщаем оператору о конфликте."""
     if current == proposed:
         return HttpResponse(status=204)
-    if request.POST.get("original") != current:
+    original = request.POST.get("original")
+    if (
+        original is None
+        or original.replace("\r\n", "\n").replace("\r", "\n") != current
+    ):
         return JsonResponse(
             {"error": "Значение уже изменилось. Обновите карточку и проверьте его."},
             status=409,
@@ -80,4 +85,37 @@ def update_payment_date(request, pk, payment_id, field):
             payment.save(update_fields=[field, "updated_at"])
     except ValidationError as error:
         return JsonResponse({"error": " ".join(error.messages)}, status=422)
+    return HttpResponse(status=204)
+
+
+@login_required
+@require_POST
+def update_policy_field(request, pk, field):
+    if not can_edit_card_field(request.user, Policy):
+        raise PermissionDenied
+    if field not in ("info3", "policy_uploaded") or "value" not in request.POST:
+        return JsonResponse({"error": "Укажите значение поля полиса."}, status=400)
+    with transaction.atomic():
+        policy = get_object_or_404(Policy.objects.select_for_update(), pk=pk)
+        value = request.POST["value"]
+        if field == "policy_uploaded":
+            if value not in ("yes", "no"):
+                return JsonResponse({"error": "Выберите «Да» или «Нет»."}, status=422)
+            current = "yes" if policy.policy_uploaded else "no"
+            proposed = value == "yes"
+        else:
+            # Браузер отправляет многострочный текст с CRLF, старые заметки
+            # могут храниться и с LF.
+            value = value.replace("\r\n", "\n").replace("\r", "\n")
+            if "\x00" in value:
+                return JsonResponse(
+                    {"error": "В тексте есть недопустимый символ."}, status=422
+                )
+            current = policy.info3.replace("\r\n", "\n").replace("\r", "\n")
+            proposed = value
+        result = check_original(request, current, value)
+        if result is not None:
+            return result
+        setattr(policy, field, proposed)
+        policy.save(update_fields=[field, "updated_at"])
     return HttpResponse(status=204)

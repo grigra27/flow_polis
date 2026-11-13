@@ -228,6 +228,7 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             else journal_label(journal)
         )
         context["card_query"] = urlencode(navigation)
+        context["can_edit_policy"] = can_edit_card_field(self.request.user, Policy)
         context["open_payment"] = self.request.GET.get("payment", "")
         context["can_edit_payment"] = can_edit_card_field(
             self.request.user, PaymentSchedule

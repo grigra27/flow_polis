@@ -1,0 +1,21 @@
+<div id="{{ panel_id }}" class="policy-field-editor" hidden>
+    <form method="post" action="{% url 'policies:update_policy_field' policy.pk field %}" class="card-edit-form" data-return-anchor="{{ anchor }}">
+        {% csrf_token %}
+        <input type="hidden" name="original">
+        <label for="{{ panel_id }}-value">{{ label }}</label>
+        {% if field == "info3" %}
+            <textarea id="{{ panel_id }}-value" name="value" rows="4" class="form-control form-control-sm" aria-describedby="{{ panel_id }}-error">
+{{ policy.info3 }}</textarea>
+        {% else %}
+            <select id="{{ panel_id }}-value" name="value" class="form-select form-select-sm" aria-describedby="{{ panel_id }}-error">
+                <option value="yes"{% if policy.policy_uploaded %} selected{% endif %}>Да</option>
+                <option value="no"{% if not policy.policy_uploaded %} selected{% endif %}>Нет</option>
+            </select>
+        {% endif %}
+        <div class="card-edit-actions">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <button class="btn btn-outline-secondary" type="button" data-edit-cancel>Отмена</button>
+        </div>
+        <p id="{{ panel_id }}-error" class="card-edit-error" role="alert"></p>
+    </form>
+</div>

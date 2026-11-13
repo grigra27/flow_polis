@@ -157,6 +157,18 @@
 .card-date-controls input { width: 10rem; min-height: 36px; }
 .card-edit-error { color: #a12d29; margin: .5rem 0 0; }
 .card-edit-error:empty { display: none; }
+.policy-note-heading, .card-edit-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.policy-note-heading { justify-content: space-between; margin-bottom: .35rem; }
+.upload-edit-button { grid-column: 1 / -1; justify-self: end; }
+.policy-field-editor { background: var(--policy-tint); border-radius: 8px; padding: .75rem; }
+.policy-field-editor label { display: block; font-weight: 600; margin-bottom: .35rem; }
+.policy-field-editor .card-edit-actions { margin-top: .5rem; }
+.policy-detail :is(#policy-note, #policy-uploaded) { scroll-margin-top: 7rem; }
 .policy-schedule .collapse strong { color: var(--policy-muted); font-weight: 550; }
 .policy-schedule .collapse small { font-size: 0.8rem; }
 .policy-schedule .btn-warning { border-color: #f6dfa5; background: #fff6db; color: #805a13; }

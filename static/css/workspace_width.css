@@ -1,0 +1,18 @@
+/* Let working tables use the available screen width, keeping their page gutters. */
+:is(
+    .policy-journal,
+    .payment-list,
+    .billing-period-list,
+    .billing-prolongation,
+    .policy-detail,
+    .summary-policies,
+    .ecosystem-page,
+    .ax--table-page
+) {
+    max-width: none;
+}
+
+/* Admin forms and the admin home retain their existing width limits. */
+body.staff-admin.change-list #content {
+    max-width: none;
+}

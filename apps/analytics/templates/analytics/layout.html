@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="ax">
+<div class="ax{% if metric or tab == 'insurers' or tab == 'channels' %} ax--table-page{% endif %}">
     <div class="ax-head">
         <h1>Аналитика</h1>
         <div class="ax-head-note">

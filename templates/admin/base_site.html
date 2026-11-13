@@ -1,5 +1,9 @@
 {% extends "admin/base_site.html" %}
 {% load static %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/staff_admin_chrome.css' %}">{% endblock %}
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/staff_admin_chrome.css' %}">
+<link rel="stylesheet" href="{% static 'css/workspace_width.css' %}?v=2026-11-13">
+{% endblock %}
 {% block bodyclass %}{{ block.super }} staff-admin{% endblock %}

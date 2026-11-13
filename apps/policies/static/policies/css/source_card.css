@@ -48,3 +48,20 @@
 
 .flow-source-card a.flow-source-card__open:hover { background: #075c58; }
 .flow-source-card a.flow-source-card__open:focus-visible { outline: 3px solid #075c58; outline-offset: 2px; }
+
+.flow-source-card__group {
+    margin-top: .75rem;
+    padding-top: .5rem;
+    border-top: 1px solid var(--app-color-border);
+}
+
+.flow-source-card__group-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding-block: .25rem;
+    color: var(--app-color-primary);
+    font-size: .875rem;
+    font-weight: 600;
+    text-underline-offset: .16em;
+}

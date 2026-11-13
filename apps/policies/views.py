@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_filters.views import FilterView
-from django.db.models import Q
+from django.db.models import Count, Q
 from .models import FlowPolicySource, Policy, PaymentSchedule, in_force_q
 from .flow_views import source_url
 from .filters import PolicyFilter
@@ -202,7 +202,9 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         policy = self.object
         links = list(
-            policy.flow_links.select_related("source").order_by("source_id", "slot")
+            policy.flow_links.select_related("source")
+            .annotate(group_policy_count=Count("source__links"))
+            .order_by("source_id", "slot")
         )
         context["flow_links"] = links
         context["flow_zs_host"] = urlsplit(settings.FLOW_ZS_BASE_URL).hostname

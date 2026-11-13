@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.4">
-{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-13.4">{% endif %}
+{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-13.5">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -98,6 +98,15 @@
                     <h3>Свод № {{ link.source_id|unlocalize }}</h3>
                     <p>{% if link.slot and link.source.total > 1 %}Объект {{ link.slot }} из {{ link.source.total }}{% elif link.source.total > 1 %}Общий полис · Объектов в своде: {{ link.source.total }}{% elif link.created_from_summary %}Полис оформлен из этого свода{% else %}Полис связан с этим сводом{% endif %}</p>
                     <a class="flow-source-card__open" href="{{ link.source_url }}" aria-label="Открыть свод: {{ link.source_label }}">Открыть свод <span aria-hidden="true">↗</span></a>
+                    {% if link.group_policy_count > 1 %}
+                    <div class="flow-source-card__group">
+                        <a class="flow-source-card__group-link" href="{% url 'policies:by-summary' link.source_id %}">
+                            <i class="bi bi-collection" aria-hidden="true"></i>
+                            Полисы этой группы ({{ link.group_policy_count }})
+                            <span class="visually-hidden">по своду № {{ link.source_id|unlocalize }}</span>
+                        </a>
+                    </div>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

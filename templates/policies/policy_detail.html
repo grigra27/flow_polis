@@ -6,7 +6,7 @@
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
 {% block extra_css %}
-    <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}">
+    <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13">
     {% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}">{% endif %}
 {% endblock %}
 
@@ -149,16 +149,16 @@
                                 <th>СП, ₽</th>
                                 <th>КВ, %</th>
                                 <th>КВ, ₽</th>
-                                <th>Дата платежа</th>
-                                <th>Статус</th>
+                                <th>Дата по договору</th>
+                                <th>Статус и даты</th>
                                 <th>Примечание</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for payment in policy.payment_schedule.all %}
-                            <tr id="installment-{{ payment.pk|unlocalize }}" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
+                            <tr id="installment-{{ payment.pk|unlocalize }}" class="payment-row {% if payment.is_cancelled %}table-cancelled{% endif %}">
                                 <td>
-                                    <i class="bi bi-chevron-right toggle-icon"></i>
+                                    <button type="button" class="payment-toggle" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" aria-controls="payment-{{ payment.pk|unlocalize }}" aria-expanded="{% if open_payment == payment.pk|stringformat:'s' %}true{% else %}false{% endif %}" aria-label="Подробности взноса {{ payment.year_number }}/{{ payment.installment_number }}"><i class="bi bi-chevron-right toggle-icon" aria-hidden="true"></i></button>
                                 </td>
                                 <td>{{ payment.year_number }}/{{ payment.installment_number }}</td>
                                 <td>{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub }}{% else %}—{% endif %}</td>
@@ -189,11 +189,31 @@
                                     {% else %}
                                         <span class="badge bg-warning text-dark">Ожидается</span>
                                     {% endif %}
+                                    {% include "policies/includes/payment_date.html" with field="paid_date" label="Оплата" full_label="Фактическая дата оплаты" value=payment.paid_date %}
+                                    {% include "policies/includes/payment_date.html" with field="insurer_date" label="Акт СК" full_label="Дата согласования акта с СК" value=payment.insurer_date %}
                                 </td>
                                 <td>
                                     <small>{{ payment.payment_info|truncatewords:10|default:"—" }}</small>
                                 </td>
                             </tr>
+                            {% if can_edit_payment %}
+                            <tr id="date-edit-{{ payment.pk|unlocalize }}" class="date-editor-row" hidden>
+                                <td colspan="9">
+                                    <form method="post" class="card-edit-form" data-date-editor>
+                                        {% csrf_token %}
+                                        <input type="hidden" name="original">
+                                        <div class="card-date-controls">
+                                            <label for="date-value-{{ payment.pk|unlocalize }}" data-date-label></label>
+                                            <input id="date-value-{{ payment.pk|unlocalize }}" class="form-control form-control-sm" name="value" type="date" aria-describedby="date-error-{{ payment.pk|unlocalize }}">
+                                            <button type="button" class="btn btn-outline-secondary" data-today="{{ card_today }}">Сегодня</button>
+                                            <button class="btn btn-primary" type="submit">Сохранить</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-edit-cancel>Отмена</button>
+                                        </div>
+                                        <p id="date-error-{{ payment.pk|unlocalize }}" class="card-edit-error" role="alert"></p>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endif %}
                             <tr class="collapse{% if open_payment == payment.pk|stringformat:'s' %} show{% endif %}" id="payment-{{ payment.pk|unlocalize }}">
                                 <td colspan="9" class="bg-light">
                                     <div class="p-3">
@@ -241,7 +261,7 @@
                                             </div>
                                         </div>
                                         {% endif %}
-                                        {% if can_edit %}
+                                        {% if can_edit_payment %}
                                         <div class="mt-2">
                                             <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-sm btn-warning">
                                                 <i class="bi bi-pencil"></i> Редактировать
@@ -457,4 +477,8 @@
     </div>
 </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'policies/js/card_edits.js' %}"></script>
 {% endblock %}

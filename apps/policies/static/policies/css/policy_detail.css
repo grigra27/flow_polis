@@ -130,7 +130,33 @@
 .policy-schedule .payment-row small { font-size: 0.75rem; }
 .policy-schedule .payment-row:not(.table-cancelled):hover > td { --bs-table-bg: var(--app-color-row-hover); }
 .policy-schedule .toggle-icon { display: inline-block; color: var(--policy-muted); transition: transform 0.2s; }
-.policy-schedule .payment-row:has(+ tr.show) .toggle-icon { transform: rotate(90deg); }
+.policy-schedule .payment-row { cursor: pointer; }
+.payment-toggle, .card-field-action {
+    border: 0;
+    background: transparent;
+    color: var(--app-color-action);
+    font: inherit;
+}
+.payment-toggle { padding: .3rem; }
+.payment-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
+.payment-date {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+    margin-top: .25rem;
+    font-size: .76rem;
+    white-space: nowrap;
+}
+.payment-date > span { color: var(--policy-muted); }
+.card-field-action { padding: .15rem 0; font-weight: 600; }
+.card-field-action:hover { text-decoration: underline; }
+.policy-schedule .date-editor-row td { background: var(--policy-tint); }
+.card-date-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.card-date-controls label { font-weight: 600; }
+.card-date-controls input { width: 10rem; min-height: 36px; }
+.card-edit-error { color: #a12d29; margin: .5rem 0 0; }
+.card-edit-error:empty { display: none; }
 .policy-schedule .collapse strong { color: var(--policy-muted); font-weight: 550; }
 .policy-schedule .collapse small { font-size: 0.8rem; }
 .policy-schedule .btn-warning { border-color: #f6dfa5; background: #fff6db; color: #805a13; }

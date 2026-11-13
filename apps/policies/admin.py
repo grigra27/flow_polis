@@ -517,6 +517,10 @@ class PolicyAdmin(admin.ModelAdmin):
         context[
             "save_and_open_front_button_name"
         ] = self.save_and_open_front_button_name
+        context["show_schedule_shortcut"] = any(
+            inline.opts.model is PaymentSchedule
+            for inline in context["inline_admin_formsets"]
+        )
         payload = self._get_accept_import_payload(request) if add else None
         if payload:
             context["accept_import_warnings"] = payload.get("warnings", [])

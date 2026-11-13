@@ -1,5 +1,5 @@
 from django.urls import path
-from . import flow_views, views
+from . import card_edits, flow_views, views
 from apps.billing import views as billing_views
 
 app_name = "policies"
@@ -13,6 +13,11 @@ urlpatterns = [
     ),
     path("", views.PolicyListView.as_view(), name="list"),
     path("<int:pk>/", views.PolicyDetailView.as_view(), name="detail"),
+    path(
+        "<int:pk>/payments/<int:payment_id>/date/<str:field>/",
+        card_edits.update_payment_date,
+        name="update_payment_date",
+    ),
     path("payments/", views.PaymentScheduleListView.as_view(), name="payments"),
     path(
         "payments/scheduled/",

@@ -120,7 +120,7 @@
         </a>
         <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--paid {% if selected_status == 'paid' %}active{% endif %}">
-            <i class="bi bi-check-circle"></i> Оплаченные
+            <i class="bi bi-check-circle"></i> Оплачено, акт не согласован
         </a>
         <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
            class="pl-status-btn pl-status-btn--overdue {% if selected_status == 'overdue' %}active{% endif %}">

@@ -1,0 +1,14 @@
+{% load l10n %}
+<div class="payment-date">
+    <span>{{ label }}</span>
+    {% if can_edit_payment %}
+    <button type="button" class="card-field-action"
+            data-edit-target="date-edit-{{ payment.pk|unlocalize }}"
+            data-date-url="{% url 'policies:update_payment_date' policy.pk payment.pk field %}"
+            data-label="{{ full_label }}" data-value="{{ value|date:'Y-m-d' }}"
+            aria-label="{{ full_label }}, взнос {{ payment.year_number }}/{{ payment.installment_number }}{% if value %}, {{ value|date:'d.m.Y' }}{% endif %}"
+            aria-expanded="false" aria-controls="date-edit-{{ payment.pk|unlocalize }}">
+        {% if value %}{{ value|date:'d.m.Y' }} <i class="bi bi-pencil" aria-hidden="true"></i>{% else %}+ Внести дату{% endif %}
+    </button>
+    {% else %}{{ value|date:'d.m.Y'|default:"—" }}{% endif %}
+</div>

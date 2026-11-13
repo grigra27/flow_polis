@@ -3,6 +3,7 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from pytest_django.asserts import assertContains
 from django.urls import reverse
 from django.utils import timezone
 
@@ -34,7 +35,7 @@ def link_policy(
             insurer=sample_insurer,
             branch=branch,
             insurance_type=kind,
-            **kwargs
+            **kwargs,
         )
         source.links.create(
             slot=slot, policy=policy, revision="r", created_from_summary=False
@@ -156,14 +157,14 @@ def test_login_returns_reader_to_requested_summary(
 
 
 def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
-    reader, group, sample_policy, settings
+    reader, group, sample_policy, policy_factory, settings
 ):
     settings.FLOW_ZS_BASE_URL = "https://zs.example"
     url = reverse("policies:detail", args=[sample_policy.pk])
     unlinked = reader.get(url).content.decode()
     assert 'id="flow-source-brand"' not in unlinked
     assert "policy-overview--linked" not in unlinked
-    second = FlowPolicySource.objects.create(summary_id=438, mode="common", total=1)
+    second = FlowPolicySource.objects.create(summary_id=438, mode="common", total=5)
     first_link = group.links.create(
         slot=7, policy=sample_policy, revision="r", created_from_summary=True
     )
@@ -184,4 +185,32 @@ def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
         == content.count(second_link.source_url)
         == 1
     )
-    assert "Объект 7 из 8" in content and "Полис связан с этим сводом" in content
+    assert "Объект 7 из 8" in content and "Общий полис" in content
+    assert "flow-source-card__group-link" not in content
+
+    today = timezone.localdate()
+    future = today + timedelta(days=1)
+    past = today - timedelta(days=1)
+    for slot, number, date in [(2, "TOMORROW", future), (3, "EXPIRED", past)]:
+        sibling = policy_factory(
+            policy_number=number,
+            client=sample_policy.client,
+            insurer=sample_policy.insurer,
+            branch=sample_policy.branch,
+            insurance_type=sample_policy.insurance_type,
+            start_date=date,
+            end_date=date,
+        )
+        group.links.create(
+            slot=slot, policy=sibling, revision="r", created_from_summary=True
+        )
+    # Open the policy directly, without the group list's navigation parameters.
+    detail = reader.get(url)
+    assert detail.status_code == 200
+    group_url = reverse("policies:by-summary", args=[group.pk])
+    assertContains(detail, 'class="flow-source-card__group-link"', count=1)
+    assertContains(detail, f'href="{group_url}"', count=1)
+    assertContains(detail, "Полисы этой группы (3)", count=1)
+    assert (
+        reverse("policies:by-summary", args=[second.pk]) not in detail.content.decode()
+    )

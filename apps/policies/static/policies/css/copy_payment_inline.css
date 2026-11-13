@@ -1,65 +1,177 @@
-/**
- * Styles for Copy Payment Inline functionality
- */
-
-.copy-payment-btn-container {
-    margin-top: 5px;
-    display: inline-block;
+/* The copy action has its own cell, including in the Django empty-form template. */
+.payment-inline {
+    --payment-line: var(--staff-line, #d7e1ec);
+    --payment-tint: var(--staff-tint, #f5f8fc);
+    --payment-link: var(--link-fg, #1565c0);
+    --payment-surface: var(--staff-card, #fff);
+    --payment-muted: var(--staff-muted, #52677e);
 }
-
-.copy-payment-btn {
-    background-color: #417690;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
+.payment-inline [hidden] { display: none !important; }
+.payment-inline .payment-copy-cell, .payment-inline .delete { text-align: center; }
+.payment-inline .copy-payment-btn, .payment-inline .payment-toggle-all, .payment-inline .payment-expand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    box-sizing: border-box;
+    min-height: 32px;
+    padding: .32rem .6rem;
+    border: 1px solid var(--payment-line);
+    border-radius: 8px;
+    background: var(--payment-surface);
+    color: var(--payment-link);
+    font-family: inherit;
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.2;
     cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: background-color 0.2s ease;
+}
+.payment-inline .copy-payment-btn {
+    background: color-mix(in srgb, var(--payment-link) 7%, var(--payment-surface));
+    border-color: color-mix(in srgb, var(--payment-link) 26%, var(--payment-surface));
+}
+.payment-inline .copy-payment-btn svg { flex: none; }
+.payment-inline .copy-payment-btn:hover, .payment-inline .copy-payment-btn:active {
+    color: var(--payment-surface);
+    background: var(--payment-link);
+    border-color: var(--payment-link);
+}
+.payment-inline .copy-payment-btn:disabled { opacity: .45; cursor: default; }
+.payment-inline button:focus-visible { outline: 2px solid var(--payment-link); outline-offset: 2px; }
+.payment-inline .payment-expand { width: 30px; padding: 0; background: transparent; border-color: transparent; }
+.payment-inline .payment-expand:hover, .payment-inline .payment-toggle-all:hover { background: var(--payment-tint); }
+.payment-inline .payment-expand[aria-expanded="true"] svg { transform: rotate(90deg); }
+.payment-inline .payment-field-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
 }
 
-.copy-payment-btn:hover {
-    background-color: #2e5266;
+.staff-admin .payment-inline {
+    container-type: inline-size;
+    --payment-columns: 1.9rem minmax(5.4rem, .7fr) minmax(8.25rem, 1.15fr) minmax(7.5rem, 1.45fr)
+        minmax(6rem, 1fr) minmax(5.8rem, .9fr) minmax(8.25rem, 1.15fr);
+    --payment-end: 3.45rem;
 }
-
-.copy-payment-btn:active {
-    background-color: #1f3a4a;
-    transform: translateY(1px);
+.staff-admin .payment-inline.payment-can-add { --payment-end: 7.5rem 3.45rem; }
+#payment_schedule-group.payment-inline fieldset { min-width: 0; margin: 0; }
+.staff-admin #payment_schedule-group.payment-inline .tabular { overflow: visible; }
+.staff-admin .payment-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .8rem 1rem;
+    border-bottom: 1px solid var(--payment-line);
 }
-
-.copy-payment-btn:focus {
-    outline: 2px solid #79aec8;
-    outline-offset: 2px;
+.staff-admin .payment-inline .payment-heading h2 { margin: 0; padding: 0; border: 0; font-size: 1rem; }
+.staff-admin .payment-inline .payment-toggle-all { padding-inline: .8rem; color: var(--payment-muted); }
+.staff-admin .payment-inline :is(.payment-table, thead, tbody) { display: block; width: 100%; }
+.staff-admin .payment-inline fieldset.module .payment-table { overflow: visible; }
+.staff-admin .payment-inline .payment-table :is(thead tr, .payment-row) {
+    display: grid;
+    grid-template-columns: var(--payment-columns) var(--payment-end);
+    align-items: start;
+    gap: 0 .45rem;
+    padding: .55rem .65rem;
+    border-bottom: 1px solid var(--payment-line);
 }
-
-/* Highlight animation for copied row */
-.payment-copied-highlight {
-    animation: highlightFade 2s ease-in-out;
+.staff-admin .payment-inline .payment-table thead tr { align-items: center; background: var(--payment-tint); }
+.staff-admin .payment-inline .payment-table :is(th, td) {
+    min-width: 0;
+    width: auto;
+    border: 0;
+    padding: 0;
+    white-space: normal;
+    background: transparent;
 }
+.staff-admin .payment-inline .payment-table th { color: var(--payment-muted); font-size: .76rem; font-weight: 600; text-align: left; text-transform: none; }
+.staff-admin .payment-inline .payment-table :is(th, td):is(.payment-copy-cell, .delete) { text-align: center; }
+.staff-admin .payment-inline .payment-table thead .payment-disclosure { padding: 0; }
+.staff-admin .payment-inline .payment-row > td { grid-row: 1; }
+.staff-admin .payment-inline .payment-table tr.has_original > td:not(.payment-details) { padding-top: 0; }
+.staff-admin .payment-inline .payment-table .empty-form { display: none; }
+.staff-admin .payment-inline .payment-table .payment-details { grid-column: 1 / -1; grid-row: 2; padding-top: .6rem; }
+.payment-period-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
+.staff-admin #payment_schedule-group.payment-inline :is(input[type="number"], input.vDateField, textarea) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 34px;
+    margin: 0;
+    padding: .35rem .48rem;
+    font-variant-numeric: tabular-nums;
+}
+.staff-admin .payment-inline input[type="number"] { appearance: textfield; text-align: right; }
+.staff-admin .payment-inline input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.staff-admin .payment-inline .payment-period-inputs input { text-align: center; }
+.staff-admin .payment-inline .payment-date p.date {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: 0 3px;
+    margin: 0;
+    padding: 0;
+}
+.staff-admin .payment-inline .payment-date .timezonewarning { grid-column: 1 / -1; }
+.staff-admin .payment-inline .payment-date .datetimeshortcuts { display: flex; align-items: center; font-size: 0; line-height: 0; }
+.staff-admin .payment-inline .payment-date .datetimeshortcuts a:first-child { display: none; } /* «Сегодня» also lives in the calendar. */
+.staff-admin .payment-inline .payment-date .datetimeshortcuts a { display: inline-flex; align-items: center; min-height: 32px; }
+.staff-admin .payment-inline .payment-summary { display: block; margin-top: .18rem; color: var(--payment-muted); font-size: .7rem; line-height: 1.35; }
+.staff-admin .payment-inline .payment-summary:empty, .staff-admin .payment-row:has(.payment-expand[aria-expanded="true"]) .payment-summary { display: none; }
+.payment-inline .payment-detail-fields {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) max-content minmax(12rem, 2.5fr);
+    align-items: start;
+    gap: .7rem 1.3rem;
+    padding: .75rem 1rem;
+    border-inline-start: 3px solid var(--payment-link);
+    border-radius: 0 8px 8px 0;
+    background: var(--payment-tint);
+}
+.payment-inline .payment-label { display: block; margin-bottom: .3rem; color: var(--payment-muted); font-size: .76rem; font-weight: 600; }
+.payment-inline .payment-detail-fields .field-alliance_paid { display: flex; align-items: center; gap: .4rem; padding-top: 1.45rem; }
+.payment-inline .field-alliance_paid .payment-label { order: 1; margin: 0; }
+.staff-admin #payment_schedule-group.payment-inline textarea { height: 2.25rem; resize: vertical; }
+.payment-inline .payment-readonly { display: block; overflow-wrap: anywhere; }
+.payment-inline .delete label { display: inline-grid; place-items: center; min-width: 32px; min-height: 32px; cursor: pointer; }
+.payment-inline .delete :is(input, .inline-deletelink) { float: none; margin: 0; }
+.staff-admin .payment-inline .delete .inline-deletelink { display: inline-block; margin-top: .5rem; }
+.staff-admin .payment-inline .payment-row:has(.delete input:checked) { background: color-mix(in srgb, var(--delete-button-bg, #ba2121) 10%, var(--payment-surface)); }
+.staff-admin .payment-inline .payment-table :is(.add-row, .row-form-errors), .staff-admin .payment-inline .payment-table :is(.add-row, .row-form-errors) td { display: block; }
+.staff-admin .payment-inline .payment-table :is(.add-row, .row-form-errors) td { padding: .75rem 1rem; }
+.payment-inline .errorlist { overflow-wrap: anywhere; }
 
-@keyframes highlightFade {
-    0% {
-        background-color: #ffc;
+@container (max-width: 60rem) {
+    .staff-admin .payment-inline.payment-can-add .payment-table { --payment-end: 2.8rem 3.45rem; }
+    .staff-admin .payment-inline .copy-payment-btn { width: 32px; padding: 0; }
+    .staff-admin .payment-inline .copy-payment-btn span { display: none; }
+}
+@container (max-width: 53rem) {
+    .staff-admin .payment-inline .payment-table thead { display: none; }
+    .staff-admin .payment-inline .payment-table .payment-row:not(.empty-form) {
+        grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
+        align-items: end;
+        gap: .55rem .8rem;
     }
-    50% {
-        background-color: #ffc;
+    .staff-admin .payment-inline .payment-table .payment-row > td { grid-row: auto; }
+    .staff-admin .payment-inline .payment-field-label {
+        position: static; grid-column: 1 / -1; width: auto; height: auto;
+        overflow: visible; clip-path: none; white-space: normal;
+        display: block; margin-bottom: .25rem; color: var(--payment-muted); font-size: .76rem;
     }
-    100% {
-        background-color: transparent;
-    }
-}
-
-/* Make sure the button container doesn't break layout */
-.inline-related td:last-child {
-    white-space: nowrap;
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 768px) {
-    .copy-payment-btn {
-        padding: 4px 8px;
-        font-size: 11px;
-    }
+    .staff-admin .payment-inline .payment-disclosure { order: 1; }
+    .staff-admin .payment-inline .payment-copy-cell { order: 2; }
+    .staff-admin .payment-inline .delete { order: 3; }
+    .staff-admin .payment-inline .payment-details { order: 4; }
+    .staff-admin .payment-inline .payment-detail-fields { grid-template-columns: minmax(0, 1fr); }
+    .staff-admin .payment-inline .payment-detail-fields .field-alliance_paid { padding: 0; }
+    .staff-admin .payment-inline .copy-payment-btn { width: auto; padding-inline: .6rem; }
+    .staff-admin .payment-inline .copy-payment-btn span { display: inline; }
+    .staff-admin .payment-inline .delete label { display: inline-flex; gap: .35rem; }
+    .staff-admin .payment-inline .delete label::after { content: "Удалить"; font-size: .76rem; }
+    .staff-admin .payment-inline .payment-table .payment-row { border-bottom-width: 2px; }
 }

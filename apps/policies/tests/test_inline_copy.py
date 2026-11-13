@@ -1,58 +1,81 @@
-"""
-Tests for inline copy functionality.
+"""Regression checks for the payment editor and Django's dynamically cloned row."""
+from html.parser import HTMLParser
 
-**Feature: policy-payment-enhancements**
-
-These tests verify that the copy button is properly configured in the inline.
-"""
 import pytest
-from django.contrib.admin.sites import AdminSite
-from apps.policies.admin import PaymentScheduleInline, PolicyAdmin
-from apps.policies.models import Policy
+from django.contrib.auth.models import Permission
+from django.urls import reverse
+
+
+class PaymentRows(HTMLParser):
+    def __init__(self, response):
+        super().__init__()
+        self.rows = {}
+        self.row = self.cell = None
+        self.feed(response.content.decode())
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "tr" and "payment-row" in attrs.get("class", "").split():
+            self.row = self.rows.setdefault(attrs["id"], {})
+        elif self.row is not None:
+            if tag == "td":
+                self.cell = self.row.setdefault(attrs["class"], [])
+            elif self.cell is not None:
+                self.cell.append((tag, attrs))
+
+    def handle_endtag(self, tag):
+        if tag == "td":
+            self.cell = None
+        elif tag == "tr":
+            self.row = None
 
 
 @pytest.mark.django_db
-class TestInlineCopyConfiguration:
-    """Tests for inline copy button configuration."""
+def test_copy_and_delete_have_separate_cells_in_every_row(admin_client, sample_payment):
+    url = reverse("admin:policies_policy_change", args=[sample_payment.policy_id])
+    response = admin_client.get(url)
+    html = response.content.decode()
+    assert "/static/policies/js/copy_payment_inline.js?v=" in html
+    assert "/static/policies/css/copy_payment_inline.css?v=" in html
+    rows = PaymentRows(response).rows
+    assert set(rows) == {f"payment_schedule-{i}" for i in (0, 1, "empty")}
+    for row_id, cells in rows.items():
+        assert list(cells)[-2:] == ["payment-copy-cell", "delete"]
+        buttons = [
+            attrs for tag, attrs in cells["payment-copy-cell"] if tag == "button"
+        ]
+        assert [button["class"] for button in buttons] == ["copy-payment-btn"]
+        assert buttons[0]["type"] == "button"
+        controls = [
+            attrs.get("name") for tag, attrs in cells["delete"] if tag == "input"
+        ]
+        assert controls == ([f"{row_id}-DELETE"] if row_id.endswith("-0") else [])
+        fields = {
+            attrs["name"].rsplit("-", 1)[-1]
+            for tag, attrs in cells["payment-details"]
+            if tag in ("input", "textarea")
+        }
+        assert fields == {"insurer_date", "alliance_paid", "payment_info"}
 
-    def test_inline_has_media_js(self):
-        """
-        Test that PaymentScheduleInline includes the copy JavaScript file.
-        """
-        inline = PaymentScheduleInline(Policy, AdminSite())
 
-        # Check that Media class exists
-        assert hasattr(inline, "Media")
-
-        # Check that js is defined
-        assert hasattr(inline.Media, "js")
-
-        # Check that our copy script is included
-        js_files = inline.Media.js
-        assert "policies/js/copy_payment_inline.js" in js_files
-
-    def test_inline_has_media_css(self):
-        """
-        Test that PaymentScheduleInline includes the copy CSS file.
-        """
-        inline = PaymentScheduleInline(Policy, AdminSite())
-
-        # Check that css is defined
-        assert hasattr(inline.Media, "css")
-
-        # Check that our copy styles are included
-        css_files = inline.Media.css.get("all", [])
-        assert "policies/css/copy_payment_inline.css" in css_files
-
-    def test_inline_registered_in_policy_admin(self):
-        """
-        Test that PaymentScheduleInline is registered in PolicyAdmin.
-        """
-        site = AdminSite()
-        admin = PolicyAdmin(Policy, site)
-
-        # Check that inlines are defined
-        assert hasattr(admin, "inlines")
-
-        # Check that PaymentScheduleInline is in the inlines
-        assert PaymentScheduleInline in admin.inlines
+@pytest.mark.django_db
+def test_view_only_inline_discloses_values_without_edit_actions(
+    client, django_user_model, sample_payment
+):
+    viewer = django_user_model.objects.create_user("viewer", is_staff=True)
+    viewer.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="policies",
+            codename__in=("view_policy", "view_paymentschedule"),
+        )
+    )
+    client.force_login(viewer)
+    url = reverse("admin:policies_policy_change", args=[sample_payment.policy_id])
+    response = client.get(url)
+    assert response.status_code == 200
+    rows = PaymentRows(response).rows
+    assert list(rows) == ["payment_schedule-0"]
+    cells = rows["payment_schedule-0"]
+    assert "payment-copy-cell" not in cells and not cells["delete"]
+    assert all(tag not in ("input", "textarea") for tag, _ in cells["payment-details"])
+    assert sample_payment.payment_info in response.content.decode()

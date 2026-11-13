@@ -1,0 +1,106 @@
+{% load policies_admin %}
+{% with fs=inline_admin_formset prefix=inline_admin_formset.formset.prefix %}
+<div class="js-inline-admin-formset inline-group payment-inline{% if fs.has_add_permission %} payment-can-add{% endif %}"
+     id="{{ prefix }}-group" data-inline-type="tabular" data-inline-formset="{{ fs.inline_formset_data }}">
+  <div class="tabular inline-related{% if forloop.last %} last-related{% endif %}">
+    {{ fs.formset.management_form }}
+    <fieldset class="module" aria-labelledby="{{ prefix }}-heading">
+      <div class="payment-heading">
+        <h2 class="inline-heading" id="{{ prefix }}-heading">{{ fs.opts.verbose_name_plural|capfirst }}</h2>
+        {% if not request.flow_source %}<button type="button" class="payment-toggle-all" hidden>Раскрыть все</button>{% endif %}
+      </div>
+      {{ fs.formset.non_form_errors }}
+      <table class="payment-table" aria-labelledby="{{ prefix }}-heading">
+        <thead><tr>
+          {% if not request.flow_source %}<th scope="col" class="payment-disclosure"><span class="visually-hidden">Детали</span></th>{% endif %}
+          <th scope="col" class="payment-period">Год / Взнос</th>
+          <th scope="col" class="payment-date">По договору</th>
+          <th scope="col" class="payment-sum" title="Стоимость застрахованного имущества для этого платежа">Страховая сумма, ₽</th>
+          <th scope="col" class="payment-premium">Премия, ₽</th>
+          <th scope="col" class="payment-kv" title="Комиссия в рублях. Рассчитывается автоматически, можно изменить вручную.">КВ, ₽</th>
+          <th scope="col" class="payment-date column-paid_date">Дата оплаты</th>
+          {% if request.flow_source %}
+            <th scope="col" class="column-insurer_date">Акт с СК</th>
+            <th scope="col" class="column-alliance_paid">Оплатил Альянс</th>
+            <th scope="col" class="column-payment_info">Примечание</th>
+          {% endif %}
+          {% if fs.has_add_permission %}<th scope="col" class="payment-copy-cell">Копия</th>{% endif %}
+          <th scope="col" class="delete">{% if fs.has_delete_permission or fs.has_add_permission %}Удалить{% endif %}</th>
+        </tr></thead>
+        <tbody>
+        {% for inline in fs %}
+          {% payment_fields inline as fields %}
+          {% if inline.form.non_field_errors %}
+            <tr class="row-form-errors"><td colspan="{% if request.flow_source %}{{ fs.has_add_permission|yesno:'11,10' }}{% else %}{{ fs.has_add_permission|yesno:'9,8' }}{% endif %}">{{ inline.form.non_field_errors }}</td></tr>
+          {% endif %}
+          <tr id="{{ prefix }}-{% if forloop.last and fs.has_add_permission %}empty{% else %}{{ forloop.counter0 }}{% endif %}"
+              class="form-row payment-row{% if inline.original %} has_original{% endif %}{% if forloop.last and fs.has_add_permission %} empty-form{% endif %}">
+            {% if not request.flow_source %}
+              <td class="payment-disclosure">
+                <button type="button" class="payment-expand" aria-expanded="false" title="Детали платежа" aria-label="Детали платежа" hidden>
+                  <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7.5 4.5 5.5 5.5-5.5 5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </td>
+            {% endif %}
+            <td class="payment-period">
+              {% if inline.needs_explicit_pk_field %}{{ inline.pk_field.field }}{% endif %}
+              {% if inline.fk_field %}{{ inline.fk_field.field }}{% endif %}
+              <div class="payment-period-inputs">
+                <div class="field-year_number">{% include "admin/policies/policy/payment_field.html" with item=fields.year_number label="Год" only %}</div>
+                <div class="field-installment_number">{% include "admin/policies/policy/payment_field.html" with item=fields.installment_number label="Взнос" only %}</div>
+              </div>
+            </td>
+            <td class="field-due_date payment-date">{% include "admin/policies/policy/payment_field.html" with item=fields.due_date only %}</td>
+            <td class="field-insurance_sum payment-sum">{% include "admin/policies/policy/payment_field.html" with item=fields.insurance_sum only %}</td>
+            <td class="field-amount payment-premium">{% include "admin/policies/policy/payment_field.html" with item=fields.amount only %}</td>
+            <td class="field-kv_rub payment-kv">{% include "admin/policies/policy/payment_field.html" with item=fields.kv_rub only %}</td>
+            <td class="field-paid_date payment-date">
+              {% include "admin/policies/policy/payment_field.html" with item=fields.paid_date only %}
+              {% if not request.flow_source %}
+                <small class="payment-summary">{% if fields.paid_date.is_readonly %}{% if inline.original.insurer_date %}Акт {% endif %}{% if inline.original.alliance_paid %}Альянс {% endif %}{% if inline.original.payment_info %}Примечание{% endif %}{% endif %}</small>
+              {% endif %}
+            </td>
+            {% if request.flow_source %}
+              <td class="field-insurer_date">{% include "admin/policies/policy/payment_field.html" with item=fields.insurer_date only %}</td>
+              <td class="field-alliance_paid">{% include "admin/policies/policy/payment_field.html" with item=fields.alliance_paid only %}</td>
+              <td class="field-payment_info">{% include "admin/policies/policy/payment_field.html" with item=fields.payment_info only %}</td>
+            {% else %}
+              <td class="payment-details">
+                <div class="payment-detail-fields">
+                  <div class="field-insurer_date payment-date">
+                    {% include "admin/policies/policy/payment_field.html" with item=fields.insurer_date detail=True only %}
+                  </div>
+                  <div class="field-alliance_paid">
+                    {% include "admin/policies/policy/payment_field.html" with item=fields.alliance_paid detail=True only %}
+                  </div>
+                  <div class="field-payment_info">
+                    {% include "admin/policies/policy/payment_field.html" with item=fields.payment_info label="Примечание" detail=True only %}
+                  </div>
+                </div>
+              </td>
+            {% endif %}
+            {% if fs.has_add_permission %}
+              <td class="payment-copy-cell">
+                {% if not inline.original or fs.has_change_permission %}
+                  <button type="button" class="copy-payment-btn" title="Копировать платёж" aria-label="Копировать платёж" hidden>
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="7" y="7" width="10" height="11" rx="2"/><path d="M13 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+                    </svg><span>Копировать</span>
+                  </button>
+                {% endif %}
+              </td>
+            {% endif %}
+            <td class="delete">
+              {% if fs.formset.can_delete and fs.has_delete_permission and inline.original %}
+                <label title="Пометить платёж к удалению">{{ inline.deletion_field.field }}<span class="visually-hidden">Пометить платёж к удалению</span></label>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="payment-copy-status visually-hidden" role="status"></div>
+    </fieldset>
+  </div>
+</div>
+{% endwith %}

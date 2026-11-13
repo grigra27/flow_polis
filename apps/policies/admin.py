@@ -218,6 +218,7 @@ class OsagoPaymentInlineFormSet(PaymentScheduleInlineFormSet):
 class PaymentScheduleInline(admin.TabularInline):
     model = PaymentSchedule
     formset = PaymentScheduleInlineFormSet
+    template = "admin/policies/policy/payment_inline.html"
     extra = 1
     fields = [
         "year_number",
@@ -246,13 +247,13 @@ class PaymentScheduleInline(admin.TabularInline):
 
     class Media:
         js = (
-            "policies/js/copy_payment_inline.js",
+            f"{settings.STATIC_URL}policies/js/copy_payment_inline.js?v=2026-11-13",
             AUTO_COMMISSION_RATE_JS,
             "policies/js/validate_payment_dates.js",
         )
         css = {
             "all": (
-                "policies/css/copy_payment_inline.css",
+                f"{settings.STATIC_URL}policies/css/copy_payment_inline.css?v=2026-11-13",
                 "policies/css/auto_commission_rate.css",
             )
         }

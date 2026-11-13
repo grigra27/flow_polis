@@ -1,0 +1,9 @@
+{% if item.is_readonly %}
+  <span class="{% if detail %}payment-label{% else %}payment-field-label{% endif %}">{{ label|default:item.field.label }}</span>
+  <span class="payment-readonly">{{ item.contents }}</span>
+{% else %}
+  <label class="{% if detail %}payment-label{% else %}payment-field-label{% endif %}" for="{{ item.field.id_for_label }}">{{ label|default:item.field.label }}</label>
+  {{ item.field.errors }}
+  {{ item.field }}
+  {% if item.field.help_text %}<span class="visually-hidden" id="{{ item.field.auto_id }}_helptext">{{ item.field.help_text }}</span>{% endif %}
+{% endif %}

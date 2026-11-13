@@ -289,6 +289,13 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
         if insurer_id:
             queryset = queryset.filter(policy__insurer_id=insurer_id)
 
+        # Фильтр использует тот же признак и значения, что журнал полисов.
+        osago = self.request.GET.get("osago")
+        if osago == "exclude":
+            queryset = queryset.without_osago()
+        elif osago == "only":
+            queryset = queryset.osago()
+
         # Filter by date range
         date_from = self.request.GET.get("date_from")
         date_to = self.request.GET.get("date_to")

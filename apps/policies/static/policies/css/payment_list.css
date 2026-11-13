@@ -34,6 +34,7 @@
 
 .payment-list .pl-filter-item { flex: 0 1 120px; }
 .payment-list .pl-filter-item--insurer { flex: 1 1 190px; max-width: 270px; }
+.payment-list .pl-filter-item--osago { flex-basis: 155px; }
 .payment-list .pl-filter-item--date { flex-basis: 145px; }
 
 .pl-status-strip {

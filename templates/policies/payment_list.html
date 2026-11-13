@@ -52,7 +52,7 @@
                 <input type="hidden" name="status" value="{{ request.GET.status }}">
                 {% endif %}
                 <div class="pl-filter-item pl-filter-item--insurer">
-                    <label class="pl-filter-label">Страховщик</label>
+                    <label class="pl-filter-label" for="insurerSelect">Страховщик</label>
                     <select name="insurer" id="insurerSelect">
                         <option value="">Все страховщики</option>
                         {% for insurer in insurers %}
@@ -60,6 +60,14 @@
                             {{ insurer.insurer_name }}
                         </option>
                         {% endfor %}
+                    </select>
+                </div>
+                <div class="pl-filter-item pl-filter-item--osago">
+                    <label class="pl-filter-label" for="osagoSelect">ОСАГО</label>
+                    <select name="osago" id="osagoSelect">
+                        <option value="">Все полисы</option>
+                        <option value="exclude" {% if request.GET.osago == 'exclude' %}selected{% endif %}>Без ОСАГО</option>
+                        <option value="only" {% if request.GET.osago == 'only' %}selected{% endif %}>Только ОСАГО</option>
                     </select>
                 </div>
                 <div class="pl-filter-item">
@@ -114,15 +122,15 @@
     <!-- Status Filter Strip -->
     <div class="pl-status-strip">
         <!-- Past payments group -->
-        <a href="{% url 'policies:payments' %}?status=approved{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='approved' page=None %}"
            class="pl-status-btn pl-status-btn--approved {% if selected_status == 'approved' %}active{% endif %}">
             <i class="bi bi-check2-circle"></i> Акт согласован СК
         </a>
-        <a href="{% url 'policies:payments' %}?status=paid{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='paid' page=None %}"
            class="pl-status-btn pl-status-btn--paid {% if selected_status == 'paid' %}active{% endif %}">
             <i class="bi bi-check-circle"></i> Оплачено, акт не согласован
         </a>
-        <a href="{% url 'policies:payments' %}?status=overdue{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='overdue' page=None %}"
            class="pl-status-btn pl-status-btn--overdue {% if selected_status == 'overdue' %}active{% endif %}">
             <i class="bi bi-exclamation-triangle"></i> Не оплаченные
         </a>
@@ -130,11 +138,11 @@
         <div class="pl-status-divider"></div>
 
         <!-- Future payments group -->
-        <a href="{% url 'policies:payments' %}?status=upcoming{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='upcoming' page=None %}"
            class="pl-status-btn pl-status-btn--upcoming {% if selected_status == 'upcoming' %}active{% endif %}">
             <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
         </a>
-        <a href="{% url 'policies:payments' %}?status=future{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='future' page=None %}"
            class="pl-status-btn pl-status-btn--future {% if selected_status == 'future' %}active{% endif %}">
             <i class="bi bi-calendar-event"></i> Будущие (больше 30 дней)
         </a>
@@ -142,7 +150,7 @@
         <div class="pl-status-divider"></div>
 
         <!-- All -->
-        <a href="{% url 'policies:payments' %}?status=all{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_insurer %}&insurer={{ selected_insurer }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if selected_year_number %}&year_number={{ selected_year_number }}{% endif %}{% if selected_installment_number %}&installment_number={{ selected_installment_number }}{% endif %}"
+        <a href="{% querystring status='all' page=None %}"
            class="pl-status-btn pl-status-btn--all {% if selected_status == 'all' %}active{% endif %}">
             <i class="bi bi-list-ul"></i> Все платежи
         </a>
@@ -320,21 +328,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle insurer select change - preserve all current URL parameters
+    // Применяем текущие поля формы, в том числе ещё не отправленный выбор ОСАГО.
     const insurerSelect = document.getElementById('insurerSelect');
     if (insurerSelect) {
         insurerSelect.addEventListener('change', function() {
-            const currentUrl = new URL(window.location.href);
-            const params = new URLSearchParams(currentUrl.search);
-
-            if (this.value) {
-                params.set('insurer', this.value);
-            } else {
-                params.delete('insurer');
-            }
-
-            params.delete('page');
-            window.location.href = currentUrl.pathname + '?' + params.toString();
+            this.form.requestSubmit();
         });
     }
 });

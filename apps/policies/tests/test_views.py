@@ -7,6 +7,9 @@ and that views properly handle the new data structure.
 import pytest
 from datetime import timedelta
 from decimal import Decimal
+from html import unescape
+import re
+from urllib.parse import parse_qs, urlsplit
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -284,10 +287,18 @@ class TestPaymentScheduleListView:
         content = response.content.decode("utf-8")
 
         assert "Акт согласован СК" in content
-        assert (
-            f"status=paid&date_from={date_from}&date_to={date_to}"
-            f"&year_number={year_number}&installment_number={installment_number}"
-        ) in content
+        paid_link = re.search(
+            r'<a href="([^"]+)"\s+class="pl-status-btn pl-status-btn--paid\b', content
+        )
+        assert paid_link is not None
+        params = parse_qs(urlsplit(unescape(paid_link.group(1))).query)
+        assert params == {
+            "status": ["paid"],
+            "date_from": [date_from],
+            "date_to": [date_to],
+            "year_number": [year_number],
+            "installment_number": [installment_number],
+        }
         assert 'name="status" value="upcoming"' in content
 
     def test_payment_list_date_filter_without_explicit_status_uses_all(

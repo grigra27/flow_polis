@@ -140,28 +140,28 @@
     min-width: 0;
     gap: var(--policy-gap);
 }
-.policy-contact-card { background: #edf5ff; border-color: #a8c7ed; }
+.policy-contact-card { background: #f7f9fc; border-color: #cfdbe8; }
 .policy-contact-card .panel-heading {
     padding: 0.75rem var(--policy-pad);
-    border-bottom-color: #164e98;
+    border-bottom-color: #d7e2ef;
     border-radius: 12px 12px 0 0;
-    background: #164e98;
-    color: white;
+    background: #e6eef7;
+    color: #34516f;
     font-weight: 700;
 }
 .policy-contact-card .panel-heading > .bi { color: inherit; }
 .policy-contacts { display: grid; gap: 0.7rem; padding: 0.8rem var(--policy-pad); }
 .policy-contacts > div { display: grid; gap: 0.25rem; min-width: 0; }
-.policy-contacts > div + div { padding-top: 0.7rem; border-top: 1px solid #c2d7f0; }
-.policy-contacts dt { color: #254d7b; font-size: 0.84rem; font-weight: 650; }
+.policy-contacts > div + div { padding-top: 0.7rem; border-top: 1px solid #dee6ef; }
+.policy-contacts dt { color: #5b6f83; font-size: 0.84rem; font-weight: 600; }
 .policy-contacts a {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
     max-width: 100%;
-    color: #124d8d;
+    color: #355a7c;
     font-size: 1.08rem;
-    font-weight: 750;
+    font-weight: 700;
 }
 .policy-contacts img { flex: none; object-fit: contain; }
 .status-list {

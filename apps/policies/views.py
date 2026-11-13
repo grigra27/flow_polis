@@ -1,4 +1,4 @@
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.urls import reverse
@@ -10,6 +10,7 @@ from django.db.models import Q
 from .models import FlowPolicySource, Policy, PaymentSchedule, in_force_q
 from .flow_views import source_url
 from .filters import PolicyFilter
+from .navigation import JournalPaginator, card_params, journal_label
 
 
 class PolicyListView(LoginRequiredMixin, FilterView):
@@ -18,6 +19,7 @@ class PolicyListView(LoginRequiredMixin, FilterView):
     context_object_name = "policies"
     filterset_class = PolicyFilter
     paginate_by = 30
+    paginator_class = JournalPaginator
 
     def get_queryset(self):
         queryset = (
@@ -202,7 +204,8 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         )
         context["flow_links"] = links
         context["flow_zs_host"] = urlsplit(settings.FLOW_ZS_BASE_URL).hostname
-        origin = self.request.GET.get("from_summary")
+        navigation = card_params(self.request.GET)
+        origin = navigation.get("from_summary")
         for link in links:
             if str(link.source_id) == origin:
                 context["group_summary_id"] = link.source_id
@@ -214,6 +217,16 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
                     else None,
                 )
                 break
+        if origin and "group_url" not in context:
+            navigation = {}
+        journal = navigation.get("journal", reverse("policies:list"))
+        context["back_url"] = context.get("group_url", journal)
+        context["back_label"] = (
+            f"К полисам по своду № {origin}"
+            if "group_url" in context
+            else journal_label(journal)
+        )
+        context["card_query"] = urlencode(navigation)
         context["info1_tags"] = policy.info_tags.filter(info_field=1).select_related(
             "tag"
         )
@@ -243,6 +256,7 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
     template_name = "policies/payment_list.html"
     context_object_name = "payments"
     paginate_by = 30
+    paginator_class = JournalPaginator
 
     def get_queryset(self):
         queryset = (

@@ -20,6 +20,7 @@ from apps.insurers.models import InsuranceType, get_osago_insurance_type
 from . import flow_views
 from .forms import AcceptUploadForm
 from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
+from .navigation import policy_card_url
 from .services.accept_parser import parse_accept_file
 from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
@@ -676,7 +677,7 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def response_change(self, request, obj):
         if self._should_redirect_to_front(request):
-            return redirect(self._get_frontend_detail_url(obj))
+            return redirect(policy_card_url(obj.pk, request.GET))
         return super().response_change(request, obj)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):

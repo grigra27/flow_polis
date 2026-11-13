@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static currency_filters %}
-{% load insurer_tags %}
+{% load insurer_tags policy_navigation l10n %}
 
 {% block title %}График платежей{% endblock %}
 
@@ -25,12 +25,12 @@
     {% if branches %}
     <div class="pl-branch-tabs">
         <a class="pl-branch-tab {% if not selected_branch %}active{% endif %}"
-           href="?{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}">
+           href="{% querystring branch=None page=None %}">
             <i class="bi bi-grid-3x3-gap"></i> Все филиалы
         </a>
         {% for branch in branches %}
         <a class="pl-branch-tab {% if selected_branch == branch.id|stringformat:'s' %}active{% endif %}"
-           href="?branch={{ branch.id }}{% for key, value in request.GET.items %}{% if key != 'branch' and key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+           href="{% querystring branch=branch.pk page=None %}">
             {% branch_logo branch size='small' %}
         </a>
         {% endfor %}
@@ -202,10 +202,11 @@
                     </thead>
                     <tbody>
                         {% for payment in payments %}
-                        <tr class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
-                            data-href="{% url 'policies:detail' payment.policy.pk %}">
+                        {% journal_return_query 'payment' payment.pk as origin %}
+                        <tr id="payment-{{ payment.pk|unlocalize }}" class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
+                            data-href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}">
                             <td style="padding-left:1rem;">
-                                {{ payment.policy.policy_number }}{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
+                                <a class="journal-record" href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}">{{ payment.policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
                                 {% if not payment.policy.broker_participation %}
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
@@ -267,10 +268,10 @@
             {% if is_paginated %}
             <div class="pl-pagination">
                 {% if page_obj.has_previous %}
-                    <a class="pl-page-btn" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Первая страница">
+                    <a class="pl-page-btn" href="{% querystring page=1 %}" title="Первая страница">
                         <i class="bi bi-chevron-double-left"></i>
                     </a>
-                    <a class="pl-page-btn" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Предыдущая">
+                    <a class="pl-page-btn" href="{% querystring page=page_obj.previous_page_number %}" title="Предыдущая">
                         <i class="bi bi-chevron-left"></i>
                     </a>
                 {% else %}
@@ -282,19 +283,19 @@
                     {% if page_obj.number == num %}
                         <span class="pl-page-btn active">{{ num }}</span>
                     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a class="pl-page-btn" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        <a class="pl-page-btn" href="{% querystring page=num %}">{{ num }}</a>
                     {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                        <a class="pl-page-btn" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        <a class="pl-page-btn" href="{% querystring page=num %}">{{ num }}</a>
                     {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
                         <span class="pl-page-ellipsis">…</span>
                     {% endif %}
                 {% endfor %}
 
                 {% if page_obj.has_next %}
-                    <a class="pl-page-btn" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Следующая">
+                    <a class="pl-page-btn" href="{% querystring page=page_obj.next_page_number %}" title="Следующая">
                         <i class="bi bi-chevron-right"></i>
                     </a>
-                    <a class="pl-page-btn" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="Последняя страница">
+                    <a class="pl-page-btn" href="{% querystring page=page_obj.paginator.num_pages %}" title="Последняя страница">
                         <i class="bi bi-chevron-double-right"></i>
                     </a>
                 {% else %}
@@ -313,7 +314,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.tbl-row-clickable').forEach(function(row) {
-        row.addEventListener('click', function() {
+        row.addEventListener('click', function(event) {
+            if (event.target.closest('a')) return;
             window.location.href = this.dataset.href;
         });
     });

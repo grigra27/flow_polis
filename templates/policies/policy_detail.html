@@ -25,13 +25,13 @@
     </h1>
     <div class="policy-page-actions">
         {% if can_edit %}
-        <a href="{% url 'admin:policies_policy_change' policy.pk %}" class="btn btn-warning">
+        <a href="{% url 'admin:policies_policy_change' policy.pk %}{% if card_query %}?{{ card_query }}{% endif %}" class="btn btn-warning">
             <i class="bi bi-pencil"></i> Редактировать
         </a>
         {% endif %}
-        <a href="{% if group_url %}{{ group_url }}{% else %}{% url 'policies:list' %}{% endif %}" class="btn btn-secondary">
+        <a href="{{ back_url }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left" aria-hidden="true"></i>
-            {% if group_url %}К полисам по своду № {{ group_summary_id }}{% else %}Назад к списку{% endif %}
+            {{ back_label }}
         </a>
     </div>
 </div>

@@ -50,6 +50,12 @@
                 </dd></div>
                 <div><dt>Год выпуска</dt><dd>{{ policy.property_year|default_if_none:"—"|unlocalize }}</dd></div>
             </dl>
+            {% if can_create_from_policy and not policy.is_osago %}
+            <div class="mt-3">
+                <a href="{% url 'admin:policies_osagopolicy_add' %}?from_object={{ policy.pk|unlocalize }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i> Оформить ОСАГО на этот объект</a>
+                {% include 'policies/includes/osago_for_vin.html' %}
+            </div>
+            {% endif %}
             <dl class="policy-contacts">
                 <div><dt>Филиал</dt><dd><a href="{% url 'insurers:branch_detail' policy.branch_id %}">{% branch_logo policy.branch size='small' %}</a></dd></div>
                 <div><dt>Менеджер</dt><dd>{% if policy.leasing_manager_id %}

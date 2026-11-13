@@ -1,0 +1,11 @@
+{% if osago_matches %}
+<div class="mt-2">
+    <strong>ОСАГО по этому VIN</strong>
+    <ul>
+        {% for contract, status in osago_matches %}
+        <li>{{ status }} · <a href="{% url 'policies:detail' contract.pk %}">{{ contract.policy_number }}</a>
+            · {{ contract.start_date|date:"d.m.Y" }} — {{ contract.end_date|date:"d.m.Y" }}{% if contract.termination_date %} · расторгнут {{ contract.termination_date|date:"d.m.Y" }}{% endif %}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}

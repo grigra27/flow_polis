@@ -35,8 +35,13 @@
 {% block form_top %}
 {{ block.super }}
 {% if template_source %}
-<p data-policy-template>Образец — <a href="{% url 'policies:detail' template_source.pk %}">полис {{ template_source.policy_number }}</a>.
-Введите новый номер, проверьте объект, сроки и договорные даты взносов.</p>
+<div data-policy-template>
+    <p>{% if osago_from_object %}Объект из полиса{% else %}Образец — полис{% endif %}
+        <a href="{% url 'policies:detail' template_source.pk %}">{{ template_source.policy_number }}</a>.
+        {% if osago_from_object %}Выберите страховщика, введите номер ОСАГО, сроки и премию.{% else %}Введите новый номер, проверьте объект, сроки и договорные даты взносов.{% endif %}
+    </p>
+    {% if osago_from_object %}{% include 'policies/includes/osago_for_vin.html' %}{% endif %}
+</div>
 {% endif %}
 {% if show_schedule_shortcut %}
     <p><a href="#payment_schedule-group">Перейти к графику платежей</a></p>

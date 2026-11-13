@@ -22,7 +22,12 @@ from . import flow_views
 from .forms import AcceptUploadForm
 from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
 from .navigation import journal_origin, policy_card_url
-from .services.policy_template import can_create_from_policy, policy_template_initial
+from .services.policy_template import (
+    can_create_from_policy,
+    policy_template_initial,
+    object_initial,
+    osago_for_vin,
+)
 from .services.accept_parser import parse_accept_file
 from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
@@ -454,23 +459,45 @@ class PolicyAdmin(admin.ModelAdmin):
 
     def add_view(self, request, form_url="", extra_context=None):
         add = super().add_view
-        if "from_policy" in request.GET:
-            if "flow_draft" in request.GET or "accept_token" in request.GET:
-                raise Http404
-            if not can_create_from_policy(request.user):
-                raise PermissionDenied
-            source_id = request.GET["from_policy"]
-            if (
-                not source_id.isascii()
-                or not source_id.isdecimal()
-                or len(source_id) > 19
-            ):
-                raise Http404
-            source = get_object_or_404(
-                self.filter_portfolio(Policy.objects.all()), pk=source_id
-            )
-            request.template_source = source
-            if request.method == "GET":
+        if "from_policy" in request.GET or "from_object" in request.GET:
+            return self._add_from_policy(request, form_url, extra_context)
+        if "flow_draft" not in request.GET:
+            return add(request, form_url, extra_context)
+        if self.osago_section:
+            raise PermissionDenied
+        return flow_views.flow_admin_add(
+            request,
+            request.GET["flow_draft"],
+            lambda context: add(
+                request, form_url, {**(extra_context or {}), **context}
+            ),
+        )
+
+    def _add_from_policy(self, request, form_url, extra_context):
+        if not can_create_from_policy(request.user):
+            raise PermissionDenied
+        from_object = "from_object" in request.GET
+        if (
+            from_object
+            and ("from_policy" in request.GET or not self.osago_section)
+            or "flow_draft" in request.GET
+            or "accept_token" in request.GET
+        ):
+            raise Http404
+        source_id = request.GET["from_object" if from_object else "from_policy"]
+        if not source_id.isascii() or not source_id.isdecimal() or len(source_id) > 19:
+            raise Http404
+        sources = (
+            Policy.objects.without_osago()
+            if from_object
+            else self.filter_portfolio(Policy.objects.all())
+        )
+        source = get_object_or_404(sources, pk=source_id)
+        request.template_source = source
+        if request.method == "GET":
+            if from_object:
+                request.template_initial = object_initial(source)
+            else:
                 request.template_initial = policy_template_initial(source)
                 request.template_payments = list(
                     source.payment_schedule.order_by(
@@ -484,26 +511,22 @@ class PolicyAdmin(admin.ModelAdmin):
                         "kv_rub",
                     )
                 )
-            return add(
-                request,
-                form_url,
-                {
-                    **(extra_context or {}),
-                    "template_source": source,
-                    "title": "Создать полис по образцу",
-                },
+        context = {
+            **(extra_context or {}),
+            "template_source": source,
+            "osago_from_object": from_object,
+            "title": "Оформить ОСАГО на этот объект"
+            if from_object
+            else "Создать полис по образцу",
+        }
+        if from_object:
+            vin = (
+                request.POST.get("vin_number", "")
+                if request.method == "POST"
+                else source.vin_number
             )
-        if "flow_draft" not in request.GET:
-            return add(request, form_url, extra_context)
-        if self.osago_section:
-            raise PermissionDenied
-        return flow_views.flow_admin_add(
-            request,
-            request.GET["flow_draft"],
-            lambda context: add(
-                request, form_url, {**(extra_context or {}), **context}
-            ),
-        )
+            context["osago_matches"] = osago_for_vin(vin)
+        return super().add_view(request, form_url, context)
 
     def import_accept_view(self, request):
         if not self.has_add_permission(request):

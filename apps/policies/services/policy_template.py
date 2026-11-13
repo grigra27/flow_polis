@@ -9,7 +9,7 @@ def can_create_from_policy(user):
     )
 
 
-def policy_template_initial(source):
+def object_initial(source):
     return {
         "client": source.client_id,
         "policyholder": source.policyholder_id,
@@ -19,6 +19,12 @@ def policy_template_initial(source):
         "property_description": source.property_description,
         "property_year": source.property_year,
         "vin_number": source.vin_number,
+    }
+
+
+def policy_template_initial(source):
+    return {
+        **object_initial(source),
         "insurer": source.insurer_id,
         "insurance_type": source.insurance_type_id,
         "start_date": source.start_date,
@@ -26,3 +32,39 @@ def policy_template_initial(source):
         "franchise": source.franchise,
         "broker_participation": source.broker_participation,
     }
+
+
+def osago_for_vin(vin):
+    """Действующие, последний завершённый и ближайший будущий договор по VIN."""
+    from django.utils import timezone
+    from apps.policies.models import Policy, in_force_q
+
+    vin = vin.strip()
+    if not vin:
+        return []
+    today = timezone.localdate()
+    matches = Policy.objects.osago().filter(vin_number__iexact=vin)
+    fields = ("pk", "policy_number", "start_date", "end_date", "termination_date")
+    current = matches.in_force(today).only(*fields).order_by("-start_date", "-pk")
+    contracts = [(policy, "Действует") for policy in current]
+    if not contracts:
+        last = (
+            matches.filter(start_date__lte=today)
+            .exclude(in_force_q(today))
+            .only(*fields)
+            .order_by("-start_date", "-pk")
+            .first()
+        )
+        if last:
+            contracts.append((last, "Предыдущий"))
+    upcoming = (
+        matches.filter(
+            start_date__gt=today, policy_active=True, termination_date__isnull=True
+        )
+        .only(*fields)
+        .order_by("start_date", "pk")
+        .first()
+    )
+    if upcoming:
+        contracts.append((upcoming, "Предстоящий"))
+    return contracts

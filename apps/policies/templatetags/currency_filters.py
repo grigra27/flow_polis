@@ -4,7 +4,7 @@ register = template.Library()
 
 
 @register.filter(name="rub")
-def format_rub(value):
+def format_rub(value, separator=" "):
     """
     Форматирует число с разделением тысяч пробелами (без символа рубля).
     Показывает копейки только если они не равны нулю.
@@ -17,14 +17,20 @@ def format_rub(value):
         # Проверяем, есть ли дробная часть
         if num == int(num):
             # Если дробной части нет, форматируем как целое число
-            formatted = "{:,}".format(int(num)).replace(",", " ")
+            formatted = "{:,}".format(int(num)).replace(",", separator)
         else:
             # Если есть дробная часть, форматируем с двумя знаками после запятой
-            formatted = "{:,.2f}".format(num).replace(",", " ")
+            formatted = "{:,.2f}".format(num).replace(",", separator)
 
         return formatted
     except (ValueError, TypeError):
         return value
+
+
+@register.filter(name="rub_compact")
+def format_rub_compact(value):
+    """Сумма с узкими неразрывными пробелами для графика платежей."""
+    return format_rub(value, separator="\u202f")
 
 
 @register.filter(name="currency")

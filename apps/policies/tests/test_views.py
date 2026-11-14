@@ -131,11 +131,10 @@ class TestPolicyDetailView:
         assert "СС, ₽" in content
 
         # Check that the actual insurance_sum value is displayed
-        # The template uses custom 'rub' filter which formats as "500 000" (with spaces)
-        # For 500000.00 it should display as "500 000"
+        # The schedule groups thousands with narrow nonbreaking spaces.
         insurance_sum_formatted = "{:,.0f}".format(
             float(sample_payment.insurance_sum)
-        ).replace(",", " ")
+        ).replace(",", "\u202f")
         assert insurance_sum_formatted in content
 
     def test_multiple_payments_show_different_insurance_sums(

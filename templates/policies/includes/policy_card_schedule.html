@@ -4,7 +4,7 @@
         <div><h2 id="schedule-title"><i class="bi bi-calendar3" aria-hidden="true"></i>График платежей</h2>
             {% if payments %}<span>{{ payments|length }} {{ payments|length|ru_pluralize:"взнос,взноса,взносов" }} · {% if payment_year_count == 1 %}{{ payments.0.year_number }}-й год{% else %}{{ payment_year_count }} {{ payment_year_count|ru_pluralize:"год,года,лет" }}{% endif %}</span>{% endif %}
         </div>
-        {% if payments %}<span class="paid-summary">Оплачено <b>{{ paid_count }} из {{ payments|length }}</b> <span aria-hidden="true">/</span> <b>{{ paid_total|rub }} ₽</b></span>{% endif %}
+        {% if payments %}<span class="paid-summary">Оплачено <b>{{ paid_count }} из {{ payments|length }}</b> <span aria-hidden="true">/</span> <b>{{ paid_total|rub_compact }} ₽</b></span>{% endif %}
     </div>
     <div class="table-responsive">
         <table class="schedule-table">
@@ -21,11 +21,11 @@
                 <tr id="installment-{{ payment.pk|unlocalize }}" class="payment-row{% if payment.pk == next_payment.pk %} payment-next{% endif %}{% if payment.is_cancelled %} table-cancelled{% endif %}{% ifchanged payment.year_number %}{% if not forloop.first %} year-start{% endif %}{% endifchanged %}">
                     <td>
                         <button type="button" class="payment-toggle" data-bs-toggle="collapse" data-bs-target="#payment-{{ payment.pk|unlocalize }}" aria-controls="payment-{{ payment.pk|unlocalize }}" aria-expanded="{% if open_payment == payment.pk|stringformat:'s' %}true{% else %}false{% endif %}" aria-label="Подробности взноса {{ payment.year_number }}/{{ payment.installment_number }}">
-                            <i class="bi bi-chevron-right" aria-hidden="true"></i> {{ payment.year_number }} / {{ payment.installment_number }}
+                            <i class="bi bi-chevron-right" aria-hidden="true"></i> {{ payment.year_number }}/{{ payment.installment_number }}
                         </button>
                     </td>
-                    <td class="num">{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub }}{% else %}—{% endif %}</td>
-                    <td class="num"><strong>{{ payment.amount|rub }}</strong></td>
+                    <td class="num">{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub_compact }}{% else %}—{% endif %}</td>
+                    <td class="num"><strong>{{ payment.amount|rub_compact }}</strong></td>
                     <td class="num">{% if payment.amount > 0 %}
                         {% with actual=payment.kv_percent_actual|floatformat:"2u" base=commission_rate.kv_percent|floatformat:"2u" %}
                         <span{% if commission_rate and actual != base %} class="rate-difference"{% endif %}>{{ actual|floatformat:"-2" }}%</span>
@@ -33,7 +33,7 @@
                         {% endwith %}
                         {% else %}—{% endif %}
                     </td>
-                    <td class="num">{{ payment.kv_rub|rub }}</td>
+                    <td class="num">{{ payment.kv_rub|rub_compact }}</td>
                     <td class="schedule-date">{{ payment.due_date|date:"d.m.Y" }}</td>
                     <td>
                         {% if payment.is_approved %}<span class="pay-status approved"><i class="bi bi-check-circle" aria-hidden="true"></i> Акт согласован СК</span>
@@ -42,8 +42,8 @@
                         {% elif payment.is_overdue %}<span class="pay-status overdue"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Не оплачен</span>
                         {% else %}<span class="pay-status expected"><i class="bi bi-clock" aria-hidden="true"></i> Ожидается</span>{% endif %}
                     </td>
-                    <td>{% include "policies/includes/payment_date.html" with field="paid_date" full_label="Фактическая дата оплаты" value=payment.paid_date %}</td>
-                    <td>{% include "policies/includes/payment_date.html" with field="insurer_date" full_label="Дата согласования акта с СК" value=payment.insurer_date %}</td>
+                    <td class="payment-date-cell">{% include "policies/includes/payment_date.html" with field="paid_date" full_label="Фактическая дата оплаты" value=payment.paid_date %}</td>
+                    <td class="payment-date-cell">{% include "policies/includes/payment_date.html" with field="insurer_date" full_label="Дата согласования акта с СК" value=payment.insurer_date %}</td>
                     <td>{% if payment.alliance_paid %}Да{% else %}Нет{% endif %}</td>
                     <td class="schedule-note policy-multiline">{{ payment.payment_info|default:"—" }}</td>
                     <td class="row-action">

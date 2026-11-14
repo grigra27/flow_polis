@@ -1,0 +1,28 @@
+{% if vin_history %}
+<section class="related-policies" aria-labelledby="related-policies-title">
+    <div class="vin-history-heading">
+        <h3 id="related-policies-title">История страхования объекта</h3>
+        <span>По этому VIN</span>
+    </div>
+    {% for group in vin_history %}
+    <div class="vin-history-group">
+        <h4>{{ group.insurance_type.name }}</h4>
+        <ol class="vin-history-list">
+            {% for item in group.contracts %}
+            <li{% if item.is_open_card %} class="vin-history-open"{% endif %}>
+                <div class="vin-history-contract">
+                    <div class="related-policy-heading">
+                        {% if item.is_open_card %}<strong>{{ item.policy.policy_number }}</strong><small>Эта карточка</small>{% else %}<a href="{% url 'policies:detail' item.policy.pk %}">{{ item.policy.policy_number }}</a>{% endif %}
+                    </div>
+                    <span class="related-policy-meta">{{ item.policy.start_date|date:"d.m.Y" }} — {{ item.policy.end_date|date:"d.m.Y" }}{% if item.policy.termination_date %} · расторжение {{ item.policy.termination_date|date:"d.m.Y" }}{% endif %}</span>
+                    {% if item.different_client %}<span class="vin-history-client">Лизингополучатель · <a href="{% url 'clients:detail' item.policy.client_id %}?role=lessee">{{ item.policy.client.client_name }}</a></span>{% endif %}
+                    {% if item.is_next %}<span class="vin-history-next">Следующий договор в базе</span>{% endif %}
+                </div>
+                <span class="coverage-badge coverage-{{ item.status }}">{{ item.status_label }}</span>
+            </li>
+            {% endfor %}
+        </ol>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}

@@ -4,7 +4,7 @@
 {% block title %}Полис {{ policy.policy_number }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.8">
+<link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-14.2">
 <link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-14.1">
 {% endblock %}
 
@@ -35,10 +35,11 @@
         <section class="policy-panel policy-facts" aria-labelledby="facts-title">
             <h2 class="panel-heading" id="facts-title"><i class="bi bi-file-text" aria-hidden="true"></i>Основная информация</h2>
             <dl class="facts-grid">
-                <div class="policy-lessee"><dt>Лизингополучатель</dt><dd><a href="{% url 'clients:detail' policy.client_id %}">{{ policy.client.client_name }}</a></dd></div>
-                <div><dt>Страхователь</dt><dd>{% if policy.policyholder_id %}<a href="{% url 'clients:detail' policy.policyholder_id %}">{{ policy.policyholder.client_name }}</a>{% else %}—{% endif %}</dd></div>
+                <div class="policy-lessee"><dt>Лизингополучатель</dt><dd><a href="{% url 'clients:detail' policy.client_id %}?role=lessee">{{ policy.client.client_name }}</a></dd></div>
+                <div><dt>Страхователь</dt><dd>{% if policy.policyholder_id %}<a href="{% url 'clients:detail' policy.policyholder_id %}?role=policyholder">{{ policy.policyholder.client_name }}</a>{% else %}—{% endif %}</dd></div>
                 <div><dt>Номер ДФА</dt><dd>{{ policy.dfa_number|default:"—" }}
                     {% if policy.dfa_number %}{% include "policies/includes/policy_copy_button.html" with value=policy.dfa_number label="Скопировать номер ДФА" only %}{% endif %}
+                    {% if dfa_policies %}<button type="button" class="dfa-related-toggle" data-bs-toggle="modal" data-bs-target="#dfa-policies"><i class="bi bi-collection" aria-hidden="true"></i> Ещё {{ dfa_policies|length }} {{ dfa_policies|length|ru_pluralize:"полис,полиса,полисов" }} по ДФА</button>{% endif %}
                 </dd></div>
                 <div><dt>Страховщик</dt><dd><a href="{% url 'insurers:detail' policy.insurer_id %}">{% insurer_logo policy.insurer size='small' %}</a></dd></div>
                 <div><dt>Вид страхования</dt><dd>{% insurance_type_icon policy.insurance_type size='small' %}</dd></div>
@@ -50,10 +51,12 @@
                 </dd></div>
                 <div><dt>Год выпуска</dt><dd>{{ policy.property_year|default_if_none:"—"|unlocalize }}</dd></div>
             </dl>
-            {% if can_create_osago_from_object %}
+            {% if can_create_osago_from_object or related_policies %}
             <div class="policy-object-actions">
+                {% if can_create_osago_from_object %}
                 <a href="{% url 'admin:policies_osagopolicy_add' %}?from_object={{ policy.pk|unlocalize }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i> Оформить ОСАГО на этот объект</a>
-                {% include 'policies/includes/osago_for_vin.html' %}
+                {% endif %}
+                {% include 'policies/includes/related_policies_by_vin.html' %}
             </div>
             {% endif %}
         </section>
@@ -136,8 +139,8 @@
             <div class="info-fields">
                 {% if info1_tags or info2_tags %}
                 <div class="info-row">
-                    {% if info1_tags %}<div class="info-field"><h3>Инфо 1</h3><ul class="policy-tags">{% for info in info1_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>{% endif %}
-                    {% if info2_tags %}<div class="info-field"><h3>Инфо 2</h3><ul class="policy-tags">{% for info in info2_tags %}<li>{{ info.tag.name }}</li>{% endfor %}</ul></div>{% endif %}
+                    {% if info1_tags %}<div class="info-field"><h3>Инфо 1</h3><ul class="policy-tags">{% for info in info1_tags %}<li><a href="{% url 'policies:list' %}?info1_tag={{ info.tag_id|unlocalize }}" aria-label="Полисы с меткой {{ info.tag.name }} в Инфо 1">{{ info.tag.name }} <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></li>{% endfor %}</ul></div>{% endif %}
+                    {% if info2_tags %}<div class="info-field"><h3>Инфо 2</h3><ul class="policy-tags">{% for info in info2_tags %}<li><a href="{% url 'policies:list' %}?info2_tag={{ info.tag_id|unlocalize }}" aria-label="Полисы с меткой {{ info.tag.name }} в Инфо 2">{{ info.tag.name }} <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></li>{% endfor %}</ul></div>{% endif %}
                 </div>
                 {% endif %}
                 {% if policy.info3 or policy.info4 or can_edit_policy %}
@@ -178,6 +181,7 @@
             </div>
         </section>
     </div>
+    {% include 'policies/includes/related_policies_by_dfa.html' %}
 </div>
 {% endblock %}
 

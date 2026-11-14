@@ -58,12 +58,19 @@ class PolicyFilter(django_filters.FilterSet):
             return queryset.osago()
         return queryset
 
-    # Фильтр по инфо1 тегам
+    # Метка и номер поля должны совпасть в одной записи PolicyInfo.
     info1_tag = django_filters.ModelChoiceFilter(
         queryset=InfoTag.objects.all(),
         field_name="info_tags__tag",
         method="filter_info1_tag",
         label="Инфо 1",
+        empty_label="Все теги",
+    )
+    info2_tag = django_filters.ModelChoiceFilter(
+        queryset=InfoTag.objects.all(),
+        field_name="info_tags__tag",
+        method="filter_info2_tag",
+        label="Инфо 2",
         empty_label="Все теги",
     )
 
@@ -72,6 +79,13 @@ class PolicyFilter(django_filters.FilterSet):
         if value:
             return queryset.filter(
                 info_tags__tag=value, info_tags__info_field=1
+            ).distinct()
+        return queryset
+
+    def filter_info2_tag(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                info_tags__tag=value, info_tags__info_field=2
             ).distinct()
         return queryset
 
@@ -94,4 +108,5 @@ class PolicyFilter(django_filters.FilterSet):
             "broker_participation",
             "osago",
             "info1_tag",
+            "info2_tag",
         ]

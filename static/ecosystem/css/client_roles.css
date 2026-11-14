@@ -1,0 +1,72 @@
+.client-role-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--v2-border);
+}
+
+.client-role-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid var(--v2-border);
+    border-radius: 8px;
+    background: #f7f9fc;
+    color: var(--v2-title);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.client-role-tabs a:hover,
+.client-role-tabs a:focus-visible {
+    border-color: var(--v2-accent);
+    color: var(--v2-accent);
+}
+
+.client-role-tabs a[aria-current="page"] {
+    border-color: #315b87;
+    background: #315b87;
+    color: #fff;
+}
+
+.client-role-tabs a span {
+    min-width: 1.55rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 5px;
+    background: #e6edf5;
+    color: #34516f;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.client-role-tabs a[aria-current="page"] span {
+    background: #ffffff26;
+    color: #fff;
+}
+
+.client-role-counterparty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.client-role-counterparty > span {
+    color: var(--v2-muted);
+    font-size: 0.7rem;
+    font-weight: 400;
+}
+
+.client-role-empty {
+    color: var(--v2-muted);
+    font-size: 0.88rem;
+    padding: 1rem 0 0;
+}

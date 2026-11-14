@@ -39,10 +39,12 @@ class TestPolicyDetailView:
         client.force_login(regular_user)
         url = reverse("policies:detail", args=[sample_policy.pk])
         html = client.get(url).content.decode()
-        assert html.count("<li>Перенайм</li>") == 2
+        assert html.count(">Перенайм ") == 2
         for group in (1, 2):
+            target = reverse("policies:list", query={f"info{group}_tag": tag.pk})
             assert re.search(
-                rf"<h3>Инфо {group}</h3>\s*<ul[^>]*><li>Перенайм</li>", html
+                rf'<h3>Инфо {group}</h3>\s*<ul[^>]*><li><a[^>]*href="{re.escape(target)}"[^>]*>Перенайм .*?</a></li>',
+                html,
             )
 
     def test_schedule_progress_and_next_installment(

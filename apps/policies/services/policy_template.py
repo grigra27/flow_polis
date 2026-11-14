@@ -41,6 +41,23 @@ def policy_template_initial(source):
     }
 
 
+def other_policies_for_vin(source):
+    """Другие договоры по VIN с текущим статусом страхового покрытия."""
+    from apps.policies.models import Policy
+    from .policy_relations import coverage_status
+
+    vin = (source.vin_number or "").strip()
+    if not vin:
+        return []
+    matches = (
+        Policy.objects.filter(vin_number__iexact=vin)
+        .exclude(pk=source.pk)
+        .select_related("insurance_type", "client")
+        .order_by("-start_date", "-pk")
+    )
+    return [(policy, coverage_status(policy)[1]) for policy in matches]
+
+
 def osago_for_vin(vin):
     """Действующие, последний завершённый и ближайший будущий договор по VIN."""
     from django.utils import timezone

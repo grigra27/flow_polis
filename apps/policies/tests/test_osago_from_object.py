@@ -88,7 +88,10 @@ def test_issue_osago_from_policy_card(
         payment.amount,
     ) == (1, 1, None, Decimal("10000"))
     assert payment.paid_date is None and payment.insurer_date is None
-    assert admin_client.get(card).context["osago_matches"] == [(new, "Действует")]
+    assert admin_client.get(card).context["related_policies"] == [
+        (new, "Действует"),
+        (earlier, "Завершён"),
+    ]
     assert (
         "Оформить ОСАГО на этот объект"
         not in admin_client.get(saved.url).content.decode()

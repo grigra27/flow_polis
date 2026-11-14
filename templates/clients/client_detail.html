@@ -7,6 +7,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'ecosystem/css/client_detail.css' %}">
 <link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}?v=2026-11-14">
+<link rel="stylesheet" href="{% static 'ecosystem/css/client_roles.css' %}?v=2026-11-14.1">
 {% endblock %}
 
 {% block content %}
@@ -15,7 +16,7 @@
     <!-- Page header -->
     <div class="mgr-page-header">
         <div>
-            <div class="mgr-page-kicker"><i class="bi bi-building"></i> Лизингополучатель</div>
+            <div class="mgr-page-kicker"><i class="bi bi-building"></i> {{ client_role_label }}</div>
             <h1 class="mgr-page-title">{{ client.client_name }}</h1>
             {% if client.alternative_name %}
             <div style="font-size:0.85rem;color:var(--v2-muted);margin-top:0.2rem;font-style:italic;">{{ client.alternative_name }}</div>
@@ -138,10 +139,19 @@
         <div class="col-lg-8">
             <div class="mgr-section">
                 <div class="mgr-section-head">
-                    <span class="mgr-section-head-title"><i class="bi bi-file-earmark-text"></i> Полисы</span>
-                    <span class="mgr-section-head-badge">{{ client_overview.total_policies }}</span>
+                    <span class="mgr-section-head-title"><i class="bi bi-file-earmark-text"></i> Полисы компании</span>
+                    <span class="mgr-section-head-badge">{{ client_role_policy_count }}</span>
                 </div>
                 <div class="mgr-section-body">
+
+                    <nav class="client-role-tabs" aria-label="Роль компании в полисах">
+                        <a href="?role=lessee"{% if client_role == 'lessee' %} aria-current="page"{% endif %}>
+                            Лизингополучатель <span>{{ client_role_counts.lessee }}</span>
+                        </a>
+                        <a href="?role=policyholder"{% if client_role == 'policyholder' %} aria-current="page"{% endif %}>
+                            Страхователь <span>{{ client_role_counts.policyholder }}</span>
+                        </a>
+                    </nav>
 
                     <!-- Stats grid -->
                     <div class="mgr-stats-grid">
@@ -200,6 +210,9 @@
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td class="record-col-policy">
                                         <a class="record-number" href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with compact=True %}
+                                        {% if client_role == 'policyholder' %}
+                                        <div class="client-role-counterparty"><span>Лизингополучатель</span><a href="{% url 'clients:detail' policy.client_id %}?role=lessee">{{ policy.client.client_name }}</a></div>
+                                        {% endif %}
                                     </td>
                                     <td class="record-col-dfa">{{ policy.dfa_number }}</td>
                                     <td class="record-col-insurer">{% insurer_logo policy.insurer size='small' %}</td>
@@ -228,7 +241,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <p style="color:var(--v2-muted);font-size:0.88rem;padding:1rem 0 0;">У лизингополучателя пока нет полисов</p>
+                    <p class="client-role-empty">{% if client_role == 'policyholder' %}У компании пока нет полисов в роли страхователя{% else %}У компании пока нет полисов в роли лизингополучателя{% endif %}</p>
                     {% endif %}
 
                 </div>

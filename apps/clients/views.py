@@ -32,8 +32,28 @@ class ClientDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        policies_qs = self.object.policies.select_related(
-            "insurer", "branch", "insurance_type", "leasing_manager"
+        role = self.request.GET.get("role", "lessee")
+        if role not in {"lessee", "policyholder"}:
+            role = "lessee"
+        role_counts = {
+            "lessee": self.object.policies.count(),
+            "policyholder": self.object.policyholder_policies.count(),
+        }
+        related_policies = (
+            self.object.policyholder_policies
+            if role == "policyholder"
+            else self.object.policies
+        )
+        policies_qs = related_policies.select_related(
+            "client", "insurer", "branch", "insurance_type", "leasing_manager"
+        )
+        context.update(
+            client_role=role,
+            client_role_label="Страхователь"
+            if role == "policyholder"
+            else "Лизингополучатель",
+            client_role_counts=role_counts,
+            client_role_policy_count=role_counts[role],
         )
         context["policies"] = policies_qs.order_by("-start_date")
 

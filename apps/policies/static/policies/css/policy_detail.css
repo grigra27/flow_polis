@@ -132,6 +132,50 @@
 .policy-facts code { color: #243e5b; font-size: 0.94rem; }
 .facts-grid time { white-space: nowrap; }
 .policy-object-actions { padding: 0.75rem 1.25rem; border-top: 1px solid var(--policy-rule); }
+.policy-object-actions > .btn + .related-policies { margin-top: 0.8rem; }
+.related-policies h3 { font-size: 0.9rem; font-weight: 650; }
+.related-policy-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 0.6rem; min-width: 0; }
+.related-policy-heading a { font-weight: 650; }
+.related-policy-heading a { min-width: 0; overflow-wrap: anywhere; }
+.related-policy-meta { color: var(--policy-muted); font-size: 0.8rem; }
+.vin-history-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.2rem 1rem; }
+.vin-history-heading > span, .related-policy-heading small { color: var(--policy-muted); font-size: 0.75rem; }
+.vin-history-group { margin-top: 0.7rem; }
+.vin-history-group h4 { margin: 0 0 0.4rem; font-size: 0.77rem; font-weight: 700; color: #536d87; }
+.policy-detail .vin-history-list { list-style: none; padding: 0 0 0 0.75rem; margin: 0 0 0 0.2rem; border-left: 2px solid #d6e2ed; }
+.vin-history-list li { position: relative; display: flex; align-items: start; justify-content: space-between; gap: 0.5rem 1rem; padding: 0.45rem 0.6rem; border-radius: 7px; }
+.vin-history-list li::before { content: ""; position: absolute; left: -1.08rem; top: 0.8rem; width: 8px; height: 8px; border-radius: 50%; background: #8da7be; border: 2px solid white; }
+.vin-history-list .vin-history-open { background: #f0f5fa; }
+.vin-history-contract { display: grid; gap: 0.15rem; min-width: 0; overflow-wrap: anywhere; }
+.vin-history-client { font-size: 0.8rem; color: var(--policy-muted); }
+.vin-history-next { color: #225c8e; font-size: 0.75rem; font-weight: 600; }
+.coverage-badge { display: inline-block; flex: none; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.75rem; line-height: 1.35; font-weight: 650; white-space: nowrap; color: white; }
+.coverage-current { background: #147a47; }
+.coverage-upcoming { background: #1b568e; }
+.coverage-completed { background: #586b7e; }
+.coverage-terminated { background: #ba2f40; }
+.dfa-related-toggle { display: flex; align-items: baseline; gap: 0.35rem; margin-top: 0.4rem; padding: 0; border: 0; background: transparent; color: #155b9d; font: 650 0.8rem/1.4 var(--app-interface-font); text-align: left; }
+.dfa-related-toggle:hover { text-decoration: underline; }
+.dfa-policies-modal .modal-content { border: 0; border-radius: 13px; }
+.dfa-policies-modal .modal-header { align-items: start; padding: 1.1rem 1.3rem; background: #f3f7fc; }
+.dfa-policies-modal .dfa-policies-subtitle { margin-top: 0.35rem; color: #52677e; font-size: 0.87rem; }
+.dfa-policies-modal .modal-body { padding: 0; }
+.dfa-policies-table { width: 100%; font-size: 0.88rem; }
+.dfa-policies-table :is(th, td) { padding: 0.8rem 1.1rem; border-bottom: 1px solid #e6ecf2; vertical-align: top; }
+.dfa-policies-table th { color: #52677e; font-size: 0.76rem; font-weight: 650; background: white; }
+.dfa-policies-table td { overflow-wrap: anywhere; }
+.dfa-policies-table td:first-child { width: 28%; }
+.dfa-policies-table td:nth-child(2) { width: 33%; }
+.dfa-policies-table small { display: block; margin-top: 0.2rem; color: #52677e; font-size: 0.79rem; }
+.dfa-policies-table a { color: #155b9d; font-weight: 650; text-decoration: none; }
+.dfa-policies-table a:hover { text-decoration: underline; }
+.dfa-policies-table tbody tr:hover { background: #f6f9fc; }
+.dfa-policy-dates { white-space: nowrap; }
+.dfa-policies-modal .modal-footer { justify-content: space-between; color: #52677e; font-size: 0.8rem; }
+@media (max-width: 575px) {
+    .vin-history-list li { flex-wrap: wrap; gap: 0.3rem; }
+    .dfa-policies-table { min-width: 700px; }
+}
 .policy-sidebar {
     grid-area: sidebar;
     display: flex;
@@ -243,6 +287,9 @@
 .note-heading .card-field-action { padding: 0; font-size: 0.76rem; font-weight: 560; }
 .info-field .policy-tags { list-style: none; padding: 0; margin-top: 0.3rem; }
 .policy-tags li { padding: 0.1rem 0.5rem; border-radius: 4px; background: #eaf2fa; color: #26577d; overflow-wrap: anywhere; }
+.policy-tags a { display: inline-block; color: inherit; text-decoration: none; font-weight: 600; padding-block: 0.1rem; }
+.policy-tags a:hover { text-decoration: underline; }
+.policy-tags a .bi { font-size: 0.7em; }
 .schedule-header, .schedule-header > div, .schedule-footer, .paid-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.8rem; }
 .schedule-header, .schedule-footer { padding: 0.72rem var(--policy-pad); justify-content: space-between; }
 .schedule-header > div > span, .paid-summary, .schedule-footer { font-size: 0.79rem; color: var(--policy-muted); }

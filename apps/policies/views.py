@@ -13,10 +13,11 @@ from .flow_permissions import can_link
 from .filters import PolicyFilter
 from .card_edits import can_edit_card_field
 from .navigation import JournalPaginator, card_params, journal_label
+from .services.policy_relations import insurance_history, other_policies_for_dfa
 from .services.policy_template import (
     can_create_from_policy,
     can_create_osago_from_object,
-    osago_for_vin,
+    other_policies_for_vin,
 )
 
 
@@ -110,6 +111,13 @@ class PolicyListView(LoginRequiredMixin, FilterView):
 
         osago_labels = {"exclude": "Без ОСАГО", "only": "Только ОСАГО"}
         add_filter("osago", "ОСАГО", osago_labels.get(query_params.get("osago")))
+
+        selected_tags = getattr(self.filterset.form, "cleaned_data", {})
+        for field in (1, 2):
+            param = f"info{field}_tag"
+            tag = selected_tags.get(param)
+            if tag:
+                add_filter(param, f"Инфо {field}", tag.name)
 
         # Булевые фильтры
         bool_mapping = {
@@ -243,8 +251,9 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         context["can_create_osago_from_object"] = context[
             "can_create_from_policy"
         ] and can_create_osago_from_object(policy)
-        if context["can_create_osago_from_object"]:
-            context["osago_matches"] = osago_for_vin(policy.vin_number)
+        context["related_policies"] = other_policies_for_vin(policy)
+        context["vin_history"] = insurance_history(policy, context["related_policies"])
+        context["dfa_policies"] = other_policies_for_dfa(policy)
         context["can_edit_policy"] = can_edit_card_field(self.request.user, Policy)
         context["open_payment"] = self.request.GET.get("payment", "")
         context["can_edit_payment"] = can_edit_card_field(

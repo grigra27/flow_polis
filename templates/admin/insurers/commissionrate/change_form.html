@@ -1,0 +1,6 @@
+{% extends "admin/change_form.html" %}
+{% block form_top %}
+{{ block.super }}
+<p>Новая версия применяется при подборе ставки для новых полисов. Уже сохранённые полисы, взносы и суммы комиссии не изменяются.</p>
+<p id="rate-version-preview" role="status" aria-live="polite"></p>
+{% endblock %}

@@ -225,3 +225,70 @@ def test_real_manager_without_branches_still_requires_explicit_data_fix(
         assert ('insurers', '0012_leasingmanager_branch') not in MigrationExecutor(connection).loader.applied_migrations
         """,
     )
+
+
+def test_commission_versions_preserve_every_existing_field_and_payment(
+    tmp_path, settings
+):
+    run_migrations(
+        tmp_path,
+        settings,
+        """
+        from datetime import date
+        from decimal import Decimal
+        apps = migrate_to([
+            ('insurers', '0015_insurancetype_needs_prolongation'),
+            ('policies', '0025_flow_dfa_groups'),
+        ])
+        Insurer = apps.get_model('insurers', 'Insurer')
+        Kind = apps.get_model('insurers', 'InsuranceType')
+        Rate = apps.get_model('insurers', 'CommissionRate')
+        Policy = apps.get_model('policies', 'Policy')
+        Payment = apps.get_model('policies', 'PaymentSchedule')
+        client = apps.get_model('clients', 'Client').objects.create(client_name='Миграция', client_inn='1234567890')
+        branch = apps.get_model('insurers', 'Branch').objects.create(branch_name='Миграция')
+        vsk = Insurer.objects.create(insurer_name='ВСК')
+        other = Insurer.objects.create(insurer_name='Другая СК')
+        old = {}
+        for name, percent in [('КАСКО','25'),('Имущество','20'),('Спецтехника','25')]:
+            kind = Kind.objects.create(name=name)
+            old[name] = Rate.objects.create(insurer=vsk, insurance_type=kind, kv_percent=Decimal(percent))
+        wrong = Rate.objects.create(insurer=other, insurance_type=old['КАСКО'].insurance_type, kv_percent=Decimal('12'))
+        policies = []
+        for i, start in enumerate([date(2026,8,1), date(2026,10,28), date(2026,10,30), date(2026,11,1)]):
+            policy = Policy.objects.create(policy_number=f'LEGACY-{i}', client=client, branch=branch, insurer=vsk, insurance_type=old['КАСКО'].insurance_type, start_date=start, end_date=date(2027,11,1), property_description='Сохранить', info3='Исходный текст')
+            policies.append(policy)
+            Payment.objects.create(policy=policy, year_number=1, installment_number=1, due_date=start, insurance_sum=100000, amount=10000, commission_rate=old['КАСКО'] if i != 3 else None, kv_rub=Decimal('1234.56'), payment_info='Индивидуальная КВ', insurer_date=start if i == 0 else None)
+        Payment.objects.create(policy=policies[2], year_number=2, installment_number=1, due_date=date(2027,10,30), insurance_sum=100000, amount=10000, commission_rate=wrong, kv_rub=Decimal('999.99'))
+        policy_fields = [f.attname for f in Policy._meta.concrete_fields]
+        payment_fields = [f.attname for f in Payment._meta.concrete_fields]
+        before_policies = list(Policy.objects.order_by('pk').values(*policy_fields))
+        before_payments = list(Payment.objects.order_by('pk').values(*payment_fields))
+        before_rates = list(Rate.objects.order_by('pk').values('pk','insurer_id','insurance_type_id','kv_percent','created_at','updated_at'))
+        apps = migrate_to([('insurers', '0017_vsk_commission_versions')])
+        Policy = apps.get_model('policies', 'Policy')
+        Payment = apps.get_model('policies', 'PaymentSchedule')
+        Rate = apps.get_model('insurers', 'CommissionRate')
+        assert list(Policy.objects.order_by('pk').values(*policy_fields)) == before_policies
+        assert list(Payment.objects.order_by('pk').values(*payment_fields)) == before_payments
+        assert list(Rate.objects.filter(pk__in=[r['pk'] for r in before_rates]).order_by('pk').values(*before_rates[0].keys())) == before_rates
+        for policy in policies[:2]:
+            migrated = Policy.objects.get(pk=policy.pk)
+            assert migrated.commission_rate_id == old['КАСКО'].pk
+            assert migrated.commission_rate_origin == 'legacy'
+        ambiguous = Policy.objects.get(pk=policies[2].pk)
+        assert ambiguous.commission_rate_id is None and ambiguous.commission_rate_origin == 'review'
+        assert Payment.objects.get(policy_id=policies[3].pk).commission_rate_id is None
+        assert dict(Rate.objects.filter(insurer=vsk.pk, effective_from=date(2026,9,1)).values_list('insurance_type__name','kv_percent')) == {'КАСКО':Decimal('30'),'Имущество':Decimal('25'),'Спецтехника':Decimal('30')}
+        assert Rate.objects.filter(insurer=other.pk).count() == 1
+        # Runtime post_save также использует billing; устанавливаем оставшийся граф.
+        quiet_command('migrate', interactive=False)
+        # Новый взнос старого осеннего полиса наследует 25%, новый полис — 30%.
+        from apps.policies.models import Policy as LivePolicy, PaymentSchedule as LivePayment
+        saved = LivePolicy.objects.get(pk=policies[1].pk)
+        payment = LivePayment.objects.create(policy=saved, year_number=2, installment_number=1, due_date=date(2027,10,28), insurance_sum=100000, amount=10000)
+        assert payment.commission_rate_id == old['КАСКО'].pk and payment.kv_rub == Decimal('2500')
+        fresh = LivePolicy.objects.create(policy_number='NEW', client_id=client.pk, branch_id=branch.pk, insurer_id=vsk.pk, insurance_type_id=old['КАСКО'].insurance_type_id, start_date=date(2026,10,28), end_date=date(2027,10,28), property_description='Новый')
+        assert fresh.commission_rate.kv_percent == Decimal('30')
+    """,
+    )

@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.views.generic import ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_filters.views import FilterView
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from .models import FlowPolicySource, Policy, PaymentSchedule, in_force_q
 from .flow_views import source_url
 from .flow_permissions import can_link
@@ -207,8 +207,15 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
                 "branch",
                 "insurance_type",
                 "leasing_manager",
+                "commission_rate",
             )
-            .prefetch_related("payment_schedule", "info_tags__tag")
+            .prefetch_related(
+                Prefetch(
+                    "payment_schedule",
+                    queryset=PaymentSchedule.objects.select_related("commission_rate"),
+                ),
+                "info_tags__tag",
+            )
         )
 
     def get_context_data(self, **kwargs):
@@ -280,16 +287,10 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
             next_payment=next_payment,
         )
 
-        # Get commission rate for this policy's insurer and insurance type
-        from apps.insurers.models import CommissionRate
-
-        try:
-            commission_rate = CommissionRate.objects.get(
-                insurer=policy.insurer, insurance_type=policy.insurance_type
-            )
-            context["commission_rate"] = commission_rate
-        except CommissionRate.DoesNotExist:
-            context["commission_rate"] = None
+        context["commission_rate"] = policy.default_commission_rate
+        context["mixed_commission_rates"] = (
+            len({p.commission_rate_id for p in payments}) > 1
+        )
 
         # Get rates by insurance year
         context["rates_by_year"] = policy.get_rates_by_year()

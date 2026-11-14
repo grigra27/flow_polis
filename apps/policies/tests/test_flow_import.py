@@ -80,7 +80,12 @@ def test_rows_and_catalogs(
         Decimal(v) for v in ("33.33", "33.33", "33.34", "79.90")
     ]
     assert initial["payments"][3]["insurance_sum"] == "8000.00"
-    assert initial["payments"][3]["kv_rub"] == Decimal("7.99")
+    # Даты начала в своде ещё нет: ставка не должна угадываться.
+    assert "kv_rub" not in initial["payments"][3]
+    from datetime import date
+
+    dated = prepare_initial(snapshot, start_date=date(2026, 9, 1))
+    assert dated["payments"][3]["kv_rub"] == Decimal("7.99")
     assert all("due_date" not in row for row in initial["payments"])
     snapshot["source_object_count"] = 3
     assert all(

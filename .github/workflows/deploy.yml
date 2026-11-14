@@ -5,7 +5,13 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Позволяет запускать вручную
+  workflow_dispatch:
+    inputs:
+      activate:
+        description: 'Activate production after building (disable for a maintenance release)'
+        type: boolean
+        required: true
+        default: true
 
 concurrency:
   group: onlinepolis-production
@@ -283,6 +289,7 @@ jobs:
     name: Deploy through restricted SSH controller
     runs-on: ubuntu-latest
     needs: build
+    if: github.event_name != 'workflow_dispatch' || inputs.activate
     env:
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
       DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
@@ -380,6 +387,9 @@ jobs:
     needs: [validate, test, build, deploy]
     if: always()
     steps:
+      - name: Maintenance artifact ready
+        if: needs.build.result == 'success' && needs.deploy.result == 'skipped'
+        run: echo "Verified image is ready; production activation was explicitly deferred"
       - name: Deployment Success
         if: needs.deploy.result == 'success'
         run: echo "Deployment and production health verification succeeded"

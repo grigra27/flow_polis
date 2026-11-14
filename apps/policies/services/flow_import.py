@@ -7,11 +7,11 @@ from django.db.models.functions import Trim
 from apps.clients.models import Client
 from apps.insurers.models import (
     Branch,
-    CommissionRate,
     Insurer,
     InsuranceType,
     LeasingManager,
 )
+from apps.insurers.commissions import resolve_commission_rate
 from apps.policies.flow_permissions import require_access
 from apps.policies.models import FlowPolicyLink, FlowPolicySource, Policy
 from .flow_client import FlowError
@@ -106,7 +106,9 @@ def _schedule(offers, rate, separate):
     return rows
 
 
-def prepare_initial(snapshot, *, slot=0, insurer_id=None, insurance_type_id=None):
+def prepare_initial(
+    snapshot, *, slot=0, insurer_id=None, insurance_type_id=None, start_date=None
+):
     warns = []
     p = {"property_description": snapshot["property_description"]}
     if normalize_dfa(snapshot["dfa_number"]):
@@ -160,15 +162,13 @@ def prepare_initial(snapshot, *, slot=0, insurer_id=None, insurance_type_id=None
         else:
             warns.append(f"Уточните {name}.")
     rate = (
-        CommissionRate.objects.filter(
-            insurer=insurer, insurance_type=insurance_type
-        ).first()
+        resolve_commission_rate(insurer.pk, insurance_type.pk, start_date)
         if insurer and insurance_type
         else None
     )
     if not rate:
         warns.append(
-            "Проверьте комиссию: для выбранного сочетания ставка не определена."
+            "Комиссия подбирается после указания даты начала страхования. Проверьте ставку и сумму КВ."
         )
     franchises = {Decimal(row["franchise"]) for row in snapshot["offers"]}
     if len(franchises) == 1:

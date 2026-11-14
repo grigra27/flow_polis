@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django import forms
+from django.conf import settings
+from django.utils import timezone
 from .models import (
     Insurer,
     Branch,
@@ -159,16 +162,70 @@ class LeasingManagerAdmin(admin.ModelAdmin):
     ordering = ["name"]
 
 
+class CommissionRateForm(forms.ModelForm):
+    class Meta:
+        model = CommissionRate
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk and "effective_from" in self.fields:
+            self.fields["effective_from"].required = True
+            self.fields[
+                "effective_from"
+            ].help_text = "Включительно. Ставка подбирается для вновь добавляемых полисов по дате начала страхования."
+
+
 @admin.register(CommissionRate)
 class CommissionRateAdmin(admin.ModelAdmin):
-    list_display = ["insurer", "insurance_type", "kv_percent_display", "created_at"]
+    change_form_template = "admin/insurers/commissionrate/change_form.html"
+    form = CommissionRateForm
+    list_display = [
+        "insurer",
+        "insurance_type",
+        "kv_percent_display",
+        "effective_from",
+        "selection_status",
+        "notes",
+    ]
     list_filter = ["insurer", "insurance_type"]
     search_fields = ["insurer__insurer_name", "insurance_type__name"]
     autocomplete_fields = ["insurer", "insurance_type"]
+    fields = ["insurer", "insurance_type", "kv_percent", "effective_from", "notes"]
+    date_hierarchy = "effective_from"
+    ordering = ["insurer", "insurance_type", "-effective_from"]
+
+    class Media:
+        js = (
+            f"{settings.STATIC_URL}insurers/js/commission_rate_form.js?v=2026-11-14.2",
+        )
+
+    def get_readonly_fields(self, request, obj=None):
+        return (
+            ["insurer", "insurance_type", "kv_percent", "effective_from"]
+            if obj and obj.is_used
+            else []
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and not (obj and obj.is_used)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("insurer", "insurance_type")
+
+    @admin.display(description="Подбор новых полисов")
+    def selection_status(self, obj):
+        today = timezone.localdate()
+        if obj.effective_from and obj.effective_from > today:
+            return "Запланирована"
+        current = CommissionRate.objects.for_policy(
+            obj.insurer_id, obj.insurance_type_id, today
+        ).first()
+        return "Текущая" if current and current.pk == obj.pk else "Предыдущие условия"
 
     def kv_percent_display(self, obj):
         """Отображение КВ без дробной части"""
-        return f"{int(round(float(obj.kv_percent)))}%"
+        return f"{obj.kv_percent.normalize():f}%"
 
     kv_percent_display.short_description = "КВ %"
     kv_percent_display.admin_order_field = "kv_percent"

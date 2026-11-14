@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from apps.core.models import TimeStampedModel
 from apps.core.file_validators import validate_image_file
@@ -164,6 +165,24 @@ class LeasingManager(models.Model):
         return self.name
 
 
+class CommissionRateQuerySet(models.QuerySet):
+    def for_policy(self, insurer_id, insurance_type_id, start_date):
+        """Последняя применимая версия; NULL — исходные условия без нижней границы."""
+        if not insurer_id or not insurance_type_id or not start_date:
+            return self.none()
+        return (
+            self.filter(
+                insurer_id=insurer_id,
+                insurance_type_id=insurance_type_id,
+            )
+            .filter(
+                models.Q(effective_from__isnull=True)
+                | models.Q(effective_from__lte=start_date)
+            )
+            .order_by(models.F("effective_from").desc(nulls_last=True), "-pk")
+        )
+
+
 class CommissionRate(TimeStampedModel):
     """
     Commission rates by insurance type and insurer
@@ -182,20 +201,71 @@ class CommissionRate(TimeStampedModel):
         related_name="commission_rates",
     )
     kv_percent = models.DecimalField(
-        "Ставка комиссии (%)", max_digits=5, decimal_places=2
+        "Ставка комиссии (%)",
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
     )
+    effective_from = models.DateField(
+        "Для полисов с датой начала от",
+        null=True,
+        blank=True,
+        help_text="Включительно. Пустая дата обозначает исходные условия до появления истории ставок.",
+    )
+    notes = models.TextField("Основание / примечание", blank=True)
+
+    objects = CommissionRateQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Ставка комиссии"
         verbose_name_plural = "Ставки комиссий"
-        unique_together = ["insurer", "insurance_type"]
-        ordering = ["insurer", "insurance_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["insurer", "insurance_type", "effective_from"],
+                name="commission_unique_start",
+            ),
+            models.UniqueConstraint(
+                fields=["insurer", "insurance_type"],
+                condition=models.Q(effective_from__isnull=True),
+                name="commission_unique_baseline",
+            ),
+        ]
+        ordering = ["insurer", "insurance_type", "effective_from", "pk"]
 
     def __str__(self):
-        return f"{self.insurer} - {self.insurance_type}: {int(round(float(self.kv_percent)))}%"
+        percent = (
+            format(Decimal(self.kv_percent).normalize(), "f")
+            if self.kv_percent is not None
+            else "—"
+        )
+        period = (
+            f"с {self.effective_from:%d.%m.%Y}"
+            if self.effective_from
+            else "исходные условия"
+        )
+        return f"{self.insurer} — {self.insurance_type}: {percent}% ({period})"
+
+    @property
+    def is_used(self):
+        return bool(self.pk) and (self.payments.exists() or self.policies.exists())
 
     def clean(self):
         super().clean()
+        if self.pk and self.is_used:
+            original = type(self).objects.get(pk=self.pk)
+            protected = (
+                "insurer_id",
+                "insurance_type_id",
+                "kv_percent",
+                "effective_from",
+            )
+            if any(
+                getattr(self, field) != getattr(original, field) for field in protected
+            ):
+                raise ValidationError(
+                    "Ставка используется в полисах или платежах. Добавьте новую версию; "
+                    "сохранённые условия изменять нельзя."
+                )
         if (
             self.insurance_type_id
             and self.insurance_type.is_osago
@@ -210,3 +280,7 @@ class CommissionRate(TimeStampedModel):
                     )
                 }
             )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

@@ -1,130 +1,27 @@
 import logging
+
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+
 from .models import PaymentSchedule
 
 logger = logging.getLogger(__name__)
 
 
 @receiver(pre_save, sender=PaymentSchedule)
-def calculate_commission(sender, instance, **kwargs):
-    """
-    Automatically calculate commission in rubles before saving
-
-    Auto-sets commission_rate if not set:
-    - Looks up rate based on policy's insurer and insurance_type
-
-    Auto-calculates kv_rub if:
-    - It's a new record (no pk yet), OR
-    - Commission rate changed and kv_rub wasn't manually edited
-    """
-    try:
-        # Auto-set commission_rate if not set
-        if not instance.commission_rate and instance.policy_id:
-            try:
-                from apps.insurers.models import CommissionRate
-
-                # Try to get commission rate from policy's insurer and insurance type
-                policy = instance.policy
-                rate = CommissionRate.objects.get(
-                    insurer=policy.insurer, insurance_type=policy.insurance_type
-                )
-                instance.commission_rate = rate
-                logger.info(
-                    f"Auto-set commission rate {rate.id} for payment "
-                    f"policy={policy.id}, insurer={policy.insurer.id}, "
-                    f"insurance_type={policy.insurance_type.id}"
-                )
-            except CommissionRate.DoesNotExist:
-                # No commission rate found. This is often a legitimate,
-                # permanent state (P2-02, 2026-09-23), not a system fault:
-                # some insurer/insurance_type combinations have no commission
-                # agreement at all (confirmed on production for
-                # insurer=15 "Чулпан" / insurance_type=1 "КАСКО" — no
-                # contract). INFO, not WARNING — a missing rate shouldn't
-                # read as an incident or trip log-based alerting.
-                logger.info(
-                    f"No commission rate configured for policy {instance.policy_id} "
-                    f"(insurer={instance.policy.insurer.id}, "
-                    f"insurance_type={instance.policy.insurance_type.id}) — "
-                    f"kv_rub left unchanged"
-                )
-                return  # Exit early if no commission rate
-            except Exception as e:
-                # Any other error - log but don't break the save
-                logger.error(
-                    f"Unexpected error getting commission rate for policy {instance.policy_id}: {e}",
-                    exc_info=True,
-                )
-                return  # Exit early on error
-
-        # If still no commission_rate, can't calculate kv_rub
-        if not instance.commission_rate:
-            return
-
-        # В предзаполненной форме сотрудник может подтвердить индивидуальную КВ.
-        if not instance.pk and getattr(instance, "_explicit_commission", False):
-            return
-        if not instance.pk:
-            try:
-                instance.kv_rub = instance.calculate_kv_rub()
-                logger.debug(f"Calculated kv_rub for new payment: {instance.kv_rub}")
-            except Exception as e:
-                logger.error(
-                    f"Error calculating kv_rub for new payment: {e}", exc_info=True
-                )
-                # Don't break save, just leave kv_rub as is
-            return
-
-        # For existing records, check if commission_rate changed
-        try:
-            old_instance = PaymentSchedule.objects.get(pk=instance.pk)
-            # If commission_rate changed, recalculate (unless user manually changed kv_rub)
-            if old_instance.commission_rate != instance.commission_rate:
-                try:
-                    # Calculate what the old value should have been
-                    old_calculated = old_instance.calculate_kv_rub()
-                    # If current kv_rub matches old calculated value, user didn't edit it manually
-                    # So we can safely recalculate
-                    if old_instance.kv_rub == old_calculated:
-                        instance.kv_rub = instance.calculate_kv_rub()
-                        logger.debug(
-                            f"Recalculated kv_rub for payment {instance.pk}: {instance.kv_rub}"
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"Error recalculating kv_rub for payment {instance.pk}: {e}",
-                        exc_info=True,
-                    )
-                    # Don't break save, just leave kv_rub as is
-        except PaymentSchedule.DoesNotExist:
-            # Shouldn't happen, but just in case - treat as new record
-            logger.warning(
-                f"PaymentSchedule {instance.pk} not found during update, treating as new"
-            )
-            try:
-                instance.kv_rub = instance.calculate_kv_rub()
-            except Exception as e:
-                logger.error(
-                    f"Error calculating kv_rub for 'new' payment {instance.pk}: {e}",
-                    exc_info=True,
-                )
-        except Exception as e:
-            logger.error(
-                f"Unexpected error in commission calculation for payment {instance.pk}: {e}",
-                exc_info=True,
-            )
-            # Don't break save
-
-    except Exception as e:
-        # Catch-all for any unexpected errors in the entire signal
-        logger.error(
-            f"Critical error in calculate_commission signal for payment "
-            f"(policy_id={getattr(instance, 'policy_id', 'unknown')}): {e}",
-            exc_info=True,
+def calculate_commission(sender, instance, raw=False, **kwargs):
+    """Новый взнос наследует условия полиса; существующий не пересчитывается."""
+    if raw or not instance._state.adding or not instance.policy_id:
+        return
+    if not instance.commission_rate_id:
+        instance.commission_rate = instance.policy.default_commission_rate
+    if not instance.commission_rate_id:
+        logger.info(
+            "No commission rate configured for policy %s (insurer=%s, insurance_type=%s) — kv_rub left unchanged",
+            instance.policy_id,
+            instance.policy.insurer_id,
+            instance.policy.insurance_type_id,
         )
-        # Don't re-raise - let the save continue
-
-
-# Сигнал update_policy_premium_total удалён: premium_total теперь
-# вычисляемый @property на модели Policy, его не нужно поддерживать в БД.
+        return
+    if not getattr(instance, "_explicit_commission", False):
+        instance.kv_rub = instance.calculate_kv_rub()

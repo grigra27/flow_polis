@@ -153,6 +153,7 @@ class CommissionRateAPITest(TestCase):
             {
                 "insurer_id": self.insurer.id,
                 "insurance_type_id": self.insurance_type.id,
+                "start_date": "2026-09-01",
             },
         )
 
@@ -169,7 +170,12 @@ class CommissionRateAPITest(TestCase):
 
         url = reverse("insurers:api_commission_rate")
         response = self.client.get(
-            url, {"insurer_id": self.insurer.id, "insurance_type_id": other_type.id}
+            url,
+            {
+                "insurer_id": self.insurer.id,
+                "insurance_type_id": other_type.id,
+                "start_date": "2026-09-01",
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -210,7 +216,7 @@ class CommissionRateAPITest(TestCase):
     def test_get_commission_rate_handles_unexpected_error(self):
         url = reverse("insurers:api_commission_rate")
         with patch(
-            "apps.insurers.views.CommissionRate.objects.get",
+            "apps.insurers.views.resolve_commission_rate",
             side_effect=RuntimeError("boom"),
         ):
             response = self.client.get(
@@ -218,6 +224,7 @@ class CommissionRateAPITest(TestCase):
                 {
                     "insurer_id": self.insurer.id,
                     "insurance_type_id": self.insurance_type.id,
+                    "start_date": "2026-09-01",
                 },
             )
 

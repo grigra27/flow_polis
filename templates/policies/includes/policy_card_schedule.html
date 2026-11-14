@@ -27,9 +27,10 @@
                     <td class="num">{% if payment.insurance_sum is not None %}{{ payment.insurance_sum|rub_compact }}{% else %}—{% endif %}</td>
                     <td class="num"><strong>{{ payment.amount|rub_compact }}</strong></td>
                     <td class="num">{% if payment.amount > 0 %}
-                        {% with actual=payment.kv_percent_actual|floatformat:"2u" base=commission_rate.kv_percent|floatformat:"2u" %}
-                        <span{% if commission_rate and actual != base %} class="rate-difference"{% endif %}>{{ actual|floatformat:"-2" }}%</span>
-                        {% if commission_rate and actual != base %}<small class="base-rate">Ставка {{ base|floatformat:"-2" }}%</small>{% endif %}
+                        {% with actual=payment.kv_percent_actual base=payment.base_commission_rate %}
+                        <span{% if payment.is_nonstandard_kv %} class="rate-difference" title="Индивидуальная КВ. По базовой ставке: {{ payment.expected_kv_rub|rub }} ₽"{% endif %}>{{ actual|floatformat:"-2" }}%</span>
+                        {% if payment.is_nonstandard_kv %}<small class="base-rate">Базовая {{ base.kv_percent|floatformat:"-2" }}%</small>
+                        {% elif not base %}<small class="base-rate">{% if payment.commission_rate_id %}Ставка требует проверки{% else %}База не задана{% endif %}</small>{% endif %}
                         {% endwith %}
                         {% else %}—{% endif %}
                     </td>
@@ -74,7 +75,8 @@
                             <div><dt>Дата платежа (по договору)</dt><dd>{{ payment.due_date|date:"d.m.Y" }}</dd></div>
                             <div><dt>Фактическая дата оплаты</dt><dd>{{ payment.paid_date|date:"d.m.Y"|default:"—" }}</dd></div>
                             <div><dt>Дата согласования акта с СК</dt><dd>{{ payment.insurer_date|date:"d.m.Y"|default:"—" }}</dd></div>
-                            <div><dt>Ставка комиссии (базовая)</dt><dd>{% if commission_rate %}{{ policy.insurer }} · {{ policy.insurance_type }} · {{ commission_rate.kv_percent|floatformat:"-2" }}%{% else %}—{% endif %}</dd></div>
+                            <div><dt>Ставка комиссии (базовая)</dt><dd>{% if payment.base_commission_rate %}{{ payment.base_commission_rate }}{% elif payment.commission_rate_id %}Ставка требует проверки: {{ payment.commission_rate }}{% else %}Базовая ставка не задана{% endif %}</dd></div>
+                            {% if payment.expected_kv_rub is not None %}<div><dt>Комиссия по базовой ставке</dt><dd>{{ payment.expected_kv_rub|rub }} ₽{% if payment.is_nonstandard_kv %} · Внесена индивидуальная КВ{% endif %}</dd></div>{% endif %}
                             <div><dt>Оплатил Альянс</dt><dd>{{ payment.alliance_paid|yesno:"Да,Нет" }}</dd></div>
                         </dl>
                         {% if payment.payment_info %}<p class="detail-note"><b>Дополнительная информация</b><br><span class="policy-multiline">{{ payment.payment_info }}</span></p>{% endif %}
@@ -90,7 +92,7 @@
     {% if payments %}
     <div class="schedule-footer">
         <span>СС — страховая сумма <i>·</i> СП — страховая премия <i>·</i> КВ — комиссия</span>
-        <span>Базовая ставка КВ <b>{% if commission_rate %}{{ commission_rate.kv_percent|floatformat:"-2" }}%{% else %}—{% endif %}</b></span>
+        <span>Базовая ставка новых взносов <b>{% if commission_rate %}{{ commission_rate.kv_percent|floatformat:"-2" }}%{% else %}не задана{% endif %}</b> · {{ policy.get_commission_rate_origin_display }}{% if mixed_commission_rates %} · У платежей разные базовые ставки{% endif %}</span>
     </div>
     {% endif %}
 </section>

@@ -342,6 +342,7 @@
 .pay-status.overdue { background: var(--policy-danger); }
 .pay-status.cancelled { background: #883846; }
 .rate-difference, .card-edit-error { color: #9b392d; }
+.rate-difference { text-decoration: underline dotted; text-underline-offset: 0.2em; text-decoration-thickness: 2px; }
 .base-rate { display: block; font-family: var(--app-interface-font); font-size: 0.73rem; color: var(--policy-muted); }
 .payment-date { font-size: 0.85rem; padding: 0.12rem 0.18rem; border-radius: 4px; }
 .payment-date:hover, .payment-date:focus-visible { background: #e4eef9; }

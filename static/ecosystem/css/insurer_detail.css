@@ -275,3 +275,13 @@
 .tbl-badge--closed   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 .tbl-badge--nobroker { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
 .tbl-badge--term     { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-size: 0.68rem; }
+
+/* Версии комиссионных условий: компактный блок в боковой колонке. */
+.commission-history .commission-caption { display: block; color: #52677e; font-size: 0.78rem; margin: 0.35rem 0 0.7rem; }
+.commission-history .commission-percent { text-align: right; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; }
+.commission-history th { font-size: 0.75rem; color: #52677e; }
+.commission-versions { margin: 0.7rem 0; }
+.commission-versions summary { color: #155b9d; cursor: pointer; font-size: 0.85rem; }
+.commission-version { display: grid; gap: 0.2rem; padding: 0.65rem 0; border-bottom: 1px solid #e6ecf2; font-size: 0.82rem; overflow-wrap: anywhere; }
+.commission-version small { color: #52677e; }
+.commission-history .btn { margin: 0.2rem 0; }

@@ -190,6 +190,27 @@ class Policy(TimeStampedModel):
         verbose_name="Вид страхования",
         related_name="policies",
     )
+    commission_rate = models.ForeignKey(
+        CommissionRate,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="policies",
+        verbose_name="Базовая ставка новых взносов",
+        help_text="Закрепляется при создании полиса. Изменение применяется только к новым взносам; сохранённые платежи не пересчитываются.",
+    )
+    commission_rate_origin = models.CharField(
+        "Источник базовой ставки",
+        max_length=10,
+        default="date",
+        editable=False,
+        choices=[
+            ("date", "По дате начала"),
+            ("legacy", "Сохранённые условия"),
+            ("review", "Требует проверки"),
+            ("manual", "Выбрана сотрудником"),
+        ],
+    )
     branch = models.ForeignKey(
         Branch, on_delete=models.PROTECT, verbose_name="Филиал", related_name="policies"
     )
@@ -253,6 +274,26 @@ class Policy(TimeStampedModel):
 
     def __str__(self):
         return f"{self.policy_number} - {self.client}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.commission_rate_id is None:
+            from apps.insurers.commissions import resolve_commission_rate
+
+            self.commission_rate = resolve_commission_rate(
+                self.insurer_id, self.insurance_type_id, self.start_date
+            )
+        return super().save(*args, **kwargs)
+
+    @property
+    def default_commission_rate(self):
+        rate = self.commission_rate
+        if (
+            rate
+            and rate.insurer_id == self.insurer_id
+            and rate.insurance_type_id == self.insurance_type_id
+        ):
+            return rate
+        return None
 
     @property
     def is_osago(self):
@@ -662,9 +703,29 @@ class PaymentSchedule(TimeStampedModel):
 
     def calculate_kv_rub(self):
         """Calculate commission in rubles"""
+        from .commissions import commission_amount
+
         if self.commission_rate:
-            return self.amount * (self.commission_rate.kv_percent / Decimal("100"))
+            return commission_amount(self.amount, self.commission_rate.kv_percent)
         return Decimal("0")
+
+    @property
+    def base_commission_rate(self):
+        from .commissions import payment_base_rate
+
+        return payment_base_rate(self)
+
+    @property
+    def expected_kv_rub(self):
+        from .commissions import expected_commission
+
+        return expected_commission(self)
+
+    @property
+    def is_nonstandard_kv(self):
+        from .commissions import is_nonstandard_commission
+
+        return is_nonstandard_commission(self)
 
     @property
     def is_paid(self):

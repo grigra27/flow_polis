@@ -5,6 +5,9 @@ from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from .commissions import rate_history, resolve_commission_rate
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Avg, Count, DecimalField, Q, Subquery
 from apps.clients.models import Client as LeasingClient
@@ -68,6 +71,7 @@ class InsurerListView(LoginRequiredMixin, ListView):
 
         insurers_with_stats = []
         for insurer in insurers:
+            insurer.rate_history = rate_history(insurer.commission_rates.all())
             total_policies = int(getattr(insurer, "total_policies", 0) or 0)
             active_policies = int(getattr(insurer, "active_policies", 0) or 0)
             broker_participation = int(getattr(insurer, "broker_participation", 0) or 0)
@@ -205,9 +209,10 @@ class InsurerDetailView(LoginRequiredMixin, DetailView):
         context["date_from"] = stats_filters.date_from
         context["date_to"] = stats_filters.date_to
 
-        context["commission_rates"] = self.object.commission_rates.select_related(
-            "insurance_type"
-        ).order_by("insurance_type__name")
+        context["rate_history"] = rate_history(
+            self.object.commission_rates.select_related("insurance_type")
+        )
+        context["commission_rates"] = context["rate_history"]["current"]
 
         context["statistics"] = InsurerStatisticsService(self.object).calculate(
             stats_filters
@@ -529,52 +534,69 @@ class LeasingManagerDetailView(LoginRequiredMixin, DetailView):
 @staff_member_required
 @require_GET
 def get_commission_rate(request):
-    """
-    API endpoint to get commission rate for a given insurer and insurance type.
-
-    Query parameters:
-    - insurer_id: ID of the insurer
-    - insurance_type_id: ID of the insurance type
-
-    Returns:
-    - JSON with commission_rate_id and kv_percent if found
-    - JSON with error message if not found
-    """
-    insurer_id = request.GET.get("insurer_id")
-    insurance_type_id = request.GET.get("insurance_type_id")
-
-    if not insurer_id or not insurance_type_id:
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "Необходимо указать insurer_id и insurance_type_id",
-            },
-            status=400,
-        )
-
+    """Новый полис — по дате начала; новый взнос — по закреплённым условиям."""
     try:
-        commission_rate = CommissionRate.objects.get(
-            insurer_id=insurer_id, insurance_type_id=insurance_type_id
-        )
-
+        policy_id = request.GET.get("policy_id")
+        if policy_id:
+            if (
+                not policy_id.isascii()
+                or not policy_id.isdecimal()
+                or len(policy_id) > 18
+            ):
+                raise ValueError
+            policy = (
+                Policy.objects.select_related(
+                    "commission_rate__insurer", "commission_rate__insurance_type"
+                )
+                .filter(pk=policy_id)
+                .first()
+            )
+            if policy is None:
+                return JsonResponse(
+                    {"success": False, "error": "Полис не найден"}, status=404
+                )
+            commission_rate = policy.default_commission_rate
+            source = policy.get_commission_rate_origin_display()
+        else:
+            insurer_id = request.GET.get("insurer_id", "")
+            insurance_type_id = request.GET.get("insurance_type_id", "")
+            start_date = parse_date(request.GET.get("start_date", ""))
+            if not start_date or any(
+                not value.isascii() or not value.isdecimal() or len(value) > 18
+                for value in (insurer_id, insurance_type_id)
+            ):
+                raise ValueError
+            commission_rate = resolve_commission_rate(
+                insurer_id, insurance_type_id, start_date
+            )
+            source = "По дате начала"
+        if commission_rate is None:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Базовая ставка не задана. Укажите комиссию вручную.",
+                }
+            )
         return JsonResponse(
             {
                 "success": True,
                 "commission_rate_id": commission_rate.id,
                 "kv_percent": str(commission_rate.kv_percent),
                 "display_name": str(commission_rate),
+                "effective_from": commission_rate.effective_from,
+                "source": source,
             }
         )
 
-    except CommissionRate.DoesNotExist:
+    except (ValueError, TypeError):
         return JsonResponse(
             {
                 "success": False,
-                "error": "Ставка комиссии не найдена для данной комбинации страховщика и вида страхования",
-            }
+                "error": "Укажите страховщика, вид и дату начала страхования или полис.",
+            },
+            status=400,
         )
-
-    except Exception as e:
+    except Exception:
         return JsonResponse(
-            {"success": False, "error": f"Ошибка: {str(e)}"}, status=500
+            {"success": False, "error": "Ошибка получения ставки комиссии"}, status=500
         )

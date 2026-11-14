@@ -2484,17 +2484,9 @@ class ThreePercentReportExporter(BaseExporter):
             "Да" if payment.alliance_paid else "Нет",
         ]
 
-    def _round_percent_for_comparison(self, value):
-        return Decimal(value).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
     def _is_nonstandard_kv(self, payment):
-        """Проверяет, отличается ли фактический процент КВ от базовой ставки."""
-        if not payment.commission_rate:
-            return False
-
-        return self._round_percent_for_comparison(
-            payment.kv_percent_actual
-        ) != self._round_percent_for_comparison(payment.commission_rate.kv_percent)
+        """Общий с карточкой критерий по сумме КВ с допуском в копейку."""
+        return payment.is_nonstandard_kv
 
     def apply_formatting(self, ws):
         """Применяет форматирование листа"""

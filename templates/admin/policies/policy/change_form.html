@@ -1,6 +1,7 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 {% load policies_admin %}
+{% load l10n %}
 
 {% block extrastyle %}
 {{ block.super }}
@@ -39,6 +40,7 @@
 
 {% block form_top %}
 {{ block.super }}
+<p id="commission-context" data-policy-id="{% if original %}{{ original.pk|unlocalize }}{% endif %}" role="status" aria-live="polite"></p>
 {% if template_source %}
 <div data-policy-template>
     <p>{% if osago_from_object %}Объект из полиса{% else %}Образец — полис{% endif %}

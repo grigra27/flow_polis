@@ -1,231 +1,131 @@
-/**
- * Auto Commission Rate Functionality
- *
- * Automatically calculates kv_rub (commission in rubles) in payment schedule inline
- * based on selected insurer and insurance_type in the main Policy form.
- * The commission_rate field is now hidden and stored in the database.
- */
-
-(function() {
+/** Версии КВ: дата нового полиса / закреплённая ставка существующего. */
+(() => {
     'use strict';
+    document.addEventListener('DOMContentLoaded', () => {
+        const context = document.getElementById('commission-context');
+        if (!context) return;
+        const insurer = document.getElementById('id_insurer');
+        const kind = document.getElementById('id_insurance_type');
+        const start = document.getElementById('id_start_date');
+        const policy = document.getElementById('id_policy');
+        const selectedRate = document.getElementById('id_commission_rate');
+        const separate = !insurer && Boolean(policy);
+        const state = new WeakMap();
+        let currentRate = null;
+        let requestVersion = 0;
+        const form = context.closest('form') || document.querySelector('form[method="post"]');
 
-    // Wait for django.jQuery to be available
-    function initWhenReady() {
-        if (typeof django === 'undefined' || typeof django.jQuery === 'undefined') {
-            setTimeout(initWhenReady, 100);
-            return;
+        function rows() {
+            if (separate) return form ? [form] : [];
+            return [...document.querySelectorAll('.payment-inline .payment-row:not(.empty-form), .dynamic-payment_schedule:not(.empty-form)')];
         }
-
-        var $ = django.jQuery;
-
-        // Последняя полученная ставка: по ней КВ пересчитывается и при вводе
-        // премии уже после выбора СК.
-        var currentKvPercent = null;
-        var prefilledForm = false;
-        var pendingKvRows = new Set();
-
-        $(document).ready(function() {
-            initAutoCommissionRate();
+        function field(row, name) {
+            return row.querySelector(separate ? '#id_' + name : '[name$="-' + name + '"]');
+        }
+        function scaled(value) {
+            const match = String(value).replace(',', '.').match(/^(\d+)(?:\.(\d{0,2}))?$/);
+            return match ? BigInt(match[1]) * 100n + BigInt((match[2] || '').padEnd(2, '0')) : null;
+        }
+        function amountText(cents) {
+            return String(cents / 100n) + '.' + String(cents % 100n).padStart(2, '0');
+        }
+        function rateFor(row) {
+            const data = state.get(row);
+            return data && data.saved ? data.base : currentRate;
+        }
+        function calculate(row) {
+            const input = field(row, 'kv_rub');
+            const amount = scaled(field(row, 'amount').value);
+            const rate = rateFor(row);
+            const percent = rate === null ? null : scaled(rate);
+            if (amount === null || percent === null) return false;
+            input.value = amountText((amount * percent + 5000n) / 10000n);
+            return true;
+        }
+        function refreshRows() {
+            rows().forEach(row => {
+                prepare(row);
+                const data = state.get(row);
+                if (!data) return;
+                const rate = rateFor(row);
+                data.label.textContent = rate === null ? 'Базовая ставка не задана' : 'Базовая ' + rate + '%';
+                data.button.disabled = rate === null;
+                if (!data.saved && !data.manual) {
+                    if (!calculate(row)) field(row, 'kv_rub').value = '';
+                }
+            });
+        }
+        function prepare(row) {
+            if (state.has(row)) return;
+            const input = field(row, 'kv_rub');
+            const amount = field(row, 'amount');
+            if (!input || !amount) return;
+            const saved = input.dataset.savedPayment === 'true';
+            const label = document.createElement('small');
+            label.className = 'commission-row-rate';
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'commission-recalculate'; button.textContent = 'По ставке';
+            button.setAttribute('aria-label', 'Пересчитать комиссию этого взноса по базовой ставке');
+            input.after(label, button);
+            const data = {saved, base: input.dataset.basePercent || null, manual: input.value !== '', label, button};
+            state.set(row, data);
+            input.addEventListener('input', () => { data.manual = input.value !== ''; });
+            amount.addEventListener('input', () => { if (!data.saved && !data.manual) calculate(row); });
+            button.addEventListener('click', () => { if (calculate(row)) data.manual = false; });
+        }
+        function isoDate(value) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const match = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            return match ? match[3] + '-' + match[2].padStart(2, '0') + '-' + match[1].padStart(2, '0') : '';
+        }
+        async function update() {
+            const version = ++requestVersion;
+            currentRate = null;
+            if (selectedRate) {
+                const option = selectedRate.selectedOptions[0];
+                currentRate = option && option.dataset.percent || null;
+                context.textContent = currentRate === null ? 'Базовая ставка новых взносов не задана.' : 'Базовая ставка новых взносов: ' + currentRate + '%. Сохранённые платежи не пересчитываются.';
+                refreshRows();
+                return;
+            }
+            const params = new URLSearchParams();
+            const policyId = context.dataset.policyId || (policy && policy.value);
+            if (policyId) params.set('policy_id', policyId);
+            else if (insurer && kind && start && insurer.value && kind.value && isoDate(start.value)) {
+                params.set('insurer_id', insurer.value); params.set('insurance_type_id', kind.value); params.set('start_date', isoDate(start.value));
+            } else {
+                context.textContent = separate ? 'Выберите полис для подбора ставки.' : 'Укажите страховщика, вид и дату начала страхования для подбора КВ.';
+                refreshRows(); return;
+            }
+            context.textContent = 'Подбор базовой ставки…';
+            refreshRows();
+            try {
+                const response = await fetch('/insurers/api/commission-rate/?' + params, {credentials: 'same-origin'});
+                const result = await response.json();
+                if (version !== requestVersion) return;
+                if (response.ok && result.success) {
+                    currentRate = result.kv_percent;
+                    context.textContent = result.display_name + ' · ' + result.source;
+                } else context.textContent = result.error || 'Не удалось получить ставку. Проверьте КВ.';
+            } catch (_) {
+                if (version !== requestVersion) return;
+                context.textContent = 'Не удалось получить ставку. Проверьте КВ перед сохранением.';
+            }
+            refreshRows();
+        }
+        [insurer, kind, start, policy, selectedRate].filter(Boolean).forEach(input => {
+            input.addEventListener('change', update);
+            if (input === start) input.addEventListener('input', update);
+            // Django Select2 сообщает об изменениях через jQuery.
+            if (input.tagName === 'SELECT' && window.django && django.jQuery) django.jQuery(input).on('change.commission', update);
         });
-
-        function initAutoCommissionRate() {
-            // Find insurer and insurance_type fields in the main form
-            var $insurerField = $('#id_insurer');
-            var $insuranceTypeField = $('#id_insurance_type');
-
-            if ($insurerField.length === 0 || $insuranceTypeField.length === 0) {
-                console.log('Поля страховщика или вида страхования не найдены');
-                return;
-            }
-
-            prefilledForm = Boolean(document.querySelector("#flow-policy-source, [data-policy-template]"));
-            if (prefilledForm && $insurerField.val() && $insuranceTypeField.val()) {
-                updateCommissionRates(false);
-            }
-
-            // Add change handlers
-            $insurerField.on('change', function() {
-                updateCommissionRates();
-            });
-
-            $insuranceTypeField.on('change', function() {
-                updateCommissionRates();
-            });
-
-            // Премия введена или изменена после выбора СК — пересчитать КВ строки.
-            $(document).on('input change', '.dynamic-payment_schedule input[name$="-amount"]', function() {
-                var $row = $(this).closest('.dynamic-payment_schedule');
-                if (prefilledForm) {
-                    pendingKvRows.add($row.get(0));
-                    // Пока ставка загружается, пустое поле поручает расчёт серверу.
-                    $row.find('input[name$="-kv_rub"]').val('');
-                }
-                if (currentKvPercent === null) {
-                    return;
-                }
-                recalculateKvRub($row, currentKvPercent);
-                pendingKvRows.delete($row.get(0));
-            });
-            $(document).on('input change', '.dynamic-payment_schedule input[name$="-kv_rub"]', function() {
-                pendingKvRows.delete($(this).closest('.dynamic-payment_schedule').get(0));
-            });
-
-            // Also handle when new payment rows are added
-            $(document).on('formset:added', function(event, $row, formsetName) {
-                if (formsetName === 'payment_schedule') {
-                    // Apply commission rate to the new row
-                    updateCommissionRates();
-                }
-            });
-        }
-
-        function updateCommissionRates(applyToExisting) {
-            var $insurerField = $('#id_insurer');
-            var $insuranceTypeField = $('#id_insurance_type');
-
-            var insurerId = $insurerField.val();
-            var insuranceTypeId = $insuranceTypeField.val();
-
-            if (prefilledForm) {
-                currentKvPercent = null;
-                if (applyToExisting !== false) {
-                    $('.dynamic-payment_schedule').each(function() {
-                        var $row = $(this);
-                        if (!$row.hasClass('empty-form') && !$row.find('input[name$="-DELETE"]').prop('checked')) {
-                            pendingKvRows.add(this);
-                            $row.find('input[name$="-kv_rub"]').val('');
-                        }
-                    });
-                }
-            }
-            // Both fields must be selected
-            if (!insurerId || !insuranceTypeId) {
-                currentKvPercent = null;
-                console.log('Не выбран страховщик или вид страхования');
-                return;
-            }
-
-            // Make AJAX request to get commission rate
-            $.ajax({
-                url: '/insurers/api/commission-rate/',
-                method: 'GET',
-                data: {
-                    insurer_id: insurerId,
-                    insurance_type_id: insuranceTypeId
-                },
-                success: function(response) {
-                    if ($('#id_insurer').val() !== insurerId || $('#id_insurance_type').val() !== insuranceTypeId) return;
-                    if (response.success) {
-                        currentKvPercent = response.kv_percent;
-                        if (prefilledForm) {
-                            pendingKvRows.forEach(function(row) {
-                                recalculateKvRub($(row), currentKvPercent);
-                            });
-                            pendingKvRows.clear();
-                            return;
-                        }
-                        // ЗС уже заполнила форму, в том числе сохранённые правки менеджера.
-                        if (applyToExisting === false) return;
-                        applyCommissionRateToAllRows(
-                            response.commission_rate_id,
-                            response.kv_percent,
-                            response.display_name
-                        );
-                    } else {
-                        currentKvPercent = null;
-                        console.warn('Ставка комиссии не найдена:', response.error);
-                        showNotification('warning', response.error);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Ошибка при получении ставки комиссии:', error);
-                    showNotification('error', 'Ошибка при получении ставки комиссии');
-                }
-            });
-        }
-
-        function applyCommissionRateToAllRows(commissionRateId, kvPercent, displayName) {
-            // Строки платежей ищем по префиксу формсета, а не по заголовку блока:
-            // у ОСАГО он другой («Платёж по полису ОСАГО»).
-            var updatedCount = 0;
-
-            $('.dynamic-payment_schedule').each(function() {
-                var $row = $(this);
-
-                // Skip empty form template and deleted rows
-                if ($row.hasClass('empty-form') || $row.find('input[name$="-DELETE"]').prop('checked')) {
-                    return;
-                }
-
-                // Find hidden commission_rate field and set its value
-                var $commissionRateField = $row.find('input[name$="-commission_rate"]');
-                if ($commissionRateField.length > 0) {
-                    $commissionRateField.val(commissionRateId);
-                }
-
-                // Recalculate kv_rub for this row
-                recalculateKvRub($row, kvPercent);
-
-                updatedCount++;
-            });
-
-            if (updatedCount > 0) {
-                showNotification('success',
-                    'Комиссия пересчитана для ' + updatedCount + ' платеж(ей): ' + displayName
-                );
-            }
-        }
-
-        function recalculateKvRub($row, kvPercent) {
-            // Find amount and kv_rub fields
-            var $amountField = $row.find('input[name$="-amount"]');
-            var $kvRubField = $row.find('input[name$="-kv_rub"]');
-
-            if ($amountField.length === 0 || $kvRubField.length === 0) {
-                return;
-            }
-
-            var amount = parseFloat($amountField.val());
-            var kvPercentValue = parseFloat(kvPercent);
-
-            if (prefilledForm && (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(kvPercentValue))) {
-                $kvRubField.val('');
-                return;
-            }
-            if (isNaN(amount) || isNaN(kvPercentValue)) {
-                return;
-            }
-
-            // Calculate commission in rubles
-            var kvRub = (amount * kvPercentValue / 100).toFixed(2);
-            $kvRubField.val(kvRub);
-        }
-
-        function showNotification(type, message) {
-            // Create notification element
-            var $notification = $('<div>', {
-                class: 'commission-rate-notification commission-rate-notification-' + type,
-                html: message
-            });
-
-            // Add to page
-            var $container = $('.breadcrumbs');
-            if ($container.length === 0) {
-                $container = $('body');
-            }
-
-            $container.after($notification);
-
-            // Auto-hide after 5 seconds
-            setTimeout(function() {
-                $notification.fadeOut(function() {
-                    $(this).remove();
-                });
-            }, 5000);
-        }
-    }
-
-    // Start initialization
-    initWhenReady();
-
+        document.addEventListener('formset:added', event => {
+            if (event.detail && event.detail.formsetName === 'payment_schedule') { prepare(event.target); refreshRows(); }
+        });
+        if (form) form.addEventListener('submit', () => {
+            // Окончательный автоматический расчёт выполняет сервер. Ручные суммы и старые строки сохраняются.
+            rows().forEach(row => { const data = state.get(row); if (data && !data.saved && !data.manual) field(row, 'kv_rub').value = ''; });
+        });
+        refreshRows(); update();
+    });
 })();

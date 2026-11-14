@@ -16,7 +16,7 @@ from urllib.parse import urlencode
 from decimal import Decimal
 from uuid import uuid4
 
-from apps.insurers.models import InsuranceType, get_osago_insurance_type
+from apps.insurers.models import InsuranceType, CommissionRate, get_osago_insurance_type
 
 from . import flow_views
 from .forms import AcceptUploadForm
@@ -34,6 +34,18 @@ from .services.accept_resolver import (
     ACCEPT_IMPORT_SESSION_KEY,
     resolve_accept_data,
 )
+
+
+class CommissionRateSelect(forms.Select):
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex, attrs
+        )
+        if hasattr(value, "instance"):
+            option["attrs"]["data-percent"] = str(value.instance.kv_percent)
+        return option
 
 
 class InsuranceSumRangeFilter(SimpleListFilter):
@@ -92,7 +104,7 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
     вылетал из save() и пользователь получал HTTP 500.
     """
 
-    def __init__(self, *args, allow_commission_override=False, **kwargs):
+    def __init__(self, *args, allow_commission_override=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.allow_commission_override = allow_commission_override
 
@@ -100,10 +112,31 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
         form = super()._construct_form(i, **kwargs)
         form.instance._date_sequence_checked_by_formset = True
         if self.allow_commission_override and "kv_rub" in form.fields:
+            form.fields["kv_rub"].required = bool(form.instance.pk)
+            form.fields["kv_rub"].widget.attrs["placeholder"] = "По ставке"
+            if not form.instance.pk:
+                supplied = (
+                    self.initial_extra[i - self.initial_form_count()]
+                    if self.initial_extra
+                    and 0 <= i - self.initial_form_count() < len(self.initial_extra)
+                    else {}
+                )
+                form.initial["kv_rub"] = supplied.get("kv_rub")
+            else:
+                rate = form.instance.base_commission_rate
+                form.fields["kv_rub"].widget.attrs["data-saved-payment"] = "true"
+                form.fields["kv_rub"].widget.attrs["data-base-percent"] = (
+                    str(rate.kv_percent) if rate else ""
+                )
+        return form
+
+    @property
+    def empty_form(self):
+        form = super().empty_form
+        if self.allow_commission_override and "kv_rub" in form.fields:
             form.fields["kv_rub"].required = False
             form.fields["kv_rub"].widget.attrs["placeholder"] = "По ставке"
-            if "kv_rub" not in form.initial:
-                form.initial["kv_rub"] = None
+            form.initial["kv_rub"] = None
         return form
 
     def clean(self):
@@ -112,6 +145,31 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
             return
 
         if self._add_insurance_kind_errors():
+            return
+
+        from apps.insurers.commissions import resolve_commission_rate
+
+        rate = (
+            self.instance.default_commission_rate
+            if self.instance.pk
+            else resolve_commission_rate(
+                self.instance.insurer_id,
+                self.instance.insurance_type_id,
+                self.instance.start_date,
+            )
+        )
+        for form in self.forms:
+            if (
+                form.cleaned_data
+                and not self._should_delete_form(form)
+                and not form.instance.pk
+            ):
+                if form.cleaned_data.get("kv_rub") is None and rate is None:
+                    form.add_error(
+                        "kv_rub",
+                        "Базовая ставка не задана. Укажите комиссию вручную (в том числе 0).",
+                    )
+        if any(self.errors):
             return
 
         rows = []
@@ -212,7 +270,7 @@ class PaymentScheduleInlineFormSet(BaseInlineFormSet):
 # скрипта меняйте версию, иначе браузеры сотрудников возьмут старый файл.
 # Полный путь: static() закодировал бы «?» в %3F.
 AUTO_COMMISSION_RATE_JS = (
-    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-13.2"
+    f"{settings.STATIC_URL}policies/js/auto_commission_rate.js?v=2026-11-14-rates.2"
 )
 
 
@@ -268,7 +326,7 @@ class PaymentScheduleInline(admin.TabularInline):
         css = {
             "all": (
                 f"{settings.STATIC_URL}policies/css/copy_payment_inline.css?v=2026-11-13",
-                "policies/css/auto_commission_rate.css",
+                f"{settings.STATIC_URL}policies/css/auto_commission_rate.css?v=2026-11-14-rates.2",
             )
         }
 
@@ -294,7 +352,11 @@ class OsagoPaymentInline(admin.TabularInline):
 
     class Media:
         js = (AUTO_COMMISSION_RATE_JS,)
-        css = {"all": ("policies/css/auto_commission_rate.css",)}
+        css = {
+            "all": (
+                f"{settings.STATIC_URL}policies/css/auto_commission_rate.css?v=2026-11-14-rates.2",
+            )
+        }
 
 
 class PolicyInfoInline(admin.TabularInline):
@@ -424,7 +486,19 @@ class PolicyAdmin(admin.ModelAdmin):
     inlines = [PaymentScheduleInline, PolicyInfoInline]
 
     def get_fieldsets(self, request, obj=None):
-        sections = super().get_fieldsets(request, obj)
+        sections = list(super().get_fieldsets(request, obj))
+        if obj is not None:
+            sections.insert(
+                -1,
+                (
+                    "Комиссионные условия",
+                    {
+                        "fields": ("commission_rate", "commission_rate_origin"),
+                        "classes": ("policy-secondary",),
+                        "description": "Изменение базовой ставки применяется только к новым взносам. Существующие платежи сохраняют свои ставки и суммы.",
+                    },
+                ),
+            )
         if obj is None or not obj.flow_links.exists():
             return sections
         result = []
@@ -435,6 +509,28 @@ class PolicyAdmin(admin.ModelAdmin):
                 options = dict(options, fields=fields)
             result.append((title, options))
         return result
+
+    def get_readonly_fields(self, request, obj=None):
+        return [*self.readonly_fields, "commission_rate_origin"]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj and "commission_rate" in form.base_fields:
+            insurer_id = request.POST.get("insurer", str(obj.insurer_id))
+            kind_id = request.POST.get("insurance_type", str(obj.insurance_type_id))
+            rates = CommissionRate.objects.none()
+            if insurer_id.isdecimal() and kind_id.isdecimal():
+                rates = CommissionRate.objects.filter(
+                    insurer_id=insurer_id, insurance_type_id=kind_id
+                )
+            form.base_fields["commission_rate"].queryset = rates
+            form.base_fields["commission_rate"].widget = CommissionRateSelect()
+        return form
+
+    def save_model(self, request, obj, form, change):
+        if change and "commission_rate" in form.changed_data:
+            obj.commission_rate_origin = "manual"
+        super().save_model(request, obj, form, change)
 
     @admin.display(description="Источник оформления")
     def flow_provenance(self, obj):
@@ -519,18 +615,24 @@ class PolicyAdmin(admin.ModelAdmin):
                 request.template_initial = object_initial(source)
             else:
                 request.template_initial = policy_template_initial(source)
-                request.template_payments = list(
-                    source.payment_schedule.order_by(
-                        "year_number", "installment_number"
-                    ).values(
-                        "year_number",
-                        "installment_number",
-                        "due_date",
-                        "insurance_sum",
-                        "amount",
-                        "kv_rub",
-                    )
-                )
+                request.template_payments = []
+                for payment in source.payment_schedule.select_related(
+                    "commission_rate", "policy"
+                ).order_by("year_number", "installment_number"):
+                    values = {
+                        field: getattr(payment, field)
+                        for field in (
+                            "year_number",
+                            "installment_number",
+                            "due_date",
+                            "insurance_sum",
+                            "amount",
+                            "kv_rub",
+                        )
+                    }
+                    if payment.base_commission_rate and not payment.is_nonstandard_kv:
+                        values["kv_rub"] = None
+                    request.template_payments.append(values)
         context = {
             **(extra_context or {}),
             "template_source": source,
@@ -969,9 +1071,64 @@ class OsagoPolicyAdmin(PolicyAdmin):
         return self._has_policy_perm(request, "delete")
 
 
+class PaymentScheduleAdminForm(forms.ModelForm):
+    class Meta:
+        model = PaymentSchedule
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        supplied = kwargs.get("initial", {})
+        super().__init__(*args, **kwargs)
+        field = self.fields.get("kv_rub")
+        if field is None:
+            return
+        if not self.instance.pk:
+            field.required = False
+            field.widget.attrs["placeholder"] = "По ставке"
+            if "kv_rub" not in supplied:
+                self.initial["kv_rub"] = None
+        else:
+            rate = self.instance.base_commission_rate
+            field.widget.attrs["data-saved-payment"] = "true"
+            field.widget.attrs["data-base-percent"] = (
+                str(rate.kv_percent) if rate else ""
+            )
+
+    def clean(self):
+        data = super().clean()
+        policy = data.get("policy")
+        if (
+            not self.instance.pk
+            and data.get("kv_rub") is None
+            and policy
+            and policy.default_commission_rate is None
+        ):
+            self.add_error(
+                "kv_rub",
+                "Базовая ставка не задана. Укажите комиссию вручную (в том числе 0).",
+            )
+        return data
+
+
 @admin.register(PaymentSchedule)
 class PaymentScheduleAdmin(admin.ModelAdmin):
+    form = PaymentScheduleAdminForm
     change_form_template = "admin/policies/paymentschedule/change_form.html"
+
+    class Media:
+        js = (AUTO_COMMISSION_RATE_JS,)
+        css = {
+            "all": (
+                f"{settings.STATIC_URL}policies/css/auto_commission_rate.css?v=2026-11-14-rates.2",
+            )
+        }
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj._explicit_commission = obj.kv_rub is not None
+            if obj.kv_rub is None:
+                obj.kv_rub = Decimal("0")
+        super().save_model(request, obj, form, change)
 
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None

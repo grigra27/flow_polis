@@ -37,3 +37,8 @@
         transform: translateY(0);
     }
 }
+
+.commission-row-rate { display: block; font-size: 11px; color: var(--body-quiet-color, #52677e); margin-top: 3px; }
+.commission-recalculate { display: inline-block; margin-top: 3px; padding: 2px 5px; border: 1px solid var(--border-color, #d5dce5); border-radius: 4px; background: var(--body-bg, white); color: var(--link-fg, #155b9d); cursor: pointer; }
+.commission-recalculate:disabled { opacity: 0.55; cursor: default; }
+#commission-context { padding: 10px 12px; background: var(--darkened-bg, #f3f7fc); border-radius: 6px; }

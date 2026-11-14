@@ -7,7 +7,7 @@
 {% block title %}{{ insurer.insurer_name }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'ecosystem/css/insurer_detail.css' %}">
+<link rel="stylesheet" href="{% static 'ecosystem/css/insurer_detail.css' %}?v=2026-11-14-rates">
 <link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}?v=2026-11-14">
 {% endblock %}
 
@@ -75,6 +75,8 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% include "insurers/includes/commission_rates.html" %}
 
             {% if insurer.notes %}
             <!-- Notes -->
@@ -249,28 +251,6 @@
             </div>
             {% endif %}
 
-            {% if commission_rates %}
-            <!-- Commission rates -->
-            <div class="mgr-section">
-                <div class="mgr-section-head">
-                    <span class="mgr-section-head-title"><i class="bi bi-percent"></i> Базовые ставки комиссий</span>
-                </div>
-                <div class="mgr-section-body">
-                    <table class="br-comm-table">
-                        <tbody>
-                            {% for rate in commission_rates %}
-                            <tr>
-                                <td>{% insurance_type_icon rate.insurance_type size='small' %}</td>
-                                <td style="text-align:right;">
-                                    <span class="br-comm-pct">{{ rate.kv_percent|percent }}%</span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {% endif %}
 
         </div>
 

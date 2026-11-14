@@ -1,0 +1,23 @@
+{% load insurer_tags l10n %}
+<section class="mgr-section commission-history" id="commission-rates" aria-labelledby="commission-rates-heading">
+    <div class="mgr-section-head"><span class="mgr-section-head-title" id="commission-rates-heading">Ставки для новых полисов</span></div>
+    <div class="mgr-section-body">
+        <p class="commission-caption">При начале страхования {{ rate_history.on_date|date:"d.m.Y" }}</p>
+        {% if rate_history.current %}
+        <table class="br-comm-table"><thead><tr><th scope="col">Вид страхования</th><th scope="col">КВ</th></tr></thead><tbody>
+        {% for rate in rate_history.current %}<tr><td>{% insurance_type_icon rate.insurance_type size='small' %}<small class="commission-caption">{% if rate.effective_from %}С {{ rate.effective_from|date:"d.m.Y" }}{% else %}Исходные условия{% endif %}{% if rate.notes %} · {{ rate.notes }}{% endif %}</small></td><td class="commission-percent">{{ rate.kv_percent|floatformat:"-2" }}%</td></tr>{% endfor %}
+        </tbody></table>
+        {% else %}<p class="commission-caption">На эту дату ставки не заданы.</p>{% endif %}
+        {% if rate_history.scheduled %}
+        <details class="commission-versions" open><summary>Запланированные изменения · {{ rate_history.scheduled|length }}</summary>
+        {% for rate in rate_history.scheduled %}<div class="commission-version"><strong>{{ rate.insurance_type }} · {{ rate.kv_percent|floatformat:"-2" }}%</strong><span>С {{ rate.effective_from|date:"d.m.Y" }}{% if rate.effective_until %} по {{ rate.effective_until|date:"d.m.Y" }}{% endif %}</span>{% if rate.notes %}<small>{{ rate.notes }}</small>{% endif %}</div>{% endfor %}
+        </details>{% endif %}
+        {% if rate_history.previous %}
+        <details class="commission-versions"><summary>Предыдущие ставки · {{ rate_history.previous|length }}</summary>
+        {% for rate in rate_history.previous %}<div class="commission-version"><strong>{{ rate.insurance_type }} · {{ rate.kv_percent|floatformat:"-2" }}%</strong><span>{% if rate.effective_from %}С {{ rate.effective_from|date:"d.m.Y" }} {% endif %}{% if rate.effective_until %}По {{ rate.effective_until|date:"d.m.Y" }} включительно{% endif %}</span>{% if rate.notes %}<small>{{ rate.notes }}</small>{% endif %}</div>{% endfor %}
+        </details>{% endif %}
+        <p class="commission-caption">Даты определяют подбор для новых полисов. Сохранённые полисы и взносы сохраняют закреплённые условия.</p>
+        {% if request.user.is_staff and perms.insurers.add_commissionrate %}<a class="btn btn-sm btn-outline-primary" href="{% url 'admin:insurers_commissionrate_add' %}?insurer={{ insurer.pk|unlocalize }}">Добавить ставку</a>{% endif %}
+        {% if request.user.is_staff and perms.insurers.view_commissionrate %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:insurers_commissionrate_changelist' %}?insurer__id__exact={{ insurer.pk|unlocalize }}">Все версии в админке</a>{% endif %}
+    </div>
+</section>

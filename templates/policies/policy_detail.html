@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'policies/css/policy_detail.css' %}?v=2026-11-13.8">
-{% if flow_links %}<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-13.6">{% endif %}
+<link rel="stylesheet" href="{% static 'policies/css/source_card.css' %}?v=2026-11-14.1">
 {% endblock %}
 
 {% block content %}
@@ -91,12 +91,12 @@
                 </dl>
             </section>
 
-            {% if flow_links %}
             <section class="policy-panel flow-source-card" aria-labelledby="flow-source-brand">
                 <header class="flow-source-card__header">
                     <h2 id="flow-source-brand"><b>флоу</b> <span aria-hidden="true">//</span> заявки</h2>
-                    <small>{{ flow_zs_host }}</small>
+                    {% if flow_zs_host %}<small>{{ flow_zs_host }}</small>{% endif %}
                 </header>
+                {% if flow_links %}
                 <ul class="flow-source-card__list">
                     {% for link in flow_links %}
                     <li>
@@ -115,8 +115,15 @@
                     </li>
                     {% endfor %}
                 </ul>
+                {% else %}
+                <div class="flow-source-card__empty">
+                    <p>Связь со сделкой не установлена</p>
+                    {% if can_link_flow_policy %}
+                    <a class="flow-source-card__open" href="{% url 'policies:link-zs-search' policy.pk %}"><i class="bi bi-link-45deg" aria-hidden="true"></i> Подобрать сделку</a>
+                    {% endif %}
+                </div>
+                {% endif %}
             </section>
-            {% endif %}
         </div>
     </div>
 

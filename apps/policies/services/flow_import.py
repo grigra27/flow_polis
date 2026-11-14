@@ -200,6 +200,7 @@ def save_linked_policy(
     dfa_number=None,
     group_version=None,
     confirm_template=False,
+    reviewed_dfa_format=False,
 ):
     """Callback writes the policy AND its schedule inside the same transaction.
 
@@ -252,11 +253,15 @@ def save_linked_policy(
         policy = (
             Policy.objects.select_for_update().filter(pk=existing_policy.pk).first()
         )
-        if (
-            not policy
-            or not normalize_dfa(number)
-            or normalize_dfa(number) != normalize_dfa(policy.dfa_number)
-        ):
+        # Only the reviewed reverse-link flow may accept equivalent formatting.
+        from .flow_matching import dfa_match
+
+        number_matches = policy and (
+            normalize_dfa(number) == normalize_dfa(policy.dfa_number)
+            or reviewed_dfa_format
+            and dfa_match(number, policy.dfa_number) == "structure"
+        )
+        if not policy or not normalize_dfa(number) or not number_matches:
             raise FlowError("ДФА выбранного полиса изменился. Повторите поиск.")
         if source.links.filter(policy=policy).exists():
             raise FlowError("Этот полис уже связан с другой позицией свода.")

@@ -204,3 +204,63 @@ def test_status_batch_shows_empty_plan_and_existing_link(
     }
     assert payload[str(empty.pk)] == {"mode": "separate", "total": 2, "links": []}
     assert payload["14"] == {"mode": None, "total": 0, "links": []}
+
+
+def test_reviewed_dfa_format_keeps_existing_group_editable(
+    admin_client, source, policy_factory
+):
+    source["source_object_count"] = 2
+    policy = policy_factory(dfa_number="12345-1")
+    linked_source = FlowPolicySource.objects.create(
+        summary_id=source["summary_id"],
+        total=2,
+        mode="separate",
+        groups=[
+            dict(
+                first_slot=1,
+                last_slot=2,
+                dfa="ТС-12345/1",
+                revision=source["revision"],
+                version="original-plan",
+            )
+        ],
+    )
+    url = reverse("policies:link-zs-confirm", args=[policy.pk, source["summary_id"]])
+    with patch(
+        "apps.policies.reverse_flow_views.flow_client.fetch_snapshot",
+        return_value=source,
+    ):
+        page = admin_client.get(url)
+        assert page.status_code == 200
+        response = admin_client.post(
+            url,
+            {
+                "confirmation_token": page.context["confirmation_token"],
+                "slot": "1",
+                "confirm": "yes",
+                "acknowledge": "yes",
+            },
+        )
+    assert response.status_code == 302
+    assert linked_source.links.get().policy_id == policy.pk
+
+    data = dict(
+        range_start="1",
+        range_end="2",
+        group_dfa="ТС-12345/1",
+        plan_version=flow_groups.plan_version(linked_source.groups),
+    )
+    flow_groups.edit_plan(source, data)
+    linked_source.refresh_from_db()
+    assert linked_source.groups[0]["dfa"] == "ТС-12345/1"
+    assert linked_source.groups[0]["version"] != "original-plan"
+    current_groups = linked_source.groups
+    data.update(
+        group_dfa="ТС-12345/2", plan_version=flow_groups.plan_version(current_groups)
+    )
+    with pytest.raises(FlowError, match="другой окончательный ДФА"):
+        flow_groups.edit_plan(source, data)
+    linked_source.refresh_from_db()
+    assert linked_source.groups == current_groups
+    policy.refresh_from_db()
+    assert policy.dfa_number == "12345-1"

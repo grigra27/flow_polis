@@ -96,6 +96,7 @@ def set_template(group, policy, snapshot):
 @transaction.atomic
 def edit_plan(snapshot, data, *, remove=False):
     from .flow_import import normalize_dfa
+    from .flow_matching import dfa_match
 
     total = snapshot["source_object_count"]
     if total < 2:
@@ -146,7 +147,9 @@ def edit_plan(snapshot, data, *, remove=False):
         existing = source.links.filter(slot__range=(first, last)).values_list(
             "policy__dfa_number", flat=True
         )
-        if any(normalize_dfa(v) != normalize_dfa(dfa) for v in existing):
+        # Reverse linking may confirm equivalent prefix/separator formatting.
+        # Keep every numeric part: a different suffix is still a different DFA.
+        if any(dfa_match(v, dfa) not in ("exact", "structure") for v in existing):
             raise FlowError(
                 "У уже оформленной позиции другой окончательный ДФА. Проверьте диапазон."
             )

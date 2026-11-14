@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static l10n %}
+
+{% block title %}Подтвердить привязку · {{ policy.policy_number }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_link.css' %}?v=2026-11-14.1">{% endblock %}
+
+{% block content %}
+<section class="flow-link-page flow-link-page--confirm" aria-labelledby="flow-link-title">
+    <a class="flow-link-back" href="{{ search_url }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> К выбору сделки</a>
+    <header class="flow-link-heading">
+        <div><span class="flow-link-eyebrow">Связь между модулями · Шаг 2 из 2</span>
+            <h1 id="flow-link-title">Проверить привязку</h1>
+            <p>Сверьте полис и выбранную сделку перед подтверждением.</p>
+        </div>
+        <span class="flow-link-brand"><b>флоу</b> <span aria-hidden="true">//</span> заявки</span>
+    </header>
+
+    {% if error %}<div class="flow-link-notice flow-link-notice--error" role="alert"><strong>Привязка не сохранена</strong><p>{{ error }}</p></div>{% endif %}
+    {% if already_linked %}<div class="flow-link-notice flow-link-notice--success" role="status"><strong>Этот полис уже связан с выбранным сводом</strong><p><a href="{{ back_url }}">Открыть карточку полиса</a></p></div>{% endif %}
+
+    {% if source %}
+    <div class="flow-link-table-wrap flow-link-comparison-wrap" tabindex="0" role="region" aria-label="Сравнение полиса и сделки">
+        <table class="flow-link-comparison">
+            <thead><tr><th scope="col">Данные</th><th scope="col">
+                <span class="flow-link-label">В «Полисах»</span><strong>Полис {{ policy.policy_number }}</strong>
+                <small class="flow-link-contract-dates">Период страхования: {{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}</small>
+                {% if policy.vin_number %}<small class="flow-link-contract-dates">VIN {{ policy.vin_number }}</small>{% endif %}
+                <a href="{{ back_url }}" target="_blank" rel="noopener noreferrer">Открыть полис ↗<span class="visually-hidden">, в новой вкладке</span></a>
+            </th><th scope="col">
+                <span class="flow-link-label">В ЗС</span><strong>Свод № {{ source.summary_id|unlocalize }}</strong>
+                <small class="flow-link-contract-dates">Дата акцепта: {{ accepted_label|default:"—" }}</small>
+                <a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Открыть свод ↗<span class="visually-hidden">, в новой вкладке</span></a>
+            </th></tr></thead>
+            <tbody>
+            {% for row in comparisons %}
+                <tr{% if row.different %} class="flow-link-difference"{% endif %}>
+                    <th scope="row">{{ row.label }}{% if row.different %}<small><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Отличается</small>{% endif %}</th>
+                    <td>{{ row.policy_value|default:"—" }}</td><td>{{ row.source_value|default:"—" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <form method="post" class="flow-link-confirm-form">
+        {% csrf_token %}
+        <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
+        <input type="hidden" name="confirm" value="yes">
+
+        {% if slots %}
+        <fieldset class="flow-link-slots">
+            <legend>{% if source.source_object_count > 1 %}Выберите позицию в своде{% else %}Объект в своде{% endif %}</legend>
+            {% if source.source_object_count > 1 %}<p class="flow-link-hint">В своде {{ source.source_object_count }} объектов.{% if available_slots %} Выберите свободную позицию для этого полиса.{% else %} Доступных позиций нет. Откройте уже связанный полис или выберите другую сделку.{% endif %}</p>{% endif %}
+            {% if available_slots %}
+            <div class="flow-link-slot-grid">
+                {% for slot in available_slots %}
+                    {% include "policies/includes/flow_link_slot.html" %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if unavailable_slots %}
+                {% if source.source_object_count > 1 %}
+                <details class="flow-link-unavailable"{% if not available_slots %} open{% endif %}>
+                    <summary>Занятые и недоступные позиции ({{ unavailable_slots|length }})</summary>
+                    <div class="flow-link-slot-grid">
+                        {% for slot in unavailable_slots %}{% include "policies/includes/flow_link_slot.html" %}{% endfor %}
+                    </div>
+                </details>
+                {% else %}
+                <div class="flow-link-slot-grid">
+                    {% for slot in unavailable_slots %}{% include "policies/includes/flow_link_slot.html" %}{% endfor %}
+                </div>
+                {% endif %}
+            {% endif %}
+        </fieldset>
+        {% endif %}
+
+        {% if warnings %}
+        <div class="flow-link-notice flow-link-notice--warning">
+            <strong>Обратите внимание на различия</strong>
+            <ul>{% for warning in warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+            {% if can_confirm %}<label class="flow-link-check"><input type="checkbox" name="acknowledge" value="yes" required><span>Я проверил различия. Полис относится к выбранной сделке.</span></label>{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="flow-link-save">
+            <p><i class="bi bi-link-45deg" aria-hidden="true"></i> {% if already_linked %}Связь со сводом уже сохранена.{% else %}При подтверждении будет сохранена связь со сводом.{% endif %} Реквизиты полиса и график платежей остаются прежними.</p>
+            <div class="flow-link-save__actions">
+                {% if can_confirm and not already_linked %}<button class="btn flow-link-primary" type="submit">Подтвердить привязку <i class="bi bi-check2" aria-hidden="true"></i></button>{% endif %}
+                <a class="btn btn-outline-secondary" href="{{ back_url }}">К карточке полиса</a>
+            </div>
+        </div>
+    </form>
+    {% else %}
+    <a class="btn btn-outline-secondary" href="{{ search_url }}">Выбрать другую сделку</a>
+    {% endif %}
+</section>
+{% endblock %}

@@ -11,7 +11,7 @@ class FlowError(ValueError):
     pass
 
 
-def _request(method, path, **kwargs):
+def _request(method, path, *, search=False, **kwargs):
     base = settings.FLOW_ZS_BASE_URL.rstrip("/")
     parsed = urlsplit(base)
     local_http = (
@@ -48,7 +48,11 @@ def _request(method, path, **kwargs):
     if response.status_code != 200:
         raise FlowError("Сервер ЗС не подтвердил запрос. Повторите попытку позже.")
     try:
-        snapshot = response.json()["snapshot"]
+        data = response.json()
+        if search:
+            _validate_search(data)
+            return data
+        snapshot = data["snapshot"]
         _validate_snapshot(snapshot)
     except (KeyError, TypeError, ValueError, ArithmeticError):
         raise FlowError(
@@ -150,3 +154,74 @@ def fetch_snapshot(summary_id):
     if snapshot["summary_id"] != summary_id:
         raise FlowError("ЗС вернул другой свод.")
     return snapshot
+
+
+def _validate_search(data):
+    if not isinstance(data, dict) or not _integer(data["page"], 10000):
+        raise ValueError
+    if type(data["has_next"]) is not bool:
+        raise ValueError
+    rows = data["results"]
+    if not isinstance(rows, list) or len(rows) > 20:
+        raise ValueError
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError
+        for field in ("summary_id", "request_id"):
+            if not _integer(row[field], 2**63 - 1):
+                raise ValueError
+        if row["summary_id"] in seen:
+            raise ValueError
+        seen.add(row["summary_id"])
+        if not _integer(row["source_object_count"], MAX_GROUP_SIZE):
+            raise ValueError
+        for field in (
+            "dfa_number",
+            "client_name",
+            "client_inn",
+            "selected_company",
+            "insurance_type",
+            "property_description",
+            "match_kind",
+            "match_label",
+        ):
+            if not isinstance(row[field], str) or len(row[field]) > 10000:
+                raise ValueError
+        for field in ("item_no", "item_count"):
+            if not _integer(row[field], MAX_GROUP_SIZE):
+                raise ValueError
+        if row["accepted_at"] is not None and not isinstance(row["accepted_at"], str):
+            raise ValueError
+
+
+def search_summaries(*, dfa="", inn="", q="", page=1, summary_ids=None):
+    summary_ids = [] if summary_ids is None else summary_ids
+    if (
+        not isinstance(dfa, str)
+        or len(dfa) > 100
+        or not isinstance(q, str)
+        or len(q) > 100
+        or not isinstance(inn, str)
+        or len(inn) > 12
+        or not _integer(page, 10000)
+        or not isinstance(summary_ids, list)
+        or len(summary_ids) > 20
+        or any(not _integer(pk, 2**63 - 1) for pk in summary_ids)
+    ):
+        raise FlowError("Проверьте условия поиска сделки.")
+    result = _request(
+        "GET",
+        "/internal/flow/v1/summaries/search/",
+        search=True,
+        params={
+            "dfa": dfa,
+            "inn": inn,
+            "q": q,
+            "page": page,
+            "summary_ids": ",".join(str(pk) for pk in summary_ids),
+        },
+    )
+    if result["page"] != page:
+        raise FlowError("ЗС вернул другую страницу поиска.")
+    return result

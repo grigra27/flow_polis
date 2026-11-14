@@ -1,0 +1,9 @@
+{% load l10n %}
+<div class="flow-link-slot{% if slot.disabled %} flow-link-slot--disabled{% endif %}">
+    <label for="flow-slot-{{ slot.value|unlocalize }}">
+        <input id="flow-slot-{{ slot.value|unlocalize }}" type="radio" name="slot" value="{{ slot.value|unlocalize }}"{% if selected_slot == slot.value %} checked{% endif %}{% if slot.disabled %} disabled{% else %} required{% endif %}>
+        <span><strong>{{ slot.label }}</strong>{% if slot.occupied %}<small>Уже оформлен</small>{% elif not slot.disabled %}<small>Доступно для привязки</small>{% endif %}</span>
+    </label>
+    {% if slot.policy_id %}<a href="{% url 'policies:detail' slot.policy_id %}" target="_blank" rel="noopener noreferrer">Полис {{ slot.policy_number }} ↗<span class="visually-hidden">, в новой вкладке</span></a>{% endif %}
+    {% if slot.reason %}<p>{{ slot.reason }}</p>{% endif %}
+</div>

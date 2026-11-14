@@ -156,13 +156,16 @@ def test_login_returns_reader_to_requested_summary(
     assert "По этому своду пока нет связанных полисов" in response.content.decode()
 
 
-def test_origin_panel_lists_each_real_source_once_and_is_hidden_without_links(
+def test_origin_panel_lists_each_real_source_once_and_shows_neutral_empty_state(
     reader, group, sample_policy, policy_factory, settings
 ):
     settings.FLOW_ZS_BASE_URL = "https://zs.example"
+    settings.FLOW_HANDOFF_ENABLED = True
     url = reverse("policies:detail", args=[sample_policy.pk])
     unlinked = reader.get(url).content.decode()
-    assert 'id="flow-source-brand"' not in unlinked
+    assert 'id="flow-source-brand"' in unlinked
+    assert "Связь со сделкой не установлена" in unlinked
+    assert "Подобрать сделку" not in unlinked
     second = FlowPolicySource.objects.create(summary_id=438, mode="common", total=5)
     first_link = group.links.create(
         slot=7, policy=sample_policy, revision="r", created_from_summary=True

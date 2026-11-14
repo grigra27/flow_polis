@@ -9,6 +9,7 @@ from django_filters.views import FilterView
 from django.db.models import Count, Q
 from .models import FlowPolicySource, Policy, PaymentSchedule, in_force_q
 from .flow_views import source_url
+from .flow_permissions import can_link
 from .filters import PolicyFilter
 from .card_edits import can_edit_card_field
 from .navigation import JournalPaginator, card_params, journal_label
@@ -212,6 +213,9 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         )
         context["flow_links"] = links
         context["flow_zs_host"] = urlsplit(settings.FLOW_ZS_BASE_URL).hostname
+        context["can_link_flow_policy"] = settings.FLOW_HANDOFF_ENABLED and can_link(
+            self.request.user
+        )
         navigation = card_params(self.request.GET)
         origin = navigation.get("from_summary")
         for link in links:

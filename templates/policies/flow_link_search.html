@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static l10n %}
+
+{% block title %}Подобрать сделку · {{ policy.policy_number }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/flow_link.css' %}?v=2026-11-14.1">{% endblock %}
+
+{% block content %}
+<section class="flow-link-page" aria-labelledby="flow-link-title">
+    <a class="flow-link-back" href="{{ back_url }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> К карточке полиса</a>
+    <header class="flow-link-heading">
+        <div><span class="flow-link-eyebrow">Связь между модулями · Шаг 1 из 2</span>
+            <h1 id="flow-link-title">Подобрать сделку ЗС</h1>
+            <p>Выберите сделку, по которой оформлен этот полис.</p>
+        </div>
+        <span class="flow-link-brand"><b>флоу</b> <span aria-hidden="true">//</span> заявки</span>
+    </header>
+
+    <section class="flow-link-policy" aria-label="Полис для привязки">
+        <div><span class="flow-link-label">Полис</span><strong>{{ policy.policy_number }}</strong></div>
+        <div><span class="flow-link-label">ДФА</span><strong>{{ policy.dfa_number|default:"—" }}</strong></div>
+        <div><span class="flow-link-label">Лизингополучатель</span><strong>{{ policy.client.client_name }}</strong><small>ИНН {{ policy.client.client_inn|default:"—" }}</small></div>
+        <div><span class="flow-link-label">Объект</span><span>{{ policy.property_description|default:"—" }}</span>{% if policy.vin_number %}<small>VIN {{ policy.vin_number }}</small>{% endif %}</div>
+    </section>
+
+    <form method="get" class="flow-link-search" role="search" aria-label="Поиск сделки">
+        <div class="flow-link-search__field">
+            <label for="deal-query">Найти другую сделку</label>
+            <input class="form-control" type="search" id="deal-query" name="q" value="{{ q }}" maxlength="100" placeholder="ДФА, клиент, ИНН, номер заявки или свода" aria-describedby="deal-query-hint">
+            <small id="deal-query-hint">Для автоматического подбора используются ДФА и ИНН этого полиса.</small>
+        </div>
+        <button class="btn flow-link-primary" type="submit"><i class="bi bi-search" aria-hidden="true"></i> Найти</button>
+        {% if q %}<a class="flow-link-reset" href="{% url 'policies:link-zs-search' policy.pk %}">К подбору по полису</a>{% endif %}
+    </form>
+
+    {% if error %}
+    <div class="flow-link-notice flow-link-notice--error" role="alert">
+        <strong>Не удалось загрузить сделки</strong><p>{{ error }}</p>
+        <a href="{% url 'policies:link-zs-search' policy.pk %}{% if q %}?q={{ q|urlencode }}{% endif %}">Повторить поиск</a>
+    </div>
+    {% endif %}
+
+    {% if candidates %}
+    <div class="flow-link-results-heading">
+        <h2>{% if q %}Результаты поиска{% else %}Подходящие сделки{% endif %}</h2>
+        <p>Сверьте данные перед выбором. Привязка появится только после подтверждения.</p>
+    </div>
+    <div class="flow-link-table-wrap" tabindex="0" role="region" aria-label="Найденные сделки">
+        <table class="flow-link-candidates">
+            <thead><tr><th scope="col">Свод и ДФА</th><th scope="col">Клиент и объект</th><th scope="col">Страхование</th><th scope="col">Оформление</th><th scope="col"><span class="visually-hidden">Действие</span></th></tr></thead>
+            <tbody>
+            {% for candidate in candidates %}
+                <tr>
+                    <td>
+                        <a class="flow-link-source" href="{{ candidate.source_url }}" target="_blank" rel="noopener noreferrer">Свод № {{ candidate.summary_id|unlocalize }} <i class="bi bi-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden">, откроется в новой вкладке</span></a>
+                        <strong class="flow-link-dfa">{{ candidate.dfa_number|default:"ДФА не указан" }}</strong>
+                        <span class="flow-link-match">{{ candidate.match_label }}</span>
+                        {% if candidate.group_match %}<small>ДФА группы: {{ candidate.group_dfa }}</small>{% endif %}
+                    </td>
+                    <td><strong>{{ candidate.client_name }}</strong><small>ИНН {{ candidate.client_inn|default:"—" }}</small><p class="flow-link-object">{{ candidate.property_description|default:"Объект не указан" }}</p>{% if candidate.item_count > 1 %}<small>Заявка {{ candidate.item_no }} из {{ candidate.item_count }} в партии</small>{% endif %}</td>
+                    <td><strong>{{ candidate.selected_company }}</strong><small>{{ candidate.insurance_type }}</small><small>Акцепт {{ candidate.accepted_label|default:"—" }}</small></td>
+                    <td><span class="flow-link-coverage">{% if candidate.total == 1 %}{% if candidate.covered_count %}Объект оформлен{% else %}Полис не привязан{% endif %}{% else %}{{ candidate.covered_count }} из {{ candidate.total }} объектов{% endif %}</span>{% if candidate.total > 1 %}<small>{% if candidate.mode == "common" and candidate.linked_count %}Один общий полис{% else %}Связано полисов: {{ candidate.linked_count }}{% endif %}</small>{% endif %}</td>
+                    <td><a class="btn flow-link-select" href="{{ candidate.review_url }}">{% if candidate.covered_count >= candidate.total %}Проверить связь{% else %}Выбрать сделку{% endif %} <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif not error %}
+    <section class="flow-link-empty" aria-labelledby="no-deals-title">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <h2 id="no-deals-title">Подходящие сделки не найдены</h2>
+        <p>Попробуйте найти сделку по клиенту, ИНН или номеру свода. Для привязки доступны акцептованные своды с выбранной страховой компанией.</p>
+    </section>
+    {% endif %}
+
+    {% if previous_url or next_url %}
+    <nav class="flow-link-pagination" aria-label="Страницы результатов">
+        {% if previous_url %}<a class="btn btn-outline-secondary" href="{{ previous_url }}">← Назад</a>{% endif %}
+        <span>Страница {{ page }}</span>
+        {% if next_url %}<a class="btn btn-outline-secondary" href="{{ next_url }}">Далее →</a>{% endif %}
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

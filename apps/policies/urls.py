@@ -1,10 +1,16 @@
 from django.urls import path
-from . import card_edits, flow_views, views
+from . import card_edits, flow_views, reverse_flow_views, views
 from apps.billing import views as billing_views
 
 app_name = "policies"
 
 urlpatterns = [
+    path("<int:pk>/link-zs/", reverse_flow_views.search, name="link-zs-search"),
+    path(
+        "<int:pk>/link-zs/<int:summary_id>/",
+        reverse_flow_views.confirm,
+        name="link-zs-confirm",
+    ),
     path("from-zs/add/", flow_views.add, name="flow-add"),
     path(
         "by-summary/<int:summary_id>/",

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static currency_filters l10n %}
 {% block title %}Дашборд 3.0{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'core/css/dashboard_v3.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/reference_images.css' %}"><link rel="stylesheet" href="{% static 'core/css/dashboard_v3.css' %}?v=20261114-design">{% endblock %}
 {% block content %}
 <div class="d3" id="dashboard" role="region" aria-label="Дашборд 3.0">
   {% if preview_label %}<div class="d3-badge">{{ preview_label }}</div>{% endif %}
@@ -13,7 +13,7 @@
     <input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="measure" value="{{ measure }}">
     <div class="d3-date"><label for="dashboard-date">Срез на дату</label><input id="dashboard-date" type="date" name="as_of" value="{{ scope.as_of|date:'Y-m-d' }}" required><button class="d3-text-button" type="button" id="dashboard-today" data-today="{{ today_value }}">Сегодня</button></div>
     <fieldset class="d3-scope"><legend class="visually-hidden">Участие брокера</legend>{% for option in scope_options %}<label><input type="radio" name="structure_scope" value="{{ option.key }}"{% if option.selected %} checked{% endif %}><span>{{ option.label }}</span></label>{% endfor %}</fieldset>
-    <details class="d3-branch-select"><summary>Филиалы{% if scope.branch_ids %} · {{ scope.branch_ids|length }}{% else %} · все{% endif %}</summary><div class="d3-branch-menu">{% for b in branches %}<label><input type="checkbox" name="branch" value="{{ b.id }}"{% if b.selected %} checked{% endif %}> {{ b.name }}</label>{% endfor %}<span class="d3-muted">Нет отметок — все филиалы</span></div></details>
+    <details class="d3-branch-select"><summary>Филиалы{% if scope.branch_ids %} · {{ scope.branch_ids|length }}{% else %} · все{% endif %}</summary><div class="d3-branch-menu">{% for b in branches %}<label><input type="checkbox" name="branch" value="{{ b.id }}"{% if b.selected %} checked{% endif %}> {% include "includes/reference_label.html" with name=b.name image_url=b.image_url only %}</label>{% endfor %}<span class="d3-muted">Нет отметок — все филиалы</span></div></details>
     <button type="submit" class="d3-button d3-button-primary">Применить</button>
   </form>
   <p class="d3-scope-note"><strong>{{ scope.as_of|date:"d.m.Y" }} · {{ scope.label }}</strong>{% if scope.branch_ids %} · {% for b in branches %}{% if b.selected %}{{ b.name }} {% endif %}{% endfor %}{% else %} · Все филиалы{% endif %}. Фильтры действуют на все вкладки.</p>

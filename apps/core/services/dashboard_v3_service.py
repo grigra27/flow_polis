@@ -15,6 +15,7 @@ from apps.policies.models import PaymentSchedule, Policy, in_force_q
 from apps.reports.services.insured_value import select_current_insured_sums
 
 from .portfolio_scope import dfa_in_force_q
+from .reference_images import ReferenceImages
 
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
@@ -57,6 +58,7 @@ class DashboardV3Service:
     def __init__(self, scope):
         self.scope = scope
         self.today = scope.as_of
+        self.images = ReferenceImages()
         self.queryset = scope.apply(Policy.objects.all())
         fields = (
             "id",
@@ -203,8 +205,11 @@ class DashboardV3Service:
             "number": p["policy_number"],
             "client": p["client__client_name"],
             "branch": p["branch__branch_name"],
+            "branch_image_url": self.images.get("branch", p["branch_id"]),
             "insurer": p["insurer__insurer_name"],
+            "insurer_image_url": self.images.get("insurer", p["insurer_id"]),
             "type": p["insurance_type__name"],
+            "type_image_url": self.images.get("type", p["insurance_type_id"]),
             "date": p["end_date"],
             "amount": self.sums.get(pk),
             "value_note": self.unknown_sum_reason(pk) if pk in self.missing_sum else "",
@@ -271,6 +276,7 @@ class DashboardV3Service:
                 {
                     "id": p[field],
                     "name": p[name_field],
+                    "image_url": self.images.get(dimension, p[field]),
                     "amount": ZERO,
                     "count": 0,
                     "unknown": 0,
@@ -626,7 +632,10 @@ class DashboardV3Service:
             from apps.reports.services.property_report import build_property_report
 
             context["property_report"] = build_property_report(
-                self.today, self.scope.branch_ids, self.scope.structure_scope
+                self.today,
+                self.scope.branch_ids,
+                self.scope.structure_scope,
+                images=self.images,
             )
         if tab == "payments":
             from apps.reports.services.property_report import _add_months, MONTH_SHORT

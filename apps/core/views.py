@@ -24,7 +24,12 @@ def dashboard(request):
     context = service.context(tab=tab, measure=request.GET.get("measure", "sum"))
     context["preview_label"] = getattr(settings, "DASHBOARD_PREVIEW_LABEL", "")
     context["branches"] = [
-        {"id": b.pk, "name": b.branch_name, "selected": b.pk in scope.branch_ids}
+        {
+            "id": b.pk,
+            "name": b.branch_name,
+            "selected": b.pk in scope.branch_ids,
+            "image_url": service.images.get("branch", b.pk),
+        }
         for b in Branch.objects.order_by("branch_name")
     ]
     context["scope_options"] = [

@@ -4,6 +4,7 @@
 {% block title %}Страховая защита имущества{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/reference_images.css' %}">
 <style>
     .pr {
         --pr-bg: #f3f7fc;
@@ -157,7 +158,7 @@
             <tbody>
             {% for r in insurers %}
             <tr>
-                <td><div class="pr-name">{% if r.logo_url %}<img class="pr-logo" src="{{ r.logo_url }}" alt="">{% endif %}{{ r.name }}</div></td>
+                <td><div class="pr-name">{% include "includes/reference_label.html" with name=r.name image_url=r.image_url only %}</div></td>
                 <td class="pr-barcell"><div class="d-flex align-items-center gap-2"><div class="pr-bar flex-grow-1"><span style="width:{{ r.bar }}%"></span></div><strong style="min-width:3.2em;text-align:right">{{ r.share|floatformat:1 }}%</strong></div></td>
                 <td class="num">{{ r.sum|rub }} ₽</td>
                 <td class="num">{{ r.count }}</td>
@@ -178,10 +179,10 @@
         <h3>Страховые компании по видам страхования</h3>
         <div class="pr-scroll">
         <table class="pr-table">
-            <thead><tr><th>Страховая компания</th>{% for h in insurer_by_type.headers %}<th class="num">{{ h }}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
+            <thead><tr><th>Страховая компания</th>{% for h in insurer_by_type.columns %}<th class="num">{% include "includes/reference_label.html" with name=h.name image_url=h.image_url only %}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
             <tbody>
             {% for row in insurer_by_type.rows %}
-            <tr><td class="pr-name">{{ row.name }}</td>
+            <tr><td><span class="pr-name">{% include "includes/reference_label.html" with name=row.name image_url=row.image_url only %}</span></td>
                 {% for c in row.cells %}<td class="num">{% if c.sum %}{{ c.sum|money_mln }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
                 <td class="num"><strong>{{ row.total|money_mln }}</strong></td></tr>
             {% endfor %}
@@ -196,7 +197,7 @@
             <thead><tr><th>Страховая компания</th>{% for d in insurer_dynamics.dates %}<th class="num">{{ d|date:"d.m.Y" }}</th>{% endfor %}<th class="num">Изменение</th></tr></thead>
             <tbody>
             {% for row in insurer_dynamics.rows %}
-            <tr><td class="pr-name">{{ row.name }}</td>
+            <tr><td><span class="pr-name">{% include "includes/reference_label.html" with name=row.name image_url=row.image_url only %}</span></td>
                 {% for v in row.shares %}<td class="num">{{ v|floatformat:1 }}%</td>{% endfor %}
                 <td class="num {% if row.change > 0 %}pr-up{% elif row.change < 0 %}pr-down{% endif %}">{% if row.change > 0 %}+{% endif %}{{ row.change|floatformat:1 }} п.п.</td></tr>
             {% endfor %}
@@ -244,10 +245,10 @@
         <h3>Страховые компании в филиалах</h3>
         <div class="pr-scroll">
         <table class="pr-table">
-            <thead><tr><th>Филиал</th>{% for h in branch_by_insurer.headers %}<th class="num">{{ h }}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
+            <thead><tr><th>Филиал</th>{% for h in branch_by_insurer.columns %}<th class="num">{% include "includes/reference_label.html" with name=h.name image_url=h.image_url only %}</th>{% endfor %}<th class="num">Итого</th></tr></thead>
             <tbody>
             {% for row in branch_by_insurer.rows %}
-            <tr><td class="pr-name">{{ row.name }}</td>
+            <tr><td><span class="pr-name">{% include "includes/reference_label.html" with name=row.name image_url=row.image_url only %}</span></td>
                 {% for c in row.cells %}<td class="pr-heat" style="background: rgba(42, 120, 214, {{ c.alpha }})">{% if c.sum %}{{ c.share|floatformat:0 }}%<span>{{ c.sum|money_mln }}</span>{% else %}<span>—</span>{% endif %}</td>{% endfor %}
                 <td class="num"><strong>{{ row.total|money_mln }}</strong></td></tr>
             {% endfor %}
@@ -294,7 +295,7 @@
             <thead><tr><th>#</th><th>Лизингополучатель</th><th>Имущество</th><th>Страховая компания</th><th>Филиал</th><th class="num">Страховая стоимость</th><th class="num">Полис до</th></tr></thead>
             <tbody>
             {% for o in top_objects %}
-            <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{{ o.description|truncatechars:70 }}</td><td>{{ o.insurer }}</td><td class="muted">{{ o.branch }}</td>
+            <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{% include "includes/reference_label.html" with name=o.type image_url=o.type_image_url only %}<div class="muted">{{ o.description|truncatechars:70 }}</div></td><td>{% include "includes/reference_label.html" with name=o.insurer image_url=o.insurer_image_url only %}</td><td class="muted">{% include "includes/reference_label.html" with name=o.branch image_url=o.branch_image_url only %}</td>
                 <td class="num"><strong>{% if o.sum is not None %}{{ o.sum|rub }} ₽{% else %}Не определена{% endif %}</strong></td><td class="num">{{ o.end_date|date:"d.m.Y" }}</td></tr>
             {% endfor %}
             </tbody>

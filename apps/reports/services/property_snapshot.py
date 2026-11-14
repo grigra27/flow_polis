@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
 
-from apps.insurers.models import Insurer
+from apps.core.services.reference_images import ReferenceImages
 
 from .insured_value import InsuredObject, insured_portfolio
 
@@ -152,17 +152,6 @@ def _build_pie_gradient(items: List[Dict[str, Any]], color_field: str = "color")
     return "conic-gradient(" + ", ".join(segments) + ")"
 
 
-def _attach_insurer_logos(items: List[Dict[str, Any]]) -> None:
-    """Подтянуть logo_url из БД к items, сгруппированным по страховщику."""
-    insurer_ids = [item["id"] for item in items if item.get("id") is not None]
-    logos: Dict[int, str] = {}
-    if insurer_ids:
-        for obj in Insurer.objects.filter(id__in=insurer_ids).only("id", "logo"):
-            logos[obj.id] = obj.logo.url if obj.logo else ""
-    for item in items:
-        item["logo_url"] = logos.get(item.get("id"), "")
-
-
 def build_property_snapshot(
     as_of=None, branch_ids=None, structure_scope="all"
 ) -> Dict[str, Any]:
@@ -178,7 +167,14 @@ def build_property_snapshot(
     by_insurer, _ = _aggregate_dimension(objects, "insurer_id", "insurer")
     by_type, _ = _aggregate_dimension(objects, "type_id", "type")
 
-    _attach_insurer_logos(by_insurer)
+    images = ReferenceImages()
+    for dimension, items in (
+        ("branch", by_branch),
+        ("insurer", by_insurer),
+        ("type", by_type),
+    ):
+        for item in items:
+            item["logo_url"] = images.get(dimension, item["id"])
 
     active_policies_count = len(objects)
 
@@ -195,7 +191,7 @@ def build_property_snapshot(
                 "items": by_branch,
                 "pie_css": _build_pie_gradient(by_branch),
                 "pie_css_bw": _build_pie_gradient(by_branch, color_field="bw_color"),
-                "show_logo": False,
+                "show_logo": True,
             },
             {
                 "title": "По страховщикам",
@@ -211,7 +207,7 @@ def build_property_snapshot(
                 "items": by_type,
                 "pie_css": _build_pie_gradient(by_type),
                 "pie_css_bw": _build_pie_gradient(by_type, color_field="bw_color"),
-                "show_logo": False,
+                "show_logo": True,
             },
         ],
     }

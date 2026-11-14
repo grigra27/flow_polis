@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional
 from django.utils import timezone
 
 from apps.analytics.money import HISTORY_RELIABLE_FROM, MONTH_SHORT
-from apps.insurers.models import Insurer
+from apps.core.services.reference_images import ReferenceImages
 
 from .insured_value import ZERO, InsuredObject, insured_portfolio
 from .property_text import (
@@ -178,23 +178,17 @@ def _change(as_of, months, branch_ids, current, structure_scope="all"):
     }
 
 
-def _insurers(objects, as_of):
+def _insurers(objects, as_of, images):
     ending_limit = as_of + timedelta(days=ENDING_SOON_DAYS)
     rows = _group(objects, key=lambda o: o.insurer_id, label=lambda o: o.insurer)
     ending = defaultdict(lambda: ZERO)
     for obj in objects:
         if obj.end_date <= ending_limit:
             ending[obj.insurer_id] += obj.insured_sum
-    logos = {
-        insurer.id: insurer.logo.url
-        for insurer in Insurer.objects.filter(id__in=[r["key"] for r in rows]).only(
-            "id", "logo"
-        )
-        if insurer.logo
-    }
     for row in rows:
         row["ending_soon"] = ending[row["key"]]
-        row["logo_url"] = logos.get(row["key"], "")
+        row["logo_url"] = images.get("insurer", row["key"])
+        row["image_url"] = row["logo_url"]
     top3 = sum((r["share"] for r in rows[:3]), ZERO)
     hhi = sum((r["share"] ** 2 for r in rows), ZERO)
     return rows, {"top3_share": top3, "hhi": hhi, "insurers": len(rows)}
@@ -225,6 +219,7 @@ def _matrix(objects, row_key, row_label, col_key, col_label, columns_limit=None)
             values.append(sum((cells[(r, c)] for c in other), ZERO))
         rows.append(
             {
+                "key": r,
                 "name": row_names[r],
                 "total": row_totals[r],
                 "cells": [
@@ -239,7 +234,11 @@ def _matrix(objects, row_key, row_label, col_key, col_label, columns_limit=None)
             }
         )
     headers = [col_names[c] for c in columns] + (["Прочие"] if other else [])
-    return {"headers": headers, "rows": rows}
+    return {
+        "headers": headers,
+        "column_keys": columns + ([None] if other else []),
+        "rows": rows,
+    }
 
 
 def _insurer_dynamics(as_of, branch_ids, current_rows, structure_scope="all"):
@@ -265,6 +264,7 @@ def _insurer_dynamics(as_of, branch_ids, current_rows, structure_scope="all"):
         "dates": [d for d, _ in snapshots],
         "rows": [
             {
+                "key": pk,
                 "name": names[pk],
                 "shares": [shares.get(pk, ZERO) for _, shares in snapshots],
                 "change": snapshots[-1][1].get(pk, ZERO)
@@ -296,15 +296,16 @@ def _ending_by_month(objects, as_of, months=12):
 
 
 def build_property_report(
-    as_of: Optional[date] = None, branch_ids=None, structure_scope="all"
+    as_of: Optional[date] = None, branch_ids=None, structure_scope="all", *, images=None
 ) -> Dict[str, Any]:
     as_of = as_of or timezone.localdate()
+    images = images or ReferenceImages()
     objects = insured_portfolio(as_of, branch_ids, structure_scope)
     totals = _totals(objects)
     brands = {o.id: detect_brand(o.description) for o in objects}
     conditions = {o.id: detect_condition(o.description) for o in objects}
 
-    insurer_rows, concentration = _insurers(objects, as_of)
+    insurer_rows, concentration = _insurers(objects, as_of, images)
 
     brand_rows = _group(objects, key=lambda o: brands[o.id])
     recognized = [r for r in brand_rows if r["key"] != NOT_RECOGNIZED]
@@ -332,6 +333,11 @@ def build_property_report(
         key=lambda o: o.manager_id,
         label=lambda o: f"{o.manager} ({o.branch})",
     )
+    manager_branches = {}
+    for obj in objects:
+        manager_branches.setdefault(obj.manager_id, obj.branch_id)
+    for row in managers:
+        row["image_url"] = images.get("branch", manager_branches[row["key"]])
     without_manager = [o for o in objects if not o.manager_id]
 
     end_years = _group(objects, key=lambda o: o.end_date.year)
@@ -341,7 +347,7 @@ def build_property_report(
 
     top_objects = sorted(objects, key=lambda o: -o.insured_sum)[:TOP_OBJECTS]
 
-    return {
+    report = {
         "as_of": as_of,
         "branch_ids": branch_ids or [],
         "structure_scope": structure_scope,
@@ -423,7 +429,11 @@ def build_property_report(
                 "description": o.description,
                 "brand": brands[o.id],
                 "insurer": o.insurer,
+                "insurer_image_url": images.get("insurer", o.insurer_id),
                 "branch": o.branch,
+                "branch_image_url": images.get("branch", o.branch_id),
+                "type": o.type,
+                "type_image_url": images.get("type", o.type_id),
                 "sum": o.insured_sum if o.insured_sum_known else None,
                 "end_date": o.end_date,
                 "policy_number": o.policy_number,
@@ -431,6 +441,22 @@ def build_property_report(
             for o in top_objects
         ],
     }
+    images.attach(report["by_type"], "type")
+    images.attach(report["by_branch"], "branch")
+    if report["insurer_dynamics"]:
+        images.attach(report["insurer_dynamics"]["rows"], "insurer")
+    for key, row_dimension, column_dimension in (
+        ("insurer_by_type", "insurer", "type"),
+        ("branch_by_insurer", "branch", "insurer"),
+    ):
+        matrix = report[key]
+        images.attach(matrix["rows"], row_dimension)
+        # Excel использует текстовые headers; HTML получает подписи с картинками.
+        matrix["columns"] = [
+            {"name": name, "image_url": images.get(column_dimension, pk)}
+            for name, pk in zip(matrix["headers"], matrix.pop("column_keys"))
+        ]
+    return report
 
 
 # --- Excel ---------------------------------------------------------------------

@@ -5,7 +5,7 @@
     <tbody>
     {% for r in rows %}
     <tr>
-        <td>{{ r.name }}</td>
+        <td>{% include "includes/reference_label.html" with name=r.name image_url=r.image_url only %}</td>
         <td class="pr-barcell"><div class="d-flex align-items-center gap-2"><div class="pr-bar flex-grow-1"><span style="width:{{ r.bar }}%"></span></div><span style="min-width:3.2em;text-align:right">{{ r.share|floatformat:1 }}%</span></div></td>
         <td class="num">{{ r.sum|money_mln }}</td>
         <td class="num muted">{{ r.count }}</td>

@@ -202,23 +202,34 @@
 .d3-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid var(--d3-line);
+  padding: 6px;
+  border-radius: 12px;
+  background: #203b5e;
   flex-wrap: wrap;
 }
 .d3-tabs a {
   padding: 10px 14px;
-  color: var(--d3-muted);
-  border-bottom: 3px solid transparent;
+  color: #edf3fb;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 550;
 }
 .d3-tabs a[aria-current="page"] {
-  color: var(--d3-blue);
-  border-bottom-color: var(--d3-blue);
+  color: #203b5e;
+  background: #fff;
+  box-shadow: 0 1px 4px #10243d33;
+  font-weight: 700;
 }
 .d3-tabs a:hover {
   text-decoration: none;
-  background: #eef4fa;
+}
+.d3-tabs a:hover:not([aria-current="page"]) {
+  background: #365574;
+  color: #fff;
+}
+.d3-tabs a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 .d3-stats,
 .d3-three,
@@ -323,7 +334,7 @@
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;
   gap: 7px;
-  align-items: start;
+  align-items: center;
   color: var(--d3-ink);
   font-size: 12px;
 }
@@ -336,7 +347,7 @@
   flex-shrink: 0;
 }
 .d3-legend i {
-  margin-top: 6px;
+  margin-top: 0;
 }
 .d3-legend b {
   font-weight: 650;

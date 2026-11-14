@@ -1,0 +1,5 @@
+# Keep current Onlinepolis release plus five previous verified releases.
+# Shared deployment lock makes maintenance skip an active deploy.
+SHELL=/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+17 * * * * root /usr/local/sbin/onlinepolis-deploy-retention --apply 2>&1 | /usr/bin/logger -t onlinepolis-retention

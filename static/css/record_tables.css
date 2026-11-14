@@ -102,6 +102,17 @@ table.record-table .record-col-tags .tbl-badge { margin-block: .1rem; white-spac
 .record-period-label { width: 1rem; color: var(--app-color-text-muted); font-size: .73rem; }
 .record-type { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
 
+/* Match the policy card's numeric typography in the two main journals. */
+table.record-table--policies .record-period time,
+table.record-table--payments td:is(.record-col-amount, .record-col-date) {
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: .875rem;
+    font-weight: 400;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: normal;
+}
+table.record-table--payments td.record-col-amount { font-weight: 700; }
+
 .record-text { min-width: 0; font-size: inherit; }
 .record-text-content { display: block; overflow-wrap: break-word; white-space: pre-line; }
 .record-col-object .record-text,

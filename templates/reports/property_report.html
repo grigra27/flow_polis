@@ -118,7 +118,8 @@
             <label>Срез на <input type="date" name="as_of" value="{{ as_of|date:'Y-m-d' }}" onchange="this.form.submit()"></label>
         </form>
         <a href="?{{ xlsx_query }}" class="pr-btn pr-btn--ghost"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-        <button type="button" class="pr-btn" onclick="window.print()"><i class="bi bi-printer"></i> Печать / PDF</button>
+        <a href="?{{ pdf_query }}" class="pr-btn"><i class="bi bi-file-earmark-pdf"></i> Скачать PDF</a>
+        <a href="?{{ print_query }}" target="_blank" rel="noopener" class="pr-btn pr-btn--ghost" title="Открыть готовый PDF для печати"><i class="bi bi-printer"></i> Печатать отчёт</a>
     </div>
 
     {# ── Обложка ── #}
@@ -127,8 +128,9 @@
         <h1>Страховая защита имущества</h1>
         <p class="pr-cover-sub">
             По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>{% if selected_branches %} · {{ selected_branches|join:", " }}{% endif %}.
-            Действующие полисы по договорам лизинга с активным ДФА, без ОСАГО. Страховая стоимость — страховая сумма текущего страхового года.
+            Действующие полисы по договорам лизинга с активным ДФА, без ОСАГО. Страховая стоимость — страховая сумма текущего страхового года. Вид «Ответственность» показан отдельно.
             {{ scope.label }}.
+            Сформировано {{ generated_at|date:"d.m.Y H:i" }} · методика {{ methodology_version }}.
         </p>
         {% if totals.missing_sum_count %}<p class="alert alert-warning">У {{ totals.missing_sum_count }} полисов СС текущего года не определена. Они входят в количество; их стоимость исключена из сумм и средних значений.</p>{% endif %}
         <div class="pr-stats">
@@ -138,11 +140,22 @@
                     {% elif totals.change_3m %}за 3 мес.: <span class="{% if totals.change_3m.delta >= 0 %}pr-up{% else %}pr-down{% endif %}">{% if totals.change_3m.delta >= 0 %}+{% endif %}{{ totals.change_3m.percent|floatformat:1 }}%</span>{% endif %}
                 </div>
             </div>
-            <div class="pr-stat"><div class="pr-stat-label">Объектов</div><div class="pr-stat-value">{{ totals.count }}</div></div>
-            <div class="pr-stat"><div class="pr-stat-label">Средняя стоимость</div><div class="pr-stat-value">{{ totals.avg|money_mln }}</div></div>
+            <div class="pr-stat"><div class="pr-stat-label">Страховых записей</div><div class="pr-stat-value">{{ totals.count }}</div></div>
+            <div class="pr-stat"><div class="pr-stat-label">Средняя СС записи</div><div class="pr-stat-value">{{ totals.avg|money_mln }}</div></div>
             <div class="pr-stat"><div class="pr-stat-label">Лизингополучателей</div><div class="pr-stat-value">{{ totals.lessees }}</div></div>
             <div class="pr-stat"><div class="pr-stat-label">Страховых компаний</div><div class="pr-stat-value">{{ totals.insurers }}</div></div>
         </div>
+    </section>
+
+    <section class="pr-section">
+        <div class="pr-kicker">Резюме для руководителя</div>
+        <h2>Главное о портфеле</h2>
+        <ul class="mt-3">
+            <li>На три крупнейших страховщика приходится {{ concentration.top3_share|floatformat:1 }}% СС имущества.</li>
+            {% for r in renewals %}{% if r.days == 90 %}<li>Окончания в ближайшие 90 дней: {{ r.endings.count }}. Текущая СС: {{ r.endings.sum|money_mln }}.</li>{% endif %}{% endfor %}
+            <li>Лимиты по виду «Ответственность»: {{ liability.sum|money_mln }}. Количество записей: {{ liability.count }}. Они не входят в СС имущества выше.</li>
+        </ul>
+        <p class="pr-note">PDF содержит восемь основных страниц и приложения с полными таблицами. В исходном срезе Дашборда: {{ scope_total|money_mln }} = СС имущества + сумма лимитов ответственности.</p>
     </section>
 
     {# ── 1. Страховщики ── #}
@@ -154,7 +167,7 @@
         </div>
         <div class="pr-scroll">
         <table class="pr-table">
-            <thead><tr><th>Страховая компания</th><th class="pr-barcell">Доля</th><th class="num">Страховая стоимость</th><th class="num">Объектов</th><th class="num">Средняя</th><th class="num">Окончание<br>в {{ ending_soon_days }} дн.</th></tr></thead>
+            <thead><tr><th>Страховая компания</th><th class="pr-barcell">Доля</th><th class="num">Страховая стоимость</th><th class="num">Страховых записей</th><th class="num">Средняя</th><th class="num">Окончание<br>в {{ ending_soon_days }} дн.</th></tr></thead>
             <tbody>
             {% for r in insurers %}
             <tr>
@@ -213,11 +226,11 @@
         <div class="pr-section-head">
             <div class="pr-kicker">Раздел 2</div>
             <h2>Какое имущество застраховано</h2>
-            <p class="pr-section-sub">Вид страхования, размер и возраст объектов, новое и подержанное имущество, франшиза, марки.</p>
+            <p class="pr-section-sub">Вид страхования, страховая сумма и возраст имущества, новое и подержанное имущество, франшиза, марки.</p>
         </div>
         <div class="pr-grid">
             <div>{% include "reports/includes/property_group_table.html" with title="Виды страхования" rows=by_type %}</div>
-            <div>{% include "reports/includes/property_group_table.html" with title="Страховая стоимость объекта" rows=by_size %}</div>
+            <div>{% include "reports/includes/property_group_table.html" with title="Размер страховой суммы" rows=by_size %}</div>
             <div>{% include "reports/includes/property_group_table.html" with title="Возраст имущества" rows=by_age %}</div>
             <div>{% include "reports/includes/property_group_table.html" with title="Новое и подержанное" rows=by_condition %}</div>
             <div>{% include "reports/includes/property_group_table.html" with title="Франшиза" rows=by_franchise %}</div>
@@ -239,7 +252,7 @@
             <div>
                 {% include "reports/includes/property_group_table.html" with title="Менеджеры" rows=by_manager %}
                 {% if managers_total > by_manager|length %}<p class="pr-note">Показаны {{ by_manager|length }} из {{ managers_total }} менеджеров.</p>{% endif %}
-                {% if without_manager.count %}<p class="pr-note">Без менеджера: {{ without_manager.count }} объектов, {{ without_manager.sum|money_mln }}.</p>{% endif %}
+                {% if without_manager.count %}<p class="pr-note">Без менеджера: {{ without_manager.count }} записей, {{ without_manager.sum|money_mln }}.</p>{% endif %}
             </div>
         </div>
         <h3>Страховые компании в филиалах</h3>
@@ -263,13 +276,15 @@
         <div class="pr-section-head">
             <div class="pr-kicker">Раздел 4</div>
             <h2>Когда заканчиваются полисы</h2>
-            <p class="pr-section-sub">Страховая стоимость, по которой полис заканчивается, а договор лизинга продолжается: по этим объектам понадобится новый полис.</p>
+            <p class="pr-section-sub">Окончания действующих полисов и отдельно кандидаты на продление. Окончание не означает разрыв покрытия: новый связанный полис может быть уже оформлен.</p>
         </div>
+        <table class="pr-table mb-4"><thead><tr><th>Горизонт</th><th>Окончания</th><th>Кандидаты на продление</th><th>СС кандидатов</th></tr></thead><tbody>{% for r in renewals %}<tr><td>{{ r.days }} дней</td><td>{{ r.endings.count }}</td><td>{{ r.candidates.count }}</td><td>{{ r.candidates.sum|money_mln }}</td></tr>{% endfor %}</tbody></table>
+        <p class="pr-note">Горизонты накопительные. Кандидаты — продлеваемые виды с ДФА, продолжающимся после окончания, и без известного раннего расторжения.</p>
         <div class="pr-grid">
             <div>
                 <h3>Ближайшие 12 месяцев</h3>
                 <table class="pr-table">
-                    <thead><tr><th>Месяц</th><th class="pr-barcell"></th><th class="num">Объектов</th><th class="num">Стоимость</th></tr></thead>
+                    <thead><tr><th>Месяц</th><th class="pr-barcell"></th><th class="num">Страховых записей</th><th class="num">Стоимость</th></tr></thead>
                     <tbody>
                     {% for r in ending_by_month %}
                     <tr><td>{{ r.label }}</td>
@@ -287,15 +302,15 @@
     <section class="pr-section">
         <div class="pr-section-head">
             <div class="pr-kicker">Раздел 5</div>
-            <h2>Крупнейшие объекты</h2>
-            <p class="pr-section-sub">Двадцать объектов с наибольшей страховой стоимостью.</p>
+            <h2>Крупнейшие страховые записи</h2>
+            <p class="pr-section-sub">Двадцать записей с наибольшей страховой стоимостью.</p>
         </div>
         <div class="pr-scroll">
         <table class="pr-table">
             <thead><tr><th>#</th><th>Лизингополучатель</th><th>Имущество</th><th>Страховая компания</th><th>Филиал</th><th class="num">Страховая стоимость</th><th class="num">Полис до</th></tr></thead>
             <tbody>
             {% for o in top_objects %}
-            <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{% include "includes/reference_label.html" with name=o.type image_url=o.type_image_url only %}<div class="muted">{{ o.description|truncatechars:70 }}</div></td><td>{% include "includes/reference_label.html" with name=o.insurer image_url=o.insurer_image_url only %}</td><td class="muted">{% include "includes/reference_label.html" with name=o.branch image_url=o.branch_image_url only %}</td>
+            <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{% include "includes/reference_label.html" with name=o.type image_url=o.type_image_url only %}<div class="muted">{{ o.description }}</div></td><td>{% include "includes/reference_label.html" with name=o.insurer image_url=o.insurer_image_url only %}</td><td class="muted">{% include "includes/reference_label.html" with name=o.branch image_url=o.branch_image_url only %}</td>
                 <td class="num"><strong>{% if o.sum is not None %}{{ o.sum|rub }} ₽{% else %}Не определена{% endif %}</strong></td><td class="num">{{ o.end_date|date:"d.m.Y" }}</td></tr>
             {% endfor %}
             </tbody>
@@ -303,11 +318,13 @@
         </div>
     </section>
 
+    <section class="pr-section"><h2>Ответственность — отдельно от имущества</h2><p class="pr-note">Страховых записей: {{ liability.count }}. Сумма учтённых лимитов {{ liability.sum|money_mln }} не входит в СС имущества и не означает единое покрытие на эту сумму.</p><table class="pr-table"><thead><tr><th>Полис / ДФА</th><th>Лизингополучатель</th><th>Страховщик</th><th>Лимит, ₽</th></tr></thead><tbody>{% for r in liability.rows %}<tr><td>{{ r.policy_number }} / {{ r.dfa_number }}</td><td>{{ r.client }}</td><td>{{ r.insurer }}</td><td>{% if r.sum is not None %}{{ r.sum|rub }}{% else %}Не определён{% endif %}</td></tr>{% empty %}<tr><td colspan="4">В выбранном срезе нет записей ответственности</td></tr>{% endfor %}</tbody></table></section>
     <section class="pr-section">
         <div class="pr-kicker">Методика</div>
         <ul class="pr-methods mb-0">
+            <li>Количество означает страховые записи, а не уникальные физические объекты. Филиал означает обслуживание, а не местонахождение имущества.</li>
             <li>В отчёт входят полисы, действующие на дату среза, по договорам лизинга с активным ДФА; полисы ОСАГО не входят (у них нет страховой суммы).</li>
-            <li>Страховая стоимость объекта — страховая сумма текущего страхового года полиса; у многолетних полисов она с годами снижается.</li>
+            <li>Размер страховой суммы — страховая сумма текущего страхового года полиса; у многолетних полисов она с годами снижается.</li>
             <li>Возраст имущества — по году выпуска; марка и состояние — по описанию имущества.</li>
             <li>Индекс Херфиндаля–Хиршмана — сумма квадратов долей страховых компаний в процентах: до 1000 — низкая концентрация, 1000–1800 — умеренная, выше — высокая.</li>
         </ul>

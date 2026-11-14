@@ -83,6 +83,9 @@ class InsuredObject:
     end_date: date
     insured_sum: Decimal
     insured_sum_known: bool = True
+    needs_prolongation: bool = True
+    dfa_deactivation_date: Optional[date] = None
+    termination_date: Optional[date] = None
 
 
 def insured_portfolio(
@@ -103,6 +106,9 @@ def insured_portfolio(
             "insurer__insurer_name",
             "branch__branch_name",
             "insurance_type__name",
+            "insurance_type__needs_prolongation",
+            "dfa_deactivation_date",
+            "termination_date",
             "leasing_manager__name",
             "property_description",
             "property_year",
@@ -138,6 +144,9 @@ def insured_portfolio(
             end_date=p.end_date,
             insured_sum=sums.get(p.id, ZERO),
             insured_sum_known=p.id in sums,
+            needs_prolongation=p.insurance_type.needs_prolongation,
+            dfa_deactivation_date=p.dfa_deactivation_date,
+            termination_date=p.termination_date,
         )
         for p in policies
     ]

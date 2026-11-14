@@ -1,3 +1,4 @@
+from django.views.decorators.cache import never_cache
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -971,32 +972,48 @@ def property_snapshot_report(request):
     return render(request, "reports/property_snapshot.html", context)
 
 
+@never_cache
 @login_required
 def property_report(request):
-    """Подробный отчёт по имуществу для лизинговой компании (HTML / Excel).
-
-    Где и как застраховано имущество на дату среза. Без КВ, премии и тарифа.
-    Доступ — как у снэпшота, всем авторизованным пользователям.
-    """
+    """Подробный отчёт для лизинговой компании: HTML / PDF / Excel."""
     from apps.core.services.portfolio_scope import PortfolioScope, SCOPE_LABELS
     from django.urls import reverse
-
+    from django.db import connection, transaction
     from apps.insurers.models import Branch
-
-    from .services.property_report import (
-        build_property_report,
-        build_property_report_workbook,
-    )
+    from .services.property_document import build_property_document
+    from .services.property_report import build_property_report_workbook
 
     scope = PortfolioScope.from_query(request.GET)
-    branch_ids = scope.branch_ids
-    report = build_property_report(scope.as_of, branch_ids, scope.structure_scope)
+    outer_transaction = connection.in_atomic_block
+    with transaction.atomic():
+        if connection.vendor == "postgresql" and not outer_transaction:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+                )
+        report = build_property_document(
+            scope.as_of, scope.branch_ids, scope.structure_scope
+        )
     report.update(scope=scope, scope_options=SCOPE_LABELS.items())
     report["dashboard_url"] = (
         reverse("core:dashboard") + "?" + scope.query(tab="portfolio")
     )
+    output_format = request.GET.get("format")
+    if output_format == "pdf":
+        from .services.property_pdf import build_property_pdf
 
-    if request.GET.get("format") == "xlsx":
+        response = HttpResponse(
+            build_property_pdf(report), content_type="application/pdf"
+        )
+        disposition = (
+            "inline" if request.GET.get("disposition") == "inline" else "attachment"
+        )
+        response[
+            "Content-Disposition"
+        ] = f'{disposition}; filename="property_report_{scope.as_of:%Y%m%d}_{scope.structure_scope}.pdf"'
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+    if output_format == "xlsx":
         from io import BytesIO
 
         buffer = BytesIO()
@@ -1007,17 +1024,15 @@ def property_report(request):
         )
         response[
             "Content-Disposition"
-        ] = f'attachment; filename="property_report_{report["as_of"]:%Y%m%d}.xlsx"'
+        ] = f'attachment; filename="property_report_{scope.as_of:%Y%m%d}.xlsx"'
         return response
-
     branches = list(Branch.objects.order_by("branch_name").values("id", "branch_name"))
-    report["branches"] = [{**b, "selected": b["id"] in branch_ids} for b in branches]
-    report["selected_branches"] = [
-        b["branch_name"] for b in branches if b["id"] in branch_ids
+    report["branches"] = [
+        {**b, "selected": b["id"] in scope.branch_ids} for b in branches
     ]
-    report["xlsx_query"] = request.GET.copy()
-    report["xlsx_query"]["format"] = "xlsx"
-    report["xlsx_query"] = report["xlsx_query"].urlencode()
+    report["xlsx_query"] = scope.query(format="xlsx")
+    report["pdf_query"] = scope.query(format="pdf")
+    report["print_query"] = scope.query(format="pdf", disposition="inline")
     return render(request, "reports/property_report.html", report)
 
 

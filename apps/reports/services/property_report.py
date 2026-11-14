@@ -161,11 +161,23 @@ def _totals(objects):
     }
 
 
-def _change(as_of, months, branch_ids, current, structure_scope="all"):
+def is_liability(obj):
+    # Именованный вид существующего справочника; не определяем вид по описанию имущества.
+    return obj.type.strip().casefold() == "ответственность"
+
+
+def _portfolio(as_of, branch_ids, structure_scope, property_only=False):
+    objects = insured_portfolio(as_of, branch_ids, structure_scope)
+    return [o for o in objects if not is_liability(o)] if property_only else objects
+
+
+def _change(
+    as_of, months, branch_ids, current, structure_scope="all", property_only=False
+):
     then = _add_months(as_of, -months)
     if then < HISTORY_RELIABLE_FROM:
         return None
-    previous = _totals(insured_portfolio(then, branch_ids, structure_scope))
+    previous = _totals(_portfolio(then, branch_ids, structure_scope, property_only))
     return {
         "date": then,
         "sum": previous["sum"],
@@ -241,7 +253,9 @@ def _matrix(objects, row_key, row_label, col_key, col_label, columns_limit=None)
     }
 
 
-def _insurer_dynamics(as_of, branch_ids, current_rows, structure_scope="all"):
+def _insurer_dynamics(
+    as_of, branch_ids, current_rows, structure_scope="all", property_only=False
+):
     dates = [
         d
         for d in _quarter_ends_before(as_of, DYNAMICS_QUARTERS)
@@ -252,14 +266,15 @@ def _insurer_dynamics(as_of, branch_ids, current_rows, structure_scope="all"):
     snapshots = []
     for snapshot_date in dates:
         rows = _group(
-            insured_portfolio(snapshot_date, branch_ids, structure_scope),
+            _portfolio(snapshot_date, branch_ids, structure_scope, property_only),
             key=lambda o: o.insurer_id,
             label=lambda o: o.insurer,
         )
         snapshots.append((snapshot_date, {r["key"]: r["share"] for r in rows}))
     snapshots.append((as_of, {r["key"]: r["share"] for r in current_rows}))
     names = {r["key"]: r["name"] for r in current_rows}
-    top = [r["key"] for r in current_rows[:MATRIX_INSURERS]]
+    selected_rows = current_rows if property_only else current_rows[:MATRIX_INSURERS]
+    top = [r["key"] for r in selected_rows]
     return {
         "dates": [d for d, _ in snapshots],
         "rows": [
@@ -296,11 +311,16 @@ def _ending_by_month(objects, as_of, months=12):
 
 
 def build_property_report(
-    as_of: Optional[date] = None, branch_ids=None, structure_scope="all", *, images=None
+    as_of: Optional[date] = None,
+    branch_ids=None,
+    structure_scope="all",
+    *,
+    images=None,
+    property_only=False,
 ) -> Dict[str, Any]:
     as_of = as_of or timezone.localdate()
     images = images or ReferenceImages()
-    objects = insured_portfolio(as_of, branch_ids, structure_scope)
+    objects = _portfolio(as_of, branch_ids, structure_scope, property_only)
     totals = _totals(objects)
     brands = {o.id: detect_brand(o.description) for o in objects}
     conditions = {o.id: detect_condition(o.description) for o in objects}
@@ -360,8 +380,12 @@ def build_property_report(
             ),
             "lessees": len({o.client_id for o in objects}),
             "insurers": concentration["insurers"],
-            "change_3m": _change(as_of, 3, branch_ids, totals, structure_scope),
-            "change_12m": _change(as_of, 12, branch_ids, totals, structure_scope),
+            "change_3m": _change(
+                as_of, 3, branch_ids, totals, structure_scope, property_only
+            ),
+            "change_12m": _change(
+                as_of, 12, branch_ids, totals, structure_scope, property_only
+            ),
         },
         "insurers": insurer_rows,
         "concentration": concentration,
@@ -373,7 +397,7 @@ def build_property_report(
             lambda o: o.type,
         ),
         "insurer_dynamics": _insurer_dynamics(
-            as_of, branch_ids, insurer_rows, structure_scope
+            as_of, branch_ids, insurer_rows, structure_scope, property_only
         ),
         "by_type": _group(objects, key=lambda o: o.type_id, label=lambda o: o.type),
         "by_size": _group(
@@ -437,6 +461,7 @@ def build_property_report(
                 "sum": o.insured_sum if o.insured_sum_known else None,
                 "end_date": o.end_date,
                 "policy_number": o.policy_number,
+                "dfa_number": o.dfa_number,
             }
             for o in top_objects
         ],
@@ -505,7 +530,7 @@ def build_property_report_workbook(report: Dict[str, Any]):
             for r in rows
         ]
 
-    group_headers = ["", "Объектов", "Страховая стоимость, ₽", "Доля, %"]
+    group_headers = ["", "Страховых записей", "Страховая стоимость, ₽", "Доля, %"]
     t = report["totals"]
     sheet(
         "Сводка",
@@ -525,9 +550,9 @@ def build_property_report_workbook(report: Dict[str, Any]):
                 or "Все филиалы",
             ],
             ["Полисов без определённой СС", t["missing_sum_count"]],
-            ["Объектов", t["count"]],
+            ["Страховых записей", t["count"]],
             ["Страховая стоимость, ₽", t["sum"].quantize(Decimal("1"))],
-            ["Средняя стоимость объекта, ₽", t["avg"].quantize(Decimal("1"))],
+            ["Средняя СС записи, ₽", t["avg"].quantize(Decimal("1"))],
             ["Лизингополучателей", t["lessees"]],
             ["Страховых компаний", t["insurers"]],
             [
@@ -541,7 +566,7 @@ def build_property_report_workbook(report: Dict[str, Any]):
         "Страховщики",
         [
             "Страховая компания",
-            "Объектов",
+            "Страховых записей",
             "Страховая стоимость, ₽",
             "Доля, %",
             "Средняя стоимость, ₽",
@@ -587,10 +612,15 @@ def build_property_report_workbook(report: Dict[str, Any]):
         ("Год окончания", "by_end_year"),
         ("Франшиза", "by_franchise"),
     ):
-        sheet(title, group_headers, group_rows(report[key]), {0: 30})
+        rows = (
+            report.get("all_managers", report[key])
+            if key == "by_manager"
+            else report[key]
+        )
+        sheet(title, group_headers, group_rows(rows), {0: 30})
     sheet(
         "Окончание по месяцам",
-        ["Месяц", "Объектов", "Страховая стоимость, ₽"],
+        ["Месяц", "Страховых записей", "Страховая стоимость, ₽"],
         [
             [r["label"], r["count"], r["sum"].quantize(Decimal("1"))]
             for r in report["ending_by_month"]
@@ -621,4 +651,33 @@ def build_property_report_workbook(report: Dict[str, Any]):
         ],
         {0: 30, 1: 50, 3: 20},
     )
+    if "liability" in report:
+        sheet(
+            "Ответственность",
+            ["Полис", "ДФА", "Страховщик", "Филиал", "Лимит, ₽"],
+            [
+                [
+                    o["policy_number"],
+                    o["dfa_number"],
+                    o["insurer"],
+                    o["branch"],
+                    o["sum"],
+                ]
+                for o in report["liability"]["rows"]
+            ],
+        )
+        sheet(
+            "Методика",
+            ["Параметр", "Значение"],
+            [
+                ["Версия", report["methodology_version"]],
+                ["Формирование", report["generated_at"].strftime("%d.%m.%Y %H:%M %Z")],
+                ["Состав", "Имущественные виды без ОСАГО; ответственность отдельно"],
+                ["СС имущества, ₽", t["sum"]],
+                ["Сумма лимитов ответственности, ₽", report["liability"]["sum"]],
+                ["Всего по исходному срезу, ₽", report["scope_total"]],
+                ["Количество", "Страховые записи, не уникальные физические объекты"],
+            ],
+            {0: 35, 1: 70},
+        )
     return workbook

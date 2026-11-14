@@ -35,6 +35,8 @@ production: доступность SMTP, установленный cron, сер
 | [Почта](EMAIL_COMMUNICATIONS_SETUP.md) | SMTP, очередь, попытки отправки и ограничения |
 | [Telegram и VK](NOTIFICATIONS_PIPELINE.md) | Настройка каналов, ошибки, дайджест и резервное копирование |
 
+- [Имущественный отчёт и PDF](PROPERTY_REPORT.md) — структура документа, методика 2.0 и печать.
+
 ## Документация рядом с кодом
 
 - [scripts/README.md](../scripts/README.md) — перечень существующих скриптов,

@@ -143,7 +143,7 @@
                     <!-- Policies table -->
                     {% if policies %}
                     <div class="table-responsive">
-                        <table class="mgr-table record-table record-table--manager">
+                        <table class="mgr-table record-table record-table--manager record-table--states">
                             <colgroup>
                                 <col class="record-col-policy">
                                 <col class="record-col-dfa">
@@ -168,7 +168,7 @@
                             </thead>
                             <tbody>
                                 {% for policy in policies %}
-                                <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %} {% if not policy.broker_participation %}row--nobroker{% endif %}"
+                                <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% elif not policy.broker_participation %}row--nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
                                     <td class="record-col-policy">
                                         <a class="record-number" href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with compact=True %}

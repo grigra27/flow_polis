@@ -284,7 +284,6 @@
 .mgr-table .journal-record { color: inherit; text-decoration: none; }
 .mgr-table .journal-record:is(:hover, :focus-visible) { text-decoration: underline; }
 .mgr-table .tbl-row-clickable:hover { background: var(--app-color-row-hover); }
-.mgr-table .tbl-row-terminated { opacity: 0.68; }
 
 .tbl-badge {
     display: inline-block;

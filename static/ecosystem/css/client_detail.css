@@ -283,8 +283,6 @@
 }
 .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
 
-.mgr-table tbody tr.tbl-row-terminated { opacity: 0.65; }
-
 .tbl-badge {
     font-size: 0.72rem;
     font-weight: 600;

@@ -446,7 +446,6 @@
 .mgr-table tbody tr:last-child td { border-bottom: none; }
 .mgr-table tbody tr.tbl-row-clickable { cursor: pointer; transition: background 0.1s; }
 .mgr-table tbody tr.tbl-row-clickable:hover { background: #f4f8fe; }
-.mgr-table tbody tr.tbl-row-terminated { opacity: 0.65; }
 
 
 .tbl-badge {

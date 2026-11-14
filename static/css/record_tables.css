@@ -130,9 +130,40 @@ table.record-table .record-col-tags .tbl-badge { margin-block: .1rem; white-spac
 .record-text-toggle:is(:hover, :focus-visible) { text-decoration: underline; }
 .record-table-viewport:focus-visible { outline: 2px solid var(--app-color-action); outline-offset: -2px; }
 
-/* Keep semantic row/cell backgrounds and readable identifiers on closed records. */
-table.record-table tbody tr:is(.tbl-row-terminated, .row--terminated, .tbl-row-cancelled) { opacity: 1; }
-table.record-table tbody tr:is(.tbl-row-terminated, .row--terminated, .tbl-row-cancelled) :is(.record-col-object, .record-col-note, .record-col-client) { color: var(--app-color-text-muted); }
+/* Opt in per table so billing column fills and the policy card keep their rules. */
+table.record-table--states {
+    /* Keep secondary text and links readable on the darker hover backgrounds. */
+    --app-color-text-muted: #526174;
+    --app-color-action: #1257a6;
+}
+table.record-table--states .record-text-content[href] { color: var(--app-color-action); }
+table.record-table.record-table--states tbody tr:is(.tbl-row-clickable, .clickable-row):hover {
+    background: var(--app-color-row-hover);
+}
+table.record-table.record-table--states tbody tr:is(.tbl-row-nobroker, .row--nobroker) {
+    background: #e5e9f0;
+}
+table.record-table.record-table--states tbody tr:is(.tbl-row-nobroker, .row--nobroker):hover {
+    background: #dae0e9;
+}
+/* Termination/cancellation takes precedence over the no-broker state. */
+table.record-table.record-table--states tbody tr:is(.tbl-row-terminated, .row--terminated, .tbl-row-cancelled) {
+    background: #fce8eb;
+    opacity: 1;
+}
+table.record-table.record-table--states tbody tr:is(.tbl-row-terminated, .row--terminated, .tbl-row-cancelled):hover {
+    background: #f8dce1;
+}
+table.record-table--states .tbl-badge:is(.tbl-badge--closed, .tbl-badge--term, .tbl-badge--cancelled) {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+table.record-table--states .tbl-badge--nobroker {
+    background: #f3f4f6;
+    color: #515d6f;
+    border: 1px solid #d1d5db;
+}
 
 /* A visual copy avoids nesting vertical scroll areas inside long lists. */
 .record-table-floating-head {

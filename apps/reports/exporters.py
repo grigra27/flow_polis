@@ -2465,11 +2465,6 @@ class ThreePercentReportExporter(BaseExporter):
         three_percent_amount = (
             payment.amount * Decimal("0.03") if payment.amount else Decimal("0")
         )
-        kv_percent = (
-            payment.commission_rate.kv_percent
-            if payment.commission_rate
-            else payment.kv_percent_actual
-        )
 
         return [
             policy.dfa_number,
@@ -2482,7 +2477,7 @@ class ThreePercentReportExporter(BaseExporter):
             self.format_value(three_percent_amount),
             policy.insurer.insurer_name if policy.insurer else "",
             policy.branch.branch_name if policy.branch else "",
-            self.format_value(kv_percent),
+            self.format_value(payment.kv_percent_actual),
             self.format_value(payment.kv_rub),
             self.format_value(payment.insurer_date),
             policy.info3,

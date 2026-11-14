@@ -423,7 +423,7 @@
                         <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> Выбор квартала</span>
                         <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> Акт согласован СК</span>
                         <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> 3% от премии</span>
-                        <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> 14 столбцов</span>
+                        <span class="exp-feat exp-feat--teal"><i class="bi bi-check2"></i> 15 столбцов</span>
                     </div>
 
                     <form method="get" action="{% url 'reports:export_three_percent_report' %}" class="needs-validation" novalidate>
@@ -613,7 +613,8 @@
                 </div>
                 <div class="modal-body">
                     <p><strong>Что попадает в отчет:</strong> платежи за выбранный квартал по дате согласования акта с СК (<code>insurer_date</code>), где дата согласования заполнена. Платежи по ОСАГО включены.</p>
-                    <p><strong>Что формируется в выгрузке:</strong> Excel на 14 столбцов с данными по ДФА, полису, клиентам, страховой премии, вознаграждению 3%, датам оплаты и согласования, страховщику, филиалу, КВ и Инфо 3.</p>
+                    <p><strong>Что формируется в выгрузке:</strong> Excel на 15 столбцов с данными по ДФА, полису, клиентам, страховой премии, вознаграждению 3%, датам оплаты и согласования, страховщику, филиалу, КВ, Инфо 3 и признаку «Оплатил Альянс».</p>
+                    <p><strong>Как рассчитывается процент КВ:</strong> фактическая сумма КВ в рублях делится на страховую премию взноса и умножается на 100. Учитываются ручные корректировки суммы КВ.</p>
                     <p class="mb-2"><strong>Почему платеж может не попасть:</strong></p>
                     <ul>
                         <li>дата согласования акта с СК не заполнена;</li>

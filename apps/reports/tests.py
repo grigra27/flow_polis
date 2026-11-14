@@ -1215,7 +1215,9 @@ class ThreePercentReportExportViewTest(TestCase):
         )
 
         self.assertEqual(sheet.cell(row=6, column=1).value, "DFA-3P-001")
-        self.assertAlmostEqual(float(sheet.cell(row=6, column=11).value), 15.0)
+        self.assertAlmostEqual(
+            float(sheet.cell(row=6, column=11).value), 8.333333333333333
+        )
         self.assertAlmostEqual(float(sheet.cell(row=6, column=12).value), 1000.0)
         # Цвета из ThreePercentReportExporter (серая заливка, красный шрифт с 2026-05-07).
         fill = ThreePercentReportExporter.NONSTANDARD_KV_FILL_COLOR
@@ -1223,6 +1225,33 @@ class ThreePercentReportExportViewTest(TestCase):
         self.assertFalse(str(standard_fill_rgb).upper().endswith(fill))
         self.assertTrue(str(nonstandard_fill_rgb).upper().endswith(fill))
         self.assertTrue(str(nonstandard_font_rgb).upper().endswith(font))
+
+    def test_three_percent_report_exports_actual_kv_with_and_without_base_rate(self):
+        """Процент в Excel учитывает ручную корректировку КВ, в том числе до нуля."""
+        from decimal import Decimal
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from apps.policies.models import PaymentSchedule
+
+        self.client.force_login(self.admin)
+
+        for commission_rate in (self.commission_rate, None):
+            for kv_rub, expected_percent in (("1250.00", 12.5), ("0.00", 0.0)):
+                with self.subTest(commission_rate=commission_rate, kv_rub=kv_rub):
+                    PaymentSchedule.objects.filter(
+                        policy=self.policy, year_number=1, installment_number=1
+                    ).update(commission_rate=commission_rate, kv_rub=Decimal(kv_rub))
+
+                    response = self.client.get(
+                        reverse("reports:export_three_percent_report"),
+                        {"three_percent_quarter": 1, "three_percent_year": 2025},
+                    )
+
+                    self.assertEqual(response.status_code, 200)
+                    sheet = load_workbook(filename=BytesIO(response.content)).active
+                    self.assertAlmostEqual(sheet["K5"].value, expected_percent)
+                    self.assertAlmostEqual(sheet["L5"].value, float(kv_rub))
+                    self.assertAlmostEqual(sheet["H5"].value, 300.0)
 
     def test_admin_gets_redirect_when_no_three_percent_data(self):
         """Тест: при отсутствии согласованных платежей за квартал админ возвращается."""

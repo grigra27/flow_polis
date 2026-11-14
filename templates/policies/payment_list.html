@@ -5,7 +5,7 @@
 {% block title %}График платежей{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'policies/css/payment_list.css' %}?v=2026-11-13-osago">
+<link rel="stylesheet" href="{% static 'policies/css/payment_list.css' %}?v=2026-11-14">
 {% endblock %}
 
 {% block content %}
@@ -192,20 +192,33 @@
         </div>
         <div class="mgr-section-body">
             <div class="table-responsive">
-                <table class="mgr-table">
+                <table class="mgr-table record-table record-table--payments">
+                    <colgroup>
+                        <col class="record-col-policy">
+                        <col class="record-col-dfa">
+                        <col class="record-col-client">
+                        <col class="record-col-object">
+                        <col class="record-col-installment">
+                        <col class="record-col-amount">
+                        <col class="record-col-date">
+                        <col class="record-col-date">
+                        <col class="record-col-note">
+                        <col class="record-col-status">
+                        {% if can_edit %}<col class="record-col-edit">{% endif %}
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="padding-left:1rem;">Полис</th>
-                            <th>Номер ДФА</th>
-                            <th>Лизингополучатель</th>
-                            <th>Объект страхования</th>
-                            <th>Год/№</th>
-                            <th>Очередной<br>взнос, ₽</th>
-                            <th>Дата платежа<br>по полису</th>
-                            <th>Дата оплаты</th>
-                            <th>Примечание</th>
-                            <th>Статус</th>
-                            {% if can_edit %}<th>Ред.</th>{% endif %}
+                            <th class="record-col-policy" scope="col">Полис</th>
+                            <th class="record-col-dfa" scope="col">Номер ДФА</th>
+                            <th class="record-col-client" scope="col">Лизингополучатель</th>
+                            <th class="record-col-object" scope="col">Объект страхования</th>
+                            <th class="record-col-installment" scope="col">Год/№</th>
+                            <th class="record-col-amount" scope="col">Очередной<br>взнос, ₽</th>
+                            <th class="record-col-date" scope="col">Дата платежа<br>по полису</th>
+                            <th class="record-col-date" scope="col">Дата оплаты</th>
+                            <th class="record-col-note" scope="col">Примечание</th>
+                            <th class="record-col-status" scope="col">Статус</th>
+                            {% if can_edit %}<th class="record-col-edit" scope="col">Ред.</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -213,31 +226,31 @@
                         {% journal_return_query 'payment' payment.pk as origin %}
                         <tr id="payment-{{ payment.pk|unlocalize }}" class="tbl-row-clickable {% if payment.is_cancelled %}tbl-row-cancelled{% elif not payment.policy.broker_participation %}tbl-row-nobroker{% endif %}"
                             data-href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}&amp;payment={{ payment.pk|unlocalize }}#installment-{{ payment.pk|unlocalize }}">
-                            <td style="padding-left:1rem;">
-                                <a class="journal-record" href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}&amp;payment={{ payment.pk|unlocalize }}#installment-{{ payment.pk|unlocalize }}">{{ payment.policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with policy=payment.policy %}
+                            <td class="record-col-policy">
+                                <a class="journal-record record-number" href="{% url 'policies:detail' payment.policy.pk %}?{{ origin }}&amp;payment={{ payment.pk|unlocalize }}#installment-{{ payment.pk|unlocalize }}">{{ payment.policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with policy=payment.policy compact=True %}
                                 {% if not payment.policy.broker_participation %}
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
                             </td>
-                            <td><strong>{{ payment.policy.dfa_number|default:"—" }}</strong></td>
-                            <td>{{ payment.policy.client.client_name }}</td>
-                            <td style="max-width:160px;">
-                                <small>{{ payment.policy.property_description|truncatewords:10 }}</small>
+                            <td class="record-col-dfa">{{ payment.policy.dfa_number|default:"—" }}</td>
+                            <td class="record-col-client">{% include "policies/includes/table_text.html" with value=payment.policy.client.client_name label="лизингополучатель" only %}</td>
+                            <td class="record-col-object">
+                                {% include "policies/includes/table_text.html" with value=payment.policy.property_description label="объект страхования" only %}
                             </td>
-                            <td style="color:var(--v2-muted);">{{ payment.year_number }}/{{ payment.installment_number }}</td>
-                            <td><strong>{{ payment.amount|rub }}</strong></td>
-                            <td style="white-space:nowrap;">{{ payment.due_date|date:"d.m.Y" }}</td>
-                            <td style="white-space:nowrap;">
+                            <td class="record-col-installment">{{ payment.year_number }}/{{ payment.installment_number }}</td>
+                            <td class="record-col-amount">{{ payment.amount|floatformat:"2g" }}</td>
+                            <td class="record-col-date">{{ payment.due_date|date:"d.m.Y" }}</td>
+                            <td class="record-col-date">
                                 {% if payment.paid_date %}
                                     {{ payment.paid_date|date:"d.m.Y" }}
                                 {% else %}
                                     <span style="color:var(--v2-muted);">—</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                <small>{{ payment.payment_info|truncatewords:15|default:"—" }}</small>
+                            <td class="record-col-note">
+                                {% include "policies/includes/table_text.html" with value=payment.payment_info label="примечание к платежу" only %}
                             </td>
-                            <td>
+                            <td class="record-col-status">
                                 {% if payment.is_approved %}
                                     <span class="tbl-badge tbl-badge--approved">Акт согласован СК</span>
                                 {% elif payment.is_paid %}
@@ -251,7 +264,7 @@
                                 {% endif %}
                             </td>
                             {% if can_edit %}
-                            <td onclick="event.stopPropagation();">
+                            <td onclick="event.stopPropagation();" class="record-col-edit">
                                 <a href="{% url 'admin:policies_paymentschedule_change' payment.pk %}?{{ origin }}&amp;entry=journal" class="btn-tbl-edit" aria-label="Редактировать платёж {{ payment.year_number }}/{{ payment.installment_number }}">
                                     <i class="bi bi-pencil"></i>
                                 </a>
@@ -260,7 +273,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="11">
+                            <td colspan="{% if can_edit %}11{% else %}10{% endif %}">
                                 <div class="pl-empty">
                                     <i class="bi bi-calendar2-x"></i>
                                     Платежи не найдены
@@ -323,7 +336,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.tbl-row-clickable').forEach(function(row) {
         row.addEventListener('click', function(event) {
-            if (event.target.closest('a')) return;
+            if (event.target.closest('a, button')) return;
             window.location.href = this.dataset.href;
         });
     });

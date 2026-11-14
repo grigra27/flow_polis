@@ -1,0 +1,7 @@
+<span class="record-type" role="img" aria-label="{{ insurance_type.name }}" title="{{ insurance_type.name }}">
+    {% if insurance_type.icon %}
+        <img src="{{ insurance_type.icon.url }}" alt="" class="insurance-type-icon">
+    {% else %}
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+    {% endif %}
+</span>

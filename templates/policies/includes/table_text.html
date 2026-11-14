@@ -1,0 +1,4 @@
+<div class="record-text" data-expandable-text="{{ label|default:'текст' }}">
+    {% if href %}<a class="record-text-content" href="{{ href }}">{{ value|default:"—" }}</a>{% else %}<span class="record-text-content">{{ value|default:"—" }}</span>{% endif %}
+    <button type="button" class="record-text-toggle" aria-expanded="false" hidden>Ещё</button>
+</div>

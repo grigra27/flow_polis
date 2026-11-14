@@ -8,7 +8,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'ecosystem/css/branch_detail.css' %}">
-<link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}">
+<link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}?v=2026-11-14">
 {% endblock %}
 
 {% block content %}
@@ -300,25 +300,35 @@
                     <!-- Policies table -->
                     {% if policies %}
                     <div class="table-responsive">
-                        <table class="mgr-table">
+                        <table class="mgr-table record-table record-table--branch">
+                            <colgroup>
+                                <col class="record-col-policy">
+                                <col class="record-col-dfa">
+                                <col class="record-col-client">
+                                <col class="record-col-insurer">
+                                <col class="record-col-type">
+                                <col class="record-col-object">
+                                <col class="record-col-period">
+                                <col class="record-col-status">
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    <th>Номер полиса</th>
-                                    <th>Номер ДФА</th>
-                                    <th>ЛП</th>
-                                    <th>Страховщик</th>
-                                    <th>Вид</th>
-                                    <th>Объект</th>
-                                    <th>Период</th>
-                                    <th>Статус</th>
+                                    <th class="record-col-policy" scope="col">Номер полиса</th>
+                                    <th class="record-col-dfa" scope="col">Номер ДФА</th>
+                                    <th class="record-col-client" scope="col">ЛП</th>
+                                    <th class="record-col-insurer" scope="col">Страховщик</th>
+                                    <th class="record-col-type" scope="col">Вид</th>
+                                    <th class="record-col-object" scope="col">Объект</th>
+                                    <th class="record-col-period" scope="col">Период</th>
+                                    <th class="record-col-status" scope="col">Статус</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for policy in policies %}
                                 <tr class="tbl-row-clickable {% if not policy.policy_active %}tbl-row-terminated{% elif not policy.broker_participation %}tbl-row-nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
-                                    <td>
-                                        <strong>{{ policy.policy_number }}</strong>{% include "policies/includes/osago_badge.html" %}
+                                    <td class="record-col-policy">
+                                        <a class="record-number" href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with compact=True %}
                                         {% if not policy.policy_active %}
                                         <span class="tbl-badge tbl-badge--term" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
                                         {% endif %}
@@ -326,13 +336,13 @@
                                         <span class="tbl-badge tbl-badge--nobroker">Без брокера</span>
                                         {% endif %}
                                     </td>
-                                    <td style="font-size:0.82rem;">{{ policy.dfa_number|default:"—" }}</td>
-                                    <td style="font-size:0.82rem;">{{ policy.client.client_name }}</td>
-                                    <td>{% insurer_logo policy.insurer size='small' %}</td>
-                                    <td>{% insurance_type_icon policy.insurance_type size='small' %}</td>
-                                    <td style="max-width:120px;"><small>{{ policy.property_description|truncatewords:8 }}</small></td>
-                                    <td style="white-space:nowrap;"><small>{{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}</small></td>
-                                    <td>
+                                    <td class="record-col-dfa">{{ policy.dfa_number|default:"—" }}</td>
+                                    <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" only %}</td>
+                                    <td class="record-col-insurer">{% insurer_logo policy.insurer size='small' %}</td>
+                                    <td class="record-col-type">{% include "policies/includes/table_type.html" with insurance_type=policy.insurance_type only %}</td>
+                                    <td class="record-col-object">{% include "policies/includes/table_text.html" with value=policy.property_description label="объект страхования" only %}</td>
+                                    <td class="record-col-period">{% include "policies/includes/table_period.html" with policy=policy only %}</td>
+                                    <td class="record-col-status">
                                         {% if policy.policy_active %}
                                         <span class="tbl-badge tbl-badge--active">Активен</span>
                                         {% else %}
@@ -363,7 +373,8 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".tbl-row-clickable").forEach((row) => {
-        row.addEventListener("click", function () {
+        row.addEventListener("click", function (event) {
+            if (event.target.closest('a, button')) return;
             window.location.href = this.dataset.href;
         });
     });

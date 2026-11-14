@@ -7,7 +7,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'ecosystem/css/manager_detail.css' %}">
-<link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}">
+<link rel="stylesheet" href="{% static 'ecosystem/css/ecosystem.css' %}?v=2026-11-14">
 {% endblock %}
 
 {% block content %}
@@ -143,25 +143,35 @@
                     <!-- Policies table -->
                     {% if policies %}
                     <div class="table-responsive">
-                        <table class="mgr-table">
+                        <table class="mgr-table record-table record-table--manager">
+                            <colgroup>
+                                <col class="record-col-policy">
+                                <col class="record-col-dfa">
+                                <col class="record-col-client">
+                                <col class="record-col-insurer">
+                                <col class="record-col-type">
+                                <col class="record-col-period">
+                                <col class="record-col-amount">
+                                <col class="record-col-status">
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    <th>Полис</th>
-                                    <th>ДФА</th>
-                                    <th>Лизингополучатель</th>
-                                    <th>Страховщик</th>
-                                    <th title="Вид страхования">Вид</th>
-                                    <th>Период</th>
-                                    <th>СП, ₽</th>
-                                    <th>Статус</th>
+                                    <th class="record-col-policy" scope="col">Полис</th>
+                                    <th class="record-col-dfa" scope="col">ДФА</th>
+                                    <th class="record-col-client" scope="col">Лизингополучатель</th>
+                                    <th class="record-col-insurer" scope="col">Страховщик</th>
+                                    <th title="Вид страхования" class="record-col-type" scope="col">Вид</th>
+                                    <th class="record-col-period" scope="col">Период</th>
+                                    <th class="record-col-amount" scope="col">СП, ₽</th>
+                                    <th class="record-col-status" scope="col">Статус</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for policy in policies %}
                                 <tr class="clickable-row {% if not policy.policy_active %}row--terminated{% endif %} {% if not policy.broker_participation %}row--nobroker{% endif %}"
                                     data-href="{% url 'policies:detail' policy.pk %}">
-                                    <td>
-                                        <strong>{{ policy.policy_number }}</strong>{% include "policies/includes/osago_badge.html" %}
+                                    <td class="record-col-policy">
+                                        <a class="record-number" href="{% url 'policies:detail' policy.pk %}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with compact=True %}
                                         {% if not policy.policy_active %}
                                         <span class="tbl-badge tbl-badge--term ms-1"
                                               title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">
@@ -172,31 +182,20 @@
                                         <span class="tbl-badge tbl-badge--nobroker ms-1">Без брокера</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ policy.dfa_number|default:"—" }}</td>
-                                    <td>
-                                        <a href="{% url 'clients:detail' policy.client.pk %}">{{ policy.client.client_name }}</a>
+                                    <td class="record-col-dfa">{{ policy.dfa_number|default:"—" }}</td>
+                                    <td class="record-col-client">
+                                        {% url 'clients:detail' policy.client.pk as client_url %}
+                                        {% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" href=client_url only %}
                                     </td>
-                                    <td>{% insurer_logo policy.insurer size='small' %}</td>
-                                    <td>
-                                        {% if policy.insurance_type.icon %}
-                                            <img src="{{ policy.insurance_type.icon.url }}"
-                                                 alt="{{ policy.insurance_type.name }}"
-                                                 title="{{ policy.insurance_type.name }}"
-                                                 class="insurance-type-icon">
-                                        {% else %}
-                                            <span title="{{ policy.insurance_type.name }}"
-                                                  class="insurance-type-icon-fallback">
-                                                <i class="bi bi-shield-check"></i>
-                                            </span>
-                                        {% endif %}
+                                    <td class="record-col-insurer">{% insurer_logo policy.insurer size='small' %}</td>
+                                    <td class="record-col-type">
+                                        {% include "policies/includes/table_type.html" with insurance_type=policy.insurance_type only %}
                                     </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}
-                                        </small>
+                                    <td class="record-col-period">
+                                        {% include "policies/includes/table_period.html" with policy=policy only %}
                                     </td>
-                                    <td><strong>{{ policy.premium_total|rub }}</strong></td>
-                                    <td>
+                                    <td class="record-col-amount">{{ policy.premium_total|floatformat:"2g" }}</td>
+                                    <td class="record-col-status">
                                         {% if policy.policy_active %}
                                             <span class="tbl-badge tbl-badge--active">Активен</span>
                                         {% else %}
@@ -225,7 +224,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.clickable-row').forEach(row => {
-        row.addEventListener('click', function () {
+        row.addEventListener('click', function (event) {
+            if (event.target.closest('a, button')) return;
             window.location.href = this.dataset.href;
         });
     });

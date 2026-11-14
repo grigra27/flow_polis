@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from decimal import Decimal
 
@@ -335,8 +336,9 @@ def test_scheduled_payments_list_displays_task_comment_column(client, billing_pa
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
-    assert "<th>Комментарии</th>" in content
-    assert "<th>Менеджер</th>" not in content
+    headers = re.findall(r"<th\b[^>]*>(.*?)</th>", content, flags=re.S)
+    assert "Комментарии" in headers
+    assert "Менеджер" not in headers
     assert "Комментарий для строки списка" in content
 
 

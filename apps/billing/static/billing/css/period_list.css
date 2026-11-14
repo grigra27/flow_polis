@@ -9,13 +9,6 @@
 .btn-mgr-group.active { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; }
 .mgr-shortcuts-note { display: grid; gap: .2rem; color: var(--journal-muted); font-size: .69rem; line-height: 1.4; }
 .mgr-shortcuts-note strong { font-weight: 600; }
-.billing-period-list .mgr-table { min-width: 70rem; }
-.billing-period-list .mgr-table td:nth-child(2),
-.billing-period-list .mgr-table td:nth-child(3),
-.billing-period-list .mgr-table td:nth-child(7) { white-space: nowrap; }
-.billing-period-list .mgr-table td:nth-child(5) { min-width: 175px; }
-.billing-period-list .mgr-table td:nth-child(6) { min-width: 150px; }
-.billing-period-list .mgr-table td:last-child { min-width: 150px; overflow-wrap: anywhere; }
 .billing-period-list .mgr-table tr.tbl-row-nobroker td { background: #f3f4f6; color: #4b5563; }
 .billing-period-list .mgr-table tr.tbl-row-nobroker:hover td { background: #e5e7eb; }
 .bil-deadline-col { background: #fff8ee; color: #6f4f13; font-weight: 650; }

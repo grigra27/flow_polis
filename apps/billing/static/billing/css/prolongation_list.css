@@ -3,13 +3,6 @@
 .billing-prolongation .mgr-page-header { display: block; }
 .billing-prolongation .bil-period { flex-basis: 154px; }
 .billing-prolongation .bil-period .bil-chip { background: transparent; padding-inline: 0; }
-.billing-prolongation .mgr-table { min-width: 70rem; }
-.billing-prolongation .mgr-table th { white-space: normal; }
-.billing-prolongation .mgr-table td { vertical-align: top; }
-.billing-prolongation .mgr-table td:first-child { white-space: nowrap; }
-.billing-prolongation .mgr-table td:nth-child(3) { min-width: 150px; }
-.billing-prolongation .mgr-table td:nth-child(7) { min-width: 190px; }
-.billing-prolongation .mgr-table td:nth-child(8) { min-width: 150px; overflow-wrap: anywhere; }
 .billing-prolongation .mgr-table tr.row-nobroker td { background: #f3f4f6; color: #4b5563; }
 .billing-prolongation .mgr-table tr.row-dfa-closed td { background: #fffbe6; }
 .billing-prolongation .letter-input { min-height: 38px; border-color: #cfdae7; border-radius: 8px; font-family: inherit; }

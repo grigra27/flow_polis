@@ -2,7 +2,7 @@
 {% load static insurer_tags l10n %}
 
 {% block title %}Полисы по своду № {{ source.pk }}{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/summary_list.css' %}">
+{% block extra_css %}<link rel="stylesheet" href="{% static 'policies/css/summary_list.css' %}?v=2026-11-14">
 <link rel="stylesheet" href="{% static 'policies/css/flow_refresh.css' %}">{% endblock %}
 
 {% block content %}
@@ -14,15 +14,21 @@
     </header>
     {% if links %}
     <div class="summary-policies-table">
-        <table aria-label="Полисы по своду">
-            <thead><tr><th scope="col">Номер полиса</th><th scope="col">Позиция</th><th scope="col">Объект</th><th scope="col">ДФА</th></tr></thead>
+        <table class="record-table record-table--summary" aria-label="Полисы по своду">
+            <colgroup>
+                <col class="record-col-policy">
+                <col class="record-col-position">
+                <col class="record-col-object">
+                <col class="record-col-dfa">
+            </colgroup>
+            <thead><tr><th scope="col" class="record-col-policy">Номер полиса</th><th scope="col" class="record-col-position">Позиция</th><th scope="col" class="record-col-object">Объект</th><th scope="col" class="record-col-dfa">ДФА</th></tr></thead>
             <tbody>
             {% for link in links %}
                 <tr>
-                    <td><a href="{% url 'policies:detail' link.policy_id %}?from_summary={{ source.pk|unlocalize }}{% if only_in_force %}&amp;in_force=1{% endif %}">{{ link.policy.policy_number }}</a></td>
-                    <td>{% if link.slot %}{{ link.slot }}{% elif source.total == 1 %}1{% else %}Все {{ source.total }}{% endif %}</td>
-                    <td>{{ link.policy.property_description|default:"—" }}{% if link.policy.vin_number %}<small>VIN {{ link.policy.vin_number }}</small>{% endif %}</td>
-                    <td>{{ link.policy.dfa_number|default:"—" }}</td>
+                    <td class="record-col-policy"><a class="record-number" href="{% url 'policies:detail' link.policy_id %}?from_summary={{ source.pk|unlocalize }}{% if only_in_force %}&amp;in_force=1{% endif %}">{{ link.policy.policy_number }}</a></td>
+                    <td class="record-col-position">{% if link.slot %}{{ link.slot }}{% elif source.total == 1 %}1{% else %}Все {{ source.total }}{% endif %}</td>
+                    <td class="record-col-object">{% include "policies/includes/table_text.html" with value=link.policy.property_description label="объект страхования" only %}{% if link.policy.vin_number %}<small>VIN {{ link.policy.vin_number }}</small>{% endif %}</td>
+                    <td class="record-col-dfa">{{ link.policy.dfa_number|default:"—" }}</td>
                 </tr>
             {% endfor %}
             </tbody>

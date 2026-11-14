@@ -138,24 +138,6 @@
     font-size: 0.82rem;
 }
 
-.payment-list .mgr-table td:first-child {
-    width: 13%;
-    min-width: 10rem;
-    color: var(--app-color-primary);
-    font-weight: 600;
-    overflow-wrap: anywhere;
-}
-
-.payment-list .mgr-table td:nth-child(2) { min-width: 7.75rem; }
-.payment-list .mgr-table td:nth-child(3) { min-width: 10rem; }
-.payment-list .mgr-table td:nth-child(4),
-.payment-list .mgr-table td:nth-child(9) { overflow-wrap: anywhere; }
-.payment-list .mgr-table td:nth-child(5),
-.payment-list .mgr-table td:nth-child(6) { white-space: nowrap; }
-.payment-list .mgr-table td:nth-child(6),
-.payment-list .mgr-table th:nth-child(6) { text-align: right; }
-.payment-list .mgr-table .tbl-row-cancelled { opacity: 0.68; }
-
 .tbl-badge--approved { background: #dcfce7; color: #15803d; }
 .tbl-badge--paid { background: #dbeafe; color: #1d4ed8; }
 .tbl-badge--cancelled,

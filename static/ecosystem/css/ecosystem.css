@@ -40,11 +40,13 @@
 .ecosystem-page :is(.mgr-info-label, .mgr-stat-label) { font-size: .72rem; font-weight: 550; }
 .ecosystem-page :is(.mgr-info-value, .mgr-stat-value) { color: var(--v2-title); }
 .ecosystem-page :is(.mgr-stat-card, .br-overview-card) { border-radius: 10px; border-color: var(--v2-border); background: #f8fafd; box-shadow: none; }
-.ecosystem-page .mgr-table { font-size: .83rem; line-height: 1.45; }
-.ecosystem-page .mgr-table th { padding: .65rem .5rem; border-color: var(--v2-border); background: #f5f8fc; color: var(--v2-muted); font-size: .67rem; letter-spacing: .035em; white-space: normal; }
-.ecosystem-page .mgr-table td { padding: .65rem .5rem; border-color: #e7edf3; overflow-wrap: anywhere; }
-.ecosystem-page .mgr-table td:first-child { font-weight: 600; }
-.ecosystem-manager-detail .mgr-table td:nth-child(7) { white-space: nowrap; }
+.ecosystem-page .mgr-table:not(.record-table) { font-size: .83rem; line-height: 1.45; }
+.ecosystem-page .mgr-table th { border-color: var(--v2-border); background: #f5f8fc; color: var(--v2-muted); }
+.ecosystem-page .mgr-table:not(.record-table) th { padding: .65rem .5rem; font-size: .67rem; letter-spacing: .035em; white-space: normal; }
+.ecosystem-page .mgr-table td { border-color: #e7edf3; }
+.ecosystem-page .mgr-table:not(.record-table) td { padding: .65rem .5rem; overflow-wrap: anywhere; }
+.ecosystem-page .mgr-table:not(.record-table) td:first-child { font-weight: 600; }
+.ecosystem-manager-detail .mgr-table:not(.record-table) td:nth-child(7) { white-space: nowrap; }
 .ecosystem-page :is(.tbl-badge, .mgr-badge, .cli-badge, .ins-badge, .br-badge) { border-radius: 6px; font-size: .71rem; font-weight: 600; }
 .ecosystem-page :is(.br-badge--broker, .ins-badge--broker) { background: #ede9fe; color: #6d28d9; }
 .ecosystem-page :is(.mgr-page-btn, .cli-page-btn, .br-page-btn, .ins-page-btn) { min-height: 32px; border-radius: 8px; font-size: .8rem; }

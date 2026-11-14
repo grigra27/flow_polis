@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'billing/css/prolongation_list.css' %}">
+<link rel="stylesheet" href="{% static 'billing/css/prolongation_list.css' %}?v=2026-11-14">
 {% endblock %}
 
 {% block content %}
@@ -117,42 +117,55 @@
         </div>
         <div class="mgr-section-body" style="padding: 0 0 0.6rem;">
             <div class="table-responsive">
-                <table class="mgr-table">
+                <table class="mgr-table record-table record-table--prolongation">
+                    <colgroup>
+                        <col class="record-col-date">
+                        <col class="record-col-branch">
+                        <col class="record-col-policy">
+                        <col class="record-col-dfa">
+                        <col class="record-col-insurer">
+                        <col class="record-col-client">
+                        <col class="record-col-client">
+                        <col class="record-col-object">
+                        <col class="record-col-note">
+                        <col class="record-col-status">
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th>Дата окончания</th>
-                            <th>Филиал</th>
-                            <th>ДФА / полис</th>
-                            <th>Страховщик</th>
-                            <th>Лизингополучатель</th>
-                            <th>Страхователь</th>
-                            <th>Объект страхования</th>
-                            <th>Инфо 4</th>
-                            <th>Примечания</th>
+                            <th class="record-col-date" scope="col">Дата окончания</th>
+                            <th class="record-col-branch" scope="col">Филиал</th>
+                            <th class="record-col-policy" scope="col">Полис</th>
+                            <th class="record-col-dfa" scope="col">ДФА</th>
+                            <th class="record-col-insurer" scope="col">Страховщик</th>
+                            <th class="record-col-client" scope="col">Лизингополучатель</th>
+                            <th class="record-col-client" scope="col">Страхователь</th>
+                            <th class="record-col-object" scope="col">Объект страхования</th>
+                            <th class="record-col-note" scope="col">Инфо 4</th>
+                            <th class="record-col-status" scope="col">Примечания</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for policy in policies %}
                         <tr class="{% if not policy.dfa_active %}row-dfa-closed{% elif not policy.broker_participation %}row-nobroker{% endif %}">
-                            <td>{{ policy.end_date|date:"d.m.Y" }}</td>
-                            <td>{{ policy.branch.branch_name|default:"—" }}</td>
-                            <td class="bil-policy-line">
-                                <strong>{{ policy.dfa_number|default:"Без ДФА" }}</strong><br>
-                                <a href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
+                            <td class="record-col-date">{{ policy.end_date|date:"d.m.Y" }}</td>
+                            <td class="record-col-branch">{{ policy.branch.branch_name|default:"—" }}</td>
+                            <td class="record-col-policy bil-policy-line">
+                                <a class="record-number" href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
                             </td>
-                            <td>{{ policy.insurer.insurer_name }}</td>
-                            <td>{{ policy.client.client_name }}</td>
-                            <td>{{ policy.policyholder.client_name|default:"—" }}</td>
-                            <td>{{ policy.property_description|default:"—" }}</td>
-                            <td>{{ policy.info4|default:"—" }}</td>
-                            <td>
+                            <td class="record-col-dfa">{{ policy.dfa_number|default:"—" }}</td>
+                            <td class="record-col-insurer">{{ policy.insurer.insurer_name }}</td>
+                            <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" only %}</td>
+                            <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.policyholder.client_name label="страхователь" only %}</td>
+                            <td class="record-col-object">{% include "policies/includes/table_text.html" with value=policy.property_description label="объект страхования" only %}</td>
+                            <td class="record-col-note">{% include "policies/includes/table_text.html" with value=policy.info4 label="Инфо 4" only %}</td>
+                            <td class="record-col-status">
                                 {% if not policy.broker_participation %}<span class="tbl-badge tbl-badge--nobroker">без брокера</span>{% endif %}
                                 {% if not policy.dfa_active %}<span class="tbl-badge tbl-badge--dfa">ДФА закрыт</span>{% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="pl-empty">
+                            <td colspan="10" class="pl-empty">
                                 <i class="bi bi-inbox"></i>
                                 Нет договоров с окончанием страхования за этот месяц по выбранным фильтрам.
                             </td>

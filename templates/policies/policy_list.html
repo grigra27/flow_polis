@@ -4,7 +4,7 @@
 {% block title %}Полисы{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'policies/css/policy_list.css' %}?v=2026-11-12-2">
+<link rel="stylesheet" href="{% static 'policies/css/policy_list.css' %}?v=2026-11-14">
 {% endblock %}
 
 {% block content %}
@@ -187,20 +187,33 @@
         </div>
         <div class="mgr-section-body">
             <div class="table-responsive">
-                <table class="mgr-table">
+                <table class="mgr-table record-table record-table--policies">
+                    <colgroup>
+                        <col class="record-col-upload">
+                        <col class="record-col-policy">
+                        <col class="record-col-dfa">
+                        <col class="record-col-client">
+                        <col class="record-col-insurer">
+                        <col class="record-col-object">
+                        <col class="record-col-type">
+                        <col class="record-col-period">
+                        <col class="record-col-tags">
+                        <col class="record-col-note">
+                        {% if can_edit %}<col class="record-col-edit">{% endif %}
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="width:2rem;text-align:center;" title="Полис подгружен"></th>
-                            <th style="padding-left:1rem;">Номер полиса</th>
-                            <th>Номер ДФА</th>
-                            <th>Лизингополучатель</th>
-                            <th>Страховщик</th>
-                            <th>Объект страхования</th>
-                            <th class="insurance-type-icon-cell" title="Вид страхования">Вид</th>
-                            <th>Период</th>
-                            <th>Инфо 1</th>
-                            <th>Инфо 3</th>
-                            {% if can_edit %}<th>Ред.</th>{% endif %}
+                            <th title="Полис подгружен" class="record-col-upload" scope="col"></th>
+                            <th class="record-col-policy" scope="col">Номер полиса</th>
+                            <th class="record-col-dfa" scope="col">Номер ДФА</th>
+                            <th class="record-col-client" scope="col">Лизингополучатель</th>
+                            <th class="record-col-insurer" scope="col">Страховщик</th>
+                            <th class="record-col-object" scope="col">Объект страхования</th>
+                            <th class="record-col-type insurance-type-icon-cell" title="Вид страхования" scope="col">Вид</th>
+                            <th class="record-col-period" scope="col">Период</th>
+                            <th class="record-col-tags" scope="col">Инфо 1</th>
+                            <th class="record-col-note" scope="col">Инфо 3</th>
+                            {% if can_edit %}<th class="record-col-edit" scope="col">Ред.</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -208,15 +221,15 @@
                         {% journal_return_query 'policy' policy.pk as origin %}
                         <tr id="policy-{{ policy.pk|unlocalize }}" class="tbl-row-clickable {% if not policy.policy_active %}tbl-row-terminated{% elif not policy.broker_participation %}tbl-row-nobroker{% endif %}"
                             data-href="{% url 'policies:detail' policy.pk %}?{{ origin }}">
-                            <td style="width:2rem;text-align:center;">
+                            <td class="record-col-upload">
                                 {% if policy.policy_uploaded %}
                                     <i class="bi bi-check-circle-fill" style="color:#15803d;" title="Полис подгружен"></i>
                                 {% else %}
                                     <i class="bi bi-x-circle-fill" style="color:#b91c1c;" title="Полис не подгружен"></i>
                                 {% endif %}
                             </td>
-                            <td style="padding-left:1rem;">
-                                <a class="journal-record" href="{% url 'policies:detail' policy.pk %}?{{ origin }}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" %}
+                            <td class="record-col-policy">
+                                <a class="journal-record record-number" href="{% url 'policies:detail' policy.pk %}?{{ origin }}">{{ policy.policy_number }}</a>{% include "policies/includes/osago_badge.html" with compact=True %}
                                 {% if not policy.policy_active %}
                                     <span class="tbl-badge tbl-badge--closed" title="Расторгнут {% if policy.termination_date %}{{ policy.termination_date|date:'d.m.Y' }}{% endif %}">Расторгнут</span>
                                 {% endif %}
@@ -224,40 +237,30 @@
                                     <span class="tbl-badge tbl-badge--nobroker" title="Без участия брокера">Без брокера</span>
                                 {% endif %}
                             </td>
-                            <td><strong>{{ policy.dfa_number|default:"—" }}</strong></td>
-                            <td>{{ policy.client.client_name }}</td>
-                            <td>{% insurer_logo policy.insurer size='small' %}</td>
-                            <td style="max-width:160px;">
-                                <small>{{ policy.property_description|truncatewords:10 }}</small>
+                            <td class="record-col-dfa">{{ policy.dfa_number|default:"—" }}</td>
+                            <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" only %}</td>
+                            <td class="record-col-insurer">{% insurer_logo policy.insurer size='small' %}</td>
+                            <td class="record-col-object">
+                                {% include "policies/includes/table_text.html" with value=policy.property_description label="объект страхования" only %}
                             </td>
-                            <td class="insurance-type-icon-cell">
-                                {% if policy.insurance_type.icon %}
-                                    <img src="{{ policy.insurance_type.icon.url }}"
-                                         alt="{{ policy.insurance_type.name }}"
-                                         title="{{ policy.insurance_type.name }}"
-                                         class="insurance-type-icon">
-                                {% else %}
-                                    <span title="{{ policy.insurance_type.name }}"
-                                          class="insurance-type-icon-fallback">
-                                        <i class="bi bi-shield-check"></i>
-                                    </span>
-                                {% endif %}
+                            <td class="record-col-type insurance-type-icon-cell">
+                                {% include "policies/includes/table_type.html" with insurance_type=policy.insurance_type only %}
                             </td>
-                            <td style="white-space:nowrap;">
-                                <small>{{ policy.start_date|date:"d.m.Y" }} — {{ policy.end_date|date:"d.m.Y" }}</small>
+                            <td class="record-col-period">
+                                {% include "policies/includes/table_period.html" with policy=policy only %}
                             </td>
-                            <td>
+                            <td class="record-col-tags">
                                 {% for info in policy.info_tags.all %}
                                     {% if info.info_field == 1 %}
                                         <span class="tbl-badge tbl-badge--info">{{ info.tag.name }}</span>
                                     {% endif %}
                                 {% endfor %}
                             </td>
-                            <td>
-                                <small>{{ policy.info3|truncatewords:10 }}</small>
+                            <td class="record-col-note">
+                                {% include "policies/includes/table_text.html" with value=policy.info3 label="Инфо 3" only %}
                             </td>
                             {% if can_edit %}
-                            <td onclick="event.stopPropagation();">
+                            <td onclick="event.stopPropagation();" class="record-col-edit">
                                 <a href="{% url 'admin:policies_policy_change' policy.pk %}?{{ origin }}" class="btn-tbl-edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
@@ -266,7 +269,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="10">
+                            <td colspan="{% if can_edit %}11{% else %}10{% endif %}">
                                 <div class="pl-empty">
                                     <i class="bi bi-file-earmark-x"></i>
                                     Полисы не найдены
@@ -346,7 +349,7 @@
 
     document.querySelectorAll('.tbl-row-clickable').forEach(function(row) {
         row.addEventListener('click', function(event) {
-            if (event.target.closest('a')) return;
+            if (event.target.closest('a, button')) return;
             window.location.href = this.dataset.href;
         });
     });

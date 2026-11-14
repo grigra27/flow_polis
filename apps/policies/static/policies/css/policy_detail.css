@@ -304,12 +304,12 @@
 .schedule-table th { color: var(--policy-muted); font-weight: 560; font-size: 0.77rem; background: var(--policy-tint); border-top: 1px solid var(--policy-line); }
 .schedule-table .num { text-align: right; white-space: nowrap; }
 .schedule-table :is(td.num, .schedule-date, .payment-date-cell, .payment-date, .payment-toggle) {
-    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-family: var(--app-numeric-font);
     font-size: 0.875rem;
     font-variant-numeric: lining-nums tabular-nums;
     letter-spacing: normal;
 }
-.schedule-table .num strong { font-weight: 700; }
+.schedule-table .num strong { font-weight: 600; }
 .schedule-table .schedule-date, .schedule-table .payment-date, .payment-toggle { white-space: nowrap; }
 .schedule-table .schedule-note { min-width: 7rem; max-width: 24rem; font-size: 0.82rem; }
 .schedule-table .row-action { width: 2.25rem; text-align: center; }
@@ -317,7 +317,7 @@
 .payment-row:target { outline: 2px solid var(--app-color-action); outline-offset: -2px; }
 .payment-row:hover { background: var(--app-color-row-hover); }
 .payment-row.payment-next { background: #edf4fd; box-shadow: inset 3px 0 #3979bf; }
-.payment-next .schedule-date { font-weight: 700; }
+.payment-next .schedule-date { font-weight: 600; }
 .payment-row.year-start td { border-top: 2px solid #cfdae6; }
 .payment-row.table-cancelled { background: var(--app-color-danger-soft); }
 .payment-toggle { display: inline-flex; align-items: center; gap: 0.25rem; color: inherit; padding: 0; }

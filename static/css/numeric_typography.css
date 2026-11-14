@@ -1,0 +1,16 @@
+/* Numeric type shared by the policy card and the two journals. */
+@font-face {
+    font-family: "Inter Numbers";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/inter/inter-regular.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Inter Numbers";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/inter/inter-semibold.ttf") format("truetype");
+}
+:root { --app-numeric-font: "Inter Numbers", Arial, sans-serif; }

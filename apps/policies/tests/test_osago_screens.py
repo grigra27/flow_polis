@@ -163,7 +163,7 @@ class TestPolicyDetail:
         ).content.decode()
 
         assert "Франшиза" in html
-        assert "3 000 000" in html
+        assert "3\u202f000\u202f000" in html
 
 
 class TestPaymentList:

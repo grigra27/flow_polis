@@ -1747,14 +1747,7 @@ class PolicyExpirationExporter(BaseExporter):
 
     def get_row_data(self, policy):
         """Возвращает данные строки для полиса"""
-        # Определяем примечание для полисов без участия брокера и неактивного ДФА
-        notes = []
-        if not policy.broker_participation:
-            notes.append("без брокера")
-        if not policy.dfa_active:
-            notes.append("ДФА закрыт")
-
-        notes_text = "; ".join(notes) if notes else ""
+        notes_text = "" if policy.broker_participation else "без брокера"
 
         return [
             # Основные данные (заполняются автоматически)
@@ -1916,9 +1909,7 @@ class PolicyExpirationExporter(BaseExporter):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.font = times_font
 
-        # 3. Выделяем серым фоном строки где статус участия брокера = "Нет"
-        # и желтым фоном строки где ДФА неактивен
-        # Нужно получить данные о broker_participation и dfa_active для каждого полиса
+        # 3. Выделяем серым фоном строки, где статус участия брокера = "Нет".
         current_row = 6  # Начинаем с первой строки данных (после добавления строки ответственности)
 
         # Группируем полисы по филиалам (как в основном методе export)
@@ -1932,11 +1923,6 @@ class PolicyExpirationExporter(BaseExporter):
         # Сортируем филиалы по алфавиту
         sorted_branches = sorted(policies_by_branch.keys())
 
-        # Желтый фон для строк с неактивным ДФА
-        yellow_fill = PatternFill(
-            start_color="FFFF99", end_color="FFFF99", fill_type="solid"
-        )
-
         # Проходим по данным и выделяем строки
         for branch_name in sorted_branches:
             # Пропускаем заголовок филиала
@@ -1944,16 +1930,7 @@ class PolicyExpirationExporter(BaseExporter):
 
             # Обрабатываем полисы филиала
             for policy in policies_by_branch[branch_name]:
-                # Проверяем статус ДФА (приоритет над участием брокера)
-                if not policy.dfa_active:
-                    # Выделяем всю строку желтым фоном
-                    for col_idx in range(1, len(self.get_headers()) + 1):
-                        cell = ws.cell(row=current_row, column=col_idx)
-                        cell.fill = yellow_fill
-                        # Применяем шрифт Times New Roman 9pt (перезаписываем)
-                        cell.font = times_font
-                # Если ДФА активен, но нет участия брокера - серый фон
-                elif not policy.broker_participation:
+                if not policy.broker_participation:
                     # Выделяем всю строку серым фоном
                     for col_idx in range(1, len(self.get_headers()) + 1):
                         cell = ws.cell(row=current_row, column=col_idx)

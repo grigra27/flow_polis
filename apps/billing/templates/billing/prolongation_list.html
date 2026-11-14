@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'billing/css/prolongation_list.css' %}?v=2026-11-14">
+<link rel="stylesheet" href="{% static 'billing/css/prolongation_list.css' %}?v=2026-11-14-dfa">
 {% endblock %}
 
 {% block content %}
@@ -146,7 +146,7 @@
                     </thead>
                     <tbody>
                         {% for policy in policies %}
-                        <tr class="{% if not policy.dfa_active %}row-dfa-closed{% elif not policy.broker_participation %}row-nobroker{% endif %}">
+                        <tr class="{% if not policy.broker_participation %}row-nobroker{% endif %}">
                             <td class="record-col-date">{{ policy.end_date|date:"d.m.Y" }}</td>
                             <td class="record-col-branch">{{ policy.branch.branch_name|default:"—" }}</td>
                             <td class="record-col-policy bil-policy-line">
@@ -160,7 +160,6 @@
                             <td class="record-col-note">{% include "policies/includes/table_text.html" with value=policy.info4 label="Инфо 4" only %}</td>
                             <td class="record-col-status">
                                 {% if not policy.broker_participation %}<span class="tbl-badge tbl-badge--nobroker">без брокера</span>{% endif %}
-                                {% if not policy.dfa_active %}<span class="tbl-badge tbl-badge--dfa">ДФА закрыт</span>{% endif %}
                             </td>
                         </tr>
                         {% empty %}

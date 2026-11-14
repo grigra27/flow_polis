@@ -4,7 +4,6 @@
 .billing-prolongation .bil-period { flex-basis: 154px; }
 .billing-prolongation .bil-period .bil-chip { background: transparent; padding-inline: 0; }
 .billing-prolongation .mgr-table tr.row-nobroker td { background: #f3f4f6; color: #4b5563; }
-.billing-prolongation .mgr-table tr.row-dfa-closed td { background: #fffbe6; }
 .billing-prolongation .letter-input { min-height: 38px; border-color: #cfdae7; border-radius: 8px; font-family: inherit; }
 
 /* Letter / send */

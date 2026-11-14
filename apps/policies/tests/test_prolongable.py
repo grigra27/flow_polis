@@ -115,7 +115,7 @@ def test_dashboard_renewal_radar(pair):
 @pytest.fixture
 def rule_a_cases(db, end):
     """Правило пролонгации «вариант А» (2026-10-23): полис доживает до своей
-    даты окончания — активен и не расторгнут досрочно."""
+    даты окончания — активен и не расторгнут досрочно; ДФА открыт."""
     kasko = InsuranceType.objects.create(name="КАСКО (правило А)")
 
     def make(number, **fields):
@@ -130,6 +130,7 @@ def rule_a_cases(db, end):
             make("A-TERM-AT-END", termination_date=end),
             # Начался в том же месяце — всё равно подлежит пролонгации.
             make("A-SHORT", start_date=end - timedelta(days=5)),
+            make("A-NO-BROKER", broker_participation=False),
         },
         "out": {
             # Как №205: расторгнут за неделю до окончания, флаг снят.
@@ -141,6 +142,21 @@ def rule_a_cases(db, end):
             # Как №891: дата расторжения есть, а флаг забыли снять.
             make("A-TERM-FLAG-LEFT", termination_date=end - timedelta(days=7)),
             make("A-INACTIVE", policy_active=False),
+            # Закрытый ДФА исключается независимо от даты закрытия и брокера.
+            make("A-DFA-CLOSED-NO-DATE", dfa_active=False),
+            make(
+                "A-DFA-CLOSED-PAST",
+                dfa_active=False,
+                dfa_deactivation_date=end - timedelta(days=10),
+            ),
+            make(
+                "A-DFA-CLOSED-FUTURE",
+                dfa_active=False,
+                dfa_deactivation_date=end + timedelta(days=10),
+            ),
+            make(
+                "A-DFA-CLOSED-NO-BROKER", dfa_active=False, broker_participation=False
+            ),
         },
     }
 
@@ -166,31 +182,40 @@ def test_page_and_export_use_the_same_rule(
 
     user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
     client.force_login(user)
+    page_response = client.get(
+        reverse("policies:prolongation"), {"period": end.strftime("%Y-%m")}
+    )
+    assert page_response.status_code == 200
+    context = page_response.context
+    assert {policy.policy_number for policy in context["policies"]} == rule_a_cases[
+        "in"
+    ]
+    assert context["total_filtered"] == len(rule_a_cases["in"])
+    assert context["full_month_count"] == len(rule_a_cases["in"])
+    selected = next(option for option in context["month_options"] if option["selected"])
+    assert selected["total"] == len(rule_a_cases["in"])
+
     start, finish = prol.month_bounds(end.year, end.month)
     response = client.get(
         reverse("reports:export_policy_expiration"),
         {"date_from": start.isoformat(), "date_to": finish.isoformat()},
     )
-    workbook = load_workbook(io.BytesIO(response.content), read_only=True)
-    text = " ".join(
-        str(cell)
-        for sheet in workbook.worksheets
-        for row in sheet.iter_rows(values_only=True)
-        for cell in row
-    )
-    for number in rule_a_cases["in"]:
-        assert number in text
-    for number in rule_a_cases["out"]:
-        assert number not in text
+    assert response.status_code == 200
+    all_numbers = rule_a_cases["in"] | rule_a_cases["out"]
+    rows = {row[0]: row for row in _cells(response.content) if row[0] in all_numbers}
+    assert set(rows) == rule_a_cases["in"]
+    assert rows["A-NO-BROKER"][-1] == "без брокера"
 
 
 def _cells(content):
     workbook = load_workbook(io.BytesIO(content), read_only=True)
-    return [
+    rows = [
         list(row)
         for sheet in workbook.worksheets
         for row in sheet.iter_rows(values_only=True)
     ]
+    workbook.close()
+    return rows
 
 
 def test_email_attachment_equals_export_for_the_month(
@@ -215,6 +240,52 @@ def test_email_attachment_equals_export_for_the_month(
     assert _cells(attachment.read()) == _cells(response.content)
 
 
+def test_page_filters_only_narrow_view_and_export_supports_branch(
+    client, django_user_model, rule_a_cases, end
+):
+    branch = Branch.objects.create(branch_name="Отдельный филиал")
+    Policy.objects.filter(policy_number="A-PLAIN").update(branch=branch)
+    user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
+    client.force_login(user)
+
+    response = client.get(
+        reverse("policies:prolongation"),
+        {"period": end.strftime("%Y-%m"), "branch": branch.pk, "q": "A-PLAIN"},
+    )
+    assert response.status_code == 200
+    assert [policy.policy_number for policy in response.context["policies"]] == [
+        "A-PLAIN"
+    ]
+    assert response.context["total_filtered"] == 1
+    assert response.context["full_month_count"] == len(rule_a_cases["in"])
+
+    start, finish = prol.month_bounds(end.year, end.month)
+    download_url = (
+        f'{reverse("reports:export_policy_expiration")}'
+        f"?date_from={start.isoformat()}&date_to={finish.isoformat()}"
+    )
+    assert f'href="{download_url}"' in response.content.decode()
+    full_export = client.get(download_url)
+    assert full_export.status_code == 200
+    all_numbers = rule_a_cases["in"] | rule_a_cases["out"]
+    assert {
+        row[0] for row in _cells(full_export.content) if row[0] in all_numbers
+    } == rule_a_cases["in"]
+
+    branch_export = client.get(
+        reverse("reports:export_policy_expiration"),
+        {
+            "date_from": start.isoformat(),
+            "date_to": finish.isoformat(),
+            "branch": branch.pk,
+        },
+    )
+    assert branch_export.status_code == 200
+    assert {
+        row[0] for row in _cells(branch_export.content) if row[0] in all_numbers
+    } == {"A-PLAIN"}
+
+
 def test_faq_modals_on_both_pages(client, django_user_model, db):
     user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
     client.force_login(user)
@@ -223,7 +294,41 @@ def test_faq_modals_on_both_pages(client, django_user_model, db):
     page = client.get(reverse("policies:prolongation")).content.decode()
     assert 'id="prolongationFaqModal"' in page
     assert rule in page
+    assert "отмечен «ДФА активен»" in page
+    assert "закрыт ДФА — снят «ДФА активен»" in page
 
     reports = client.get(reverse("reports:index")).content.decode()
     assert 'id="policyExpirationFaqModal"' in reports
     assert rule in reports
+    assert "отмечен «ДФА активен»" in reports
+    assert "закрыт ДФА — снят «ДФА активен»" in reports
+
+
+def test_only_closed_dfa_produces_empty_page_and_no_export(
+    client, django_user_model, db, end
+):
+    insurance_type = InsuranceType.objects.create(name="КАСКО (закрытый ДФА)")
+    policy = _policy("ONLY-CLOSED-DFA", insurance_type, end)
+    Policy.objects.filter(pk=policy.pk).update(dfa_active=False)
+    user = django_user_model.objects.create_user("staff", password="x", is_staff=True)
+    client.force_login(user)
+
+    response = client.get(
+        reverse("policies:prolongation"), {"period": end.strftime("%Y-%m")}
+    )
+    assert response.status_code == 200
+    assert not response.context["policies"]
+    assert response.context["total_filtered"] == 0
+    assert response.context["full_month_count"] == 0
+    selected = next(
+        option for option in response.context["month_options"] if option["selected"]
+    )
+    assert selected["total"] == 0
+
+    start, finish = prol.month_bounds(end.year, end.month)
+    response = client.get(
+        reverse("reports:export_policy_expiration"),
+        {"date_from": start.isoformat(), "date_to": finish.isoformat()},
+    )
+    assert response.status_code == 302
+    assert response.url == reverse("reports:index")

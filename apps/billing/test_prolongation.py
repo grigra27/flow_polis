@@ -1,9 +1,11 @@
 from datetime import date, timedelta
+from io import BytesIO
 
 import pytest
 from django.contrib.auth.models import User
 from django.test import override_settings
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from apps.billing import prolongation_services as prol
 from apps.billing.models import ProlongationBatch
@@ -56,6 +58,8 @@ def test_get_prolongation_policies_matches_expiration_filter(month_anchor):
 @pytest.mark.django_db
 def test_month_options_count_policies_per_month(month_anchor):
     _make_policy(month_anchor, policy_number="A")
+    closed = _make_policy(month_anchor, policy_number="CLOSED-DFA")
+    Policy.objects.filter(pk=closed.pk).update(dfa_active=False)
     _make_policy(month_anchor, policy_number="B")
 
     months = prol.visible_prolongation_months(today=month_anchor)
@@ -92,6 +96,8 @@ def test_superuser_can_send_prolongation_email_with_auto_excel(
         lambda outbound_email, user=None: outbound_email,
     )
     _make_policy(month_anchor, policy_number="A")
+    closed = _make_policy(month_anchor, policy_number="CLOSED-DFA")
+    Policy.objects.filter(pk=closed.pk).update(dfa_active=False)
     admin = User.objects.create_superuser(
         username="prol_sender", email="p@example.com", password="testpass123"
     )
@@ -109,6 +115,12 @@ def test_superuser_can_send_prolongation_email_with_auto_excel(
     assert email.to_addresses == ["recipient@example.com"]
     assert email.attachments.count() == 1
     assert email.attachments.get().original_filename.endswith(".xlsx")
+    with email.attachments.get().file.open("rb") as attachment:
+        workbook = load_workbook(BytesIO(attachment.read()), read_only=True)
+        numbers = {row[0] for row in workbook.active.iter_rows(values_only=True)}
+        workbook.close()
+    assert "A" in numbers
+    assert "CLOSED-DFA" not in numbers
     # Партия создаётся лениво при отправке и служит content_object письма.
     batch = ProlongationBatch.objects.get(
         year=month_anchor.year, month=month_anchor.month
@@ -117,12 +129,18 @@ def test_superuser_can_send_prolongation_email_with_auto_excel(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("has_closed_policy", [False, True])
 @override_settings(COMMUNICATIONS_EMAIL_ENABLED=True)
-def test_send_without_policies_does_not_create_email(client, month_anchor, monkeypatch):
+def test_send_without_policies_does_not_create_email(
+    client, month_anchor, monkeypatch, has_closed_policy
+):
     monkeypatch.setattr(
         "apps.billing.views.queue_outbound_email",
         lambda outbound_email, user=None: outbound_email,
     )
+    if has_closed_policy:
+        closed = _make_policy(month_anchor, policy_number="ONLY-CLOSED-DFA")
+        Policy.objects.filter(pk=closed.pk).update(dfa_active=False)
     admin = User.objects.create_superuser(
         username="empty_sender", email="e@example.com", password="testpass123"
     )

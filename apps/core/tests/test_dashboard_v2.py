@@ -456,8 +456,8 @@ class DashboardV2ViewTests(TestCase):
         response = self.client.get(reverse("core:dashboard"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Dashboard 3.0")
-        self.assertContains(response, "Портфель и работа")
+        self.assertContains(response, "<h1>Дашборд 3.0</h1>", html=True)
+        self.assertContains(response, "<title>Дашборд 3.0</title>", html=True)
         self.assertContains(response, "Все сделки")
         self.assertContains(response, "С участием брокера")
         self.assertIn("activity", response.context)

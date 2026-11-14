@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 {% load static currency_filters l10n %}
-{% block title %}Dashboard 3.0 · Портфель и работа{% endblock %}
+{% block title %}Дашборд 3.0{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'core/css/dashboard_v3.css' %}">{% endblock %}
 {% block content %}
-<div class="d3" id="dashboard" role="region" aria-label="Dashboard 3.0">
+<div class="d3" id="dashboard" role="region" aria-label="Дашборд 3.0">
   {% if preview_label %}<div class="d3-badge">{{ preview_label }}</div>{% endif %}
   <header class="d3-heading">
-    <div><div class="d3-eyebrow">Dashboard 3.0</div><h1>Портфель и работа</h1><p class="d3-muted">Страховая защита имущества и ближайшие действия</p></div>
+    <div><h1>Дашборд 3.0</h1><p class="d3-muted">Страховая защита имущества и ближайшие действия</p></div>
     <div class="d3-actions"><a class="d3-button" href="{{ snapshot_url }}">Краткий срез</a><a class="d3-button" href="{{ report_url }}">Отчёт по имуществу ↗</a></div>
   </header>
   <form method="get" class="d3-toolbar" id="dashboard-filters">

@@ -1,245 +1,52 @@
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from datetime import timedelta
 from pathlib import Path
-import logging
-
-logger = logging.getLogger(__name__)
-
-STRUCTURE_SCOPE_OPTIONS = (
-    {
-        "key": "all",
-        "label": "Все сделки",
-        "hint": "С участием брокера и без",
-    },
-    {
-        "key": "broker",
-        "label": "Только с участием брокера",
-        "hint": "Только broker_participation = Да",
-    },
-)
 
 
-def _normalize_structure_scope(scope):
-    normalized = (scope or "").strip().lower()
-    if normalized in {"broker", "with_broker", "broker_only"}:
-        return "broker"
-    return "all"
-
-
-def _build_structure_scope_context(request, selected_scope):
-    normalized_scope = _normalize_structure_scope(selected_scope)
-    switch_options = []
-    for option in STRUCTURE_SCOPE_OPTIONS:
-        params = request.GET.copy()
-        params["structure_scope"] = option["key"]
-        switch_options.append(
-            {
-                **option,
-                "active": option["key"] == normalized_scope,
-                "url": f"{request.path}?{params.urlencode()}#portfolio-structure",
-            }
-        )
-
-    return {
-        "dashboard_v2_structure_scope": normalized_scope,
-        "dashboard_v2_structure_scope_options": switch_options,
-    }
-
-
+@never_cache
 @login_required
 def dashboard(request):
-    """
-    Dashboard 2.0
-    """
-    requested_structure_scope = request.GET.get("structure_scope")
-    from django.utils.dateparse import parse_date
+    """Dashboard 3.0. Все вкладки и расшифровки используют один срез."""
+    from django.core.paginator import Paginator
+    from django.conf import settings
+    from apps.insurers.models import Branch
+    from .services.portfolio_scope import PortfolioScope, SCOPE_LABELS
+    from .services.dashboard_v3_service import DashboardV3Service, TABS
 
-    requested_as_of = parse_date(request.GET.get("as_of") or "")
-    try:
-        from apps.core.services.dashboard_v2_service import DashboardV2Service
-
-        context = DashboardV2Service().get_dashboard_context(
-            structure_scope=requested_structure_scope or "all",
-            as_of=requested_as_of,
+    scope = PortfolioScope.from_query(request.GET)
+    tab = request.GET.get("tab", "overview")
+    if tab not in dict(TABS):
+        tab = "overview"
+    service = DashboardV3Service(scope)
+    context = service.context(tab=tab, measure=request.GET.get("measure", "sum"))
+    context["preview_label"] = getattr(settings, "DASHBOARD_PREVIEW_LABEL", "")
+    context["branches"] = [
+        {"id": b.pk, "name": b.branch_name, "selected": b.pk in scope.branch_ids}
+        for b in Branch.objects.order_by("branch_name")
+    ]
+    context["scope_options"] = [
+        {"key": key, "label": label, "selected": key == scope.structure_scope}
+        for key, label in SCOPE_LABELS.items()
+    ]
+    context["today_value"] = timezone.localdate().isoformat()
+    context["detail"] = service.detail(request.GET)
+    if context["detail"]:
+        detail = context["detail"]
+        detail["total"] = len(detail["rows"])
+        detail["page"] = Paginator(detail.pop("rows"), 40).get_page(
+            request.GET.get("page")
         )
-    except Exception as exc:
-        logger.error("Error building Dashboard 2.0 context: %s", exc, exc_info=True)
-        context = {
-            "dashboard_v2_meta": {
-                "generated_at": timezone.now(),
-                "today": timezone.localdate(),
-                "period_label": "Ошибка расчета",
-            },
-            "dashboard_v2_snapshot": {
-                "active_policies_count": 0,
-                "not_uploaded_policies_count": 0,
-                "not_uploaded_policies_share": 0,
-                "upcoming_payments_count": 0,
-                "upcoming_payments_amount": 0,
-                "no_payment_data_count": 0,
-                "no_payment_data_amount": 0,
-                "health_score": 0,
-                "data_quality_score": 0,
-                "cards": [],
-            },
-            "dashboard_v2_health": {
-                "score": 0,
-                "previous_score": 0,
-                "delta": 0,
-                "delta_label": "0.0",
-                "delta_direction": "flat",
-                "components": [],
-                "weights": {},
-                "interpretation": "Недоступно",
-            },
-            "dashboard_v2_bridge": {
-                "calendar_year": timezone.localdate().year,
-                "year_start": timezone.localdate().replace(month=1, day=1),
-                "year_end": timezone.localdate().replace(month=12, day=31),
-                "actual_period_label": "Прошедших месяцев в этом году еще нет",
-                "planned_period_label": "Текущий и будущие месяцы в этом году отсутствуют",
-                "actual": {"premium": 0, "insurance_sum": 0},
-                "planned": {"premium": 0, "insurance_sum": 0},
-                "bridge": {"premium": 0, "insurance_sum": 0},
-                "premium_actual_share": 0,
-                "premium_plan_share": 0,
-            },
-            "dashboard_v2_payment_contour": {
-                "snapshot": None,
-                "window_30": {},
-                "statuses": [],
-            },
-            "dashboard_v2_aging": {"buckets": [], "total_amount": 0, "total_count": 0},
-            "dashboard_v2_renewal": {"active_total": 0, "horizons": []},
-            "dashboard_v2_data_quality": {"quality_score": 0, "problems": []},
-            "dashboard_v2_structure": {
-                "policy_count": 0,
-                "by_branch": [],
-                "by_insurer": [],
-                "by_type": [],
-                "top_branch": None,
-                "top_insurer": None,
-                "top_type": None,
-                "branch_breakdown": {
-                    "top": [],
-                    "other_share": 0,
-                    "chart": [],
-                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
-                },
-                "insurer_breakdown": {
-                    "top": [],
-                    "other_share": 0,
-                    "chart": [],
-                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
-                },
-                "type_breakdown": {
-                    "top": [],
-                    "other_share": 0,
-                    "chart": [],
-                    "pie_css": "conic-gradient(#e3ecf8 0% 100%)",
-                },
-            },
-            "dashboard_v2_concentration": {
-                "insurer": {
-                    "hhi": 0,
-                    "top1_share": 0,
-                    "top3_share": 0,
-                    "level": "Низкий",
-                },
-                "branch": {
-                    "hhi": 0,
-                    "top1_share": 0,
-                    "top3_share": 0,
-                    "level": "Низкий",
-                },
-                "overall_hhi": 0,
-                "overall_level": "Низкий",
-            },
-            "dashboard_v2_dynamics": {
-                "window_30": {
-                    "days": 30,
-                    "created_count": 0,
-                    "deactivated_count": 0,
-                    "net_growth": 0,
-                    "net_growth_label": "+0",
-                },
-                "window_90": {
-                    "days": 90,
-                    "created_count": 0,
-                    "deactivated_count": 0,
-                    "net_growth": 0,
-                    "net_growth_label": "+0",
-                },
-                "overdue_share_current": 0,
-                "overdue_share_previous": 0,
-                "overdue_share_delta_pp": 0,
-                "overdue_share_delta_pp_label": "0.0",
-            },
-            "dashboard_v2_insights": {"insights": [], "quick_actions": []},
-            "dashboard_v2_legacy_relay": {
-                "cards": [
-                    {
-                        "key": "upcoming",
-                        "type": "payment",
-                        "tone": "warning",
-                        "title": "Предстоящие платежи",
-                        "count": 0,
-                        "rows": [],
-                        "link_url": reverse("policies:payments") + "?status=upcoming",
-                        "link_label": "Все предстоящие платежи",
-                    },
-                    {
-                        "key": "overdue",
-                        "type": "payment",
-                        "tone": "danger",
-                        "title": "Нет данных об оплате",
-                        "count": 0,
-                        "rows": [],
-                        "link_url": reverse("policies:payments") + "?status=overdue",
-                        "link_label": "Все не оплаченные платежи",
-                    },
-                    {
-                        "key": "recent",
-                        "type": "policy",
-                        "tone": "primary",
-                        "title": "Недавно добавленные полисы",
-                        "count": 0,
-                        "rows": [],
-                        "link_url": reverse("policies:list"),
-                        "link_label": "Все полисы",
-                    },
-                    {
-                        "key": "not_uploaded",
-                        "type": "policy",
-                        "tone": "info",
-                        "title": "Полисы неподгруженные",
-                        "count": 0,
-                        "rows": [],
-                        "link_url": reverse("policies:list") + "?policy_uploaded=False",
-                        "link_label": "Все не подгруженные полисы",
-                    },
-                ]
-            },
-            "dashboard_v2_structure_scope": _normalize_structure_scope(
-                requested_structure_scope
-            ),
-        }
-
-    context.update(
-        _build_structure_scope_context(
-            request,
-            selected_scope=context.get(
-                "dashboard_v2_structure_scope", requested_structure_scope or "all"
-            ),
-        )
-    )
-
+        params = request.GET.copy()
+        for direction, number in (
+            ("previous", detail["page"].number - 1),
+            ("next", detail["page"].number + 1),
+        ):
+            params["page"] = number
+            detail[direction + "_url"] = "?" + params.urlencode() + "#dashboard-detail"
+        detail["close_url"] = service.url(tab, measure=context["measure"])
     return render(request, "core/dashboard.html", context)
 
 

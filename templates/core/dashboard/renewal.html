@@ -1,0 +1,2 @@
+{% load currency_filters l10n %}
+<section class="d3-card"><h2>Продления 30 / 60 / 90 дней</h2>{% for horizon in renewal %}<a class="d3-line" href="{{ horizon.url }}"><span>В течение {{ horizon.days }} дней</span><b>{{ horizon.count }} <small>· {{ horizon.sum|money_mln }}</small></b></a><div class="d3-track"><span style="width:{{ horizon.share|unlocalize }}%"></span></div>{% endfor %}<p class="d3-footnote">Горизонты включают друг друга. Только продлеваемые виды с ДФА, продолжающимся после окончания полиса. СС без ОСАГО.</p></section>

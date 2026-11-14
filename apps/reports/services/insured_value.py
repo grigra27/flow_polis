@@ -11,8 +11,8 @@
 (решение владельца 2026-10-17): у первого взноса последнего года, начавшегося
 не позже даты среза. У многолетних полисов сумма с годами снижается, поэтому
 максимум по графику (сумма первого года) завышал портфель примерно на 5%.
-Если первого взноса текущего года в графике нет, берётся максимальная сумма
-по графику.
+Если год или его страховая сумма не определены, значение неизвестно:
+максимальная сумма другого года не подставляется.
 """
 
 from dataclasses import dataclass
@@ -23,30 +23,42 @@ from typing import Dict, Iterable, List, Optional
 from django.utils import timezone
 
 from apps.policies.models import PaymentSchedule, Policy, in_force_q
+from apps.core.services.portfolio_scope import (
+    PortfolioScope,
+    dfa_in_force_q,
+    normalize_scope,
+)
 
 ZERO = Decimal("0")
 
 
 def current_insured_sums(policy_ids: Iterable[int], as_of: date) -> Dict[int, Decimal]:
     """{id полиса: страховая сумма текущего года на as_of}."""
-    current: Dict[int, tuple] = {}
-    maximum: Dict[int, Decimal] = {}
-    for policy_id, year, installment, due, value in PaymentSchedule.objects.filter(
-        policy_id__in=list(policy_ids)
-    ).values_list(
+    rows = PaymentSchedule.objects.filter(policy_id__in=list(policy_ids)).values_list(
         "policy_id", "year_number", "installment_number", "due_date", "insurance_sum"
-    ):
-        if value is None:
-            continue
-        if value > maximum.get(policy_id, ZERO):
-            maximum[policy_id] = value
+    )
+    return select_current_insured_sums(rows, as_of)
+
+
+def select_current_insured_sums(rows, as_of: date) -> Dict[int, Decimal]:
+    """Общий расчёт для отчётов и Dashboard, включая неполные графики.
+
+    Сначала определяем текущий год, даже если его СС отсутствует. Иначе NULL
+    у нового года незаметно заменялся бы стоимостью предыдущего года.
+    """
+    current: Dict[int, tuple] = {}
+    started_years: Dict[int, int] = {}
+    for policy_id, year, installment, due, value in rows:
+        if due <= as_of:
+            started_years[policy_id] = max(year, started_years.get(policy_id, 0))
         if installment == 1 and due <= as_of:
             if policy_id not in current or year > current[policy_id][0]:
                 current[policy_id] = (year, value)
-    result = {pk: value for pk, (_, value) in current.items()}
-    for pk, value in maximum.items():
-        result.setdefault(pk, value)
-    return result
+    return {
+        pk: value
+        for pk, (year, value) in current.items()
+        if value is not None and year == started_years[pk]
+    }
 
 
 @dataclass
@@ -70,22 +82,38 @@ class InsuredObject:
     start_date: date
     end_date: date
     insured_sum: Decimal
+    insured_sum_known: bool = True
 
 
 def insured_portfolio(
-    as_of: Optional[date] = None, branch_ids=None
+    as_of: Optional[date] = None, branch_ids=None, structure_scope="all"
 ) -> List[InsuredObject]:
     """Объекты в силе на as_of с активным ДФА и их страховая стоимость."""
     as_of = as_of or timezone.localdate()
     policies = (
         Policy.objects.without_osago()
-        .filter(in_force_q(as_of), dfa_active=True)
+        .filter(in_force_q(as_of), dfa_in_force_q(as_of))
         .select_related(
             "client", "insurer", "branch", "insurance_type", "leasing_manager"
         )
+        .only(
+            "policy_number",
+            "dfa_number",
+            "client__client_name",
+            "insurer__insurer_name",
+            "branch__branch_name",
+            "insurance_type__name",
+            "leasing_manager__name",
+            "property_description",
+            "property_year",
+            "franchise",
+            "start_date",
+            "end_date",
+        )
     )
-    if branch_ids:
-        policies = policies.filter(branch_id__in=branch_ids)
+    policies = PortfolioScope(
+        as_of, normalize_scope(structure_scope), tuple(branch_ids or ())
+    ).apply(policies)
     policies = list(policies)
     sums = current_insured_sums([p.id for p in policies], as_of)
     return [
@@ -109,6 +137,7 @@ def insured_portfolio(
             start_date=p.start_date,
             end_date=p.end_date,
             insured_sum=sums.get(p.id, ZERO),
+            insured_sum_known=p.id in sums,
         )
         for p in policies
     ]

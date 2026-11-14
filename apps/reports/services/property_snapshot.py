@@ -11,6 +11,7 @@
 графику, то есть сумма первого года). Суммы складываются по группам
 (филиал / страховщик / вид страхования).
 """
+
 import math
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
@@ -162,7 +163,9 @@ def _attach_insurer_logos(items: List[Dict[str, Any]]) -> None:
         item["logo_url"] = logos.get(item.get("id"), "")
 
 
-def build_property_snapshot(as_of=None) -> Dict[str, Any]:
+def build_property_snapshot(
+    as_of=None, branch_ids=None, structure_scope="all"
+) -> Dict[str, Any]:
     """Сформировать данные для отчёта-снимка распределения портфеля.
 
     as_of — дата среза «в силе» (по умолчанию сегодня): полисы учитываются по
@@ -170,7 +173,7 @@ def build_property_snapshot(as_of=None) -> Dict[str, Any]:
     """
     if as_of is None:
         as_of = timezone.localdate()
-    objects = insured_portfolio(as_of)
+    objects = insured_portfolio(as_of, branch_ids, structure_scope)
     by_branch, total = _aggregate_dimension(objects, "branch_id", "branch")
     by_insurer, _ = _aggregate_dimension(objects, "insurer_id", "insurer")
     by_type, _ = _aggregate_dimension(objects, "type_id", "type")
@@ -184,6 +187,7 @@ def build_property_snapshot(as_of=None) -> Dict[str, Any]:
         "dfa_active_only": True,
         "total_insurance_sum": total,
         "active_policies_count": active_policies_count,
+        "missing_sum_count": sum(not obj.insured_sum_known for obj in objects),
         "sections": [
             {
                 "title": "По филиалам",

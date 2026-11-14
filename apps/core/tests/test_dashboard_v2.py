@@ -456,13 +456,13 @@ class DashboardV2ViewTests(TestCase):
         response = self.client.get(reverse("core:dashboard"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Дашборд версия 2.0")
-        self.assertContains(response, "Ключевые списки из основного дашборда")
+        self.assertContains(response, "Dashboard 3.0")
+        self.assertContains(response, "Портфель и работа")
         self.assertContains(response, "Все сделки")
-        self.assertContains(response, "Только с участием брокера")
-        self.assertIn("dashboard_v2_health", response.context)
-        self.assertIn("dashboard_v2_insights", response.context)
-        self.assertEqual(response.context["dashboard_v2_structure_scope"], "all")
+        self.assertContains(response, "С участием брокера")
+        self.assertIn("activity", response.context)
+        self.assertIn("tasks", response.context)
+        self.assertEqual(response.context["scope"].structure_scope, "all")
 
     def test_dashboard_v2_accepts_structure_scope_query_param(self):
         self.client.force_login(self.user)
@@ -472,7 +472,7 @@ class DashboardV2ViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["dashboard_v2_structure_scope"], "broker")
+        self.assertEqual(response.context["scope"].structure_scope, "broker")
 
     def test_exports_page_does_not_contain_dashboard_v2_link(self):
         self.client.force_login(self.user)

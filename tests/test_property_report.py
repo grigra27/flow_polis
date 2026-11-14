@@ -134,10 +134,11 @@ def test_current_year_sum_not_max(make):
 
 
 @pytest.mark.django_db
-def test_falls_back_to_max_without_current_installment(make):
+def test_missing_current_installment_has_unknown_sum(make):
     p = make([10 * M, 8 * M])
     PaymentSchedule.objects.filter(policy=p).update(installment_number=2)
-    assert current_insured_sums([p.id], AS_OF) == {p.id: 10 * M}
+    assert current_insured_sums([p.id], AS_OF) == {}
+    assert not insured_portfolio(AS_OF)[0].insured_sum_known
 
 
 @pytest.mark.django_db

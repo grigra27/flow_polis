@@ -399,6 +399,7 @@
 {% block content %}
 <div class="ps-root">
     <div class="ps-toolbar">
+        <a href="{{ dashboard_url }}" class="ps-btn ps-btn--ghost">К Dashboard</a>
         <a href="{% url 'reports:index' %}" class="ps-btn ps-btn--ghost">
             <i class="bi bi-arrow-left"></i> К экспортам
         </a>
@@ -409,6 +410,8 @@
             <i class="bi bi-printer"></i> Печать / Сохранить как PDF
         </button>
         <form method="get" class="ps-asof-form">
+            {% for branch_id in branch_ids %}<input type="hidden" name="branch" value="{{ branch_id }}">{% endfor %}
+            <label class="me-2">Сделки <select name="structure_scope" onchange="this.form.submit()">{% for key,label in scope_options %}<option value="{{ key }}"{% if key == scope.structure_scope %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
             <label>Срез на дату:
                 <input type="date" name="as_of"
                        value="{{ as_of|date:'Y-m-d' }}"
@@ -423,7 +426,9 @@
         <p class="ps-cover-sub">
             По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>.
             Учитываются только действующие полисы с активным ДФА, без ОСАГО.
+            {{ scope.label }}. {% if selected_branches %}Филиалы: {{ selected_branches|join:", " }}.{% endif %}
         </p>
+        {% if missing_sum_count %}<p class="alert alert-warning">СС текущего года не определена у {{ missing_sum_count }} полисов. Их стоимость не включена в сумму; максимум другого года не подставляется.</p>{% endif %}
 
         <div class="ps-summary">
             <div class="ps-summary-card">
@@ -520,7 +525,7 @@
             <div class="modal-body">
                 <p><strong>Что попадает в срез:</strong> только полисы, которые действуют на выбранную дату и у которых <code>dfa_active = True</code>. Полисы ОСАГО не учитываются: у них нет страховой суммы.</p>
                 <p><strong>Правило действующего полиса:</strong> дата среза входит в период страхования (<code>start_date &lt;= дата &lt;= end_date</code>), полис не расторгнут к этой дате, и он не закрыт вручную без даты расторжения.</p>
-                <p><strong>Как считается СС полиса:</strong> берётся страховая сумма текущего страхового года — у первого взноса последнего года полиса, начавшегося не позже даты среза. У многолетних полисов сумма с годами снижается. Если такого взноса в графике нет, берётся максимальная страховая сумма по графику.</p>
+                <p><strong>Как считается СС полиса:</strong> берётся страховая сумма текущего страхового года — у первого взноса последнего года полиса, начавшегося не позже даты среза. Если текущий год или его СС определить нельзя, стоимость не включается в сумму и показывается число таких полисов.</p>
                 <p><strong>Как строятся таблицы:</strong> рассчитанные СС полисов суммируются по филиалам, страховщикам и видам страхования. В строке группы показываются количество полисов, сумма СС и доля группы в общем портфеле.</p>
                 <p><strong>Дата среза:</strong> по умолчанию используется текущая дата открытия страницы. Дату можно поменять в верхней панели отчёта.</p>
                 <p class="mb-0"><strong>Печать/PDF:</strong> эта справка и верхняя панель управления скрываются при печати.</p>

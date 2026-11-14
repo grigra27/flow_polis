@@ -654,9 +654,11 @@ def export_policies_csv(request):
                 policy.insurance_type.name if policy.insurance_type else "",
                 policy.branch.branch_name if policy.branch else "",
                 month_names_ru[payment.due_date.month] if payment.due_date else "",
-                "Новая"
-                if payment.year_number == 1 and not policy.renewal_to_old_dfa
-                else "Пролонгация",
+                (
+                    "Новая"
+                    if payment.year_number == 1 and not policy.renewal_to_old_dfa
+                    else "Пролонгация"
+                ),
                 "Да" if policy.broker_participation else "Нет",
             ]
             writer.writerow(row)
@@ -947,10 +949,25 @@ def property_snapshot_report(request):
     пользователям.
     """
     from .services.property_snapshot import build_property_snapshot
-    from django.utils.dateparse import parse_date
+    from django.urls import reverse
+    from apps.core.services.portfolio_scope import PortfolioScope, SCOPE_LABELS
+    from apps.insurers.models import Branch
 
-    as_of = parse_date(request.GET.get("as_of") or "")
-    context = build_property_snapshot(as_of=as_of)
+    scope = PortfolioScope.from_query(request.GET)
+    context = build_property_snapshot(
+        scope.as_of, scope.branch_ids, scope.structure_scope
+    )
+    context.update(
+        scope=scope, scope_options=SCOPE_LABELS.items(), branch_ids=scope.branch_ids
+    )
+    context["selected_branches"] = list(
+        Branch.objects.filter(pk__in=scope.branch_ids).values_list(
+            "branch_name", flat=True
+        )
+    )
+    context["dashboard_url"] = (
+        reverse("core:dashboard") + "?" + scope.query(tab="portfolio")
+    )
     return render(request, "reports/property_snapshot.html", context)
 
 
@@ -961,7 +978,8 @@ def property_report(request):
     Где и как застраховано имущество на дату среза. Без КВ, премии и тарифа.
     Доступ — как у снэпшота, всем авторизованным пользователям.
     """
-    from django.utils.dateparse import parse_date
+    from apps.core.services.portfolio_scope import PortfolioScope, SCOPE_LABELS
+    from django.urls import reverse
 
     from apps.insurers.models import Branch
 
@@ -970,9 +988,13 @@ def property_report(request):
         build_property_report_workbook,
     )
 
-    as_of = parse_date(request.GET.get("as_of") or "")
-    branch_ids = [int(v) for v in request.GET.getlist("branch") if v.isdigit()]
-    report = build_property_report(as_of=as_of, branch_ids=branch_ids)
+    scope = PortfolioScope.from_query(request.GET)
+    branch_ids = scope.branch_ids
+    report = build_property_report(scope.as_of, branch_ids, scope.structure_scope)
+    report.update(scope=scope, scope_options=SCOPE_LABELS.items())
+    report["dashboard_url"] = (
+        reverse("core:dashboard") + "?" + scope.query(tab="portfolio")
+    )
 
     if request.GET.get("format") == "xlsx":
         from io import BytesIO

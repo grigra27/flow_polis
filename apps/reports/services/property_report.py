@@ -77,15 +77,22 @@ def _group(
         k = key(obj)
         group = groups.setdefault(
             k,
-            {"key": k, "name": label(obj) if label else k, "sum": ZERO, "count": 0},
+            {
+                "key": k,
+                "name": label(obj) if label else k,
+                "sum": ZERO,
+                "count": 0,
+                "known_count": 0,
+            },
         )
         group["sum"] += obj.insured_sum
         group["count"] += 1
+        group["known_count"] += int(obj.insured_sum_known)
     total = sum((g["sum"] for g in groups.values()), ZERO)
     rows = list(groups.values())
     for row in rows:
         row["share"] = _share(row["sum"], total)
-        row["avg"] = row["sum"] / row["count"] if row["count"] else ZERO
+        row["avg"] = row["sum"] / row["known_count"] if row["known_count"] else ZERO
     if order:
         rows.sort(
             key=lambda r: order.index(r["key"]) if r["key"] in order else len(order)
@@ -147,21 +154,27 @@ def _quarter_ends_before(as_of: date, count: int) -> List[date]:
 
 def _totals(objects):
     total = sum((o.insured_sum for o in objects), ZERO)
-    return {"sum": total, "count": len(objects)}
+    return {
+        "sum": total,
+        "count": len(objects),
+        "missing_sum_count": sum(not o.insured_sum_known for o in objects),
+    }
 
 
-def _change(as_of, months, branch_ids, current):
+def _change(as_of, months, branch_ids, current, structure_scope="all"):
     then = _add_months(as_of, -months)
     if then < HISTORY_RELIABLE_FROM:
         return None
-    previous = _totals(insured_portfolio(then, branch_ids))
+    previous = _totals(insured_portfolio(then, branch_ids, structure_scope))
     return {
         "date": then,
         "sum": previous["sum"],
         "delta": current["sum"] - previous["sum"],
-        "percent": _share(current["sum"] - previous["sum"], previous["sum"])
-        if previous["sum"]
-        else None,
+        "percent": (
+            _share(current["sum"] - previous["sum"], previous["sum"])
+            if previous["sum"]
+            else None
+        ),
     }
 
 
@@ -229,7 +242,7 @@ def _matrix(objects, row_key, row_label, col_key, col_label, columns_limit=None)
     return {"headers": headers, "rows": rows}
 
 
-def _insurer_dynamics(as_of, branch_ids, current_rows):
+def _insurer_dynamics(as_of, branch_ids, current_rows, structure_scope="all"):
     dates = [
         d
         for d in _quarter_ends_before(as_of, DYNAMICS_QUARTERS)
@@ -240,7 +253,7 @@ def _insurer_dynamics(as_of, branch_ids, current_rows):
     snapshots = []
     for snapshot_date in dates:
         rows = _group(
-            insured_portfolio(snapshot_date, branch_ids),
+            insured_portfolio(snapshot_date, branch_ids, structure_scope),
             key=lambda o: o.insurer_id,
             label=lambda o: o.insurer,
         )
@@ -283,10 +296,10 @@ def _ending_by_month(objects, as_of, months=12):
 
 
 def build_property_report(
-    as_of: Optional[date] = None, branch_ids=None
+    as_of: Optional[date] = None, branch_ids=None, structure_scope="all"
 ) -> Dict[str, Any]:
     as_of = as_of or timezone.localdate()
-    objects = insured_portfolio(as_of, branch_ids)
+    objects = insured_portfolio(as_of, branch_ids, structure_scope)
     totals = _totals(objects)
     brands = {o.id: detect_brand(o.description) for o in objects}
     conditions = {o.id: detect_condition(o.description) for o in objects}
@@ -331,13 +344,18 @@ def build_property_report(
     return {
         "as_of": as_of,
         "branch_ids": branch_ids or [],
+        "structure_scope": structure_scope,
         "totals": {
             **totals,
-            "avg": totals["sum"] / totals["count"] if totals["count"] else ZERO,
+            "avg": (
+                totals["sum"] / (totals["count"] - totals["missing_sum_count"])
+                if totals["count"] > totals["missing_sum_count"]
+                else ZERO
+            ),
             "lessees": len({o.client_id for o in objects}),
             "insurers": concentration["insurers"],
-            "change_3m": _change(as_of, 3, branch_ids, totals),
-            "change_12m": _change(as_of, 12, branch_ids, totals),
+            "change_3m": _change(as_of, 3, branch_ids, totals, structure_scope),
+            "change_12m": _change(as_of, 12, branch_ids, totals, structure_scope),
         },
         "insurers": insurer_rows,
         "concentration": concentration,
@@ -348,11 +366,17 @@ def build_property_report(
             lambda o: o.type_id,
             lambda o: o.type,
         ),
-        "insurer_dynamics": _insurer_dynamics(as_of, branch_ids, insurer_rows),
+        "insurer_dynamics": _insurer_dynamics(
+            as_of, branch_ids, insurer_rows, structure_scope
+        ),
         "by_type": _group(objects, key=lambda o: o.type_id, label=lambda o: o.type),
         "by_size": _group(
             objects,
-            key=lambda o: _size_bucket(o.insured_sum),
+            key=lambda o: (
+                _size_bucket(o.insured_sum)
+                if o.insured_sum_known
+                else "СС не определена"
+            ),
             order=[b[0] for b in SIZE_BUCKETS],
         ),
         "by_age": _group(
@@ -394,12 +418,13 @@ def build_property_report(
         ),
         "top_objects": [
             {
+                "id": o.id,
                 "client": o.client,
                 "description": o.description,
                 "brand": brands[o.id],
                 "insurer": o.insurer,
                 "branch": o.branch,
-                "sum": o.insured_sum,
+                "sum": o.insured_sum if o.insured_sum_known else None,
                 "end_date": o.end_date,
                 "policy_number": o.policy_number,
             }
@@ -460,6 +485,20 @@ def build_property_report_workbook(report: Dict[str, Any]):
         "Сводка",
         ["Показатель", "Значение"],
         [
+            [
+                "Участие брокера",
+                {
+                    "all": "Все сделки",
+                    "broker": "С участием брокера",
+                    "direct": "Без участия брокера",
+                }.get(report.get("structure_scope"), "Все сделки"),
+            ],
+            [
+                "Филиалы (ID)",
+                ", ".join(str(pk) for pk in report.get("branch_ids", []))
+                or "Все филиалы",
+            ],
+            ["Полисов без определённой СС", t["missing_sum_count"]],
             ["Объектов", t["count"]],
             ["Страховая стоимость, ₽", t["sum"].quantize(Decimal("1"))],
             ["Средняя стоимость объекта, ₽", t["avg"].quantize(Decimal("1"))],
@@ -549,7 +588,7 @@ def build_property_report_workbook(report: Dict[str, Any]):
                 o["brand"],
                 o["insurer"],
                 o["branch"],
-                o["sum"].quantize(Decimal("1")),
+                o["sum"].quantize(Decimal("1")) if o["sum"] is not None else None,
                 o["end_date"],
             ]
             for o in report["top_objects"]

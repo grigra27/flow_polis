@@ -98,7 +98,9 @@
     <div class="pr-toolbar">
         <a href="{% url 'reports:index' %}" class="pr-btn pr-btn--ghost"><i class="bi bi-arrow-left"></i> К экспортам</a>
         <span class="pr-spacer"></span>
+        <a href="{{ dashboard_url }}" class="pr-btn pr-btn--ghost">К Dashboard</a>
         <form method="get">
+            <label>Сделки <select name="structure_scope" onchange="this.form.submit()">{% for key,label in scope_options %}<option value="{{ key }}"{% if key == scope.structure_scope %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
             <div class="dropdown">
                 <button class="pr-btn pr-btn--ghost dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                     {% if selected_branches %}Филиалы: {{ selected_branches|length }}{% else %}Все филиалы{% endif %}
@@ -125,7 +127,9 @@
         <p class="pr-cover-sub">
             По состоянию на <strong>{{ as_of|date:"d.m.Y" }}</strong>{% if selected_branches %} · {{ selected_branches|join:", " }}{% endif %}.
             Действующие полисы по договорам лизинга с активным ДФА, без ОСАГО. Страховая стоимость — страховая сумма текущего страхового года.
+            {{ scope.label }}.
         </p>
+        {% if totals.missing_sum_count %}<p class="alert alert-warning">У {{ totals.missing_sum_count }} полисов СС текущего года не определена. Они входят в количество; их стоимость исключена из сумм и средних значений.</p>{% endif %}
         <div class="pr-stats">
             <div class="pr-stat"><div class="pr-stat-label">Страховая стоимость</div><div class="pr-stat-value">{{ totals.sum|money_mln }}</div>
                 <div class="pr-stat-sub">
@@ -291,7 +295,7 @@
             <tbody>
             {% for o in top_objects %}
             <tr><td class="muted">{{ forloop.counter }}</td><td>{{ o.client }}</td><td>{{ o.description|truncatechars:70 }}</td><td>{{ o.insurer }}</td><td class="muted">{{ o.branch }}</td>
-                <td class="num"><strong>{{ o.sum|rub }} ₽</strong></td><td class="num">{{ o.end_date|date:"d.m.Y" }}</td></tr>
+                <td class="num"><strong>{% if o.sum is not None %}{{ o.sum|rub }} ₽{% else %}Не определена{% endif %}</strong></td><td class="num">{{ o.end_date|date:"d.m.Y" }}</td></tr>
             {% endfor %}
             </tbody>
         </table>

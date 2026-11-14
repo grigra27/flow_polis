@@ -24,6 +24,7 @@ from .models import OsagoPolicy, Policy, PaymentSchedule, PolicyInfo
 from .navigation import journal_origin, policy_card_url
 from .services.policy_template import (
     can_create_from_policy,
+    can_create_osago_from_object,
     policy_template_initial,
     object_initial,
     osago_for_vin,
@@ -507,7 +508,11 @@ class PolicyAdmin(admin.ModelAdmin):
             if from_object
             else self.filter_portfolio(Policy.objects.all())
         )
-        source = get_object_or_404(sources, pk=source_id)
+        source = get_object_or_404(
+            sources.select_related("insurance_type"), pk=source_id
+        )
+        if from_object and not can_create_osago_from_object(source):
+            raise Http404
         request.template_source = source
         if request.method == "GET":
             if from_object:

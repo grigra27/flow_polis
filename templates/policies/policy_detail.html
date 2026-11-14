@@ -50,7 +50,7 @@
                 </dd></div>
                 <div><dt>Год выпуска</dt><dd>{{ policy.property_year|default_if_none:"—"|unlocalize }}</dd></div>
             </dl>
-            {% if can_create_from_policy and not policy.is_osago %}
+            {% if can_create_osago_from_object %}
             <div class="policy-object-actions">
                 <a href="{% url 'admin:policies_osagopolicy_add' %}?from_object={{ policy.pk|unlocalize }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i> Оформить ОСАГО на этот объект</a>
                 {% include 'policies/includes/osago_for_vin.html' %}

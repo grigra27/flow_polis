@@ -12,7 +12,11 @@ from .flow_views import source_url
 from .filters import PolicyFilter
 from .card_edits import can_edit_card_field
 from .navigation import JournalPaginator, card_params, journal_label
-from .services.policy_template import can_create_from_policy, osago_for_vin
+from .services.policy_template import (
+    can_create_from_policy,
+    can_create_osago_from_object,
+    osago_for_vin,
+)
 
 
 class PolicyListView(LoginRequiredMixin, FilterView):
@@ -232,7 +236,10 @@ class PolicyDetailView(LoginRequiredMixin, DetailView):
         )
         context["card_query"] = urlencode(navigation)
         context["can_create_from_policy"] = can_create_from_policy(self.request.user)
-        if context["can_create_from_policy"] and not policy.is_osago:
+        context["can_create_osago_from_object"] = context[
+            "can_create_from_policy"
+        ] and can_create_osago_from_object(policy)
+        if context["can_create_osago_from_object"]:
             context["osago_matches"] = osago_for_vin(policy.vin_number)
         context["can_edit_policy"] = can_edit_card_field(self.request.user, Policy)
         context["open_payment"] = self.request.GET.get("payment", "")

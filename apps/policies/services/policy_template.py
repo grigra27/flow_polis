@@ -9,6 +9,13 @@ def can_create_from_policy(user):
     )
 
 
+def can_create_osago_from_object(source):
+    """Оформление ОСАГО на тот же объект доступно только из полиса КАСКО."""
+    return (
+        not source.is_osago and source.insurance_type.name.strip().casefold() == "каско"
+    )
+
+
 def object_initial(source):
     return {
         "client": source.client_id,

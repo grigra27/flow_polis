@@ -12,10 +12,17 @@ from apps.policies.tests.test_copy_policy import form_payload
 pytestmark = [pytest.mark.admin, pytest.mark.django_db]
 
 
+@pytest.fixture
+def kasko_policy(sample_policy):
+    sample_policy.insurance_type = InsuranceType.objects.create(name="КАСКО")
+    sample_policy.save(update_fields=["insurance_type"])
+    return sample_policy
+
+
 def test_issue_osago_from_policy_card(
-    admin_client, policy_factory, sample_payment, insurer_factory
+    admin_client, policy_factory, sample_payment, insurer_factory, kasko_policy
 ):
-    obj = sample_payment.policy
+    obj = kasko_policy
     obj.vin_number = "VINTEST123"
     obj.property_year = 2022
     obj.save()
@@ -95,18 +102,51 @@ def test_issue_osago_from_policy_card(
 
 
 def test_osago_matches_require_vin_and_an_authorized_operator(
-    admin_client, client, django_user_model, sample_policy, policy_factory
+    admin_client, client, django_user_model, kasko_policy, policy_factory
 ):
     kind = InsuranceType.objects.create(name="ОСАГО", is_osago=True)
     policy_factory(
-        insurance_type=kind, vin_number="", dfa_number=sample_policy.dfa_number
+        insurance_type=kind, vin_number="", dfa_number=kasko_policy.dfa_number
     )
-    card = reverse("policies:detail", args=[sample_policy.pk])
+    card = reverse("policies:detail", args=[kasko_policy.pk])
     url = reverse(
-        "admin:policies_osagopolicy_add", query={"from_object": sample_policy.pk}
+        "admin:policies_osagopolicy_add", query={"from_object": kasko_policy.pk}
     )
     assert admin_client.get(url).context["osago_matches"] == []
     viewer = django_user_model.objects.create_user("reader", is_staff=True)
     client.force_login(viewer)
     assert url not in client.get(card).content.decode()
     assert client.get(url).status_code == client.post(url, {}).status_code == 403
+
+
+@pytest.mark.parametrize(
+    "type_name",
+    [
+        "Ответственность",
+        "Грузы",
+        "Имущество",
+        "Спецтехника",
+        "КАСКО спецтехники",
+        "ОСАГО",
+    ],
+)
+def test_osago_from_other_insurance_types_is_unavailable(
+    admin_client, sample_policy, type_name
+):
+    sample_policy.insurance_type = InsuranceType.objects.create(
+        name=type_name, is_osago=type_name == "ОСАГО"
+    )
+    sample_policy.vin_number = "VINTEST123"
+    sample_policy.save(update_fields=["insurance_type", "vin_number"])
+    card = admin_client.get(reverse("policies:detail", args=[sample_policy.pk]))
+    assert card.status_code == 200
+    assert "Оформить ОСАГО на этот объект" not in card.content.decode()
+    assert "Создать по образцу" in card.content.decode()
+
+    url = reverse(
+        "admin:policies_osagopolicy_add", query={"from_object": sample_policy.pk}
+    )
+    before = Policy.objects.count()
+    assert admin_client.get(url).status_code == 404
+    assert admin_client.post(url, {}).status_code == 404
+    assert Policy.objects.count() == before

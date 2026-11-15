@@ -26,11 +26,12 @@ DIMENSIONS = (
     ("type", "Виды страхования"),
 )
 TABS = (
-    ("overview", "Обзор"),
-    ("portfolio", "Портфель"),
-    ("payments", "Платежи и продления"),
-    ("quality", "Качество данных"),
+    ("overview", "Обзор", "Состояние на дату"),
+    ("portfolio", "Портфель", "Структура и концентрация"),
+    ("payments", "Платежи и продления", "График взносов"),
+    ("quality", "Качество данных", "Полнота записей"),
 )
+TAB_KEYS = [key for key, *_ in TABS]
 
 
 def percent(part, total):
@@ -559,8 +560,13 @@ class DashboardV3Service:
             "historical": self.today < timezone.localdate(),
             "projected": self.today > timezone.localdate(),
             "tabs": [
-                {"key": key, "title": title, "url": self.url(key, measure=measure)}
-                for key, title in TABS
+                {
+                    "key": key,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "url": self.url(key, measure=measure),
+                }
+                for key, title, subtitle in TABS
             ],
             "total_sum": sum(self.sums.values(), ZERO),
             "policy_count": len(self.property),

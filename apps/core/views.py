@@ -14,11 +14,11 @@ def dashboard(request):
     from django.conf import settings
     from apps.insurers.models import Branch
     from .services.portfolio_scope import PortfolioScope, SCOPE_LABELS
-    from .services.dashboard_v3_service import DashboardV3Service, TABS
+    from .services.dashboard_v3_service import DashboardV3Service, TAB_KEYS
 
     scope = PortfolioScope.from_query(request.GET)
     tab = request.GET.get("tab", "overview")
-    if tab not in dict(TABS):
+    if tab not in TAB_KEYS:
         tab = "overview"
     service = DashboardV3Service(scope)
     context = service.context(tab=tab, measure=request.GET.get("measure", "sum"))

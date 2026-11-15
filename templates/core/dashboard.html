@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static currency_filters l10n %}
 {% block title %}Дашборд 3.0{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/reference_images.css' %}"><link rel="stylesheet" href="{% static 'core/css/dashboard_v3.css' %}?v=20261114-design">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/reference_images.css' %}"><link rel="stylesheet" href="{% static 'core/css/dashboard_v3.css' %}?v=20261114-toc">{% endblock %}
 {% block content %}
 <div class="d3" id="dashboard" role="region" aria-label="Дашборд 3.0">
   {% if preview_label %}<div class="d3-badge">{{ preview_label }}</div>{% endif %}
@@ -19,7 +19,7 @@
   <p class="d3-scope-note"><strong>{{ scope.as_of|date:"d.m.Y" }} · {{ scope.label }}</strong>{% if scope.branch_ids %} · {% for b in branches %}{% if b.selected %}{{ b.name }} {% endif %}{% endfor %}{% else %} · Все филиалы{% endif %}. Фильтры действуют на все вкладки.</p>
   {% if historical %}<div class="d3-notice">Исторический срез восстановлен по датам в текущей базе. Подгрузка файлов и ручные статусы без даты отражают состояние записей сейчас.</div>{% endif %}
   {% if projected %}<div class="d3-notice">Будущий срез рассчитан по известным срокам полисов и графикам. Новые договоры и будущие изменения записей в нём ещё не учтены.</div>{% endif %}
-  <nav class="d3-tabs" aria-label="Разделы Dashboard">{% for item in tabs %}<a href="{{ item.url }}"{% if tab == item.key %} aria-current="page"{% endif %}>{{ item.title }}</a>{% endfor %}</nav>
+  <nav class="d3-tabs" aria-label="Разделы Dashboard">{% for item in tabs %}<a href="{{ item.url }}"{% if tab == item.key %} aria-current="page"{% endif %}><span class="d3-tab-num">{{ forloop.counter|stringformat:"02d" }}</span><span class="d3-tab-title">{{ item.title }}</span><span class="d3-tab-sub">{{ item.subtitle }}</span></a>{% endfor %}</nav>
   <div class="d3-stats">
     <a class="d3-stat" href="{{ policies_url }}"><span>Страховая стоимость</span><strong>{{ total_sum|money_mln }}</strong><small>Текущий страховой год · без ОСАГО</small></a>
     <a class="d3-stat" href="{{ policies_url }}"><span>Полисов в имущественном срезе</span><strong>{{ policy_count }}</strong><small>В силе на дату · активный ДФА</small></a>

@@ -1036,6 +1036,63 @@ def property_report(request):
     return render(request, "reports/property_report.html", report)
 
 
+@never_cache
+@login_required
+def quarterly_presentation(request):
+    """Квартальная презентация для лизинговой компании: предпросмотр и PDF.
+
+    Срез — последний календарный день выбранного квартала; по умолчанию
+    берётся последний завершённый квартал. Доступ — всем авторизованным,
+    как у подробного имущественного отчёта.
+    """
+    from django.db import connection, transaction
+
+    from .services.quarterly_presentation import (
+        QUARTER_NUMERALS,
+        build_quarterly_presentation,
+        last_completed_quarter,
+    )
+
+    default_year, default_quarter = last_completed_quarter()
+    try:
+        year = int(request.GET.get("year", default_year))
+        quarter = int(request.GET.get("quarter", default_quarter))
+    except (TypeError, ValueError):
+        year, quarter = default_year, default_quarter
+    current_year = timezone.localdate().year
+    if not (2000 <= year <= current_year + 5 and 1 <= quarter <= 4):
+        year, quarter = default_year, default_quarter
+
+    outer_transaction = connection.in_atomic_block
+    with transaction.atomic():
+        if connection.vendor == "postgresql" and not outer_transaction:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+                )
+        presentation = build_quarterly_presentation(year, quarter)
+
+    if request.GET.get("format") == "pdf":
+        from .services.quarterly_pdf import build_quarterly_pdf
+
+        response = HttpResponse(
+            build_quarterly_pdf(presentation), content_type="application/pdf"
+        )
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="quarterly_presentation_{year}_Q{quarter}.pdf"'
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    presentation["year_choices"] = sorted(
+        set(range(current_year, current_year - 8, -1)) | {year}, reverse=True
+    )
+    presentation["quarter_choices"] = [
+        (value, f"{numeral} квартал") for value, numeral in QUARTER_NUMERALS.items()
+    ]
+    return render(request, "reports/quarterly_presentation.html", presentation)
+
+
 @login_required
 def export_database_backup(request):
     """Скачивание актуального backup-файла базы данных."""

@@ -190,17 +190,24 @@ def _change(
     }
 
 
+def insurer_distribution(objects, images):
+    """Общие строки «страховщик → сумма, доля, логотип» для отчёта и презентации."""
+    rows = _group(objects, key=lambda o: o.insurer_id, label=lambda o: o.insurer)
+    for row in rows:
+        row["image_url"] = images.get("insurer", row["key"])
+    return rows
+
+
 def _insurers(objects, as_of, images):
     ending_limit = as_of + timedelta(days=ENDING_SOON_DAYS)
-    rows = _group(objects, key=lambda o: o.insurer_id, label=lambda o: o.insurer)
+    rows = insurer_distribution(objects, images)
     ending = defaultdict(lambda: ZERO)
     for obj in objects:
         if obj.end_date <= ending_limit:
             ending[obj.insurer_id] += obj.insured_sum
     for row in rows:
         row["ending_soon"] = ending[row["key"]]
-        row["logo_url"] = images.get("insurer", row["key"])
-        row["image_url"] = row["logo_url"]
+        row["logo_url"] = row["image_url"]
     top3 = sum((r["share"] for r in rows[:3]), ZERO)
     hhi = sum((r["share"] ** 2 for r in rows), ZERO)
     return rows, {"top3_share": top3, "hhi": hhi, "insurers": len(rows)}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Квартальная презентация для лизинговой компании{% endblock %}
+
+{% block extra_css %}
+<style>
+    .qp { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; color: #24384f; }
+    body { background: #f3f7fc; }
+    .qp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+    .qp-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .95rem; border-radius: 999px; font-weight: 600; font-size: .88rem;
+              background: #1565c0; color: #fff; border: 1px solid #1565c0; text-decoration: none; cursor: pointer; }
+    .qp-btn:hover { background: #104a91; color: #fff; }
+    .qp-btn--ghost { background: #fff; color: #17324f; border-color: #dbe5f1; }
+    .qp-btn--ghost:hover { background: #f6f9fd; color: #17324f; }
+    .qp-toolbar form { display: inline-flex; align-items: center; gap: .5rem; margin: 0; font-size: .88rem; }
+    .qp-toolbar select { border: 1px solid #dbe5f1; border-radius: 999px; padding: .4rem .7rem; font: inherit; color: #17324f; background: #fff; }
+    .qp-asof { font-size: .88rem; color: #5d748d; }
+    .qp-spacer { flex: 1; }
+
+    .qp-slide-wrap { overflow-x: auto; }
+    .qp-slide { background: #fff; border: 1px solid #dbe5f1; border-radius: 12px; box-shadow: 0 2px 10px rgba(23, 50, 79, .06);
+                aspect-ratio: 16 / 9; min-width: 760px; padding: 2.2% 3.6%; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+    .qp-slide-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.1%; }
+    .qp-slide-title { font-size: 1.45rem; font-weight: 800; color: #1a1a1a; margin: 0; }
+    .qp-slide-date { color: #555; font-size: .95rem; margin-top: .3rem; }
+    .qp-wordmark { font-size: 1.05rem; color: #111; white-space: nowrap; }
+    .qp-wordmark b { font-weight: 800; }
+    .qp-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .qp-table th { background: #111; color: #fff; font-weight: 700; text-align: left; padding: .5rem .65rem; }
+    .qp-table th.num, .qp-table td.num { text-align: right; white-space: nowrap; }
+    .qp-table td { padding: .42rem .65rem; color: #1a1a1a; }
+    .qp-table tbody tr:nth-child(odd) td { background: #fff; }
+    .qp-table tbody tr:nth-child(even) td { background: #f2f2f2; }
+    .qp-table tr.qp-total td { background: #e4e4e4; font-weight: 800; border-top: 2px solid #111; }
+    .qp-name { display: flex; align-items: center; gap: .55rem; font-weight: 600; }
+    .qp-logo { width: 22px; height: 22px; object-fit: contain; background: #fff; border-radius: 5px; flex: none; }
+    .qp-empty { color: #555; font-size: 1rem; padding: 1.5rem 0; }
+    .qp-slide-note { margin-top: auto; padding-top: .8rem; color: #555; font-size: .78rem; }
+    .qp-note { color: #5d748d; font-size: .85rem; margin-top: .9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qp">
+    <div class="qp-toolbar">
+        <a href="{% url 'reports:index' %}" class="qp-btn qp-btn--ghost"><i class="bi bi-arrow-left"></i> К экспортам</a>
+        <form method="get">
+            <label>Год
+                <select name="year" onchange="this.form.submit()">
+                    {% for y in year_choices %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>Квартал
+                <select name="quarter" onchange="this.form.submit()">
+                    {% for value, name in quarter_choices %}<option value="{{ value }}"{% if value == quarter %} selected{% endif %}>{{ name }}</option>{% endfor %}
+                </select>
+            </label>
+        </form>
+        <span class="qp-asof">Дата среза: <strong>{{ as_of|date:"d.m.Y" }}</strong> (последний день квартала)</span>
+        <span class="qp-spacer"></span>
+        <a href="?year={{ year }}&quarter={{ quarter }}&format=pdf" class="qp-btn"><i class="bi bi-file-earmark-pdf"></i> Скачать PDF</a>
+    </div>
+
+    {% with slide=slides.0 %}
+    <div class="qp-slide-wrap">
+        <div class="qp-slide">
+            <div class="qp-slide-head">
+                <div>
+                    <h1 class="qp-slide-title">{{ slide.title }}</h1>
+                    <div class="qp-slide-date">По состоянию на {{ slide.as_of|date:"d.m.Y" }}</div>
+                </div>
+                <span class="qp-wordmark"><b>флоу</b>//полисы</span>
+            </div>
+            {% if slide.empty %}
+            <div class="qp-empty">На выбранную дату нет действующих полисов с активным ДФА — распределение по страховщикам пусто.</div>
+            {% else %}
+            <table class="qp-table">
+                <thead>
+                    <tr><th>Страховая компания</th><th class="num">Страховая сумма, ₽</th><th class="num">Доля</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in slide.rows %}
+                    <tr>
+                        <td><span class="qp-name">{% if row.image_url %}<img class="qp-logo" src="{{ row.image_url }}" alt="">{% endif %}{{ row.name }}</span></td>
+                        <td class="num">{{ row.sum_display }}</td>
+                        <td class="num">{{ row.share_display }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="qp-total">
+                        <td>Итого</td>
+                        <td class="num">{{ slide.total_sum_display }}</td>
+                        <td class="num">{{ slide.total_share_display }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+            <div class="qp-slide-note">
+                {% if slide.other_count %}«Иные» — {{ slide.other_count }} страховщиков с меньшей страховой суммой. {% endif %}
+                Страховая сумма текущего страхового года действующих полисов с активным ДФА; без ОСАГО и лимитов ответственности.
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+
+    <p class="qp-note">
+        {{ quarter_label }}. Предпросмотр и PDF используют одни и те же рассчитанные данные.
+        Цифры совпадают с подробным имущественным отчётом на ту же дату при всех филиалах и режиме «Все сделки».
+        PDF — одна альбомная страница 16:9.
+    </p>
+</div>
+{% endblock %}

@@ -51,6 +51,11 @@ urlpatterns = [
     ),
     path("property-report/", views.property_report, name="property_report"),
     path(
+        "quarterly-presentation/",
+        views.quarterly_presentation,
+        name="quarterly_presentation",
+    ),
+    path(
         "export/backups/database/",
         views.export_database_backup,
         name="export_database_backup",

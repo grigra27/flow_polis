@@ -7,6 +7,7 @@
 from io import BytesIO
 
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
@@ -18,6 +19,7 @@ from reportlab.platypus import (
 )
 
 from .property_pdf import _fonts, label, p
+from .quarterly_presentation import HEAT_COLORS
 
 PAGE_SIZE = (960, 540)
 MARGIN_X = 40
@@ -28,6 +30,7 @@ ROW_GRAY = colors.HexColor("#f2f2f2")
 TOTAL_GRAY = colors.HexColor("#e4e4e4")
 INK = colors.HexColor("#1a1a1a")
 MUTED = colors.HexColor("#555555")
+HEAT_FILL = tuple(colors.HexColor(c) for c in HEAT_COLORS)
 
 # Внутренние отступы Frame обнулены, поэтому доступная область совпадает
 # с полями страницы и расчёт высоты сходится с фактической вёрсткой.
@@ -54,8 +57,10 @@ FIT_LEVELS = (
 
 # Матрица филиал × страховщик: шрифт, отступы, предел строк шапки и названий
 # филиалов. До 10 строк филиалов + шапка + «Итого» помещаются на слайд.
-MATRIX_NAME_RATIO = 0.24
-MATRIX_TOTAL_RATIO = 0.11
+# Узкие колонки филиала и итогов отдают ширину страховщикам: «Росгосстрах»
+# и «страховщики» должны помещаться в столбец целиком на обычном уровне.
+MATRIX_NAME_RATIO = 0.17
+MATRIX_TOTAL_RATIO = 0.10
 MATRIX_FIT_LEVELS = (
     (10, 4, 3, 2),
     (9.5, 3.5, 3, 2),
@@ -78,22 +83,37 @@ def _wordmark(canvas, doc):
     canvas.restoreState()
 
 
-def _fit_name(text, width, size, lines):
-    """Обрезает отображаемое название до заданного числа строк с многоточием."""
-    leading = size * 1.35
-    limit = lines * leading + 0.1
-    if p(text, size, color=INK).wrap(width, 10000)[1] <= limit:
-        return text
-    words = str(text).split()
-    lo, hi, best = 0, len(words), "…"
+def _clip_word(word, width, size, font):
+    if pdfmetrics.stringWidth(word, font, size) <= width:
+        return word
+    lo, hi, best = 0, len(word), "…"
     while lo <= hi:
         mid = (lo + hi) // 2
-        candidate = " ".join(words[:mid]).rstrip() + "…"
-        if p(candidate, size, color=INK).wrap(width, 10000)[1] <= limit:
+        candidate = word[:mid] + "…"
+        if pdfmetrics.stringWidth(candidate, font, size) <= width:
             best, lo = candidate, mid + 1
         else:
             hi = mid - 1
     return best
+
+
+def _fit_name(text, width, size, lines, bold=False):
+    """Пакует название по словам; длинные слова и обрезанный хвост — с многоточием."""
+    font = "PropertyInterBold" if bold else "PropertyInter"
+    words = [_clip_word(word, width, size, font) for word in str(text).split()]
+    packed, line = [], ""
+    for word in words:
+        candidate = f"{line} {word}".strip()
+        if pdfmetrics.stringWidth(candidate, font, size) <= width:
+            line = candidate
+        else:
+            packed.append(line)
+            line = word
+    packed.append(line)
+    if len(packed) > lines:
+        packed = packed[:lines]
+        packed[-1] = _clip_word(packed[-1] + "…", width, size, font)
+    return "\n".join(packed)
 
 
 def _insurer_table(slide, width, size, padding, logo_scale, lines):
@@ -210,7 +230,9 @@ def _matrix_table(slide, width, size, padding, header_lines, name_lines):
         [p("Филиал", size, True, colors.white)]
         + [
             p(
-                _fit_name(col["name"], column_width - 12, size, header_lines),
+                _fit_name(
+                    col["name"], column_width - 12, size, header_lines, bold=True
+                ),
                 size,
                 True,
                 colors.white,
@@ -259,15 +281,41 @@ def _matrix_table(slide, width, size, padding, header_lines, name_lines):
     ]
     for row_index, row in enumerate(slide["rows"], 1):
         for cell_index, cell in enumerate(row["cells"], 1):
-            if cell["highlight"]:
+            if cell["heat"]:
                 style.append(
                     (
                         "BACKGROUND",
                         (cell_index, row_index),
                         (cell_index, row_index),
-                        ROW_GRAY,
+                        HEAT_FILL[cell["heat"] - 1],
                     )
                 )
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _matrix_legend(slide):
+    cells = [p("млн ₽:", 7.5, color=MUTED)] + [
+        p(item["label"], 7.5, True, INK) for item in slide["legend"]
+    ]
+    widths = [pdfmetrics.stringWidth("млн ₽:", "PropertyInter", 7.5) + 10] + [
+        pdfmetrics.stringWidth(item["label"], "PropertyInterBold", 7.5) + 12
+        for item in slide["legend"]
+    ]
+    table = Table([cells], colWidths=widths, hAlign="LEFT")
+    style = [
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("BOX", (1, 0), (-1, -1), 0.5, colors.HexColor("#bbbbbb")),
+        ("INNERGRID", (1, 0), (-1, -1), 0.5, colors.HexColor("#bbbbbb")),
+    ]
+    for index, item in enumerate(slide["legend"], 1):
+        style.append(
+            ("BACKGROUND", (index, 0), (index, 0), colors.HexColor(item["color"]))
+        )
     table.setStyle(TableStyle(style))
     return table
 
@@ -285,9 +333,12 @@ def _branch_matrix_slide(slide):
         ]
 
     note = p(slide["note"], 8.5, color=MUTED)
+    legend = _matrix_legend(slide)
+    legend_gap = Spacer(1, 6)
     gap = Spacer(1, 10)
     fixed = sum(f.wrap(SLIDE_WIDTH, 10000)[1] for f in head)
     fixed += gap.wrap(SLIDE_WIDTH, 10000)[1] + note.wrap(SLIDE_WIDTH, 10000)[1]
+    fixed += legend_gap.wrap(SLIDE_WIDTH, 10000)[1] + legend.wrap(SLIDE_WIDTH, 10000)[1]
     budget = SLIDE_HEIGHT - fixed
     # Таблица измеряется на реальной ширине слайда; первый помещающийся
     # уровень сжатия гарантирует, что матрица, итоги и примечание на странице.
@@ -296,10 +347,10 @@ def _branch_matrix_slide(slide):
             slide, SLIDE_WIDTH, size, padding, header_lines, name_lines
         )
         if table.wrap(SLIDE_WIDTH, 10000)[1] <= budget:
-            return head + [table, gap, note]
+            return head + [table, legend_gap, legend, gap, note]
     size, padding, header_lines, name_lines = MATRIX_FIT_LEVELS[-1]
     table = _matrix_table(slide, SLIDE_WIDTH, size, padding, header_lines, name_lines)
-    return head + [table, gap, note]
+    return head + [table, legend_gap, legend, gap, note]
 
 
 SLIDE_RENDERERS = {"insurers": _insurer_slide, "branch_matrix": _branch_matrix_slide}

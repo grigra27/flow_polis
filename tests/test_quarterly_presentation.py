@@ -8,7 +8,9 @@
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
+from collections import Counter
 from unittest import mock
+import re
 
 import pytest
 from django.contrib.auth.models import User
@@ -28,6 +30,7 @@ from apps.reports.services.property_report import (
     build_property_report,
 )
 from apps.reports.services.quarterly_presentation import (
+    HEAT_COLORS,
     build_branch_matrix_slide,
     build_insurer_slide,
     build_quarterly_presentation,
@@ -629,12 +632,15 @@ def test_branch_matrix_cell_displays_and_totals(matrix_data):
 
 
 @pytest.mark.django_db
-def test_branch_matrix_highlights_max_positive_cell(matrix_data):
+def test_branch_matrix_heat_levels_and_neutral_cells(matrix_data):
     slide = build_branch_matrix_slide(AS_OF)
-    expected = {"Псков": 0, "Москва": 0, "Казань": 1}
+    expected = {"Псков": [1, 1, 0], "Москва": [1, 0, 1], "Казань": [0, 1, 1]}
     for row in slide["rows"]:
-        highlighted = [i for i, c in enumerate(row["cells"]) if c["highlight"]]
-        assert highlighted == [expected[row["name"]]]
+        assert [c["heat"] for c in row["cells"]] == expected[row["name"]]
+    # «<0,1» — положительная сумма, первый уровень шкалы.
+    kazan = next(r for r in slide["rows"] if r["name"] == "Казань")
+    assert kazan["cells"][2]["display"] == "<0,1"
+    assert kazan["cells"][2]["heat"] == 1
 
 
 @pytest.mark.django_db
@@ -701,9 +707,9 @@ def test_branch_matrix_other_groups_and_intersection(big_grid):
     assert "7 крупнейших" in slide["note"]
     assert "ещё 2" in slide["note"]
     assert "3 филиалов" in slide["note"]
-    # «Иные» не подсвечиваются как максимум ни в строках, ни в столбце.
-    assert all(not c["highlight"] for c in other_row["cells"])
-    assert all(not r["cells"][7]["highlight"] for r in slide["rows"])
+    # «Иные» остаются нейтральными и в строках, и в столбце.
+    assert all(c["heat"] == 0 for c in other_row["cells"])
+    assert all(r["cells"][7]["heat"] == 0 for r in slide["rows"])
 
 
 @pytest.mark.django_db
@@ -783,7 +789,110 @@ def test_branch_matrix_cell_display_rules(refs, make):
     zero = next(r for r in slide["rows"] if r["name"] == "Нулевой")
     assert zero["total_display"] == "—"
     assert all(cell["display"] == "—" for cell in zero["cells"])
-    assert all(not cell["highlight"] for cell in zero["cells"])
+    assert all(cell["heat"] == 0 for cell in zero["cells"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "rub, level",
+    [
+        (0, 0),
+        (1, 1),
+        (49_999_999, 1),
+        (50_000_000, 2),
+        (99_999_999, 2),
+        (100_000_000, 3),
+        (199_999_999, 3),
+        (200_000_000, 4),
+        (299_999_999, 4),
+        (300_000_000, 5),
+        (1_000_000_000, 5),
+    ],
+)
+def test_heat_level_boundaries(rub, level):
+    assert qp_service._heat_level(Decimal(rub)) == level
+
+
+@pytest.mark.django_db
+def test_heat_same_sum_same_level_in_different_branches(refs, make):
+    moscow = Branch.objects.create(branch_name="Москва")
+    make([120 * M])  # Псков × А
+    make([250 * M], insurer="b")  # Псков × Б
+    make([120 * M], branch=moscow)  # Москва × А
+    make([40 * M], insurer="b", branch=moscow)  # Москва × Б
+    slide = build_branch_matrix_slide(AS_OF)
+    rows = {r["name"]: r for r in slide["rows"]}
+    # Столбцы отсортированы по убыванию итогов: СК Б (290 млн) перед СК А.
+    assert [c["heat"] for c in rows["Псков"]["cells"]] == [4, 3]
+    assert [c["heat"] for c in rows["Москва"]["cells"]] == [1, 3]
+    assert rows["Псков"]["cells"][1]["heat"] == rows["Москва"]["cells"][1]["heat"]
+
+
+def _pdf_fill_colors(page):
+    data = page.get_contents().get_data()
+    rects = re.findall(
+        rb"([0-9.]+) ([0-9.]+) ([0-9.]+) rg\s+n?\s*[-0-9.]+ [-0-9.]+ [-0-9.]+ [-0-9.]+ re\s+f\*?",
+        data,
+    )
+    return Counter(
+        "#%02X%02X%02X" % tuple(round(float(c) * 255) for c in rgb)
+        for rgb in rects
+        if "#%02X%02X%02X" % tuple(round(float(c) * 255) for c in rgb) in HEAT_COLORS
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_html_and_pdf_use_same_heat_levels_and_colors(client, refs, make):
+    moscow = Branch.objects.create(branch_name="Москва")
+    insurers = [Insurer.objects.create(insurer_name=f"СК {j}") for j in range(5)]
+    unknown = Insurer.objects.create(insurer_name="СК Ж")
+    for insurer, value in zip(insurers, [30 * M, 60 * M, 150 * M, 250 * M, 400 * M]):
+        make([value], insurer=insurer)
+        make([value], insurer=insurer, branch=moscow)
+    make([10 * M, None], start=date(2025, 8, 1), years=2, insurer=unknown)
+    make(
+        [10 * M, None], start=date(2025, 8, 1), years=2, insurer=unknown, branch=moscow
+    )
+
+    slide = build_branch_matrix_slide(AS_OF)
+    levels = Counter(c["heat"] for r in slide["rows"] for c in r["cells"] if c["heat"])
+    assert levels == Counter({1: 2, 2: 2, 3: 2, 4: 2, 5: 2})
+
+    client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
+    url = reverse("reports:quarterly_presentation")
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    html_levels = Counter(
+        int(match) for match in re.findall(r'class="num qp-heat-(\d)"', html)
+    )
+    assert html_levels == levels
+    for color in HEAT_COLORS:
+        assert html.count(f'style="background: {color};"') == 1  # образец легенды
+
+    response = client.get(url, {"year": 2026, "quarter": 3, "format": "pdf"})
+    reader = read_pdf(response.content)
+    assert len(reader.pages) == 2
+    fills = _pdf_fill_colors(reader.pages[1])
+    # Ячейки матрицы плюс по одному образцу каждого уровня в легенде.
+    assert fills == Counter({color: 3 for color in HEAT_COLORS})
+    second = reader.pages[1].extract_text()
+    for item in slide["legend"]:
+        assert item["label"] in second
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_pdf_header_keeps_short_names_whole(client, refs, make):
+    insurer = Insurer.objects.create(insurer_name="Росгосстрах")
+    make([500 * M], insurer=insurer)
+    for j in range(7):
+        other = Insurer.objects.create(insurer_name=f"СК {j}")
+        make([(10 + j) * M], insurer=other)
+    pages = _pdf_pages(client)
+    lines = [line.strip() for line in pages[1].splitlines()]
+    assert "Росгосстрах" in lines
+    assert "Иные" in lines
+    assert "страховщики" in lines
 
 
 @pytest.mark.integration
@@ -844,6 +953,8 @@ def test_pdf_max_filled_matrix_stays_two_pages(client, refs, make):
     assert "7 крупнейших" in second
     assert "млн ₽" in second
     assert "без ОСАГО и лимитов ответственности." in second
+    for label in ("до 50", "50–100", "100–200", "200–300", "от 300"):
+        assert label in second  # легенда шкалы на второй странице
 
 
 @pytest.mark.integration

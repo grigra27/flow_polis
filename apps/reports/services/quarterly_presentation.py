@@ -29,6 +29,33 @@ MAX_MATRIX_BRANCHES = 10
 TOP_MATRIX_BRANCHES = MAX_MATRIX_BRANCHES - 1
 QUARTER_NUMERALS = {1: "I", 2: "II", 3: "III", 4: "IV"}
 
+# Фиксированная шкала тепловой карты в рублях: одинаковая сумма получает
+# одинаковый уровень в любой строке и любом квартале.
+HEAT_THRESHOLDS = (
+    Decimal(50_000_000),
+    Decimal(100_000_000),
+    Decimal(200_000_000),
+    Decimal(300_000_000),
+)
+HEAT_COLORS = ("#F0F5FA", "#DCE8F2", "#C2D6E6", "#A4C1D7", "#82A8C4")
+HEAT_LEGEND = (
+    {"color": HEAT_COLORS[0], "label": "до 50"},
+    {"color": HEAT_COLORS[1], "label": "50–100"},
+    {"color": HEAT_COLORS[2], "label": "100–200"},
+    {"color": HEAT_COLORS[3], "label": "200–300"},
+    {"color": HEAT_COLORS[4], "label": "от 300"},
+)
+
+
+def _heat_level(value: Decimal) -> int:
+    """0 — нейтральная ячейка, 1–5 — уровень шкалы по неокруглённой сумме."""
+    if value <= 0:
+        return 0
+    for level, threshold in enumerate(HEAT_THRESHOLDS, 1):
+        if value < threshold:
+            return level
+    return len(HEAT_COLORS)
+
 
 def quarter_end(year: int, quarter: int) -> date:
     """Последний календарный день квартала."""
@@ -163,13 +190,8 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
     rows = []
     for row in shown:
         sums = [cell["sum"] for cell in row["cells"]]
-        # Подсветка максимума — только среди отдельно показанных страховщиков
-        # и только в строках реальных филиалов; «Иные» не подсвечиваются.
-        shown_range = range(column_count - 1 if other_insurers else column_count)
-        best = max((sums[i] for i in shown_range), default=ZERO)
-        highlight = None
-        if best > 0 and not row.get("is_other"):
-            highlight = next(i for i in shown_range if sums[i] == best)
+        # Тепловая карта — только на пересечении отдельных филиалов
+        # и отдельно показанных страховщиков; «Иные» остаются нейтральными.
         rows.append(
             {
                 "key": row["key"],
@@ -180,7 +202,12 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
                     {
                         "sum": value,
                         "display": _cell_display(value),
-                        "highlight": i == highlight,
+                        "heat": (
+                            0
+                            if row.get("is_other")
+                            or (other_insurers and i == column_count - 1)
+                            else _heat_level(value)
+                        ),
                     }
                     for i, value in enumerate(sums)
                 ],
@@ -220,6 +247,7 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
         "as_of": as_of,
         "columns": columns,
         "rows": rows,
+        "legend": HEAT_LEGEND,
         "total_sum": total,
         "total_sum_display": _cell_display(total),
         "insurer_count": insurer_count,

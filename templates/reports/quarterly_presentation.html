@@ -40,15 +40,23 @@
     .qp-slide-note { margin-top: auto; padding-top: .8rem; color: #555; font-size: .78rem; }
     .qp-note { color: #5d748d; font-size: .85rem; margin-top: .9rem; }
 
-    .qp-slide--matrix { min-width: 900px; }
+    .qp-slide--matrix { min-width: 980px; }
     .qp-matrix { table-layout: fixed; font-size: .8rem; }
-    .qp-matrix th, .qp-matrix td { padding: .32rem .5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .qp-matrix th:first-child, .qp-matrix td:first-child { width: 20%; }
-    .qp-matrix th:last-child, .qp-matrix td:last-child { width: 10%; }
+    .qp-matrix th, .qp-matrix td { padding: .32rem .35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qp-matrix th:first-child, .qp-matrix td:first-child { width: 10%; }
+    .qp-matrix th:last-child, .qp-matrix td:last-child { width: 7.5%; }
     .qp-matrix .qp-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .qp-matrix .qp-th-label { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; word-break: break-all; }
-    .qp-table td.qp-max { background: #f2f2f2; }
+    .qp-matrix .qp-th-label { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; font-size: .75rem; }
+    .qp-matrix .qp-th-word { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+    .qp-legend { display: flex; align-items: center; gap: .4rem; margin-top: .55rem; font-size: .72rem; color: #1a1a1a; }
+    .qp-legend-unit { color: #555; }
+    .qp-legend-item { padding: .12rem .5rem; border: 1px solid #bbb; border-radius: 3px; font-weight: 600; }
     .qp-table td.qp-rowtotal { background: #e4e4e4; font-weight: 800; }
+    .qp-matrix tbody tr td.qp-heat-1 { background: #F0F5FA; }
+    .qp-matrix tbody tr td.qp-heat-2 { background: #DCE8F2; }
+    .qp-matrix tbody tr td.qp-heat-3 { background: #C2D6E6; }
+    .qp-matrix tbody tr td.qp-heat-4 { background: #A4C1D7; }
+    .qp-matrix tbody tr td.qp-heat-5 { background: #82A8C4; }
 </style>
 {% endblock %}
 
@@ -113,7 +121,7 @@
                 <thead>
                     <tr>
                         <th>Филиал</th>
-                        {% for col in slide.columns %}<th class="num" title="{{ col.name }}"><span class="qp-th-label">{{ col.name }}</span></th>{% endfor %}
+                        {% for col in slide.columns %}<th class="num" title="{{ col.name }}"><span class="qp-th-label">{% for word in col.name.split %}<span class="qp-th-word">{{ word }}</span> {% endfor %}</span></th>{% endfor %}
                         <th class="num">Итого</th>
                     </tr>
                 </thead>
@@ -121,7 +129,7 @@
                     {% for row in slide.rows %}
                     <tr>
                         <td title="{{ row.name }}"><span class="qp-name">{{ row.name }}</span></td>
-                        {% for cell in row.cells %}<td class="num{% if cell.highlight %} qp-max{% endif %}">{{ cell.display }}</td>{% endfor %}
+                        {% for cell in row.cells %}<td class="num{% if cell.heat %} qp-heat-{{ cell.heat }}{% endif %}">{{ cell.display }}</td>{% endfor %}
                         <td class="num qp-rowtotal">{{ row.total_display }}</td>
                     </tr>
                     {% endfor %}
@@ -132,6 +140,10 @@
                     </tr>
                 </tbody>
             </table>
+            <div class="qp-legend">
+                <span class="qp-legend-unit">млн ₽:</span>
+                {% for item in slide.legend %}<span class="qp-legend-item" style="background: {{ item.color }};">{{ item.label }}</span>{% endfor %}
+            </div>
             {% endif %}
             <div class="qp-slide-note">
                 {% if slide.kind == "insurers" %}
@@ -151,4 +163,29 @@
         PDF — две альбомные страницы 16:9, по одному слайду на страницу.
     </p>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const fit = function () {
+            document.querySelectorAll('.qp-matrix .qp-th-label').forEach(function (label) {
+                const words = label.querySelectorAll('.qp-th-word');
+                words.forEach(function (word) {
+                    if (word.dataset.full === undefined) word.dataset.full = word.textContent;
+                    else word.textContent = word.dataset.full;
+                });
+                if (label.scrollHeight <= label.clientHeight + 1) return;
+                const bottom = label.getBoundingClientRect().bottom;
+                let last = null;
+                words.forEach(function (word) {
+                    if (word.getBoundingClientRect().bottom <= bottom + 1) last = word;
+                });
+                if (last) last.textContent = last.dataset.full + '…';
+            });
+        };
+        fit();
+        window.addEventListener('resize', fit);
+    })();
+</script>
 {% endblock %}

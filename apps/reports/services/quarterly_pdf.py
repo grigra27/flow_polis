@@ -52,6 +52,21 @@ FIT_LEVELS = (
     (7, 1.5, 1.0, 1),
 )
 
+# Матрица филиал × страховщик: шрифт, отступы, предел строк шапки и названий
+# филиалов. До 10 строк филиалов + шапка + «Итого» помещаются на слайд.
+MATRIX_NAME_RATIO = 0.24
+MATRIX_TOTAL_RATIO = 0.11
+MATRIX_FIT_LEVELS = (
+    (10, 4, 3, 2),
+    (9.5, 3.5, 3, 2),
+    (9, 3, 3, 2),
+    (9, 3, 2, 1),
+    (8, 2.5, 2, 1),
+    (8, 2, 2, 1),
+    (7, 1.5, 2, 1),
+    (7, 1.2, 1, 1),
+)
+
 
 def _wordmark(canvas, doc):
     canvas.saveState()
@@ -185,7 +200,109 @@ def _insurer_slide(slide):
     return head + [table, gap, note]
 
 
-SLIDE_RENDERERS = {"insurers": _insurer_slide}
+def _matrix_table(slide, width, size, padding, header_lines, name_lines):
+    columns = slide["columns"]
+    column_count = len(columns)
+    name_width = width * MATRIX_NAME_RATIO
+    total_width = width * MATRIX_TOTAL_RATIO
+    column_width = (width - name_width - total_width) / column_count
+    header = (
+        [p("Филиал", size, True, colors.white)]
+        + [
+            p(
+                _fit_name(col["name"], column_width - 12, size, header_lines),
+                size,
+                True,
+                colors.white,
+                right=True,
+            )
+            for col in columns
+        ]
+        + [p("Итого", size, True, colors.white, right=True)]
+    )
+    body = []
+    for row in slide["rows"]:
+        body.append(
+            [
+                p(
+                    _fit_name(row["name"], name_width - 12, size, name_lines),
+                    size,
+                    color=INK,
+                )
+            ]
+            + [p(cell["display"], size, color=INK, right=True) for cell in row["cells"]]
+            + [p(row["total_display"], size, True, INK, right=True)]
+        )
+    total = (
+        [p("Итого", size, True, INK)]
+        + [p(col["total_display"], size, True, INK, right=True) for col in columns]
+        + [p(slide["total_sum_display"], size, True, INK, right=True)]
+    )
+    table = Table(
+        [header] + body + [total],
+        colWidths=[name_width] + [column_width] * column_count + [total_width],
+        hAlign="LEFT",
+    )
+    last = len(body) + 1
+    total_column = column_count + 1
+    style = [
+        ("BACKGROUND", (0, 0), (-1, 0), BLACK),
+        ("ROWBACKGROUNDS", (0, 1), (-1, last - 1), [colors.white, ROW_GRAY]),
+        ("BACKGROUND", (total_column, 1), (total_column, last - 1), TOTAL_GRAY),
+        ("BACKGROUND", (0, last), (-1, last), TOTAL_GRAY),
+        ("LINEABOVE", (0, last), (-1, last), 1, BLACK),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), padding),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
+    ]
+    for row_index, row in enumerate(slide["rows"], 1):
+        for cell_index, cell in enumerate(row["cells"], 1):
+            if cell["highlight"]:
+                style.append(
+                    (
+                        "BACKGROUND",
+                        (cell_index, row_index),
+                        (cell_index, row_index),
+                        ROW_GRAY,
+                    )
+                )
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _branch_matrix_slide(slide):
+    head = _slide_head(slide)
+    if slide["empty"]:
+        return head + [
+            p(
+                "На выбранную дату нет действующих полисов с активным ДФА — "
+                "распределение по филиалам и страховщикам пусто.",
+                12,
+                color=MUTED,
+            )
+        ]
+
+    note = p(slide["note"], 8.5, color=MUTED)
+    gap = Spacer(1, 10)
+    fixed = sum(f.wrap(SLIDE_WIDTH, 10000)[1] for f in head)
+    fixed += gap.wrap(SLIDE_WIDTH, 10000)[1] + note.wrap(SLIDE_WIDTH, 10000)[1]
+    budget = SLIDE_HEIGHT - fixed
+    # Таблица измеряется на реальной ширине слайда; первый помещающийся
+    # уровень сжатия гарантирует, что матрица, итоги и примечание на странице.
+    for size, padding, header_lines, name_lines in MATRIX_FIT_LEVELS:
+        table = _matrix_table(
+            slide, SLIDE_WIDTH, size, padding, header_lines, name_lines
+        )
+        if table.wrap(SLIDE_WIDTH, 10000)[1] <= budget:
+            return head + [table, gap, note]
+    size, padding, header_lines, name_lines = MATRIX_FIT_LEVELS[-1]
+    table = _matrix_table(slide, SLIDE_WIDTH, size, padding, header_lines, name_lines)
+    return head + [table, gap, note]
+
+
+SLIDE_RENDERERS = {"insurers": _insurer_slide, "branch_matrix": _branch_matrix_slide}
 
 
 def build_quarterly_pdf(presentation):

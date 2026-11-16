@@ -19,6 +19,7 @@
     .qp-spacer { flex: 1; }
 
     .qp-slide-wrap { overflow-x: auto; }
+    .qp-slide-wrap + .qp-slide-wrap { margin-top: 1.25rem; }
     .qp-slide { background: #fff; border: 1px solid #dbe5f1; border-radius: 12px; box-shadow: 0 2px 10px rgba(23, 50, 79, .06);
                 aspect-ratio: 16 / 9; min-width: 760px; padding: 2.2% 3.6%; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
     .qp-slide-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.1%; }
@@ -38,6 +39,16 @@
     .qp-empty { color: #555; font-size: 1rem; padding: 1.5rem 0; }
     .qp-slide-note { margin-top: auto; padding-top: .8rem; color: #555; font-size: .78rem; }
     .qp-note { color: #5d748d; font-size: .85rem; margin-top: .9rem; }
+
+    .qp-slide--matrix { min-width: 900px; }
+    .qp-matrix { table-layout: fixed; font-size: .8rem; }
+    .qp-matrix th, .qp-matrix td { padding: .32rem .5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qp-matrix th:first-child, .qp-matrix td:first-child { width: 20%; }
+    .qp-matrix th:last-child, .qp-matrix td:last-child { width: 10%; }
+    .qp-matrix .qp-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qp-matrix .qp-th-label { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; word-break: break-all; }
+    .qp-table td.qp-max { background: #f2f2f2; }
+    .qp-table td.qp-rowtotal { background: #e4e4e4; font-weight: 800; }
 </style>
 {% endblock %}
 
@@ -62,9 +73,9 @@
         <a href="?year={{ year }}&quarter={{ quarter }}&format=pdf" class="qp-btn"><i class="bi bi-file-earmark-pdf"></i> Скачать PDF</a>
     </div>
 
-    {% with slide=slides.0 %}
+    {% for slide in slides %}
     <div class="qp-slide-wrap">
-        <div class="qp-slide">
+        <div class="qp-slide{% if slide.kind != 'insurers' %} qp-slide--matrix{% endif %}">
             <div class="qp-slide-head">
                 <div>
                     <h1 class="qp-slide-title">{{ slide.title }}</h1>
@@ -73,8 +84,11 @@
                 <span class="qp-wordmark"><b>флоу</b>//полисы</span>
             </div>
             {% if slide.empty %}
-            <div class="qp-empty">На выбранную дату нет действующих полисов с активным ДФА — распределение по страховщикам пусто.</div>
-            {% else %}
+            <div class="qp-empty">
+                {% if slide.kind == "insurers" %}На выбранную дату нет действующих полисов с активным ДФА — распределение по страховщикам пусто.
+                {% else %}На выбранную дату нет действующих полисов с активным ДФА — распределение по филиалам и страховщикам пусто.{% endif %}
+            </div>
+            {% elif slide.kind == "insurers" %}
             <table class="qp-table">
                 <thead>
                     <tr><th>Страховая компания</th><th class="num">Страховая сумма, ₽</th><th class="num">Доля</th></tr>
@@ -94,19 +108,47 @@
                     </tr>
                 </tbody>
             </table>
+            {% else %}
+            <table class="qp-table qp-matrix">
+                <thead>
+                    <tr>
+                        <th>Филиал</th>
+                        {% for col in slide.columns %}<th class="num" title="{{ col.name }}"><span class="qp-th-label">{{ col.name }}</span></th>{% endfor %}
+                        <th class="num">Итого</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in slide.rows %}
+                    <tr>
+                        <td title="{{ row.name }}"><span class="qp-name">{{ row.name }}</span></td>
+                        {% for cell in row.cells %}<td class="num{% if cell.highlight %} qp-max{% endif %}">{{ cell.display }}</td>{% endfor %}
+                        <td class="num qp-rowtotal">{{ row.total_display }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="qp-total">
+                        <td>Итого</td>
+                        {% for col in slide.columns %}<td class="num">{{ col.total_display }}</td>{% endfor %}
+                        <td class="num">{{ slide.total_sum_display }}</td>
+                    </tr>
+                </tbody>
+            </table>
             {% endif %}
             <div class="qp-slide-note">
-                {% if slide.other_count %}«Иные» — {{ slide.other_count }} страховщиков с меньшей страховой суммой. {% endif %}
-                Страховая сумма текущего страхового года действующих полисов с активным ДФА; без ОСАГО и лимитов ответственности.
+                {% if slide.kind == "insurers" %}
+                    {% if slide.other_count %}«Иные» — {{ slide.other_count }} страховщиков с меньшей страховой суммой. {% endif %}
+                    Страховая сумма текущего страхового года действующих полисов с активным ДФА; без ОСАГО и лимитов ответственности.
+                {% else %}
+                    {{ slide.note }}
+                {% endif %}
             </div>
         </div>
     </div>
-    {% endwith %}
+    {% endfor %}
 
     <p class="qp-note">
         {{ quarter_label }}. Предпросмотр и PDF используют одни и те же рассчитанные данные.
         Цифры совпадают с подробным имущественным отчётом на ту же дату при всех филиалах и режиме «Все сделки».
-        PDF — одна альбомная страница 16:9.
+        PDF — две альбомные страницы 16:9, по одному слайду на страницу.
     </p>
 </div>
 {% endblock %}

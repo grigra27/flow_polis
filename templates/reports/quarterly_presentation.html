@@ -57,6 +57,22 @@
     .qp-matrix tbody tr td.qp-heat-3 { background: #C2D6E6; }
     .qp-matrix tbody tr td.qp-heat-4 { background: #A4C1D7; }
     .qp-matrix tbody tr td.qp-heat-5 { background: #82A8C4; }
+
+    .qp-broker-head { display: flex; align-items: baseline; gap: 1.4rem; margin: .1rem 0 .9rem; }
+    .qp-broker-share { font-size: 2.1rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
+    .qp-broker-stat { font-size: .85rem; color: #555; }
+    .qp-broker-stat b { color: #1a1a1a; }
+    .qp-broker { table-layout: fixed; font-size: .8rem; }
+    .qp-broker th, .qp-broker td { padding: .34rem .4rem; }
+    .qp-broker th.qp-label, .qp-broker td:first-child { width: 16%; }
+    .qp-broker td:first-child { font-weight: 600; }
+    .qp-broker thead th { font-size: .72rem; }
+    .qp-broker thead th.qp-group { text-align: center; font-size: .8rem; }
+    .qp-broker thead th.qp-sub { text-align: right; }
+    .qp-broker tbody td.qp-m { border-left: 1px solid #bbb; }
+    .qp-table.qp-broker tbody tr td.qp-q { background: #e4e4e4; font-weight: 700; }
+    .qp-table.qp-broker .qp-q-start { border-left: 2px solid #111; }
+    .qp-table.qp-broker--compact tbody td.num { font-size: .68rem; }
 </style>
 {% endblock %}
 
@@ -87,13 +103,14 @@
             <div class="qp-slide-head">
                 <div>
                     <h1 class="qp-slide-title">{{ slide.title }}</h1>
-                    <div class="qp-slide-date">По состоянию на {{ slide.as_of|date:"d.m.Y" }}</div>
+                    <div class="qp-slide-date">{% if slide.kind == "broker" %}{{ slide.quarter_label }} · {{ slide.subtitle }}{% else %}По состоянию на {{ slide.as_of|date:"d.m.Y" }}{% endif %}</div>
                 </div>
                 <span class="qp-wordmark"><b>флоу</b>//полисы</span>
             </div>
             {% if slide.empty %}
             <div class="qp-empty">
                 {% if slide.kind == "insurers" %}На выбранную дату нет действующих полисов с активным ДФА — распределение по страховщикам пусто.
+                {% elif slide.kind == "broker" %}Нет подходящих фактических оплат за квартал
                 {% else %}На выбранную дату нет действующих полисов с активным ДФА — распределение по филиалам и страховщикам пусто.{% endif %}
             </div>
             {% elif slide.kind == "insurers" %}
@@ -114,6 +131,37 @@
                         <td class="num">{{ slide.total_sum_display }}</td>
                         <td class="num">{{ slide.total_share_display }}</td>
                     </tr>
+                </tbody>
+            </table>
+            {% elif slide.kind == "broker" %}
+            <div class="qp-broker-head">
+                <span class="qp-broker-share">{{ slide.share_display }}</span>
+                <span class="qp-broker-stat">СС без брокера, млн ₽: <b>{{ slide.without_display }}</b></span>
+                <span class="qp-broker-stat">Общая СС, млн ₽: <b>{{ slide.total_display }}</b></span>
+            </div>
+            <table class="qp-table qp-broker{% if slide.compact %} qp-broker--compact{% endif %}">
+                <thead>
+                    <tr>
+                        <th rowspan="2" class="qp-label">Договоры</th>
+                        {% for block in slide.months %}<th colspan="3" class="qp-group">{{ block.name }}</th>{% endfor %}
+                        <th colspan="3" class="qp-group qp-q-start">{{ slide.quarter_block.name }}</th>
+                    </tr>
+                    <tr>
+                        {% for block in slide.months %}<th class="qp-sub">Всего, млн ₽</th><th class="qp-sub">Без брокера, млн ₽</th><th class="qp-sub">Доля без брокера</th>{% endfor %}
+                        <th class="qp-sub qp-q-start">Всего, млн ₽</th><th class="qp-sub">Без брокера, млн ₽</th><th class="qp-sub">Доля без брокера</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in slide.table_rows %}
+                    <tr>
+                        <td>{{ row.label }}</td>
+                        {% for cells in row.cells %}
+                        <td class="num{% if forloop.last %} qp-q qp-q-start{% elif forloop.counter0 == 1 or forloop.counter0 == 2 %} qp-m{% endif %}">{{ cells.total_display }}</td>
+                        <td class="num{% if forloop.last %} qp-q{% endif %}">{{ cells.without_display }}</td>
+                        <td class="num{% if forloop.last %} qp-q{% endif %}">{{ cells.share_display }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
             {% else %}
@@ -159,8 +207,8 @@
 
     <p class="qp-note">
         {{ quarter_label }}. Предпросмотр и PDF используют одни и те же рассчитанные данные.
-        Цифры совпадают с подробным имущественным отчётом на ту же дату при всех филиалах и режиме «Все сделки».
-        PDF — две альбомные страницы 16:9, по одному слайду на страницу.
+        Слайды 1–2 совпадают с подробным имущественным отчётом на ту же дату при всех филиалах и режиме «Все сделки»; слайд 3 считается по фактическим оплатам взносов за квартал.
+        PDF — три альбомные страницы 16:9, по одному слайду на страницу.
     </p>
 </div>
 {% endblock %}

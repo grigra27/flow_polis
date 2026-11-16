@@ -260,6 +260,8 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
 
 
 def build_quarterly_presentation(year: int, quarter: int) -> dict:
+    from .quarterly_payments import build_broker_slide
+
     as_of = quarter_end(year, quarter)
     objects = _portfolio(as_of, None, "all", property_only=True)
     images = ReferenceImages()
@@ -271,5 +273,6 @@ def build_quarterly_presentation(year: int, quarter: int) -> dict:
         "slides": [
             build_insurer_slide(as_of, objects=objects, images=images),
             build_branch_matrix_slide(as_of, objects=objects),
+            build_broker_slide(year, quarter),
         ],
     }

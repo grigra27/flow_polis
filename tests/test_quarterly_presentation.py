@@ -1,8 +1,9 @@
-"""Квартальная презентация для лизинговой компании: оба слайда, PDF и доступ.
+"""Квартальная презентация для лизинговой компании: три слайда, PDF и доступ.
 
-Цифры слайдов сверяются с подробным имущественным отчётом и полной
+Цифры слайдов 1–2 сверяются с подробным имущественным отчётом и полной
 матрицей филиал × страховщик на ту же дату (все филиалы, «Все сделки»,
-без лимитов ответственности). PDF — ровно две страницы 16:9.
+без лимитов ответственности). Слайд 3 считается по фактическим оплатам
+взносов за квартал. PDF — ровно три страницы 16:9.
 """
 
 from datetime import date
@@ -24,6 +25,7 @@ from apps.clients.models import Client
 from apps.insurers.models import Branch, InsuranceType, Insurer, LeasingManager
 from apps.policies.models import PaymentSchedule, Policy
 from apps.reports.services import quarterly_presentation as qp_service
+from apps.reports.services import quarterly_pdf as qp_pdf
 from apps.reports.services.property_report import (
     _matrix,
     _portfolio,
@@ -38,6 +40,10 @@ from apps.reports.services.quarterly_presentation import (
     quarter_end,
 )
 from apps.reports.services.quarterly_pdf import build_quarterly_pdf
+from apps.reports.services.quarterly_payments import (
+    broker_payment_pairs,
+    build_broker_slide,
+)
 
 AS_OF = date(2026, 9, 30)  # конец III квартала 2026
 M = Decimal("1000000")
@@ -105,12 +111,17 @@ def make(refs):
         dfa_active=True,
         broker=True,
         branch="branch",
+        renewal=False,
+        termination=None,
+        dfa_deactivation=None,
+        policy_active=True,
+        payments=None,
     ):
         counter["n"] += 1
         policy = Policy.objects.create(
             policy_number=f"QP-{counter['n']}",
             dfa_number=f"D-QP-{counter['n']}",
-            client=refs[client],
+            client=refs[client] if isinstance(client, str) else client,
             insurer=refs[insurer] if isinstance(insurer, str) else insurer,
             branch=refs[branch] if isinstance(branch, str) else branch,
             insurance_type=refs[kind] if isinstance(kind, str) else kind,
@@ -120,20 +131,44 @@ def make(refs):
             end_date=date(start.year + years, start.month, start.day),
             dfa_active=dfa_active,
             broker_participation=broker,
+            renewal_to_old_dfa=renewal,
+            termination_date=termination,
+            dfa_deactivation_date=dfa_deactivation,
+            policy_active=policy_active,
             leasing_manager=refs["manager"],
+        )
+
+        def year_sum(year):
+            if kind == "osago":
+                return None
+            return sums[year - 1] if year - 1 < len(sums) else None
+
+        # payments — явные строки графика: year, inst, due, paid, sum, amount, act.
+        # Без него создаётся прежний график: первый взнос каждого года, без оплат.
+        rows = (
+            payments
+            if payments is not None
+            else [{"year": year} for year in range(1, len(sums) + 1)]
         )
         PaymentSchedule.objects.bulk_create(
             [
                 PaymentSchedule(
                     policy=policy,
-                    year_number=year,
-                    installment_number=1,
-                    due_date=date(start.year + year - 1, start.month, start.day),
-                    insurance_sum=None if kind == "osago" else value,
-                    amount=Decimal("1000"),
+                    year_number=row.get("year", 1),
+                    installment_number=row.get("inst", 1),
+                    due_date=row.get(
+                        "due",
+                        date(
+                            start.year + row.get("year", 1) - 1, start.month, start.day
+                        ),
+                    ),
+                    insurance_sum=row.get("sum", year_sum(row.get("year", 1))),
+                    amount=row.get("amount", Decimal("1000")),
                     kv_rub=Decimal("100"),
+                    paid_date=row.get("paid"),
+                    insurer_date=row.get("act"),
                 )
-                for year, value in enumerate(sums, 1)
+                for row in rows
             ]
         )
         return policy
@@ -274,11 +309,24 @@ def test_empty_slice(refs):
     presentation = build_quarterly_presentation(2026, 3)
     data = build_quarterly_pdf(presentation)
     reader = PdfReader(BytesIO(data))
-    assert len(reader.pages) == 2
+    assert len(reader.pages) == 3
     assert "распределение по страховщикам пусто" in reader.pages[0].extract_text()
     assert (
         "распределение по филиалам и страховщикам пусто"
         in reader.pages[1].extract_text()
+    )
+    assert (
+        "Нет подходящих фактических оплат за квартал" in reader.pages[2].extract_text()
+    )
+    broker_slide = build_broker_slide(2026, 3)
+    assert broker_slide["empty"]
+    assert broker_slide["share_display"] == "—"
+    assert broker_slide["total_display"] == "—"
+    assert broker_slide["without_display"] == "—"
+    assert [m["name"] for m in broker_slide["months"]] == ["Июль", "Август", "Сентябрь"]
+    assert all(
+        row["total_display"] == "—" and row["share_display"] == "—"
+        for row in broker_slide["quarter_block"]["rows"]
     )
 
 
@@ -287,7 +335,11 @@ def test_presentation_quarter_label_and_as_of():
     presentation = build_quarterly_presentation(2026, 3)
     assert presentation["as_of"] == AS_OF
     assert presentation["quarter_label"] == "III квартал 2026 года"
-    assert [s["kind"] for s in presentation["slides"]] == ["insurers", "branch_matrix"]
+    assert [s["kind"] for s in presentation["slides"]] == [
+        "insurers",
+        "branch_matrix",
+        "broker",
+    ]
     assert all(s["as_of"] == AS_OF for s in presentation["slides"])
 
 
@@ -299,9 +351,10 @@ def test_presentation_order_and_single_portfolio_load(make):
     ) as spy:
         presentation = build_quarterly_presentation(2026, 3)
     assert spy.call_count == 1
-    slide1, slide2 = presentation["slides"]
+    slide1, slide2, slide3 = presentation["slides"]
     assert slide1["kind"] == "insurers"
     assert slide2["kind"] == "branch_matrix"
+    assert slide3["kind"] == "broker"
     assert slide1["total_sum"] == slide2["total_sum"] == 5 * M
 
 
@@ -372,7 +425,7 @@ def test_view_invalid_params_fall_back_to_default(client):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_is_two_landscape_16x9_pages(client, make):
+def test_pdf_is_three_landscape_16x9_pages(client, make):
     make([10 * M, 9 * M, 8 * M])
     make([4 * M], insurer="b")
     client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
@@ -387,7 +440,7 @@ def test_pdf_is_two_landscape_16x9_pages(client, make):
     )
     assert response["X-Content-Type-Options"] == "nosniff"
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 2
+    assert len(reader.pages) == 3
     for page in reader.pages:
         box = page.mediabox
         assert float(box.width) > float(box.height)
@@ -406,6 +459,12 @@ def test_pdf_is_two_landscape_16x9_pages(client, make):
     assert "14,0" in second  # общий итог в млн ₽ совпадает со слайдом 1
     assert "млн ₽" in second
     assert "флоу//полисы" in second
+    third = reader.pages[2].extract_text()
+    assert "Страхование с участием и без участия брокера" in third
+    assert "III квартал 2026 года · По фактической дате оплаты взносов" in third
+    assert "Нет подходящих фактических оплат за квартал" in third
+    assert "флоу//полисы" in third
+    assert "Распределение имущества" not in third
 
 
 @pytest.mark.integration
@@ -436,7 +495,7 @@ def test_preview_and_pdf_use_same_numbers(client, make):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_max_rows_with_long_names_stays_two_pages(client, refs, make):
+def test_pdf_max_rows_with_long_names_stays_three_pages(client, refs, make):
     for i in range(14):
         insurer = Insurer.objects.create(
             insurer_name=f"СК «Длинное название {i:02d}» "
@@ -449,7 +508,7 @@ def test_pdf_max_rows_with_long_names_stays_two_pages(client, refs, make):
         {"year": 2026, "quarter": 3, "format": "pdf"},
     )
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 2
+    assert len(reader.pages) == 3
     text = reader.pages[0].extract_text()
     for i in range(11):
         assert f"СК «Длинное название {i:02d}»" in text
@@ -494,7 +553,7 @@ def _pdf_pages(client, **params):
     )
     assert response.status_code == 200
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 2
+    assert len(reader.pages) == 3
     texts = []
     for page in reader.pages:
         box = page.mediabox
@@ -719,7 +778,7 @@ def test_other_composition_differs_between_slides(refs, make):
         insurer = Insurer.objects.create(insurer_name=f"СК {j:02d}")
         make([(14 - j) * M], insurer=insurer)
         make([(14 - j) * M], insurer=insurer, branch=moscow)
-    slide1, slide2 = build_quarterly_presentation(2026, 3)["slides"]
+    slide1, slide2, _ = build_quarterly_presentation(2026, 3)["slides"]
     assert slide1["other_count"] == 3  # на слайде 1 скрыты СК 11–13
     assert slide2["other_insurer_count"] == 7  # на слайде 2 скрыты СК 07–13
     assert slide1["rows"][-1]["sum"] == 12 * M
@@ -871,7 +930,7 @@ def test_html_and_pdf_use_same_heat_levels_and_colors(client, refs, make):
 
     response = client.get(url, {"year": 2026, "quarter": 3, "format": "pdf"})
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 2
+    assert len(reader.pages) == 3
     fills = _pdf_fill_colors(reader.pages[1])
     # Ячейки матрицы плюс по одному образцу каждого уровня в легенде.
     assert fills == Counter({color: 3 for color in HEAT_COLORS})
@@ -921,7 +980,7 @@ def test_pdf_second_page_matrix_totals_and_note(client, matrix_data):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_max_filled_matrix_stays_two_pages(client, refs, make):
+def test_pdf_max_filled_matrix_stays_three_pages(client, refs, make):
     branches = [refs["branch"]] + [
         Branch.objects.create(
             branch_name=f"Филиал с длинным названием {i:02d} "
@@ -966,7 +1025,7 @@ def test_preview_shows_both_slides_with_same_numbers(client, matrix_data):
     ).content.decode()
     assert "Распределение имущества по страховщикам" in html
     assert "Распределение имущества по филиалам и страховщикам" in html
-    assert "две альбомные страницы 16:9" in html
+    assert "три альбомные страницы 16:9" in html
     slide = build_branch_matrix_slide(AS_OF)
     for col in slide["columns"]:
         assert col["name"] in html
@@ -978,3 +1037,603 @@ def test_preview_shows_both_slides_with_same_numbers(client, matrix_data):
             assert escape(cell["display"]) in html
     assert escape(slide["note"]) in html
     assert slide["total_sum_display"] in html
+
+
+# --- Слайд 3: страхование с участием и без участия брокера --------------------
+
+
+def _row(slide, label, month=None):
+    """Строка категории: month=None — «Итого за квартал», 0..2 — месяцы."""
+    rows = (
+        slide["quarter_block"]["rows"]
+        if month is None
+        else slide["months"][month]["rows"]
+    )
+    return next(r for r in rows if r["label"] == label)
+
+
+def _flat(text):
+    return " ".join(text.split())
+
+
+def _strip_csrf(text):
+    return re.sub(r'name="csrfmiddlewaretoken" value="[^"]+"', "", text)
+
+
+def _pay(make, value, paid, year=1, inst=1, due=None, **policy_kwargs):
+    """Полис с оплаченным взносом; СС года лежит на взносе №1 того же года."""
+    first = {"year": year, "inst": 1, "sum": value, "due": due or paid}
+    rows = [first]
+    if inst == 1:
+        first["paid"] = paid
+    else:
+        rows.append({"year": year, "inst": inst, "due": due or paid, "paid": paid})
+    return make([value], payments=rows, **policy_kwargs)
+
+
+@pytest.mark.django_db
+def test_broker_quarter_boundaries_are_inclusive(make):
+    _pay(make, M, date(2026, 6, 30))  # II квартал
+    _pay(make, M, date(2026, 7, 1))  # первый день III
+    _pay(make, M, date(2026, 9, 30))  # последний день III
+    _pay(make, M, date(2026, 10, 1))  # IV квартал
+    slide = build_broker_slide(2026, 3)
+    assert [m["name"] for m in slide["months"]] == ["Июль", "Август", "Сентябрь"]
+    assert _row(slide, "Все договоры")["total"] == 2 * M
+    assert [_row(slide, "Все договоры", m)["total"] for m in range(3)] == [
+        M,
+        Decimal(0),
+        M,
+    ]
+    assert _row(build_broker_slide(2026, 2), "Все договоры")["total"] == M
+    assert _row(build_broker_slide(2026, 4), "Все договоры")["total"] == M
+
+
+@pytest.mark.django_db
+def test_broker_period_is_paid_date_not_due_or_act(make):
+    # due 29.09 и акт 30.09 — III квартал, фактическая оплата 02.10 — IV.
+    make(
+        [10 * M],
+        start=date(2026, 9, 1),
+        years=1,
+        payments=[
+            {
+                "year": 1,
+                "inst": 1,
+                "due": date(2026, 9, 29),
+                "paid": date(2026, 10, 2),
+                "act": date(2026, 9, 30),
+                "sum": 10 * M,
+            }
+        ],
+    )
+    assert build_broker_slide(2026, 3)["empty"]
+    slide = build_broker_slide(2026, 4)
+    assert [m["name"] for m in slide["months"]] == ["Октябрь", "Ноябрь", "Декабрь"]
+    assert _row(slide, "Все договоры", 0)["total"] == 10 * M
+    assert _row(slide, "Все договоры")["total"] == 10 * M
+    assert _row(slide, "Новые договоры")["total"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_unpaid_rows_are_excluded(make):
+    make(
+        [10 * M],
+        payments=[{"year": 1, "inst": 1, "due": date(2026, 8, 1), "sum": 10 * M}],
+    )
+    _pay(make, 5 * M, date(2026, 8, 1))
+    assert len(broker_payment_pairs(2026, 3)) == 1
+    assert _row(build_broker_slide(2026, 3), "Все договоры")["total"] == 5 * M
+
+
+@pytest.mark.django_db
+def test_broker_termination_date_cuts_payments_on_and_after_it(make):
+    policy = make(
+        [10 * M],
+        termination=date(2026, 8, 15),
+        payments=[
+            {"year": 1, "inst": 1, "paid": date(2026, 8, 10), "sum": 10 * M},
+            {"year": 1, "inst": 2, "paid": date(2026, 8, 15), "sum": 10 * M},
+            {"year": 1, "inst": 3, "paid": date(2026, 8, 20), "sum": 10 * M},
+        ],
+    )
+    closed = make(
+        [5 * M],
+        termination=date(2026, 8, 15),
+        payments=[{"year": 1, "inst": 1, "paid": date(2026, 8, 15), "sum": 5 * M}],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert [p["policy_id"] for p in pairs] == [policy.pk]
+    assert closed.pk not in {p["policy_id"] for p in pairs}
+    # Оплата до расторжения остаётся в историческом квартале, месяц — первый.
+    assert pairs[0]["month"] == 2
+    assert (
+        pairs[0]["payment_id"] == policy.payment_schedule.get(installment_number=1).pk
+    )
+    assert _row(build_broker_slide(2026, 3), "Все договоры")["total"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_dfa_closure_date_cuts_payments_on_and_after_it(make):
+    before = make(
+        [10 * M],
+        dfa_active=False,
+        dfa_deactivation=date(2026, 8, 15),
+        payments=[
+            {"year": 1, "inst": 1, "paid": date(2026, 7, 10), "sum": 10 * M},
+            {"year": 1, "inst": 2, "paid": date(2026, 8, 20), "sum": 10 * M},
+        ],
+    )
+    make(
+        [5 * M],
+        dfa_active=False,
+        dfa_deactivation=date(2026, 8, 15),
+        payments=[{"year": 1, "inst": 1, "paid": date(2026, 8, 15), "sum": 5 * M}],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert [p["policy_id"] for p in pairs] == [before.pk]
+    assert pairs[0]["month"] == 1
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры")["total"] == 10 * M
+    # На конец квартала ДФА закрыт: слайды 1–2 пусты, слайд 3 считает оплату.
+    assert build_insurer_slide(AS_OF)["empty"]
+
+
+@pytest.mark.django_db
+def test_broker_cleared_flags_without_date_are_excluded(make):
+    _pay(make, 10 * M, date(2026, 8, 1), policy_active=False)
+    _pay(make, 10 * M, date(2026, 8, 1), dfa_active=False)
+    _pay(make, 3 * M, date(2026, 8, 1))
+    assert _row(build_broker_slide(2026, 3), "Все договоры")["total"] == 3 * M
+
+
+@pytest.mark.django_db
+def test_broker_does_not_require_policy_in_force_at_quarter_end(make):
+    # Плановое окно закрылось 01.07.2026, оплата 05.07 — в квартале учитывается.
+    make(
+        [10 * M],
+        start=date(2025, 7, 1),
+        years=1,
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "paid": date(2026, 7, 5)}
+        ],
+    )
+    assert _row(build_broker_slide(2026, 3), "Все договоры")["total"] == 10 * M
+    assert build_insurer_slide(AS_OF)["empty"]
+
+
+@pytest.mark.django_db
+def test_broker_osago_and_liability_are_excluded(refs, make):
+    weird = InsuranceType.objects.create(name="  ОТВЕТСТВЕННОСТЬ  ")
+    _pay(make, 10 * M, date(2026, 8, 1))
+    _pay(make, None, date(2026, 8, 1), kind="osago", years=1)
+    _pay(make, 50 * M, date(2026, 8, 1), kind="liability", years=1)
+    _pay(make, 7 * M, date(2026, 8, 1), kind=weird, years=1)
+    assert len(broker_payment_pairs(2026, 3)) == 1
+    assert _row(build_broker_slide(2026, 3), "Все договоры")["total"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_new_vs_prolongation_classification(make):
+    _pay(make, 10 * M, date(2026, 7, 5))  # год 1 без флага → новые
+    _pay(make, 20 * M, date(2026, 8, 5), broker=False, renewal=True)  # год 1 + флаг
+    _pay(make, 30 * M, date(2026, 9, 5), year=2, inst=3, broker=False)  # год 2
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры")["total"] == 60 * M
+    assert _row(slide, "Все договоры")["without"] == 50 * M
+    assert _row(slide, "Новые договоры")["total"] == 10 * M
+    assert _row(slide, "Новые договоры")["without"] == 0
+    assert _row(slide, "Новые договоры")["share_display"] == "0,00%"
+    assert _row(slide, "Пролонгации")["total"] == 50 * M
+    assert _row(slide, "Пролонгации")["without"] == 50 * M
+    assert _row(slide, "Пролонгации")["share_display"] == "100,00%"
+    assert slide["share_display"] == "83,33%"
+
+
+@pytest.mark.django_db
+def test_broker_control_example_forty_mln_in_each_quarter(make):
+    # Контрольный пример ТЗ: год 2, СС 40 млн, квартальные взносы без брокера.
+    make(
+        [40 * M, 40 * M],
+        start=date(2025, 7, 1),
+        years=2,
+        broker=False,
+        payments=[
+            {
+                "year": 2,
+                "inst": 1,
+                "due": date(2026, 7, 1),
+                "paid": date(2026, 7, 10),
+                "sum": 40 * M,
+            },
+            {"year": 2, "inst": 2, "due": date(2026, 10, 1), "paid": date(2026, 10, 5)},
+        ],
+    )
+    for quarter, month_index in ((3, 0), (4, 0)):
+        slide = build_broker_slide(2026, quarter)
+        assert _row(slide, "Пролонгации")["without"] == 40 * M
+        assert _row(slide, "Пролонгации")["total"] == 40 * M
+        assert _row(slide, "Пролонгации")["share_display"] == "100,00%"
+        assert _row(slide, "Пролонгации", month_index)["without"] == 40 * M
+        assert _row(slide, "Все договоры")["without"] == 40 * M
+        assert _row(slide, "Новые договоры")["total"] == 0
+        assert slide["without_display"] == "40,0"
+        assert slide["share_display"] == "100,00%"
+
+
+@pytest.mark.django_db
+def test_broker_control_example_both_payments_in_quarter_counted_once(make):
+    make(
+        [40 * M, 40 * M],
+        start=date(2025, 7, 1),
+        years=2,
+        broker=False,
+        payments=[
+            {
+                "year": 2,
+                "inst": 1,
+                "due": date(2026, 7, 1),
+                "paid": date(2026, 7, 10),
+                "sum": 40 * M,
+            },
+            {
+                "year": 2,
+                "inst": 2,
+                "due": date(2026, 10, 1),
+                "paid": date(2026, 9, 20),
+                "sum": 40 * M,
+            },
+        ],
+    )
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Пролонгации")["without"] == 40 * M
+    assert [_row(slide, "Пролонгации", m)["without"] for m in range(3)] == [
+        40 * M,
+        Decimal(0),
+        Decimal(0),
+    ]
+    assert build_broker_slide(2026, 4)["empty"]
+
+
+@pytest.mark.django_db
+def test_broker_multi_year_policy_uses_sum_of_paid_year(make):
+    # Год 3 начался до квартала; взнос №1 оплачен в II квартале, №2 — в III.
+    make(
+        [100 * M, 90 * M, 80 * M],
+        start=date(2024, 5, 1),
+        years=3,
+        payments=[
+            {
+                "year": 3,
+                "inst": 1,
+                "due": date(2026, 5, 1),
+                "paid": date(2026, 5, 2),
+                "sum": 80 * M,
+            },
+            {
+                "year": 3,
+                "inst": 2,
+                "due": date(2026, 8, 1),
+                "paid": date(2026, 8, 5),
+                "sum": 70 * M,
+                "amount": Decimal("5000000"),
+            },
+        ],
+    )
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры")["total"] == 80 * M  # не 100, не 70, не премия
+    assert _row(slide, "Все договоры", 1)["total"] == 80 * M  # август
+    assert _row(slide, "Пролонгации")["total"] == 80 * M
+    assert _row(slide, "Новые договоры")["total"] == 0
+
+
+@pytest.mark.django_db
+def test_broker_same_year_two_months_counted_once_in_first_month(make):
+    policy = make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 2, "due": date(2026, 9, 1), "paid": date(2026, 9, 15)},
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "paid": date(2026, 7, 20)},
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert len(pairs) == 1
+    assert pairs[0]["month"] == 1
+    assert (
+        pairs[0]["payment_id"] == policy.payment_schedule.get(installment_number=1).pk
+    )
+    slide = build_broker_slide(2026, 3)
+    assert [_row(slide, "Все договоры", m)["total"] for m in range(3)] == [
+        10 * M,
+        Decimal(0),
+        Decimal(0),
+    ]
+    assert _row(slide, "Все договоры")["total"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_same_paid_date_tie_breaks_by_payment_pk(make):
+    policy = make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "paid": date(2026, 8, 1), "sum": 10 * M},
+            {"year": 1, "inst": 2, "paid": date(2026, 8, 1), "sum": 10 * M},
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert len(pairs) == 1
+    assert pairs[0]["payment_id"] == policy.payment_schedule.order_by("pk").first().pk
+
+
+@pytest.mark.django_db
+def test_broker_pair_reappears_in_next_quarter(make):
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "paid": date(2026, 7, 20), "sum": 10 * M},
+            {"year": 1, "inst": 2, "paid": date(2026, 10, 20), "sum": 10 * M},
+        ],
+    )
+    q3 = build_broker_slide(2026, 3)
+    q4 = build_broker_slide(2026, 4)
+    assert (
+        _row(q3, "Все договоры")["total"] == _row(q4, "Все договоры")["total"] == 10 * M
+    )
+    assert _row(q3, "Все договоры", 0)["total"] == 10 * M
+    assert _row(q4, "Все договоры", 0)["total"] == 10 * M
+    assert _row(q3, "Новые договоры")["total"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_two_years_of_same_policy_are_not_merged(make):
+    policy = make(
+        [10 * M, 8 * M],
+        start=date(2025, 7, 1),
+        years=2,
+        payments=[
+            {
+                "year": 1,
+                "inst": 1,
+                "due": date(2025, 7, 1),
+                "paid": date(2025, 7, 10),
+                "sum": 10 * M,
+            },
+            {"year": 1, "inst": 2, "due": date(2026, 7, 1), "paid": date(2026, 7, 10)},
+            {"year": 2, "inst": 1, "due": date(2026, 8, 1), "paid": date(2026, 8, 10)},
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert {(p["policy_id"], p["year_number"]) for p in pairs} == {
+        (policy.pk, 1),
+        (policy.pk, 2),
+    }
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры")["total"] == 18 * M
+    assert _row(slide, "Новые договоры")["total"] == 10 * M
+    assert _row(slide, "Пролонгации")["total"] == 8 * M
+    assert [_row(slide, "Все договоры", m)["total"] for m in range(3)] == [
+        10 * M,
+        8 * M,
+        Decimal(0),
+    ]
+
+
+@pytest.fixture
+def broker_data(refs, make):
+    """Оба канала, два филиала, три месяца, «<0,1» и неизвестная СС."""
+    moscow = Branch.objects.create(branch_name="Москва")
+    _pay(make, 10 * M, date(2026, 7, 5))
+    _pay(make, 4 * M, date(2026, 7, 20), broker=False)
+    _pay(make, 6 * M, date(2026, 8, 10), year=2, broker=False, branch=moscow)
+    _pay(make, 3 * M, date(2026, 9, 15), renewal=True)
+    _pay(make, Decimal("40000"), date(2026, 9, 20), broker=False)
+    _pay(make, None, date(2026, 8, 25), broker=False)
+    return moscow
+
+
+@pytest.mark.django_db
+def test_broker_months_and_categories_add_up(broker_data):
+    slide = build_broker_slide(2026, 3)
+    for label in ("Все договоры", "Новые договоры", "Пролонгации"):
+        quarter = _row(slide, label)
+        for key in ("total", "without"):
+            assert (
+                sum((_row(slide, label, m)[key] for m in range(3)), Decimal(0))
+                == quarter[key]
+            )
+    all_row = _row(slide, "Все договоры")
+    new_row = _row(slide, "Новые договоры")
+    old_row = _row(slide, "Пролонгации")
+    for key in ("total", "without"):
+        assert all_row[key] == new_row[key] + old_row[key]
+    assert all_row["total"] == Decimal("23040000")
+    assert all_row["without"] == Decimal("10040000")
+    assert all_row["total_display"] == "23,0"
+    assert all_row["without_display"] == "10,0"
+    assert all_row["share_display"] == slide["share_display"] == "43,58%"
+    assert new_row["total"] == Decimal("14040000")  # 10 + 4 + «<0,1» — год 1
+    assert old_row["total"] == 9 * M  # 6 (год 2) + 3 (перезаключение)
+    assert slide["unknown_count"] == 1
+    assert slide["unknown_without_count"] == 1
+
+
+@pytest.mark.django_db
+def test_broker_quarter_share_is_not_mean_of_month_shares(make):
+    _pay(make, 2 * M, date(2026, 7, 5))
+    _pay(make, M, date(2026, 7, 6), broker=False)
+    _pay(make, M, date(2026, 8, 5))
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры", 0)["share_display"] == "33,33%"
+    assert _row(slide, "Все договоры", 1)["share_display"] == "0,00%"
+    assert _row(slide, "Все договоры", 2)["share_display"] == "—"
+    assert _row(slide, "Все договоры")["share_display"] == "25,00%"  # 1/4, не 16,67
+    assert slide["share_display"] == "25,00%"
+
+
+@pytest.mark.django_db
+def test_broker_share_uses_unrounded_sums(make):
+    _pay(make, Decimal("834560"), date(2026, 7, 5))
+    _pay(make, Decimal("400000"), date(2026, 7, 6), broker=False)
+    row = _row(build_broker_slide(2026, 3), "Все договоры")
+    assert row["total_display"] == "1,2"
+    assert row["without_display"] == "0,4"
+    assert row["share_display"] == "32,40%"  # не 0,4 / 1,2 = 33,33%
+
+
+@pytest.mark.django_db
+def test_broker_zero_denominator_and_small_positive(make):
+    _pay(make, 10 * M, date(2026, 7, 5))
+    _pay(make, Decimal("40000"), date(2026, 8, 5), broker=False)
+    slide = build_broker_slide(2026, 3)
+    july = _row(slide, "Все договоры", 0)
+    assert july["without_display"] == "—"
+    assert july["share_display"] == "0,00%"
+    august = _row(slide, "Все договоры", 1)
+    assert august["total_display"] == august["without_display"] == "<0,1"
+    assert august["share_display"] == "100,00%"
+    september = _row(slide, "Все договоры", 2)
+    assert september["total_display"] == "—"
+    assert september["share_display"] == "—"
+    assert len(slide["months"]) == 3  # пустой месяц не скрыт
+
+
+@pytest.mark.django_db
+def test_broker_unknown_sums_are_excluded_and_noted(make):
+    _pay(make, 10 * M, date(2026, 7, 5))
+    _pay(make, None, date(2026, 7, 6), broker=False)
+    _pay(make, None, date(2026, 8, 6))
+    slide = build_broker_slide(2026, 3)
+    assert slide["unknown_count"] == 2
+    assert slide["unknown_without_count"] == 1
+    assert _row(slide, "Все договоры")["total"] == 10 * M
+    assert "Пар полис–год с неопределённой СС: 2 (без брокера — 1)" in slide["note"]
+    assert not slide["empty"]
+    assert len(broker_payment_pairs(2026, 3)) == 3  # пары сохранены для слайда 4
+
+
+@pytest.mark.django_db
+def test_broker_pairs_keep_branch_and_client_ids(refs, make):
+    moscow = Branch.objects.create(branch_name="Москва")
+    other = Client.objects.create(client_name="ООО Другой", client_inn="7700000302")
+    policy = _pay(
+        make,
+        10 * M,
+        date(2026, 8, 5),
+        year=2,
+        broker=False,
+        branch=moscow,
+        client=other,
+    )
+    pair = broker_payment_pairs(2026, 3)[0]
+    assert pair["policy_id"] == policy.pk
+    assert pair["branch_id"] == moscow.pk
+    assert pair["client_id"] == other.pk
+    assert pair["year_number"] == 2
+    assert pair["broker"] is False
+    assert pair["prolongation"] is True
+    assert pair["month"] == 2
+    assert pair["insured_sum"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_selection_query_count_does_not_grow(make, django_assert_num_queries):
+    _pay(make, 10 * M, date(2026, 8, 5))
+    with django_assert_num_queries(2):
+        broker_payment_pairs(2026, 3)
+    for i in range(20):
+        _pay(make, (i + 1) * M, date(2026, 8, 6), broker=i % 2 == 0)
+    with django_assert_num_queries(2):
+        pairs = broker_payment_pairs(2026, 3)
+    assert len(pairs) == 21
+
+
+@pytest.mark.django_db
+def test_broker_slide_does_not_change_first_two_slides(make):
+    _pay(make, 10 * M, date(2026, 8, 5))
+    _pay(make, 4 * M, date(2026, 8, 6), broker=False, insurer="b")
+    slide1, slide2, slide3 = build_quarterly_presentation(2026, 3)["slides"]
+    assert slide1 == build_insurer_slide(AS_OF)
+    assert slide2 == build_branch_matrix_slide(AS_OF)
+    assert slide3["kind"] == "broker"
+    assert slide3["total_display"] == "14,0"
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_broker_slide_ignores_branch_and_scope_filters(client, refs, make):
+    moscow = Branch.objects.create(branch_name="Москва")
+    _pay(make, 10 * M, date(2026, 8, 5))
+    _pay(make, 4 * M, date(2026, 8, 6), broker=False, branch=moscow)
+    client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
+    url = reverse("reports:quarterly_presentation")
+    base = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    filtered = client.get(
+        url,
+        {"year": 2026, "quarter": 3, "branch": moscow.pk, "scope": "direct"},
+    ).content.decode()
+    # CSRF-токен меняется от запроса к запросу, остальная страница — нет.
+    assert _strip_csrf(base) == _strip_csrf(filtered)
+    assert "14,0" in base
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_broker_html_and_pdf_use_same_numbers(client, broker_data):
+    url = reverse("reports:quarterly_presentation")
+    third = _pdf_pages(client)[2]  # помощник сам авторизует клиента
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    slide = build_broker_slide(2026, 3)
+    caption = "III квартал 2026 года · По фактической дате оплаты взносов"
+    assert slide["title"] in html and slide["title"] in third
+    assert caption in html and caption in _flat(third)
+    assert "флоу//полисы" in third
+    for block in slide["months"] + [slide["quarter_block"]]:
+        assert block["name"] in html and block["name"] in third
+        for row in block["rows"]:
+            assert row["label"] in html and row["label"] in third
+            for key in ("total_display", "without_display", "share_display"):
+                assert escape(row[key]) in html
+                assert row[key] in third
+    for key in ("share_display", "without_display", "total_display"):
+        assert slide[key] in html and slide[key] in third
+    assert escape(slide["note"]) in html
+    assert _flat(slide["note"]) in _flat(third)
+    assert "Распределение имущества" not in third
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_broker_empty_quarter_renders_in_html_and_pdf(client, refs):
+    url = reverse("reports:quarterly_presentation")
+    pages = _pdf_pages(client)  # помощник сам авторизует клиента
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    assert "Страхование с участием и без участия брокера" in html
+    assert "Нет подходящих фактических оплат за квартал" in html
+    assert "Страхование с участием и без участия брокера" in pages[2]
+    assert "Нет подходящих фактических оплат за квартал" in pages[2]
+    assert "распределение по страховщикам пусто" in pages[0]
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_broker_pdf_third_page_fits_with_large_sums(client, refs, make):
+    for i in range(30):
+        _pay(
+            make,
+            Decimal("1234567890") - i * M,
+            date(2026, 7 + i % 3, 5),
+            year=1 + i % 2,
+            broker=i % 2 == 0,
+        )
+    third = _pdf_pages(client)[2]
+    slide = build_broker_slide(2026, 3)
+    assert "Итого за квартал" in third
+    for row in slide["quarter_block"]["rows"]:
+        assert row["total_display"] in third
+        assert row["without_display"] in third
+        assert row["share_display"] in third
+    assert _flat(slide["note"]) in _flat(third)
+    for data in (slide, build_broker_slide(2026, 1)):
+        flowables = qp_pdf._broker_slide(data)
+        height = sum(f.wrap(qp_pdf.SLIDE_WIDTH, 10000)[1] for f in flowables)
+        assert height <= qp_pdf.SLIDE_HEIGHT

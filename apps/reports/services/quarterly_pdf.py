@@ -7,11 +7,14 @@
 from io import BytesIO
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
     PageTemplate,
+    Paragraph,
     Spacer,
     Table,
     TableStyle,
@@ -71,6 +74,17 @@ MATRIX_FIT_LEVELS = (
     (7, 1.5, 2, 1),
     (7, 1.2, 1, 1),
 )
+
+# Слайд 3: таблица из трёх строк и четырёх блоков месяцев/квартала.
+# 11 pt — предел, при котором «брокера,» и «Доля без» ещё целые в колонке.
+BROKER_FIT_LEVELS = (
+    (11, 6),
+    (10, 5),
+    (9, 4),
+    (8, 3),
+    (7, 2),
+)
+BROKER_LABEL_RATIO = 0.16
 
 
 def _wordmark(canvas, doc):
@@ -353,7 +367,157 @@ def _branch_matrix_slide(slide):
     return head + [table, legend_gap, legend, gap, note]
 
 
-SLIDE_RENDERERS = {"insurers": _insurer_slide, "branch_matrix": _branch_matrix_slide}
+def _broker_center(text, size, color=colors.white):
+    return Paragraph(
+        text,
+        ParagraphStyle(
+            "broker-center",
+            fontName="PropertyInterBold",
+            fontSize=size,
+            leading=size * 1.35,
+            textColor=color,
+            alignment=TA_CENTER,
+        ),
+    )
+
+
+def _broker_table(slide, width, size, padding):
+    blocks = slide["months"] + [slide["quarter_block"]]
+    label_width = width * BROKER_LABEL_RATIO
+    num_width = (width - label_width) / 12
+    header = [p("Договоры", size, True, colors.white)]
+    subheader = [""]
+    for block in blocks:
+        # Название блока живёт в первой колонке объединения; остальные пустые,
+        # иначе ReportLab рисует только первую ячейку и сдвигает заголовки.
+        header.extend([_broker_center(block["name"], size), "", ""])
+        subheader.extend(
+            p(
+                _fit_name(label, num_width - 10, size, 3, bold=True),
+                size,
+                True,
+                colors.white,
+                right=True,
+            )
+            for label in ("Всего, млн ₽", "Без брокера, млн ₽", "Доля без брокера")
+        )
+    body = []
+    for row_index in range(3):
+        row = [p(blocks[0]["rows"][row_index]["label"], size, True, INK)]
+        for block in blocks:
+            cells = block["rows"][row_index]
+            bold = block is slide["quarter_block"]
+            row.extend(
+                [
+                    p(cells["total_display"], size, bold, INK, right=True),
+                    p(cells["without_display"], size, bold, INK, right=True),
+                    p(cells["share_display"], size, bold, INK, right=True),
+                ]
+            )
+        body.append(row)
+    table = Table(
+        [header, subheader] + body,
+        colWidths=[label_width] + [num_width] * 12,
+        hAlign="LEFT",
+    )
+    style = [
+        ("SPAN", (0, 0), (0, 1)),
+        ("BACKGROUND", (0, 0), (-1, 1), BLACK),
+        ("ROWBACKGROUNDS", (0, 2), (-1, -1), [colors.white, ROW_GRAY]),
+        ("BACKGROUND", (10, 2), (-1, -1), TOTAL_GRAY),
+        ("LINEABOVE", (0, 2), (-1, 2), 1, BLACK),
+        ("LINEBEFORE", (10, 0), (10, -1), 1, BLACK),
+        ("LINEBEFORE", (4, 0), (4, -1), 0.5, colors.HexColor("#bbbbbb")),
+        ("LINEBEFORE", (7, 0), (7, -1), 0.5, colors.HexColor("#bbbbbb")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), padding),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
+    ]
+    for index in range(4):
+        style.append(("SPAN", (1 + index * 3, 0), (3 + index * 3, 0)))
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _broker_widest_cell(slide, size):
+    """Самая широкая цифра таблицы: колонки уже, чем строка итогов слайда 1."""
+    widest = 0.0
+    for block in slide["months"] + [slide["quarter_block"]]:
+        font = (
+            "PropertyInterBold" if block is slide["quarter_block"] else "PropertyInter"
+        )
+        for row in block["rows"]:
+            for key in ("total_display", "without_display", "share_display"):
+                widest = max(widest, pdfmetrics.stringWidth(row[key], font, size))
+    return widest
+
+
+def _broker_head(slide):
+    return [
+        p(slide["title"], 22, True, INK),
+        Spacer(1, 6),
+        p(f'{slide["quarter_label"]} · {slide["subtitle"]}', 12.5, color=MUTED),
+        Spacer(1, 14),
+    ]
+
+
+def _broker_slide(slide):
+    head = _broker_head(slide)
+    note = p(slide["note"], 8.5, color=MUTED)
+    gap = Spacer(1, 10)
+    if slide["empty"]:
+        return head + [
+            p("Нет подходящих фактических оплат за квартал", 12, color=MUTED),
+            gap,
+            note,
+        ]
+    headline = Table(
+        [
+            [
+                p(slide["share_display"], 30, True, INK),
+                p(f'СС без брокера, млн ₽: {slide["without_display"]}', 11, True, INK),
+                p(f'Общая СС, млн ₽: {slide["total_display"]}', 11, True, INK),
+            ]
+        ],
+        colWidths=[SLIDE_WIDTH * 0.22, SLIDE_WIDTH * 0.39, SLIDE_WIDTH * 0.39],
+        hAlign="LEFT",
+    )
+    headline.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    headline_gap = Spacer(1, 12)
+    fixed = sum(f.wrap(SLIDE_WIDTH, 10000)[1] for f in head)
+    fixed += headline.wrap(SLIDE_WIDTH, 10000)[1]
+    fixed += headline_gap.wrap(SLIDE_WIDTH, 10000)[1]
+    fixed += gap.wrap(SLIDE_WIDTH, 10000)[1] + note.wrap(SLIDE_WIDTH, 10000)[1]
+    budget = SLIDE_HEIGHT - fixed
+    num_width = (SLIDE_WIDTH - SLIDE_WIDTH * BROKER_LABEL_RATIO) / 12
+    for size, padding in BROKER_FIT_LEVELS:
+        if _broker_widest_cell(slide, size) > num_width - 10:
+            continue
+        table = _broker_table(slide, SLIDE_WIDTH, size, padding)
+        if table.wrap(SLIDE_WIDTH, 10000)[1] <= budget:
+            return head + [headline, headline_gap, table, gap, note]
+    size, padding = BROKER_FIT_LEVELS[-1]
+    table = _broker_table(slide, SLIDE_WIDTH, size, padding)
+    return head + [headline, headline_gap, table, gap, note]
+
+
+SLIDE_RENDERERS = {
+    "insurers": _insurer_slide,
+    "branch_matrix": _branch_matrix_slide,
+    "broker": _broker_slide,
+}
 
 
 def build_quarterly_pdf(presentation):

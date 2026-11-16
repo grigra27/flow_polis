@@ -12,6 +12,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image as PILImage
 from pypdf import PdfReader
 
 from apps.clients.models import Client
@@ -387,3 +388,74 @@ def test_exports_page_links_presentation(client):
     client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
     html = client.get(reverse("reports:index")).content.decode()
     assert reverse("reports:quarterly_presentation") in html
+
+
+@pytest.fixture
+def logos(settings, tmp_path):
+    """Реальные PNG-логотипы во временном MEDIA_ROOT, которые загрузит PDF."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.MEDIA_URL = "/media/"
+
+    def make_logo(i):
+        relative = f"insurer_logos/logo{i}.png"
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        PILImage.new("RGB", (64, 64), (200, 40 + i * 12, 60)).save(path)
+        return relative
+
+    return make_logo
+
+
+def _pdf_page(client, **params):
+    client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
+    response = client.get(
+        reverse("reports:quarterly_presentation"),
+        {"year": 2026, "quarter": 3, "format": "pdf", **params},
+    )
+    assert response.status_code == 200
+    reader = read_pdf(response.content)
+    assert len(reader.pages) == 1
+    box = reader.pages[0].mediabox
+    assert float(box.width) / float(box.height) == pytest.approx(16 / 9)
+    return reader.pages[0].extract_text()
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_pdf_twelve_short_names_with_real_logos_one_page(client, refs, make, logos):
+    # Регрессия: с реальными логотипами примечание уходило на вторую страницу.
+    for i in range(12):
+        insurer = Insurer.objects.create(insurer_name=f"СК {i:02d}", logo=logos(i))
+        make([(i + 1) * M], insurer=insurer)
+    text = _pdf_page(client)
+    for i in range(12):
+        assert f"СК {i:02d}" in text
+    assert "Итого" in text and "100,00%" in text
+    assert "Распределение имущества по страховщикам" in text
+    assert "По состоянию на 30.09.2026" in text
+    assert "без ОСАГО и лимитов ответственности." in text
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_pdf_long_names_with_logos_one_page(client, refs, make, logos):
+    # Регрессия: длинные названия уводили «Итого» и примечание на вторую страницу.
+    for i in range(14):
+        insurer = Insurer.objects.create(
+            insurer_name=f"СК «Длинное название {i:02d}» "
+            + "страхования имущества " * 10,
+            logo=logos(i),
+        )
+        make([(14 - i) * M], insurer=insurer)
+    text = _pdf_page(client)
+    for i in range(11):
+        assert f"СК «Длинное название {i:02d}»" in text
+    assert "Иные" in text
+    assert "СК «Длинное название 13»" not in text
+    assert "…" in text  # отображаемое название обрезано с многоточием
+    assert "Итого" in text and "100,00%" in text
+    assert "без ОСАГО и лимитов ответственности." in text
+    slide = build_insurer_slide(AS_OF)
+    for row in slide["rows"]:
+        assert row["sum_display"] in text
+        assert row["share_display"] in text

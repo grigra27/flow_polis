@@ -18,6 +18,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db.models import F, Q
+from django.utils import timezone
 
 from apps.clients.models import Client
 from apps.insurers.models import Branch
@@ -165,9 +166,85 @@ def _block(pairs) -> list:
                 "total_display": _cell_display(total),
                 "without_display": _cell_display(without),
                 "share_display": _share_display(total, without),
+                # Неокруглённая доля для диаграммы; None — знаменатель пуст.
+                "share_value": without / total * 100 if total else None,
             }
         )
     return rows
+
+
+def _previous_quarter(year: int, quarter: int):
+    return (year - 1, 4) if quarter == 1 else (year, quarter - 1)
+
+
+def _quarter_comparison(year: int, quarter: int, share_value):
+    """Разница с предыдущим кварталом в п.п. по одинаковой методике.
+
+    Показывается только для двух завершённых кварталов с определённой
+    долей: выбранный квартал должен закончиться, у предыдущего должна
+    быть непустая СС «Все договоры».
+    """
+    if share_value is None or quarter_end(year, quarter) > timezone.localdate():
+        return None
+    prev_year, prev_quarter = _previous_quarter(year, quarter)
+    prev_known = [
+        p
+        for p in broker_payment_pairs(prev_year, prev_quarter)
+        if p["insured_sum"] is not None
+    ]
+    prev_total, prev_without = _sums(prev_known)
+    if not prev_total:
+        return None
+    delta = share_value - prev_without / prev_total * 100
+    sign = "+" if delta >= 0 else "-"
+    return {
+        "display": f"{sign}{_percent(abs(delta))} п.п.",
+        "label": (
+            f"{'ко' if prev_quarter == 2 else 'к'} "
+            f"{QUARTER_NUMERALS[prev_quarter]} кварталу {prev_year} года"
+        ),
+    }
+
+
+def _chart_bar(row) -> dict:
+    return {"display": row["share_display"], "value": row["share_value"]}
+
+
+def _chart_data(months) -> dict:
+    """Данные диаграммы слайда 3: доля без брокера новых и пролонгаций.
+
+    Значения берутся из тех же блоков, что и таблица. height_pct — доля
+    высоты столбца от шкалы (от нуля до максимума); None — доля не
+    определена, столбца нет, в подписи прочерк. height_css — то же
+    одним знаком после запятой для style в HTML.
+    """
+    entries = [
+        {
+            "name": month["name"],
+            "new": _chart_bar(month["rows"][1]),
+            "prolong": _chart_bar(month["rows"][2]),
+        }
+        for month in months
+    ]
+    defined = [
+        bar["value"]
+        for entry in entries
+        for bar in (entry["new"], entry["prolong"])
+        if bar["value"] is not None
+    ]
+    scale_max = max(defined) * Decimal("1.15") if defined else None
+    for entry in entries:
+        for bar in (entry["new"], entry["prolong"]):
+            if bar["value"] is None:
+                bar["height_pct"] = None
+            elif scale_max:
+                bar["height_pct"] = bar["value"] / scale_max * 100
+            else:
+                bar["height_pct"] = ZERO
+            bar["height_css"] = (
+                "" if bar["height_pct"] is None else f"{float(bar['height_pct']):.1f}"
+            )
+    return {"months": entries, "scale_max": scale_max}
 
 
 def build_broker_slide(year: int, quarter: int, pairs=None) -> dict:
@@ -185,6 +262,7 @@ def build_broker_slide(year: int, quarter: int, pairs=None) -> dict:
     ]
     total, without = _sums(known)
     quarter_rows = _block(known)
+    share_value = without / total * 100 if total else None
     # Итоги >= 100 млрд ₽ не влезают в колонку обычным кеглем — HTML уменьшит шрифт.
     numeric = [
         row[key]
@@ -220,8 +298,11 @@ def build_broker_slide(year: int, quarter: int, pairs=None) -> dict:
             for i in range(3)
         ],
         "share_display": _share_display(total, without),
+        "share_label": "Доля без брокера по страховой сумме",
+        "comparison": _quarter_comparison(year, quarter, share_value),
         "without_display": _cell_display(without),
         "total_display": _cell_display(total),
+        "chart": _chart_data(months),
         "unknown_count": len(unknown),
         "unknown_without_count": sum(not p["broker"] for p in unknown),
         "note": note,
@@ -284,6 +365,23 @@ def _distribution_block(pairs, key_field: str, names: dict, other_label: str) ->
     }
 
 
+def _top_branches_conclusion(block, total):
+    """Вывод о крупнейших обслуживающих филиалах слайда 4.
+
+    Доля считается от исходных сумм двух первых строк (без «Иных»),
+    не сложением округлённых процентов. Один филиал — его доля.
+    """
+    real = [row for row in block["rows"] if not row.get("is_other")]
+    if not real or not total:
+        return None
+    top = real[:2]
+    share = sum((row["sum"] for row in top), ZERO) / total * 100
+    return {
+        "names": " и ".join(row["name"] for row in top),
+        "share_display": _percent(share) + "%",
+    }
+
+
 def build_distribution_slide(year: int, quarter: int, pairs=None) -> dict:
     """Слайд 4: раскладка «Без брокера» по филиалам и лизингополучателям.
 
@@ -315,6 +413,7 @@ def build_distribution_slide(year: int, quarter: int, pairs=None) -> dict:
     if not known:
         slide["sum_display"] = "—"
         slide["tables"] = []
+        slide["branches_conclusion"] = None
         slide["note"] = base_note
         return slide
     branch_names = _distribution_names(
@@ -327,7 +426,10 @@ def build_distribution_slide(year: int, quarter: int, pairs=None) -> dict:
     clients = _distribution_block(
         known, "client_id", client_names, "Иные лизингополучатели"
     )
-    slide["sum_display"] = _cell_display(branches["total"]["sum"])
+    slide["sum_display"] = f"{_cell_display(branches['total']['sum'])} млн ₽"
+    slide["branches_conclusion"] = _top_branches_conclusion(
+        branches, branches["total"]["sum"]
+    )
     # Итоги >= 100 млрд ₽ не влезают в колонку обычным кеглем — HTML уменьшит шрифт.
     displays = [
         row[key]

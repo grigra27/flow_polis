@@ -100,6 +100,29 @@ def _cell_display(value: Decimal) -> str:
     return "<0,1" if text == "0,0" else text
 
 
+def _billions_display(value: Decimal) -> str:
+    """Крупный показатель портфеля: млрд ₽ с двумя знаками, ниже — млн ₽."""
+    if value >= Decimal(1_000_000_000):
+        scaled = (value / Decimal(1_000_000_000)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        return f"{scaled:,.2f}".replace(",", " ").replace(".", ",") + " млрд ₽"
+    scaled = (value / Decimal(1_000_000)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return f"{int(scaled):,}".replace(",", " ") + " млн ₽"
+
+
+# «Доля пяти крупнейших страховщиков»; при меньшем числе — словом.
+TOP_COUNT_WORDS = {1: "одного", 2: "двух", 3: "трёх", 4: "четырёх", 5: "пяти"}
+
+
+def _top_label(count: int) -> str:
+    if count == 1:
+        return "Доля крупнейшего страховщика"
+    if count == 0:
+        return "Доля крупнейших страховщиков"
+    return f"Доля {TOP_COUNT_WORDS[count]} крупнейших страховщиков"
+
+
 def build_insurer_slide(as_of: date, objects=None, images=None) -> dict:
     images = ReferenceImages() if images is None else images
     if objects is None:
@@ -126,6 +149,27 @@ def build_insurer_slide(as_of: date, objects=None, images=None) -> dict:
     for row in rows:
         row["sum_display"] = _rub(row["sum"])
         row["share_display"] = _percent(row["share"]) + "%"
+    # Полосы в таблице: единая шкала по крупнейшей доле отдельно показанных
+    # страховщиков; «Иные» и «Итого» остаются без полос.
+    real_rows = [row for row in rows if row["key"] is not None]
+    max_real_share = max((row["share"] for row in real_rows), default=ZERO)
+    for row in rows:
+        if row["key"] is None or not max_real_share:
+            row["bar"] = ZERO
+            row["bar_css"] = ""
+        else:
+            fraction = row["share"] / max_real_share
+            row["bar"] = fraction
+            row["bar_css"] = f"{float(fraction) * 100:.1f}"
+    top = real_rows[:5]
+    top_share = sum((row["share"] for row in top), ZERO)
+    notes = []
+    if other_count:
+        notes.append(f"«Иные» — {other_count} страховщиков с меньшей страховой суммой.")
+    notes.append(
+        "Страховая сумма текущего страхового года действующих полисов "
+        "с активным ДФА; без ОСАГО и лимитов ответственности."
+    )
     return {
         "kind": "insurers",
         "title": "Распределение имущества по страховщикам",
@@ -134,9 +178,21 @@ def build_insurer_slide(as_of: date, objects=None, images=None) -> dict:
         "total_sum": total,
         "total_sum_display": _rub(total),
         "total_share_display": "100,00%" if total else "—",
+        "portfolio_display": _billions_display(total),
+        "top_count": len(top),
+        "top_share_display": (
+            f"{top_share.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP):.1f}".replace(
+                ".", ","
+            )
+            + "%"
+        )
+        if total
+        else "—",
+        "top_label": _top_label(len(top)),
         "record_count": totals["count"],
         "insurer_count": insurer_count,
         "other_count": other_count,
+        "note": " ".join(notes),
         "empty": not rows,
     }
 
@@ -218,6 +274,39 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
                 "is_other": row.get("is_other", False),
             }
         )
+    # Цвет ячейки берётся из серверной палитры: один источник для HTML,
+    # легенды и PDF — без HEX-дублей в CSS.
+    for row in rows:
+        for cell in row["cells"]:
+            cell["color"] = HEAT_COLORS[cell["heat"] - 1] if cell["heat"] else ""
+
+    # Два крупнейших сочетания «филиал × страховщик» среди видимых ячеек:
+    # без «Иных» в обеих осях и без итогов, по неокруглённым суммам.
+    combos = []
+    for row in rows:
+        if row["is_other"]:
+            continue
+        for i, cell in enumerate(row["cells"]):
+            if other_insurers and i == column_count - 1:
+                continue
+            if cell["sum"] <= 0:
+                continue
+            combos.append((cell["sum"], row["name"], headers[i]))
+    combos.sort(key=lambda item: (-item[0], item[1], item[2]))
+    top_combos = [
+        {
+            "branch": branch,
+            "insurer": insurer,
+            "display": f"{_million_display(value)} млн ₽",
+        }
+        for value, branch, insurer in combos[:2]
+    ]
+    if len(top_combos) >= 2:
+        top_combos_label = "Крупнейшие сочетания филиал × страховщик"
+    elif top_combos:
+        top_combos_label = "Крупнейшее сочетание филиал × страховщик"
+    else:
+        top_combos_label = ""
 
     columns = [
         {
@@ -252,6 +341,8 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
         "columns": columns,
         "rows": rows,
         "legend": HEAT_LEGEND,
+        "top_combos_label": top_combos_label,
+        "top_combos": top_combos,
         "total_sum": total,
         "total_sum_display": _cell_display(total),
         "insurer_count": insurer_count,

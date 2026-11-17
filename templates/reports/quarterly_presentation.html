@@ -20,13 +20,14 @@
 
     .qp-slide-wrap { overflow-x: auto; }
     .qp-slide-wrap + .qp-slide-wrap { margin-top: 1.25rem; }
+    .qp-scope { font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+                color: #5d748d; margin-bottom: .35rem; }
     .qp-slide { background: #fff; border: 1px solid #dbe5f1; border-radius: 12px; box-shadow: 0 2px 10px rgba(23, 50, 79, .06);
                 aspect-ratio: 16 / 9; min-width: 760px; padding: 2.2% 3.6%; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
     .qp-slide-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.1%; }
     .qp-slide-title { font-size: 1.45rem; font-weight: 800; color: #1a1a1a; margin: 0; }
     .qp-slide-date { color: #555; font-size: .95rem; margin-top: .3rem; }
-    .qp-wordmark { font-size: 1.05rem; color: #111; white-space: nowrap; }
-    .qp-wordmark b { font-weight: 800; }
+    .qp-brand { height: 30px; width: auto; flex: none; }
     .qp-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
     .qp-table th { background: #111; color: #fff; font-weight: 700; text-align: left; padding: .5rem .65rem; }
     .qp-table th.num, .qp-table td.num { text-align: right; white-space: nowrap; }
@@ -37,8 +38,16 @@
     .qp-name { display: flex; align-items: center; gap: .55rem; font-weight: 600; }
     .qp-logo { width: 22px; height: 22px; object-fit: contain; background: #fff; border-radius: 5px; flex: none; }
     .qp-empty { color: #555; font-size: 1rem; padding: 1.5rem 0; }
-    .qp-slide-note { margin-top: auto; padding-top: .8rem; color: #555; font-size: .78rem; }
     .qp-note { color: #5d748d; font-size: .85rem; margin-top: .9rem; }
+
+    .qp-ins-head { display: flex; gap: 3.2rem; margin: .1rem 0 .9rem; }
+    .qp-ins-stat { display: flex; flex-direction: column; }
+    .qp-ins-value { font-size: 1.75rem; font-weight: 800; color: #1a1a1a; line-height: 1.1; }
+    .qp-ins-caption { font-size: .78rem; color: #555; }
+    .qp-table th.qp-barcol, .qp-table td.qp-barcell { width: 16%; }
+    .qp-bar { width: 100%; height: 9px; background: #e9eef4; border-radius: 3px; overflow: hidden; }
+    .qp-bar-fill { height: 100%; background: #203b5e; border-radius: 3px; }
+    .qp-conclusion { font-size: .9rem; font-weight: 600; color: #1a1a1a; margin: 0 0 .55rem; }
 
     .qp-slide--matrix { min-width: 980px; }
     .qp-matrix { table-layout: fixed; font-size: .8rem; }
@@ -52,14 +61,11 @@
     .qp-legend-unit { color: #555; }
     .qp-legend-item { padding: .12rem .5rem; border: 1px solid #bbb; border-radius: 3px; font-weight: 600; }
     .qp-table td.qp-rowtotal { background: #e4e4e4; font-weight: 800; }
-    .qp-matrix tbody tr td.qp-heat-1 { background: #F0F5FA; }
-    .qp-matrix tbody tr td.qp-heat-2 { background: #DCE8F2; }
-    .qp-matrix tbody tr td.qp-heat-3 { background: #C2D6E6; }
-    .qp-matrix tbody tr td.qp-heat-4 { background: #A4C1D7; }
-    .qp-matrix tbody tr td.qp-heat-5 { background: #82A8C4; }
 
-    .qp-broker-head { display: flex; align-items: baseline; gap: 1.4rem; margin: .1rem 0 .9rem; }
+    .qp-broker-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1.4rem; margin: .1rem 0 .9rem; }
+    .qp-broker-sharewrap { display: flex; flex-direction: column; }
     .qp-broker-share { font-size: 2.1rem; font-weight: 800; color: #1a1a1a; line-height: 1; }
+    .qp-broker-caption { font-size: .78rem; color: #555; }
     .qp-broker-stat { font-size: .85rem; color: #555; }
     .qp-broker-stat b { color: #1a1a1a; }
     .qp-broker { table-layout: fixed; font-size: .8rem; }
@@ -74,8 +80,25 @@
     .qp-table.qp-broker .qp-q-start { border-left: 2px solid #111; }
     .qp-table.qp-broker--compact tbody td.num { font-size: .68rem; }
 
-    .qp-dist-head { display: flex; align-items: baseline; gap: 1.4rem; margin: .1rem 0 .9rem; }
+    .qp-chart { margin-top: .8rem; }
+    .qp-chart-plot { display: flex; height: 120px; border-bottom: 1px solid #c9d4e0; }
+    .qp-chart-group { flex: 1; }
+    .qp-chart-pair { display: flex; justify-content: center; gap: 14px; align-items: flex-end; height: 100%; }
+    .qp-chart-slot { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; width: 44px; height: 100%; }
+    .qp-chart-val { font-size: .66rem; color: #1a1a1a; white-space: nowrap; padding-bottom: 2px; }
+    .qp-chart-bar { width: 100%; }
+    .qp-chart-bar--new { background: #555555; }
+    .qp-chart-bar--prolong { background: #e4e4e4; border: 1px solid #999; border-bottom: none; }
+    .qp-chart-months { display: flex; margin-top: 4px; }
+    .qp-chart-month { flex: 1; text-align: center; font-size: .74rem; color: #555; }
+    .qp-chart-legend { display: flex; gap: 1.4rem; margin-top: .4rem; font-size: .74rem; color: #1a1a1a; }
+    .qp-chart-swatch { display: inline-block; width: 10px; height: 10px; margin-right: .35rem; vertical-align: -1px; }
+    .qp-chart-swatch--new { background: #555555; }
+    .qp-chart-swatch--prolong { background: #e4e4e4; border: 1px solid #999; }
+
+    .qp-dist-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1.4rem; margin: .1rem 0 .9rem; }
     .qp-dist-label { font-size: .85rem; color: #555; }
+    .qp-dist-conclusion { font-size: .85rem; font-weight: 600; color: #1a1a1a; }
     .qp-dist-tables { display: flex; align-items: flex-start; gap: 1.4rem; }
     .qp-dist { table-layout: fixed; font-size: .8rem; }
     .qp-dist th, .qp-dist td { padding: .34rem .4rem; }
@@ -88,6 +111,11 @@
     .qp-dist th:nth-child(3) { width: 16%; }
     .qp-dist td:first-child { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .qp-table.qp-dist--compact tbody td.num { font-size: .68rem; }
+
+    .qp-warn { margin-top: .5rem; font-size: .82rem; color: #8a5a00; }
+    .qp-how { margin-top: .55rem; font-size: .82rem; color: #555; }
+    .qp-how summary { cursor: pointer; color: #1565c0; font-weight: 600; }
+    .qp-how p { margin: .4rem 0 0; max-width: 64rem; }
 </style>
 {% endblock %}
 
@@ -114,13 +142,18 @@
 
     {% for slide in slides %}
     <div class="qp-slide-wrap">
+        {% if slide.kind == "insurers" or slide.kind == "branch_matrix" %}
+        <div class="qp-scope">Портфель на дату среза</div>
+        {% else %}
+        <div class="qp-scope">Страховые суммы по фактическим оплатам за квартал</div>
+        {% endif %}
         <div class="qp-slide{% if slide.kind != 'insurers' %} qp-slide--matrix{% endif %}">
             <div class="qp-slide-head">
                 <div>
                     <h1 class="qp-slide-title">{{ slide.title }}</h1>
                     <div class="qp-slide-date">{% if slide.kind == "broker" or slide.kind == "broker_distribution" %}{{ slide.quarter_label }} · {{ slide.subtitle }}{% else %}По состоянию на {{ slide.as_of|date:"d.m.Y" }}{% endif %}</div>
                 </div>
-                <span class="qp-wordmark"><b>флоу</b>//полисы</span>
+                <img class="qp-brand" src="{% static 'images/onlayn-broker.png' %}" alt="ООО «ОН-ЛАЙН БРОКЕР»">
             </div>
             {% if slide.empty %}
             <div class="qp-empty">
@@ -134,20 +167,26 @@
                 Оплаты без брокера в квартале есть, но страховая сумма не определена ни у одной из {{ slide.unknown_count }} пар полис–год.
             </div>
             {% elif slide.kind == "insurers" %}
+            <div class="qp-ins-head">
+                <div class="qp-ins-stat"><span class="qp-ins-value">{{ slide.portfolio_display }}</span><span class="qp-ins-caption">Страховая сумма портфеля</span></div>
+                <div class="qp-ins-stat"><span class="qp-ins-value">{{ slide.top_share_display }}</span><span class="qp-ins-caption">{{ slide.top_label }}</span></div>
+            </div>
             <table class="qp-table">
                 <thead>
-                    <tr><th>Страховая компания</th><th class="num">Страховая сумма, ₽</th><th class="num">Доля</th></tr>
+                    <tr><th>Страховая компания</th><th class="qp-barcol"></th><th class="num">Страховая сумма, ₽</th><th class="num">Доля</th></tr>
                 </thead>
                 <tbody>
                     {% for row in slide.rows %}
                     <tr>
                         <td><span class="qp-name">{% if row.image_url %}<img class="qp-logo" src="{{ row.image_url }}" alt="">{% endif %}{{ row.name }}</span></td>
+                        <td class="qp-barcell">{% if row.bar_css %}<div class="qp-bar"><div class="qp-bar-fill" style="width: {{ row.bar_css }}%;"></div></div>{% endif %}</td>
                         <td class="num">{{ row.sum_display }}</td>
                         <td class="num">{{ row.share_display }}</td>
                     </tr>
                     {% endfor %}
                     <tr class="qp-total">
                         <td>Итого</td>
+                        <td class="qp-barcell"></td>
                         <td class="num">{{ slide.total_sum_display }}</td>
                         <td class="num">{{ slide.total_share_display }}</td>
                     </tr>
@@ -155,9 +194,13 @@
             </table>
             {% elif slide.kind == "broker" %}
             <div class="qp-broker-head">
-                <span class="qp-broker-share">{{ slide.share_display }}</span>
+                <div class="qp-broker-sharewrap">
+                    <span class="qp-broker-share">{{ slide.share_display }}</span>
+                    <span class="qp-broker-caption">{{ slide.share_label }}</span>
+                </div>
                 <span class="qp-broker-stat">СС без брокера, млн ₽: <b>{{ slide.without_display }}</b></span>
                 <span class="qp-broker-stat">Общая СС, млн ₽: <b>{{ slide.total_display }}</b></span>
+                {% if slide.comparison %}<span class="qp-broker-stat">{{ slide.comparison.display }} {{ slide.comparison.label }}</span>{% endif %}
             </div>
             <table class="qp-table qp-broker{% if slide.compact %} qp-broker--compact{% endif %}">
                 <thead>
@@ -184,10 +227,36 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <div class="qp-chart">
+                <div class="qp-chart-plot">
+                    {% for entry in slide.chart.months %}
+                    <div class="qp-chart-group">
+                        <div class="qp-chart-pair">
+                            <div class="qp-chart-slot">
+                                <span class="qp-chart-val">{{ entry.new.display }}</span>
+                                {% if entry.new.height_css %}<div class="qp-chart-bar qp-chart-bar--new" style="height: {{ entry.new.height_css }}%;"></div>{% endif %}
+                            </div>
+                            <div class="qp-chart-slot">
+                                <span class="qp-chart-val">{{ entry.prolong.display }}</span>
+                                {% if entry.prolong.height_css %}<div class="qp-chart-bar qp-chart-bar--prolong" style="height: {{ entry.prolong.height_css }}%;"></div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="qp-chart-months">
+                    {% for entry in slide.chart.months %}<span class="qp-chart-month">{{ entry.name }}</span>{% endfor %}
+                </div>
+                <div class="qp-chart-legend">
+                    <span><i class="qp-chart-swatch qp-chart-swatch--new"></i>Новые договоры</span>
+                    <span><i class="qp-chart-swatch qp-chart-swatch--prolong"></i>Пролонгации</span>
+                </div>
+            </div>
             {% elif slide.kind == "broker_distribution" %}
             <div class="qp-dist-head">
                 <span class="qp-broker-share">{{ slide.sum_display }}</span>
                 <span class="qp-dist-label">{{ slide.sum_label }}</span>
+                {% if slide.branches_conclusion %}<span class="qp-dist-conclusion">{{ slide.branches_conclusion.names }} — {{ slide.branches_conclusion.share_display }} страховой суммы без брокера</span>{% endif %}
             </div>
             <div class="qp-dist-tables">
                 {% for table in slide.tables %}
@@ -214,6 +283,9 @@
                 {% endfor %}
             </div>
             {% else %}
+            {% if slide.top_combos %}
+            <div class="qp-conclusion">{{ slide.top_combos_label }}: {% for combo in slide.top_combos %}{{ combo.branch }} × {{ combo.insurer }} — {{ combo.display }}{% if not forloop.last %} и {% endif %}{% endfor %}</div>
+            {% endif %}
             <table class="qp-table qp-matrix">
                 <thead>
                     <tr>
@@ -226,7 +298,7 @@
                     {% for row in slide.rows %}
                     <tr>
                         <td title="{{ row.name }}"><span class="qp-name">{{ row.name }}</span></td>
-                        {% for cell in row.cells %}<td class="num{% if cell.heat %} qp-heat-{{ cell.heat }}{% endif %}">{{ cell.display }}</td>{% endfor %}
+                        {% for cell in row.cells %}<td class="num"{% if cell.color %} style="background: {{ cell.color }};"{% endif %}>{{ cell.display }}</td>{% endfor %}
                         <td class="num qp-rowtotal">{{ row.total_display }}</td>
                     </tr>
                     {% endfor %}
@@ -242,15 +314,16 @@
                 {% for item in slide.legend %}<span class="qp-legend-item" style="background: {{ item.color }};">{{ item.label }}</span>{% endfor %}
             </div>
             {% endif %}
-            <div class="qp-slide-note">
-                {% if slide.kind == "insurers" %}
-                    {% if slide.other_count %}«Иные» — {{ slide.other_count }} страховщиков с меньшей страховой суммой. {% endif %}
-                    Страховая сумма текущего страхового года действующих полисов с активным ДФА; без ОСАГО и лимитов ответственности.
-                {% else %}
-                    {{ slide.note }}
-                {% endif %}
-            </div>
         </div>
+        {% if slide.kind == "broker" and slide.unknown_count %}
+        <div class="qp-warn">Пар полис–год с неопределённой страховой суммой: {{ slide.unknown_count }} (без брокера — {{ slide.unknown_without_count }}); в денежные итоги они не включены.</div>
+        {% elif slide.kind == "broker_distribution" and slide.unknown_count %}
+        <div class="qp-warn">Пар полис–год без брокера с неопределённой страховой суммой: {{ slide.unknown_count }}; в денежные итоги и доли они не включены.</div>
+        {% endif %}
+        <details class="qp-how">
+            <summary>Как рассчитано</summary>
+            <p>{{ slide.note }}</p>
+        </details>
     </div>
     {% endfor %}
 

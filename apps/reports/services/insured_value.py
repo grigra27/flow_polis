@@ -31,6 +31,14 @@ from apps.core.services.portfolio_scope import (
 
 ZERO = Decimal("0")
 
+# Именованный вид существующего справочника; не определяем вид по описанию имущества.
+LIABILITY_TYPE_NAME = "ответственность"
+
+
+def is_liability_type(name: str) -> bool:
+    """Вид страхования «Ответственность»: имя без регистра и внешних пробелов."""
+    return name.strip().casefold() == LIABILITY_TYPE_NAME
+
 
 def current_insured_sums(policy_ids: Iterable[int], as_of: date) -> Dict[int, Decimal]:
     """{id полиса: страховая сумма текущего года на as_of}."""

@@ -12,7 +12,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.policies.models import PaymentSchedule, Policy, in_force_q
-from apps.reports.services.insured_value import select_current_insured_sums
+from apps.reports.services.insured_value import (
+    is_liability_type,
+    select_current_insured_sums,
+)
 
 from .portfolio_scope import dfa_in_force_q
 from .reference_images import ReferenceImages
@@ -164,8 +167,13 @@ class DashboardV3Service:
                     in_force_q(when), dfa_in_force_q(when)
                 ).values_list("pk", flat=True)
             )
+            # Имущественный срез — правило подробного отчёта: без ОСАГО
+            # и лимитов вида «Ответственность», до любых агрегаций.
             property_ids = {
-                pk for pk in active if not self.policies[pk]["insurance_type__is_osago"]
+                pk
+                for pk in active
+                if not self.policies[pk]["insurance_type__is_osago"]
+                and not is_liability_type(self.policies[pk]["insurance_type__name"])
             }
             sums = select_current_insured_sums(self.sum_rows, when)
             self._snapshots[when] = (
@@ -642,6 +650,7 @@ class DashboardV3Service:
                 self.scope.branch_ids,
                 self.scope.structure_scope,
                 images=self.images,
+                property_only=True,
             )
         if tab == "payments":
             from apps.reports.services.property_report import _add_months, MONTH_SHORT

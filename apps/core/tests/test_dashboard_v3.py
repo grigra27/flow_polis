@@ -16,11 +16,16 @@ from apps.policies.models import PaymentSchedule, Policy
 from apps.core.services.dashboard_v3_service import DashboardV3Service
 from apps.core.services.portfolio_scope import PortfolioScope
 from apps.reports.services.insured_value import current_insured_sums
+from apps.reports.services.property_document import build_property_document
 from apps.reports.services.property_report import (
     build_property_report,
     build_property_report_workbook,
 )
 from apps.reports.services.property_snapshot import build_property_snapshot
+from apps.reports.services.quarterly_presentation import (
+    build_branch_matrix_slide,
+    build_insurer_slide,
+)
 
 AS_OF = date(2027, 6, 15)  # Все сервисы получают явную дату, не зависят от часов.
 pytestmark = pytest.mark.django_db
@@ -247,6 +252,53 @@ def test_osago_is_only_in_premium_and_payments(make_policy):
     assert context["annual_premium"] == 777
     assert context["problems"][1]["count"] == 0
     assert context["activity"]["score"] is None
+
+
+def test_liability_limit_stays_out_of_property_totals_on_every_surface(make_policy):
+    # Правило подробного отчёта на всех поверхностях: конец квартала,
+    # все филиалы, все сделки — сравнение с презентацией.
+    as_of = date(2027, 6, 30)
+    liability_kind = InsuranceType.objects.create(name="Ответственность")
+    property_policy = make_policy()
+    liability = make_policy(insurance_type=liability_kind)
+    pay(property_policy, value=7_000_000)
+    pay(liability, value=10_000_000)
+    context = DashboardV3Service(PortfolioScope(as_of, "all", ())).context("portfolio")
+    snapshot = build_property_snapshot(as_of)
+    document = build_property_document(as_of)
+    insurer_slide = build_insurer_slide(as_of)
+    matrix_slide = build_branch_matrix_slide(as_of)
+    assert (
+        context["total_sum"]
+        == snapshot["total_insurance_sum"]
+        == document["totals"]["sum"]
+        == insurer_slide["total_sum"]
+        == matrix_slide["total_sum"]
+        == 7_000_000
+    )
+    assert (
+        context["policy_count"]
+        == snapshot["active_policies_count"]
+        == document["totals"]["count"]
+        == insurer_slide["record_count"]
+        == 1
+    )
+    assert document["scope_total"] == 17_000_000
+    assert document["liability"]["sum"] == 10_000_000
+    assert [row["policy_number"] for row in document["liability"]["rows"]] == [
+        liability.policy_number
+    ]
+    assert [row["sum"] for row in document["liability"]["rows"]] == [10_000_000]
+    assert [row["name"] for row in document["by_type"]] == ["Имущество тест"]
+    assert [row["name"] for row in context["property_report"]["by_type"]] == [
+        "Имущество тест"
+    ]
+    by_type_section = next(
+        s for s in snapshot["sections"] if s["title"] == "По видам страхования"
+    )
+    assert [item["name"] for item in by_type_section["items"]] == ["Имущество тест"]
+    assert context["annual_premium"] == 200
+    assert context["all_policy_count"] == 2
 
 
 def test_commission_is_neither_loaded_nor_used_in_public_context(make_policy):

@@ -2,9 +2,10 @@
 Снимок распределения портфеля действующих полисов по страховой сумме.
 
 Близок к блоку Portfolio Structure в Dashboard V2, но дополнительно
-ограничивает портфель активными ДФА и возвращает полный список без отсечения
-«топ-5 + Прочие». Используется для отчёта-презентации руководству лизинговой
-компании.
+ограничивает портфель активными ДФА и имущественными видами — лимиты
+вида «Ответственность» исключаются до агрегации, как в подробном отчёте, —
+и возвращает полный список без отсечения «топ-5 + Прочие». Используется
+для отчёта-презентации руководству лизинговой компании.
 
 Логика «страховой суммы полиса» — insured_value.current_insured_sums:
 страховая сумма текущего страхового года (до 2026-10-17 брался максимум по
@@ -21,6 +22,7 @@ from django.utils import timezone
 from apps.core.services.reference_images import ReferenceImages
 
 from .insured_value import InsuredObject, insured_portfolio
+from .property_report import is_liability
 
 
 DECIMAL_ZERO = Decimal("0")
@@ -162,7 +164,11 @@ def build_property_snapshot(
     """
     if as_of is None:
         as_of = timezone.localdate()
-    objects = insured_portfolio(as_of, branch_ids, structure_scope)
+    objects = [
+        o
+        for o in insured_portfolio(as_of, branch_ids, structure_scope)
+        if not is_liability(o)
+    ]
     by_branch, total = _aggregate_dimension(objects, "branch_id", "branch")
     by_insurer, _ = _aggregate_dimension(objects, "insurer_id", "insurer")
     by_type, _ = _aggregate_dimension(objects, "type_id", "type")

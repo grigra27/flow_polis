@@ -16,6 +16,7 @@ from apps.core.services.dashboard_v3_service import DashboardV3Service
 from apps.core.services.portfolio_scope import PortfolioScope
 from apps.reports.services.property_document import build_property_document
 from apps.reports.services.property_pdf import build_property_pdf, logo
+from apps.reports.services.property_snapshot import build_property_snapshot
 
 AS_OF = date(2027, 6, 15)
 pytestmark = pytest.mark.django_db
@@ -74,10 +75,12 @@ def read_pdf(report):
     return PdfReader(BytesIO(data))
 
 
-def test_property_and_liability_reconcile_without_changing_dashboard(make_pdf_policy):
+def test_property_and_liability_reconcile_in_report_snapshot_and_dashboard(
+    make_pdf_policy,
+):
     make_pdf_policy(value=1000)
     kind = InsuranceType.objects.create(name="Ответственность")
-    make_pdf_policy(value=200, insurance_type=kind)
+    liability_policy = make_pdf_policy(value=200, insurance_type=kind)
     report = build_property_document(AS_OF)
     assert report["totals"]["sum"] == 1000
     assert report["totals"]["count"] == 1
@@ -85,9 +88,13 @@ def test_property_and_liability_reconcile_without_changing_dashboard(make_pdf_po
     assert report["scope_total"] == 1200
     assert (
         DashboardV3Service(PortfolioScope(AS_OF, "all", ())).context()["total_sum"]
-        == 1200
+        == 1000
     )
+    assert build_property_snapshot(AS_OF)["total_insurance_sum"] == 1000
     assert [r["name"] for r in report["by_type"]] == ["Имущество PDF"]
+    assert {
+        row["policy_number"]: row["sum"] for row in report["liability"]["rows"]
+    } == {liability_policy.policy_number: 200}
 
 
 @pytest.mark.parametrize(

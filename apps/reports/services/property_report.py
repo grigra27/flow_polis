@@ -22,7 +22,7 @@ from django.utils import timezone
 from apps.analytics.money import HISTORY_RELIABLE_FROM, MONTH_SHORT
 from apps.core.services.reference_images import ReferenceImages
 
-from .insured_value import ZERO, InsuredObject, insured_portfolio
+from .insured_value import ZERO, InsuredObject, insured_portfolio, is_liability_type
 from .property_text import (
     CONDITION_NEW,
     CONDITION_UNKNOWN,
@@ -162,8 +162,7 @@ def _totals(objects):
 
 
 def is_liability(obj):
-    # Именованный вид существующего справочника; не определяем вид по описанию имущества.
-    return obj.type.strip().casefold() == "ответственность"
+    return is_liability_type(obj.type)
 
 
 def _portfolio(as_of, branch_ids, structure_scope, property_only=False):
@@ -261,7 +260,12 @@ def _matrix(objects, row_key, row_label, col_key, col_label, columns_limit=None)
 
 
 def _insurer_dynamics(
-    as_of, branch_ids, current_rows, structure_scope="all", property_only=False
+    as_of,
+    branch_ids,
+    current_rows,
+    structure_scope="all",
+    property_only=False,
+    rows_limit=MATRIX_INSURERS,
 ):
     dates = [
         d
@@ -280,7 +284,7 @@ def _insurer_dynamics(
         snapshots.append((snapshot_date, {r["key"]: r["share"] for r in rows}))
     snapshots.append((as_of, {r["key"]: r["share"] for r in current_rows}))
     names = {r["key"]: r["name"] for r in current_rows}
-    selected_rows = current_rows if property_only else current_rows[:MATRIX_INSURERS]
+    selected_rows = current_rows[:rows_limit] if rows_limit else current_rows
     top = [r["key"] for r in selected_rows]
     return {
         "dates": [d for d, _ in snapshots],
@@ -324,6 +328,7 @@ def build_property_report(
     *,
     images=None,
     property_only=False,
+    dynamics_rows_limit=MATRIX_INSURERS,
 ) -> Dict[str, Any]:
     as_of = as_of or timezone.localdate()
     images = images or ReferenceImages()
@@ -404,7 +409,12 @@ def build_property_report(
             lambda o: o.type,
         ),
         "insurer_dynamics": _insurer_dynamics(
-            as_of, branch_ids, insurer_rows, structure_scope, property_only
+            as_of,
+            branch_ids,
+            insurer_rows,
+            structure_scope,
+            property_only,
+            dynamics_rows_limit,
         ),
         "by_type": _group(objects, key=lambda o: o.type_id, label=lambda o: o.type),
         "by_size": _group(
@@ -682,7 +692,7 @@ def build_property_report_workbook(report: Dict[str, Any]):
                 ["Состав", "Имущественные виды без ОСАГО; ответственность отдельно"],
                 ["СС имущества, ₽", t["sum"]],
                 ["Сумма лимитов ответственности, ₽", report["liability"]["sum"]],
-                ["Всего по исходному срезу, ₽", report["scope_total"]],
+                ["СС имущества + лимиты ответственности, ₽", report["scope_total"]],
                 ["Количество", "Страховые записи, не уникальные физические объекты"],
             ],
             {0: 35, 1: 70},

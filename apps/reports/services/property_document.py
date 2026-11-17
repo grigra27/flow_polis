@@ -20,7 +20,12 @@ METHOD_VERSION = "2.0"
 def build_property_document(as_of, branch_ids=(), structure_scope="all"):
     images = ReferenceImages()
     report = build_property_report(
-        as_of, branch_ids, structure_scope, property_only=True, images=images
+        as_of,
+        branch_ids,
+        structure_scope,
+        property_only=True,
+        dynamics_rows_limit=None,
+        images=images,
     )
     objects = insured_portfolio(as_of, branch_ids, structure_scope)
     property_objects = [o for o in objects if not is_liability(o)]

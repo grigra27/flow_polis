@@ -513,10 +513,217 @@ def _broker_slide(slide):
     return head + [headline, headline_gap, table, gap, note]
 
 
+# Слайд 4: две таблицы рядом — филиалы (уже) и лизингополучатели (шире,
+# там длиннее названия). Размер, отступы и предел строк названий.
+DIST_BRANCH_RATIO = 0.40
+DIST_CLIENT_RATIO = 0.58
+DIST_BRANCH_NAME_RATIO = 0.56
+DIST_BRANCH_SUM_RATIO = 0.26
+DIST_CLIENT_NAME_RATIO = 0.72
+DIST_CLIENT_SUM_RATIO = 0.16
+DIST_FIT_LEVELS = (
+    (11, 4, 2),
+    (10, 4, 2),
+    (9, 3, 2),
+    (8, 2.5, 2),
+    (7, 2, 1),
+)
+
+
+def _dist_min_num_width():
+    """Самая узкая числовая колонка обеих таблиц — граница для цифр."""
+    left = SLIDE_WIDTH * DIST_BRANCH_RATIO
+    right = SLIDE_WIDTH * DIST_CLIENT_RATIO
+    return min(
+        left * DIST_BRANCH_SUM_RATIO,
+        left * (1 - DIST_BRANCH_NAME_RATIO - DIST_BRANCH_SUM_RATIO),
+        right * DIST_CLIENT_SUM_RATIO,
+        right * (1 - DIST_CLIENT_NAME_RATIO - DIST_CLIENT_SUM_RATIO),
+    )
+
+
+def _dist_widest_cell(slide, size):
+    widest = 0.0
+    for block in slide["tables"]:
+        for row in block["rows"]:
+            for key in ("sum_display", "share_display"):
+                widest = max(
+                    widest,
+                    pdfmetrics.stringWidth(row[key], "PropertyInter", size),
+                )
+        for key in ("sum_display", "share_display"):
+            widest = max(
+                widest,
+                pdfmetrics.stringWidth(block["total"][key], "PropertyInterBold", size),
+            )
+    return widest
+
+
+def _dist_table(block, width, size, padding, name_lines, name_ratio, sum_ratio):
+    name_width = width * name_ratio
+    sum_width = width * sum_ratio
+    share_width = width - name_width - sum_width
+    header = [_broker_center(block["name"], size), "", ""]
+    subheader = [
+        p("Название", size, True, colors.white),
+        p("СС, млн ₽", size, True, colors.white, right=True),
+        p("Доля", size, True, colors.white, right=True),
+    ]
+    body = [
+        [
+            p(
+                _fit_name(row["name"], name_width - 12, size, name_lines),
+                size,
+                color=INK,
+            ),
+            p(row["sum_display"], size, color=INK, right=True),
+            p(row["share_display"], size, color=INK, right=True),
+        ]
+        for row in block["rows"]
+    ]
+    total = block["total"]
+    total_row = [
+        p(total["name"], size, True, INK),
+        p(total["sum_display"], size, True, INK, right=True),
+        p(total["share_display"], size, True, INK, right=True),
+    ]
+    table = Table(
+        [header, subheader] + body + [total_row],
+        colWidths=[name_width, sum_width, share_width],
+        hAlign="LEFT",
+    )
+    last = len(body) + 2
+    table.setStyle(
+        TableStyle(
+            [
+                ("SPAN", (0, 0), (2, 0)),
+                ("BACKGROUND", (0, 0), (-1, 1), BLACK),
+                ("ROWBACKGROUNDS", (0, 2), (-1, last - 1), [colors.white, ROW_GRAY]),
+                ("BACKGROUND", (0, last), (-1, last), TOTAL_GRAY),
+                ("LINEABOVE", (0, last), (-1, last), 1, BLACK),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), padding),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
+            ]
+        )
+    )
+    return table
+
+
+def _dist_tables_row(slide, size, padding, name_lines):
+    branch_width = SLIDE_WIDTH * DIST_BRANCH_RATIO
+    client_width = SLIDE_WIDTH * DIST_CLIENT_RATIO
+    left = _dist_table(
+        slide["tables"][0],
+        branch_width,
+        size,
+        padding,
+        name_lines,
+        DIST_BRANCH_NAME_RATIO,
+        DIST_BRANCH_SUM_RATIO,
+    )
+    right = _dist_table(
+        slide["tables"][1],
+        client_width,
+        size,
+        padding,
+        name_lines,
+        DIST_CLIENT_NAME_RATIO,
+        DIST_CLIENT_SUM_RATIO,
+    )
+    tables = Table(
+        [[left, "", right]],
+        colWidths=[
+            branch_width,
+            SLIDE_WIDTH - branch_width - client_width,
+            client_width,
+        ],
+        hAlign="LEFT",
+    )
+    tables.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return tables
+
+
+def _distribution_slide(slide):
+    head = _broker_head(slide)
+    note = p(slide["note"], 8.5, color=MUTED)
+    gap = Spacer(1, 10)
+    if slide["empty"]:
+        return head + [
+            p(
+                "Нет подходящих фактических оплат без участия брокера " "за квартал",
+                12,
+                color=MUTED,
+            ),
+            gap,
+            note,
+        ]
+    if slide["no_sums"]:
+        return head + [
+            p(
+                "Оплаты без брокера в квартале есть, но страховая сумма не "
+                f"определена ни у одной из {slide['unknown_count']} пар полис–год.",
+                12,
+                color=MUTED,
+            ),
+            gap,
+            note,
+        ]
+    headline = Table(
+        [
+            [
+                p(slide["sum_display"], 30, True, INK),
+                p(slide["sum_label"], 11, True, INK),
+            ]
+        ],
+        colWidths=[SLIDE_WIDTH * 0.24, SLIDE_WIDTH * 0.76],
+        hAlign="LEFT",
+    )
+    headline.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    headline_gap = Spacer(1, 12)
+    fixed = sum(f.wrap(SLIDE_WIDTH, 10000)[1] for f in head)
+    fixed += headline.wrap(SLIDE_WIDTH, 10000)[1]
+    fixed += headline_gap.wrap(SLIDE_WIDTH, 10000)[1]
+    fixed += gap.wrap(SLIDE_WIDTH, 10000)[1] + note.wrap(SLIDE_WIDTH, 10000)[1]
+    budget = SLIDE_HEIGHT - fixed
+    for size, padding, name_lines in DIST_FIT_LEVELS:
+        if _dist_widest_cell(slide, size) > _dist_min_num_width() - 10:
+            continue
+        tables = _dist_tables_row(slide, size, padding, name_lines)
+        if tables.wrap(SLIDE_WIDTH, 10000)[1] <= budget:
+            return head + [headline, headline_gap, tables, gap, note]
+    size, padding, name_lines = DIST_FIT_LEVELS[-1]
+    tables = _dist_tables_row(slide, size, padding, name_lines)
+    return head + [headline, headline_gap, tables, gap, note]
+
+
 SLIDE_RENDERERS = {
     "insurers": _insurer_slide,
     "branch_matrix": _branch_matrix_slide,
     "broker": _broker_slide,
+    "broker_distribution": _distribution_slide,
 }
 
 

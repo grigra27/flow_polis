@@ -1,13 +1,17 @@
 """Квартальная презентация для лизинговой компании.
 
 Слайд 1 — «Распределение имущества по страховщикам», слайд 2 —
-«Распределение имущества по филиалам и страховщикам». Набор записей
-загружается один раз на запрос и используется обоими слайдами,
-предпросмотром и PDF. Методика общая с подробным имущественным отчётом
-(insured_value + property_report): полисы в силе на конец квартала с
-активным на эту дату ДФА, все филиалы, все сделки, без ОСАГО и без
-лимитов вида «Ответственность»; страховая сумма текущего страхового
-года, неизвестная сумма не подменяется и не входит в итог.
+«Распределение имущества по филиалам и страховщикам», слайд 3 —
+«Страхование с участием и без участия брокера» по фактическим оплатам,
+слайд 4 — «Распределение страхования без участия брокера» по филиалам
+и лизингополучателям на тех же парах оплат. Портфель слайдов 1–2
+загружается один раз на запрос, пары оплат слайдов 3–4 — тоже,
+предпросмотр и PDF используют одни данные. Методика слайдов 1–2 общая
+с подробным имущественным отчётом (insured_value + property_report):
+полисы в силе на конец квартала с активным на эту дату ДФА, все
+филиалы, все сделки, без ОСАГО и без лимитов вида «Ответственность»;
+страховая сумма текущего страхового года, неизвестная сумма не
+подменяется и не входит в итог.
 """
 
 import calendar
@@ -260,11 +264,17 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
 
 
 def build_quarterly_presentation(year: int, quarter: int) -> dict:
-    from .quarterly_payments import build_broker_slide
+    from .quarterly_payments import (
+        broker_payment_pairs,
+        build_broker_slide,
+        build_distribution_slide,
+    )
 
     as_of = quarter_end(year, quarter)
     objects = _portfolio(as_of, None, "all", property_only=True)
     images = ReferenceImages()
+    # Пары оплат считаются один раз на запрос и питают слайды 3 и 4.
+    pairs = broker_payment_pairs(year, quarter)
     return {
         "year": year,
         "quarter": quarter,
@@ -273,6 +283,7 @@ def build_quarterly_presentation(year: int, quarter: int) -> dict:
         "slides": [
             build_insurer_slide(as_of, objects=objects, images=images),
             build_branch_matrix_slide(as_of, objects=objects),
-            build_broker_slide(year, quarter),
+            build_broker_slide(year, quarter, pairs=pairs),
+            build_distribution_slide(year, quarter, pairs=pairs),
         ],
     }

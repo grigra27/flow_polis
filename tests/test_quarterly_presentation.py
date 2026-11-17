@@ -1,9 +1,11 @@
-"""Квартальная презентация для лизинговой компании: три слайда, PDF и доступ.
+"""Квартальная презентация для лизинговой компании: четыре слайда, PDF и доступ.
 
 Цифры слайдов 1–2 сверяются с подробным имущественным отчётом и полной
 матрицей филиал × страховщик на ту же дату (все филиалы, «Все сделки»,
 без лимитов ответственности). Слайд 3 считается по фактическим оплатам
-взносов за квартал. PDF — ровно три страницы 16:9.
+взносов за квартал, слайд 4 раскладывает «Без брокера» слайда 3 по
+филиалам и лизингополучателям на тех же парах. PDF — ровно четыре
+страницы 16:9.
 """
 
 from datetime import date
@@ -25,6 +27,7 @@ from apps.clients.models import Client
 from apps.insurers.models import Branch, InsuranceType, Insurer, LeasingManager
 from apps.policies.models import PaymentSchedule, Policy
 from apps.reports.services import quarterly_presentation as qp_service
+from apps.reports.services import quarterly_payments as qp_payments
 from apps.reports.services import quarterly_pdf as qp_pdf
 from apps.reports.services.property_report import (
     _matrix,
@@ -43,6 +46,7 @@ from apps.reports.services.quarterly_pdf import build_quarterly_pdf
 from apps.reports.services.quarterly_payments import (
     broker_payment_pairs,
     build_broker_slide,
+    build_distribution_slide,
 )
 
 AS_OF = date(2026, 9, 30)  # конец III квартала 2026
@@ -309,7 +313,7 @@ def test_empty_slice(refs):
     presentation = build_quarterly_presentation(2026, 3)
     data = build_quarterly_pdf(presentation)
     reader = PdfReader(BytesIO(data))
-    assert len(reader.pages) == 3
+    assert len(reader.pages) == 4
     assert "распределение по страховщикам пусто" in reader.pages[0].extract_text()
     assert (
         "распределение по филиалам и страховщикам пусто"
@@ -317,6 +321,10 @@ def test_empty_slice(refs):
     )
     assert (
         "Нет подходящих фактических оплат за квартал" in reader.pages[2].extract_text()
+    )
+    assert (
+        "Нет подходящих фактических оплат без участия брокера за квартал"
+        in reader.pages[3].extract_text()
     )
     broker_slide = build_broker_slide(2026, 3)
     assert broker_slide["empty"]
@@ -328,6 +336,10 @@ def test_empty_slice(refs):
         row["total_display"] == "—" and row["share_display"] == "—"
         for row in broker_slide["quarter_block"]["rows"]
     )
+    distribution = build_distribution_slide(2026, 3)
+    assert distribution["empty"] and not distribution["no_sums"]
+    assert distribution["sum_display"] == "—"
+    assert distribution["tables"] == []
 
 
 @pytest.mark.django_db
@@ -339,6 +351,7 @@ def test_presentation_quarter_label_and_as_of():
         "insurers",
         "branch_matrix",
         "broker",
+        "broker_distribution",
     ]
     assert all(s["as_of"] == AS_OF for s in presentation["slides"])
 
@@ -351,10 +364,11 @@ def test_presentation_order_and_single_portfolio_load(make):
     ) as spy:
         presentation = build_quarterly_presentation(2026, 3)
     assert spy.call_count == 1
-    slide1, slide2, slide3 = presentation["slides"]
+    slide1, slide2, slide3, slide4 = presentation["slides"]
     assert slide1["kind"] == "insurers"
     assert slide2["kind"] == "branch_matrix"
     assert slide3["kind"] == "broker"
+    assert slide4["kind"] == "broker_distribution"
     assert slide1["total_sum"] == slide2["total_sum"] == 5 * M
 
 
@@ -425,7 +439,7 @@ def test_view_invalid_params_fall_back_to_default(client):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_is_three_landscape_16x9_pages(client, make):
+def test_pdf_is_four_landscape_16x9_pages(client, make):
     make([10 * M, 9 * M, 8 * M])
     make([4 * M], insurer="b")
     client.force_login(User.objects.create_user("qp", "qp@u.ru", "x"))
@@ -440,7 +454,7 @@ def test_pdf_is_three_landscape_16x9_pages(client, make):
     )
     assert response["X-Content-Type-Options"] == "nosniff"
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 3
+    assert len(reader.pages) == 4
     for page in reader.pages:
         box = page.mediabox
         assert float(box.width) > float(box.height)
@@ -464,6 +478,10 @@ def test_pdf_is_three_landscape_16x9_pages(client, make):
     assert "III квартал 2026 года · По фактической дате оплаты взносов" in third
     assert "Нет подходящих фактических оплат за квартал" in third
     assert "флоу//полисы" in third
+    fourth = reader.pages[3].extract_text()
+    assert "Распределение страхования без участия брокера" in fourth
+    assert "Нет подходящих фактических оплат без участия брокера за квартал" in fourth
+    assert "флоу//полисы" in fourth
     assert "Распределение имущества" not in third
 
 
@@ -495,7 +513,7 @@ def test_preview_and_pdf_use_same_numbers(client, make):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_max_rows_with_long_names_stays_three_pages(client, refs, make):
+def test_pdf_max_rows_with_long_names_stay_within_four_pages(client, refs, make):
     for i in range(14):
         insurer = Insurer.objects.create(
             insurer_name=f"СК «Длинное название {i:02d}» "
@@ -508,7 +526,7 @@ def test_pdf_max_rows_with_long_names_stays_three_pages(client, refs, make):
         {"year": 2026, "quarter": 3, "format": "pdf"},
     )
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 3
+    assert len(reader.pages) == 4
     text = reader.pages[0].extract_text()
     for i in range(11):
         assert f"СК «Длинное название {i:02d}»" in text
@@ -553,7 +571,7 @@ def _pdf_pages(client, **params):
     )
     assert response.status_code == 200
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 3
+    assert len(reader.pages) == 4
     texts = []
     for page in reader.pages:
         box = page.mediabox
@@ -778,7 +796,7 @@ def test_other_composition_differs_between_slides(refs, make):
         insurer = Insurer.objects.create(insurer_name=f"СК {j:02d}")
         make([(14 - j) * M], insurer=insurer)
         make([(14 - j) * M], insurer=insurer, branch=moscow)
-    slide1, slide2, _ = build_quarterly_presentation(2026, 3)["slides"]
+    slide1, slide2, *_ = build_quarterly_presentation(2026, 3)["slides"]
     assert slide1["other_count"] == 3  # на слайде 1 скрыты СК 11–13
     assert slide2["other_insurer_count"] == 7  # на слайде 2 скрыты СК 07–13
     assert slide1["rows"][-1]["sum"] == 12 * M
@@ -930,7 +948,7 @@ def test_html_and_pdf_use_same_heat_levels_and_colors(client, refs, make):
 
     response = client.get(url, {"year": 2026, "quarter": 3, "format": "pdf"})
     reader = read_pdf(response.content)
-    assert len(reader.pages) == 3
+    assert len(reader.pages) == 4
     fills = _pdf_fill_colors(reader.pages[1])
     # Ячейки матрицы плюс по одному образцу каждого уровня в легенде.
     assert fills == Counter({color: 3 for color in HEAT_COLORS})
@@ -980,7 +998,7 @@ def test_pdf_second_page_matrix_totals_and_note(client, matrix_data):
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_pdf_max_filled_matrix_stays_three_pages(client, refs, make):
+def test_pdf_max_filled_matrix_stays_four_pages(client, refs, make):
     branches = [refs["branch"]] + [
         Branch.objects.create(
             branch_name=f"Филиал с длинным названием {i:02d} "
@@ -1025,7 +1043,7 @@ def test_preview_shows_both_slides_with_same_numbers(client, matrix_data):
     ).content.decode()
     assert "Распределение имущества по страховщикам" in html
     assert "Распределение имущества по филиалам и страховщикам" in html
-    assert "три альбомные страницы 16:9" in html
+    assert "четыре альбомные страницы 16:9" in html
     slide = build_branch_matrix_slide(AS_OF)
     for col in slide["columns"]:
         assert col["name"] in html
@@ -1551,11 +1569,14 @@ def test_broker_selection_query_count_does_not_grow(make, django_assert_num_quer
 def test_broker_slide_does_not_change_first_two_slides(make):
     _pay(make, 10 * M, date(2026, 8, 5))
     _pay(make, 4 * M, date(2026, 8, 6), broker=False, insurer="b")
-    slide1, slide2, slide3 = build_quarterly_presentation(2026, 3)["slides"]
+    slide1, slide2, slide3, slide4 = build_quarterly_presentation(2026, 3)["slides"]
     assert slide1 == build_insurer_slide(AS_OF)
     assert slide2 == build_branch_matrix_slide(AS_OF)
     assert slide3["kind"] == "broker"
     assert slide3["total_display"] == "14,0"
+    assert slide4["kind"] == "broker_distribution"
+    assert slide4["sum_display"] == "4,0"  # только полис без брокера
+    assert slide4["tables"][0]["total"]["sum"] == 4 * M
 
 
 @pytest.mark.integration
@@ -1609,8 +1630,10 @@ def test_broker_empty_quarter_renders_in_html_and_pdf(client, refs):
     html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
     assert "Страхование с участием и без участия брокера" in html
     assert "Нет подходящих фактических оплат за квартал" in html
+    assert "Нет подходящих фактических оплат без участия брокера за квартал" in html
     assert "Страхование с участием и без участия брокера" in pages[2]
     assert "Нет подходящих фактических оплат за квартал" in pages[2]
+    assert "Нет подходящих фактических оплат без участия брокера за квартал" in pages[3]
     assert "распределение по страховщикам пусто" in pages[0]
 
 
@@ -1637,3 +1660,263 @@ def test_broker_pdf_third_page_fits_with_large_sums(client, refs, make):
         flowables = qp_pdf._broker_slide(data)
         height = sum(f.wrap(qp_pdf.SLIDE_WIDTH, 10000)[1] for f in flowables)
         assert height <= qp_pdf.SLIDE_HEIGHT
+
+
+# --- Слайд 4: распределение страхования без участия брокера --------------------
+
+
+@pytest.mark.django_db
+def test_distribution_uses_single_pairs_selection_for_slides_3_and_4(refs, make):
+    _pay(make, 6 * M, date(2026, 7, 5), broker=False)
+    _pay(make, 2 * M, date(2026, 8, 5))
+    with mock.patch(
+        "apps.reports.services.quarterly_payments.broker_payment_pairs",
+        wraps=qp_payments.broker_payment_pairs,
+    ) as spy:
+        presentation = build_quarterly_presentation(2026, 3)
+    assert spy.call_count == 1
+    slide3, slide4 = presentation["slides"][2:]
+    assert slide3["without_display"] == slide4["sum_display"] == "6,0"
+
+
+@pytest.mark.django_db
+def test_distribution_totals_match_broker_slide_without(broker_data):
+    slide3 = build_broker_slide(2026, 3)
+    without = _row(slide3, "Все договоры")["without"]
+    slide4 = build_distribution_slide(2026, 3, pairs=broker_payment_pairs(2026, 3))
+    branch_total = slide4["tables"][0]["total"]
+    client_total = slide4["tables"][1]["total"]
+    # До округления итог каждой таблицы = «Без брокера» слайда 3 (не суммы двух таблиц).
+    assert branch_total["sum"] == client_total["sum"] == without == Decimal("10040000")
+    assert branch_total["sum_display"] == slide3["without_display"] == "10,0"
+    assert branch_total["share_display"] == client_total["share_display"] == "100,00%"
+    assert slide4["sum_display"] == "10,0"
+    pskov = next(r for r in slide4["tables"][0]["rows"] if r["name"] == "Псков")
+    moscow = next(r for r in slide4["tables"][0]["rows"] if r["name"] == "Москва")
+    assert (pskov["sum"], pskov["share_display"]) == (Decimal("4040000"), "40,24%")
+    assert (moscow["sum"], moscow["share_display"]) == (6 * M, "59,76%")
+    client_row = slide4["tables"][1]["rows"][0]
+    assert client_row["name"] == "ООО Лизинг"
+    assert client_row["share_display"] == "100,00%"  # доля от «Без брокера»
+
+
+@pytest.mark.django_db
+def test_distribution_excludes_broker_and_unknown_sums(refs, make):
+    _pay(make, 50 * M, date(2026, 7, 5), broker=True)  # канал с брокером не входит
+    _pay(make, 7 * M, date(2026, 7, 6), broker=False)
+    _pay(make, None, date(2026, 8, 6), broker=False)  # без СС — только примечание
+    slide = build_distribution_slide(2026, 3)
+    assert slide["unknown_count"] == 1
+    assert not slide["empty"] and not slide["no_sums"]
+    assert slide["tables"][0]["total"]["sum"] == 7 * M
+    row = slide["tables"][0]["rows"][0]
+    assert row["sum"] == 7 * M
+    # Доля считается от 7 млн без брокера, а не от 57 млн всех сделок.
+    assert row["share_display"] == "100,00%"
+    assert "Пар полис–год с неопределённой СС: 1" in slide["note"]
+
+
+@pytest.mark.django_db
+def test_distribution_same_names_different_ids_are_separate_rows(refs, make):
+    b1 = Branch.objects.create(branch_name="Северо-Запад")
+    b2 = Branch.objects.create(branch_name="Северо-Запад")
+    c1 = Client.objects.create(client_name="ООО Ромашка", client_inn="7801000001")
+    c2 = Client.objects.create(client_name="ООО Ромашка", client_inn="7801000002")
+    _pay(make, 5 * M, date(2026, 7, 5), broker=False, branch=b1, client=c1)
+    _pay(make, 3 * M, date(2026, 7, 6), broker=False, branch=b2, client=c2)
+    slide = build_distribution_slide(2026, 3)
+    assert [(r["id"], r["sum"]) for r in slide["tables"][0]["rows"]] == [
+        (b1.pk, 5 * M),
+        (b2.pk, 3 * M),
+    ]
+    assert [(r["id"], r["sum"]) for r in slide["tables"][1]["rows"]] == [
+        (c1.pk, 5 * M),
+        (c2.pk, 3 * M),
+    ]
+
+
+@pytest.mark.django_db
+def test_distribution_sorted_by_sum_then_id(refs, make):
+    branches = [Branch.objects.create(branch_name=f"Ф {i}") for i in range(4)]
+    _pay(make, 2 * M, date(2026, 7, 5), broker=False, branch=branches[3])
+    _pay(make, 9 * M, date(2026, 7, 5), broker=False, branch=branches[1])
+    _pay(make, 2 * M, date(2026, 7, 5), broker=False, branch=branches[0])
+    slide = build_distribution_slide(2026, 3)
+    assert [(r["id"], r["sum"]) for r in slide["tables"][0]["rows"]] == [
+        (branches[1].pk, 9 * M),
+        (branches[0].pk, 2 * M),
+        (branches[3].pk, 2 * M),
+    ]
+
+
+@pytest.mark.django_db
+def test_distribution_eight_groups_show_all_without_other(refs, make):
+    branches = [Branch.objects.create(branch_name=f"Ф {i:02d}") for i in range(8)]
+    for i, branch in enumerate(branches):
+        _pay(make, (i + 1) * M, date(2026, 7, 5), broker=False, branch=branch)
+    slide = build_distribution_slide(2026, 3)
+    rows = slide["tables"][0]["rows"]
+    assert len(rows) == 8
+    assert [r["sum"] for r in rows] == [(8 - i) * M for i in range(8)]
+    assert all(not r.get("is_other") for r in rows)
+    assert "Иные филиалы" not in slide["note"]
+    assert slide["tables"][0]["total"]["sum"] == 36 * M
+
+
+@pytest.mark.django_db
+def test_distribution_nine_groups_top_seven_plus_other(refs, make):
+    branches = [Branch.objects.create(branch_name=f"Ф {i:02d}") for i in range(9)]
+    for i, branch in enumerate(branches):
+        _pay(make, (i + 1) * M, date(2026, 7, 5), broker=False, branch=branch)
+    slide = build_distribution_slide(2026, 3)
+    rows = slide["tables"][0]["rows"]
+    assert len(rows) == 8
+    assert [r["sum"] for r in rows[:7]] == [(i + 1) * M for i in range(8, 1, -1)]
+    other = rows[-1]
+    assert other["name"] == "Иные филиалы" and other["id"] is None
+    assert other["sum"] == 3 * M  # суммы скрытых групп не потеряны
+    assert other["share_display"] == "6,67%"
+    assert slide["tables"][0]["other_count"] == 2
+    assert slide["tables"][0]["total"]["sum"] == 45 * M
+    assert "«Иные филиалы» — ещё 2 филиалов" in slide["note"]
+
+
+@pytest.mark.django_db
+def test_distribution_empty_without_broker_slice(refs, make):
+    _pay(make, 10 * M, date(2026, 7, 5), broker=True)
+    slide = build_distribution_slide(2026, 3)
+    assert slide["empty"] and not slide["no_sums"]
+    assert slide["unknown_count"] == 0
+    assert slide["sum_display"] == "—"
+    assert slide["tables"] == []
+
+
+@pytest.mark.django_db
+def test_distribution_all_unknown_sums_is_separate_state(refs, make):
+    _pay(make, 10 * M, date(2026, 7, 5), broker=True)
+    _pay(make, None, date(2026, 7, 6), broker=False)
+    _pay(make, None, date(2026, 8, 6), broker=False)
+    slide = build_distribution_slide(2026, 3)
+    assert not slide["empty"] and slide["no_sums"]
+    assert slide["unknown_count"] == 2
+    assert slide["sum_display"] == "—"
+    assert slide["tables"] == []
+
+
+@pytest.mark.django_db
+def test_distribution_small_positive_and_total_share(refs, make):
+    _pay(make, Decimal("40000"), date(2026, 7, 5), broker=False)
+    slide = build_distribution_slide(2026, 3)
+    row = slide["tables"][0]["rows"][0]
+    assert row["sum_display"] == "<0,1"
+    assert row["share_display"] == "100,00%"
+    assert slide["tables"][0]["total"]["share_display"] == "100,00%"
+
+
+@pytest.mark.django_db
+def test_distribution_names_batch_queries(refs, make, django_assert_num_queries):
+    branches = [Branch.objects.create(branch_name=f"Ф {i}") for i in range(3)]
+    clients = [
+        Client.objects.create(client_name=f"ООО {i}", client_inn=f"780200000{i}")
+        for i in range(3)
+    ]
+    for i in range(12):
+        _pay(
+            make,
+            (i + 1) * M,
+            date(2026, 7, 5),
+            broker=False,
+            branch=branches[i % 3],
+            client=clients[i % 3],
+        )
+    pairs = broker_payment_pairs(2026, 3)
+    with django_assert_num_queries(2):  # по одному запросу на справочник
+        slide = build_distribution_slide(2026, 3, pairs=pairs)
+    assert len(slide["tables"][0]["rows"]) == 3
+    assert len(slide["tables"][1]["rows"]) == 3
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_distribution_html_and_pdf_use_same_numbers(client, broker_data):
+    url = reverse("reports:quarterly_presentation")
+    fourth = _pdf_pages(client)[3]  # помощник сам авторизует клиента
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    slide = build_distribution_slide(2026, 3)
+    caption = "III квартал 2026 года · По фактической дате оплаты взносов"
+    assert slide["title"] in html and slide["title"] in fourth
+    assert caption in html and caption in _flat(fourth)
+    assert "флоу//полисы" in fourth
+    assert slide["sum_display"] in html and slide["sum_display"] in fourth
+    assert slide["sum_label"] in html and slide["sum_label"] in _flat(fourth)
+    for table in slide["tables"]:
+        assert table["name"] in html and table["name"] in fourth
+        for row in table["rows"] + [table["total"]]:
+            assert row["name"] in html and row["name"] in fourth
+            assert row["sum_display"] in html and row["sum_display"] in fourth
+            assert row["share_display"] in html and row["share_display"] in fourth
+    assert escape(slide["note"]) in html
+    assert _flat(slide["note"]) in _flat(fourth)
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_distribution_empty_and_no_sums_render_in_html_and_pdf(client, refs, make):
+    url = reverse("reports:quarterly_presentation")
+    _pay(make, 10 * M, date(2026, 7, 5), broker=True)
+    pages = _pdf_pages(client)  # помощник сам авторизует клиента
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    assert "Нет подходящих фактических оплат без участия брокера за квартал" in html
+    assert "Нет подходящих фактических оплат без участия брокера за квартал" in pages[3]
+    # Оплаты без брокера появились, но все СС неизвестны — другое состояние.
+    _pay(make, None, date(2026, 8, 6), broker=False)
+    response = client.get(url, {"year": 2026, "quarter": 3, "format": "pdf"})
+    fourth = read_pdf(response.content).pages[3].extract_text()
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    assert "Оплаты без брокера в квартале есть" in html
+    assert "не определена ни у одной из 1 пар полис–год" in _flat(fourth)
+    assert "Итого" not in fourth and "0,00%" not in fourth
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_distribution_pdf_fourth_page_fits_with_long_names(client, refs, make):
+    branches = [refs["branch"]] + [
+        Branch.objects.create(
+            branch_name=f"Филиал длинное название {i:02d} "
+            + "обслуживания лизинга " * 4
+        )
+        for i in range(8)
+    ]
+    clients = [
+        Client.objects.create(
+            client_name=f"ООО «Длинное наименование {i:02d}» "
+            + "лизингополучатель техники " * 3,
+            client_inn=f"7803{i:04d}00",
+        )
+        for i in range(12)
+    ]
+    for i in range(30):
+        _pay(
+            make,
+            Decimal("1234567890") - i * M,
+            date(2026, 7 + i % 3, 5),
+            year=1 + i % 2,
+            broker=False,
+            branch=branches[i % len(branches)],
+            client=clients[i % len(clients)],
+        )
+    fourth = _pdf_pages(client)[3]
+    slide = build_distribution_slide(2026, 3)
+    assert slide["tables"][0]["other_count"] == 2  # 9 филиалов → 7 + «Иные» из 2
+    assert slide["tables"][1]["other_count"] == 5  # 12 лизингополучателей
+    assert "Иные филиалы" in fourth and "Иные лизингополучатели" in fourth
+    for table in slide["tables"]:
+        assert table["name"] in fourth
+        for row in table["rows"] + [table["total"]]:
+            assert row["sum_display"] in fourth
+            assert row["share_display"] in fourth
+    data = build_distribution_slide(2026, 3, pairs=broker_payment_pairs(2026, 3))
+    flowables = qp_pdf._distribution_slide(data)
+    height = sum(f.wrap(qp_pdf.SLIDE_WIDTH, 10000)[1] for f in flowables)
+    assert height <= qp_pdf.SLIDE_HEIGHT

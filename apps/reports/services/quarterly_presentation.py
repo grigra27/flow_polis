@@ -192,6 +192,7 @@ def build_insurer_slide(as_of: date, objects=None, images=None) -> dict:
         "record_count": totals["count"],
         "insurer_count": insurer_count,
         "other_count": other_count,
+        "unknown_sum_count": sum(not o.insured_sum_known for o in objects),
         "note": " ".join(notes),
         "empty": not rows,
     }
@@ -349,6 +350,7 @@ def build_branch_matrix_slide(as_of: date, objects=None) -> dict:
         "other_insurer_count": other_insurer_count,
         "branch_count": branch_count,
         "other_branch_count": other_branch_count,
+        "unknown_sum_count": sum(not o.insured_sum_known for o in objects),
         "note": " ".join(notes),
         "empty": not all_rows,
     }

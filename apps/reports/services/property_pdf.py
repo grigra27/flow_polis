@@ -68,7 +68,7 @@ def million(value):
     return number(Decimal(value) / 1_000_000)
 
 
-def p(value, size=9.2, bold=False, color=INK, right=False):
+def p(value, size=9.2, bold=False, color=INK, right=False, rightIndent=0):
     # Описания и названия из базы всегда проходят XML-экранирование.
     value = "".join(
         ch
@@ -84,6 +84,7 @@ def p(value, size=9.2, bold=False, color=INK, right=False):
             leading=size * 1.35,
             textColor=color,
             alignment=TA_RIGHT if right else 0,
+            rightIndent=rightIndent,
             spaceAfter=0,
             splitLongWords=True,
         ),

@@ -236,6 +236,15 @@ def test_unknown_current_sum_is_not_counted(make):
 
 
 @pytest.mark.django_db
+def test_portfolio_slides_report_unknown_sum_count(make):
+    # Оба портфельных слайда считают одни и те же записи без СС.
+    make([10 * M, None], start=date(2025, 8, 1), years=2)
+    make([4 * M], insurer="b")
+    assert build_insurer_slide(AS_OF)["unknown_sum_count"] == 1
+    assert build_branch_matrix_slide(AS_OF)["unknown_sum_count"] == 1
+
+
+@pytest.mark.django_db
 def test_closed_dfa_and_expired_are_excluded(make):
     make([5 * M])
     make([5 * M], dfa_active=False)
@@ -1831,6 +1840,60 @@ def test_chart_zero_share_differs_from_undefined(make):
 
 
 @pytest.mark.django_db
+def test_share_bold_only_for_defined_shares(make):
+    _pay(make, 10 * M, date(2026, 7, 5))  # июль: доля 0,00%
+    _pay(make, 8 * M, date(2026, 8, 5), broker=False)  # август: 100,00%
+    _pay(make, None, date(2026, 9, 5), broker=False)  # сентябрь: прочерк
+    slide = build_broker_slide(2026, 3)
+    all_row = next(r for r in slide["table_rows"] if r["label"] == "Все договоры")
+    july, august, september, quarter = all_row["cells"]
+    assert july["share_display"] == "0,00%" and july["share_bold"]
+    assert august["share_display"] == "100,00%" and august["share_bold"]
+    assert september["share_display"] == "—" and not september["share_bold"]
+    assert quarter["share_display"] == "44,44%" and quarter["share_bold"]
+
+
+@pytest.mark.unit
+def test_broker_widest_cell_measures_bold_share():
+    # «100,00%» в жирном начертании шире обычного: подбор шрифта должен
+    # мерить долю именно жирным, иначе колонка обрежет значение.
+    from reportlab.pdfbase import pdfmetrics
+
+    from apps.reports.services.property_pdf import _fonts
+
+    _fonts()
+    row = {
+        "total_display": "1,0",
+        "without_display": "1,0",
+        "share_display": "100,00%",
+        "share_bold": True,
+    }
+    slide = {
+        "months": [{"rows": [dict(row)]}],
+        "quarter_block": {"rows": [dict(row)]},
+    }
+    widest = qp_pdf._broker_widest_cell(slide, 11)
+    assert widest == pdfmetrics.stringWidth("100,00%", "PropertyInterBold", 11)
+    assert widest > pdfmetrics.stringWidth("100,00%", "PropertyInter", 11)
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_share_column_bold_in_html_and_fits_pdf(client, make):
+    _pay(make, 10 * M, date(2026, 7, 5))
+    _pay(make, 8 * M, date(2026, 8, 5), broker=False)
+    _pay(make, None, date(2026, 9, 5), broker=False)
+    third = _pdf_pages(client)[2]
+    html = client.get(
+        reverse("reports:quarterly_presentation"), {"year": 2026, "quarter": 3}
+    ).content.decode()
+    # Определённые доли жирны во всех четырёх блоках: в июле, августе и
+    # квартале по две (строки «Все» и «Новые»), в сентябре одни прочерки.
+    assert html.count(' qp-share-bold"') == 6
+    assert "0,00%" in third and "100,00%" in third and "44,44%" in third
+
+
+@pytest.mark.django_db
 def test_comparison_across_year_boundary(make):
     # I квартал 2027 сравнивается с завершённым IV кварталом 2026.
     _pay(make, 8 * M, date(2026, 12, 5), broker=False)
@@ -1866,6 +1929,47 @@ def test_comparison_hidden_when_previous_quarter_empty(make):
     ):
         slide = build_broker_slide(2027, 1)
     assert slide["comparison"] is None
+
+
+@pytest.mark.django_db
+def test_comparison_appears_only_day_after_quarter_end(make):
+    # Обе доли определены; 30.09 — последний день квартала, сравнения ещё нет.
+    _pay(make, 6 * M, date(2026, 6, 5), broker=False)
+    _pay(make, 6 * M, date(2026, 6, 6), broker=True)
+    _pay(make, 8 * M, date(2026, 9, 5), broker=False)
+    with mock.patch.object(
+        qp_payments.timezone, "localdate", return_value=date(2026, 9, 30)
+    ):
+        assert build_broker_slide(2026, 3)["comparison"] is None
+    with mock.patch.object(
+        qp_payments.timezone, "localdate", return_value=date(2026, 10, 1)
+    ):
+        comparison = build_broker_slide(2026, 3)["comparison"]
+    assert comparison["label"] == "ко II кварталу 2026 года"
+    # Доля II квартала 50%, доля III квартала 100% → сдвиг +50,00 п.п.
+    assert comparison["display"] == "+50,00 п.п."
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_comparison_lives_in_details_not_in_card_or_pdf(client, make):
+    # Сравнение убрано из карточки слайда 3 и из PDF: осталось только в
+    # раскрываемом блоке «Как рассчитано» под слайдом.
+    _pay(make, 6 * M, date(2026, 6, 5), broker=False)
+    _pay(make, 6 * M, date(2026, 6, 6), broker=True)
+    _pay(make, 8 * M, date(2026, 9, 5), broker=False)
+    with mock.patch.object(
+        qp_payments.timezone, "localdate", return_value=date(2026, 10, 1)
+    ):
+        third = _pdf_pages(client)[2]
+        html = client.get(
+            reverse("reports:quarterly_presentation"), {"year": 2026, "quarter": 3}
+        ).content.decode()
+    assert "+50,00 п.п." not in _flat(third)
+    assert "ко II кварталу 2026 года" not in _flat(third)
+    assert "Изменение доли без брокера: +50,00 п.п. ко II кварталу 2026 года." in html
+    # В карточке сравнения нет: текст встречается один раз, внутри details.
+    assert html.count("+50,00 п.п.") == 1
 
 
 # --- Слайд 4: распределение страхования без участия брокера --------------------
@@ -2098,6 +2202,38 @@ def test_html_keeps_methodology_scope_and_warns_unknown_sums(client, refs, make)
     assert "Страховые суммы по фактическим оплатам за квартал" in html
     # Логотип ООО «ОН-ЛАЙН БРОКЕР» из static вместо текстовой марки.
     assert "onlayn-broker.png" in html
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_unknown_sum_warning_on_portfolio_slides_only(client, make):
+    make([10 * M, None], start=date(2025, 8, 1), years=2)
+    make([4 * M], insurer="b")
+    pages = _pdf_pages(client)  # помощник сам авторизует клиента
+    html = client.get(
+        reverse("reports:quarterly_presentation"), {"year": 2026, "quarter": 3}
+    ).content.decode()
+    # Предупреждение видно под обоими портфельными слайдами, вне details.
+    assert (
+        html.count('class="qp-warn">Записей без определённой страховой суммы — 1.') == 2
+    )
+    # В PDF предупреждений о СС нет.
+    for page in pages:
+        assert "Записей без определённой страховой суммы" not in page
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_unknown_sum_warning_absent_when_all_known(client, make):
+    make([10 * M, 9 * M, 8 * M])
+    make([4 * M], insurer="b")
+    pages = _pdf_pages(client)
+    html = client.get(
+        reverse("reports:quarterly_presentation"), {"year": 2026, "quarter": 3}
+    ).content.decode()
+    assert "Записей без определённой страховой суммы" not in html
+    for page in pages:
+        assert "Записей без определённой страховой суммы" not in page
 
 
 @pytest.mark.integration

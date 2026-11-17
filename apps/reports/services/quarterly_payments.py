@@ -166,6 +166,8 @@ def _block(pairs) -> list:
                 "total_display": _cell_display(total),
                 "without_display": _cell_display(without),
                 "share_display": _share_display(total, without),
+                # Определённая доля выделяется жирным; прочерк — обычным.
+                "share_bold": bool(total),
                 # Неокруглённая доля для диаграммы; None — знаменатель пуст.
                 "share_value": without / total * 100 if total else None,
             }
@@ -181,10 +183,11 @@ def _quarter_comparison(year: int, quarter: int, share_value):
     """Разница с предыдущим кварталом в п.п. по одинаковой методике.
 
     Показывается только для двух завершённых кварталов с определённой
-    долей: выбранный квартал должен закончиться, у предыдущего должна
-    быть непустая СС «Все договоры».
+    долей: у предыдущего должна быть непустая СС «Все договоры», а
+    выбранный квартал должен закончиться — сравнение появляется не
+    раньше дня, следующего за днём окончания квартала.
     """
-    if share_value is None or quarter_end(year, quarter) > timezone.localdate():
+    if share_value is None or quarter_end(year, quarter) >= timezone.localdate():
         return None
     prev_year, prev_quarter = _previous_quarter(year, quarter)
     prev_known = [

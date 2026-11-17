@@ -27,7 +27,7 @@
     .qp-slide-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.1%; }
     .qp-slide-title { font-size: 1.45rem; font-weight: 800; color: #1a1a1a; margin: 0; }
     .qp-slide-date { color: #555; font-size: .95rem; margin-top: .3rem; }
-    .qp-brand { height: 30px; width: auto; flex: none; }
+    .qp-brand { width: 90px; height: auto; flex: none; }
     .qp-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
     .qp-table th { background: #111; color: #fff; font-weight: 700; text-align: left; padding: .5rem .65rem; }
     .qp-table th.num, .qp-table td.num { text-align: right; white-space: nowrap; }
@@ -77,6 +77,7 @@
     .qp-broker thead th.qp-sub { text-align: right; }
     .qp-broker tbody td.qp-m { border-left: 1px solid #bbb; }
     .qp-table.qp-broker tbody tr td.qp-q { background: #e4e4e4; font-weight: 700; }
+    .qp-table.qp-broker tbody td.qp-share-bold { font-weight: 700; }
     .qp-table.qp-broker .qp-q-start { border-left: 2px solid #111; }
     .qp-table.qp-broker--compact tbody td.num { font-size: .68rem; }
 
@@ -200,7 +201,6 @@
                 </div>
                 <span class="qp-broker-stat">СС без брокера, млн ₽: <b>{{ slide.without_display }}</b></span>
                 <span class="qp-broker-stat">Общая СС, млн ₽: <b>{{ slide.total_display }}</b></span>
-                {% if slide.comparison %}<span class="qp-broker-stat">{{ slide.comparison.display }} {{ slide.comparison.label }}</span>{% endif %}
             </div>
             <table class="qp-table qp-broker{% if slide.compact %} qp-broker--compact{% endif %}">
                 <thead>
@@ -221,7 +221,7 @@
                         {% for cells in row.cells %}
                         <td class="num{% if forloop.last %} qp-q qp-q-start{% elif forloop.counter0 == 1 or forloop.counter0 == 2 %} qp-m{% endif %}">{{ cells.total_display }}</td>
                         <td class="num{% if forloop.last %} qp-q{% endif %}">{{ cells.without_display }}</td>
-                        <td class="num{% if forloop.last %} qp-q{% endif %}">{{ cells.share_display }}</td>
+                        <td class="num{% if forloop.last %} qp-q{% endif %}{% if cells.share_bold %} qp-share-bold{% endif %}">{{ cells.share_display }}</td>
                         {% endfor %}
                     </tr>
                     {% endfor %}
@@ -315,7 +315,11 @@
             </div>
             {% endif %}
         </div>
-        {% if slide.kind == "broker" and slide.unknown_count %}
+        {% if slide.kind == "insurers" and slide.unknown_sum_count %}
+        <div class="qp-warn">Записей без определённой страховой суммы — {{ slide.unknown_sum_count }}. Они не включены в денежный итог.</div>
+        {% elif slide.kind == "branch_matrix" and slide.unknown_sum_count %}
+        <div class="qp-warn">Записей без определённой страховой суммы — {{ slide.unknown_sum_count }}. Они не включены в денежный итог.</div>
+        {% elif slide.kind == "broker" and slide.unknown_count %}
         <div class="qp-warn">Пар полис–год с неопределённой страховой суммой: {{ slide.unknown_count }} (без брокера — {{ slide.unknown_without_count }}); в денежные итоги они не включены.</div>
         {% elif slide.kind == "broker_distribution" and slide.unknown_count %}
         <div class="qp-warn">Пар полис–год без брокера с неопределённой страховой суммой: {{ slide.unknown_count }}; в денежные итоги и доли они не включены.</div>
@@ -323,6 +327,9 @@
         <details class="qp-how">
             <summary>Как рассчитано</summary>
             <p>{{ slide.note }}</p>
+            {% if slide.kind == "broker" and slide.comparison %}
+            <p>Изменение доли без брокера: {{ slide.comparison.display }} {{ slide.comparison.label }}.</p>
+            {% endif %}
         </details>
     </div>
     {% endfor %}

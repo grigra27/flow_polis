@@ -13,6 +13,7 @@ from django.conf import settings
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import (
     BaseDocTemplate,
@@ -42,11 +43,12 @@ TRACK_GRAY = colors.HexColor("#e9eef4")
 BAR_COLOR = NAVY
 HEAT_FILL = tuple(colors.HexColor(c) for c in HEAT_COLORS)
 
-# Логотип ООО «ОН-ЛАЙН БРОКЕР» — статический ассет, пропорции исходника
-# 1166×690; один размер и отступы на всех четырёх страницах.
+# Логотип ООО «ОН-ЛАЙН БРОКЕР» — статический ассет без лишних пустых полей;
+# пропорции берутся из самого файла. Один размер и отступы на всех страницах.
 BRAND_PATH = Path(settings.BASE_DIR) / "static" / "images" / "onlayn-broker.png"
-BRAND_ASPECT = 1166 / 690
-BRAND_HEIGHT = 24
+BRAND_WIDTH = 80
+# Место в шапке слева от логотипа, чтобы заголовок и дата не заходили под него.
+BRAND_HEAD_RESERVE = BRAND_WIDTH + 12
 
 # Внутренние отступы Frame обнулены, поэтому доступная область совпадает
 # с полями страницы и расчёт высоты сходится с фактической вёрсткой.
@@ -101,15 +103,21 @@ BROKER_FIT_LEVELS = (
 BROKER_LABEL_RATIO = 0.16
 
 
+def _brand_size():
+    img = ImageReader(str(BRAND_PATH))
+    image_width, image_height = img.getSize()
+    return BRAND_WIDTH, BRAND_WIDTH * image_height / image_width
+
+
 def _wordmark(canvas, doc):
     canvas.saveState()
-    width = BRAND_HEIGHT * BRAND_ASPECT
+    width, height = _brand_size()
     canvas.drawImage(
         str(BRAND_PATH),
         PAGE_SIZE[0] - MARGIN_X - width,
-        PAGE_SIZE[1] - MARGIN_TOP - BRAND_HEIGHT + 10,
+        PAGE_SIZE[1] - MARGIN_TOP - height + 10,
         width=width,
-        height=BRAND_HEIGHT,
+        height=height,
         mask="auto",
         preserveAspectRatio=True,
     )
@@ -263,9 +271,14 @@ def _insurer_table(slide, width, size, padding, logo_scale, lines):
 
 def _slide_head(slide):
     return [
-        p(slide["title"], 22, True, INK),
+        p(slide["title"], 22, True, INK, rightIndent=BRAND_HEAD_RESERVE),
         Spacer(1, 6),
-        p(f'По состоянию на {slide["as_of"]:%d.%m.%Y}', 12.5, color=MUTED),
+        p(
+            f'По состоянию на {slide["as_of"]:%d.%m.%Y}',
+            12.5,
+            color=MUTED,
+            rightIndent=BRAND_HEAD_RESERVE,
+        ),
         Spacer(1, 16),
     ]
 
@@ -500,7 +513,13 @@ def _broker_table(slide, width, size, padding):
                 [
                     p(cells["total_display"], size, bold, INK, right=True),
                     p(cells["without_display"], size, bold, INK, right=True),
-                    p(cells["share_display"], size, bold, INK, right=True),
+                    p(
+                        cells["share_display"],
+                        size,
+                        bold or cells["share_bold"],
+                        INK,
+                        right=True,
+                    ),
                 ]
             )
         body.append(row)
@@ -538,8 +557,16 @@ def _broker_widest_cell(slide, size):
             "PropertyInterBold" if block is slide["quarter_block"] else "PropertyInter"
         )
         for row in block["rows"]:
-            for key in ("total_display", "without_display", "share_display"):
-                widest = max(widest, pdfmetrics.stringWidth(row[key], font, size))
+            widest = max(
+                widest, pdfmetrics.stringWidth(row["total_display"], font, size)
+            )
+            widest = max(
+                widest, pdfmetrics.stringWidth(row["without_display"], font, size)
+            )
+            share_font = "PropertyInterBold" if row["share_bold"] else font
+            widest = max(
+                widest, pdfmetrics.stringWidth(row["share_display"], share_font, size)
+            )
     return widest
 
 
@@ -591,15 +618,26 @@ class _BrokerChart(Flowable):
         if not months:
             return
         group_width = self.width / len(months)
-        offset = self.BAR_WIDTH + self.BAR_GAP / 2
         canvas.setStrokeColor(colors.HexColor("#c9d4e0"))
         canvas.setLineWidth(0.75)
         canvas.line(0, self.BASELINE_Y, self.width, self.BASELINE_Y)
         for index, entry in enumerate(months):
+            # Пара столбцов симметрична относительно центра месячной группы:
+            # внутренний зазор — BAR_GAP, пара целиком — 2 * BAR_WIDTH + BAR_GAP.
             center = group_width * index + group_width / 2
-            self._draw_bar(canvas, center - offset, self.BASELINE_Y, entry["new"], True)
             self._draw_bar(
-                canvas, center + offset, self.BASELINE_Y, entry["prolong"], False
+                canvas,
+                center - self.BAR_WIDTH - self.BAR_GAP / 2,
+                self.BASELINE_Y,
+                entry["new"],
+                True,
+            )
+            self._draw_bar(
+                canvas,
+                center + self.BAR_GAP / 2,
+                self.BASELINE_Y,
+                entry["prolong"],
+                False,
             )
             canvas.setFillColor(INK)
             canvas.setFont("PropertyInter", 8)
@@ -624,25 +662,24 @@ class _BrokerChart(Flowable):
 
 def _broker_head(slide):
     return [
-        p(slide["title"], 22, True, INK),
+        p(slide["title"], 22, True, INK, rightIndent=BRAND_HEAD_RESERVE),
         Spacer(1, 6),
-        p(f'{slide["quarter_label"]} · {slide["subtitle"]}', 12.5, color=MUTED),
+        p(
+            f'{slide["quarter_label"]} · {slide["subtitle"]}',
+            12.5,
+            color=MUTED,
+            rightIndent=BRAND_HEAD_RESERVE,
+        ),
         Spacer(1, 14),
     ]
 
 
 def _broker_headline(slide):
-    comparison = slide["comparison"]
     cells = [
         p(slide["share_display"], 30, True, INK),
         p(slide["share_label"], 9, color=MUTED),
         p(f'СС без брокера, млн ₽: {slide["without_display"]}', 10.5, True, INK),
         p(f'Общая СС, млн ₽: {slide["total_display"]}', 10.5, True, INK),
-        p(
-            f'{comparison["display"]} {comparison["label"]}' if comparison else "",
-            9.5,
-            color=MUTED,
-        ),
     ]
     # Доля не должна переноситься на вторую строку: ширина первой колонки
     # подгоняется под самое длинное значение, остальные сжимаются пропорционально.
@@ -651,7 +688,7 @@ def _broker_headline(slide):
         pdfmetrics.stringWidth(slide["share_display"], "PropertyInterBold", 30) + 12,
     )
     rest = SLIDE_WIDTH - share_width
-    ratios = (0.20, 0.20, 0.20, 0.27)
+    ratios = (0.34, 0.33, 0.33)
     headline = Table(
         [cells],
         colWidths=[share_width] + [rest * ratio / sum(ratios) for ratio in ratios],

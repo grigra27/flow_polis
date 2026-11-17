@@ -120,18 +120,88 @@ def test_missing_current_value_never_uses_previous_maximum(make_policy):
     assert build_property_report_workbook(report)["Крупнейшие объекты"].max_row > 0
 
 
-def test_missing_first_installment_is_unknown_even_when_other_values_exist(make_policy):
+def test_missing_first_installment_restored_from_next_filled(make_policy):
     p = make_policy()
     pay(p, installment=2, value=5000)
-    assert current_insured_sums([p.pk], AS_OF) == {}
-    assert service().missing_sum == {p.pk}
+    assert current_insured_sums([p.pk], AS_OF) == {p.pk: Decimal(5000)}
+    assert service().missing_sum == set()
 
 
-def test_missing_first_installment_of_new_year_does_not_restore_old_sum(make_policy):
+def test_missing_first_installment_of_new_year_restores_own_year_not_old(make_policy):
     p = make_policy()
     pay(p, year=1, due=AS_OF - timedelta(days=400), value=1000)
     pay(p, year=2, installment=2, value=800)
-    assert current_insured_sums([p.pk], AS_OF) == {}
+    # Восстанавливается СС текущего года по №2, а не сумма прошлого года.
+    assert current_insured_sums([p.pk], AS_OF) == {p.pk: Decimal(800)}
+
+
+def test_restored_policy_leaves_missing_list_but_stays_in_count(make_policy):
+    p = make_policy()
+    pay(p, installment=1, value=None)
+    pay(p, installment=2, value=5000)
+    context = service().context()
+    assert context["policy_count"] == 1
+    assert context["missing_sum_count"] == 0
+    assert context["total_sum"] == 5000
+
+
+def test_unknown_sum_reasons_distinguish_three_cases(make_policy):
+    no_schedule = make_policy()
+    future = make_policy()
+    pay(future, due=AS_OF + timedelta(days=10), value=500)
+    empty_year = make_policy()
+    pay(empty_year, year=1, due=AS_OF - timedelta(days=400), value=1000)
+    pay(empty_year, year=2, value=None)
+    s = service()
+    assert s.missing_sum == {no_schedule.pk, future.pk, empty_year.pk}
+    assert s.unknown_sum_reason(no_schedule.pk) == "Нет графика платежей"
+    assert s.unknown_sum_reason(future.pk) == (
+        f"Первый срок взноса {AS_OF + timedelta(days=10):%d.%m.%Y} — после даты среза"
+    )
+    assert s.unknown_sum_reason(empty_year.pk) == "Не заполнена СС страхового года 2"
+    assert s.policy_row(future.pk)["value_note"] == s.unknown_sum_reason(future.pk)
+
+
+def test_restored_sum_agrees_on_every_surface(make_policy):
+    # Контрольный пример: прошлый год 10 млн, у текущего года №1 пуст,
+    # №2 с наступившим сроком — 8 млн, №3 ещё не наступил — 7 млн.
+    as_of = date(2027, 6, 30)
+    osago_kind = InsuranceType.objects.create(name="ОСАГО D3R", is_osago=True)
+    liability_kind = InsuranceType.objects.create(name="Ответственность")
+    restored = make_policy()
+    pay(restored, year=1, due=as_of - timedelta(days=400), value=10_000_000)
+    pay(restored, year=2, due=as_of - timedelta(days=100), value=None)
+    pay(restored, year=2, installment=2, due=as_of - timedelta(days=5), value=8_000_000)
+    pay(restored, year=2, installment=3, due=as_of + timedelta(days=5), value=7_000_000)
+    osago = make_policy(insurance_type=osago_kind)
+    pay(osago, value=None, amount=777)
+    liability = make_policy(insurance_type=liability_kind)
+    pay(liability, value=10_000_000)
+    context = DashboardV3Service(PortfolioScope(as_of, "all", ())).context("portfolio")
+    snapshot = build_property_snapshot(as_of)
+    document = build_property_document(as_of)
+    report = build_property_report(as_of, property_only=True)
+    insurer_slide = build_insurer_slide(as_of)
+    matrix_slide = build_branch_matrix_slide(as_of)
+    assert (
+        context["total_sum"]
+        == snapshot["total_insurance_sum"]
+        == document["totals"]["sum"]
+        == report["totals"]["sum"]
+        == insurer_slide["total_sum"]
+        == matrix_slide["total_sum"]
+        == 8_000_000
+    )
+    assert (
+        context["policy_count"]
+        == snapshot["active_policies_count"]
+        == document["totals"]["count"]
+        == report["totals"]["count"]
+        == insurer_slide["record_count"]
+        == 1
+    )
+    assert context["missing_sum_count"] == report["totals"]["missing_sum_count"] == 0
+    assert insurer_slide["unknown_sum_count"] == matrix_slide["unknown_sum_count"] == 0
 
 
 @pytest.mark.parametrize(

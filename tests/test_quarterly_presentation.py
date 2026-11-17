@@ -1465,6 +1465,184 @@ def test_broker_multi_year_policy_uses_sum_of_paid_year(make):
 
 
 @pytest.mark.django_db
+def test_broker_empty_first_restored_from_second_due_before_payment(make):
+    # №1 пуст, №2 с наступившим сроком и заполненной СС не оплачен,
+    # оплачен №3 без суммы: источник — №2, месяц — по оплате №3.
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {"year": 1, "inst": 2, "due": date(2026, 8, 1), "sum": 8 * M},
+            {
+                "year": 1,
+                "inst": 3,
+                "due": date(2026, 9, 1),
+                "paid": date(2026, 9, 5),
+                "sum": None,
+            },
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert len(pairs) == 1
+    assert pairs[0]["insured_sum"] == 8 * M
+    assert pairs[0]["month"] == 3
+    slide = build_broker_slide(2026, 3)
+    assert _row(slide, "Все договоры")["total"] == 8 * M
+    assert slide["unknown_count"] == 0
+
+
+@pytest.mark.django_db
+def test_broker_absent_first_restored_from_second(make):
+    # Взноса №1 в графике года вообще нет.
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 2, "due": date(2026, 8, 1), "sum": 8 * M},
+            {
+                "year": 1,
+                "inst": 3,
+                "due": date(2026, 9, 1),
+                "paid": date(2026, 9, 5),
+                "sum": None,
+            },
+        ],
+    )
+    assert broker_payment_pairs(2026, 3)[0]["insured_sum"] == 8 * M
+
+
+@pytest.mark.django_db
+def test_broker_early_paid_source_installment_is_allowed(make):
+    # Оплаченный №2 — источник, хотя договорный срок наступит позже:
+    # досрочная оплата самого взноса допустима.
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {
+                "year": 1,
+                "inst": 2,
+                "due": date(2026, 10, 1),
+                "sum": 8 * M,
+                "paid": date(2026, 9, 20),
+            },
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert pairs[0]["insured_sum"] == 8 * M
+    assert pairs[0]["month"] == 3
+
+
+@pytest.mark.django_db
+def test_broker_later_unpaid_installment_does_not_backfill(make):
+    # №3 с суммой 7 млн имеет срок после первой оплаты и не оплачен:
+    # сумму пары в III квартале он не восстанавливает.
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {
+                "year": 1,
+                "inst": 2,
+                "due": date(2026, 7, 15),
+                "sum": None,
+                "paid": date(2026, 7, 20),
+            },
+            {"year": 1, "inst": 3, "due": date(2026, 10, 1), "sum": 7 * M},
+        ],
+    )
+    slide = build_broker_slide(2026, 3)
+    assert slide["unknown_count"] == 1
+    assert _row(slide, "Все договоры")["total"] == 0
+    assert build_broker_slide(2026, 4)["empty"]
+
+
+@pytest.mark.django_db
+def test_broker_two_payments_of_restored_pair_counted_once(make):
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {
+                "year": 1,
+                "inst": 2,
+                "due": date(2026, 8, 1),
+                "sum": 8 * M,
+                "paid": date(2026, 8, 5),
+            },
+            {
+                "year": 1,
+                "inst": 3,
+                "due": date(2026, 9, 1),
+                "sum": 8 * M,
+                "paid": date(2026, 9, 20),
+            },
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert len(pairs) == 1
+    assert pairs[0]["month"] == 2
+    assert pairs[0]["insured_sum"] == 8 * M
+    slide = build_broker_slide(2026, 3)
+    assert [_row(slide, "Все договоры", m)["total"] for m in range(3)] == [
+        Decimal(0),
+        8 * M,
+        Decimal(0),
+    ]
+    assert _row(slide, "Все договоры")["total"] == 8 * M
+
+
+@pytest.mark.django_db
+def test_broker_filled_first_stays_source_even_if_unpaid(make):
+    # №1 заполнен, но не оплачен; оплачен №2 с другой суммой —
+    # по действующей методике источник остаётся №1.
+    make(
+        [10 * M],
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": 10 * M},
+            {
+                "year": 1,
+                "inst": 2,
+                "due": date(2026, 8, 1),
+                "sum": 7 * M,
+                "paid": date(2026, 8, 5),
+            },
+        ],
+    )
+    assert broker_payment_pairs(2026, 3)[0]["insured_sum"] == 10 * M
+
+
+@pytest.mark.django_db
+def test_broker_restoration_does_not_cross_year(make):
+    # Оплачен взнос года 2 без суммы; заполненный №2 года 2 ещё не наступил,
+    # а сумма года 1 не подставляется.
+    make(
+        [10 * M, 8 * M],
+        start=date(2025, 7, 1),
+        years=2,
+        payments=[
+            {
+                "year": 1,
+                "inst": 1,
+                "due": date(2025, 7, 1),
+                "sum": 10 * M,
+                "paid": date(2025, 7, 5),
+            },
+            {"year": 2, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {"year": 2, "inst": 2, "due": date(2026, 10, 1), "sum": 8 * M},
+            {
+                "year": 2,
+                "inst": 3,
+                "due": date(2026, 9, 1),
+                "sum": None,
+                "paid": date(2026, 9, 5),
+            },
+        ],
+    )
+    pairs = broker_payment_pairs(2026, 3)
+    assert [(p["year_number"], p["insured_sum"]) for p in pairs] == [(2, None)]
+
+
+@pytest.mark.django_db
 def test_broker_same_year_two_months_counted_once_in_first_month(make):
     policy = make(
         [10 * M],
@@ -1744,6 +1922,36 @@ def test_broker_html_and_pdf_use_same_numbers(client, broker_data):
 
 @pytest.mark.integration
 @pytest.mark.django_db
+def test_broker_restored_sum_reaches_html_and_pdf(client, refs, make):
+    # Сумма восстановлена по №2 оплаченного года; PDF остаётся 4 страницами 16:9.
+    make(
+        [10 * M],
+        broker=False,
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {
+                "year": 1,
+                "inst": 2,
+                "due": date(2026, 10, 1),
+                "sum": 8 * M,
+                "paid": date(2026, 9, 20),
+            },
+        ],
+    )
+    url = reverse("reports:quarterly_presentation")
+    third, fourth = _pdf_pages(client)[2:]
+    html = client.get(url, {"year": 2026, "quarter": 3}).content.decode()
+    slide3 = build_broker_slide(2026, 3)
+    slide4 = build_distribution_slide(2026, 3)
+    assert slide3["without_display"] == "8,0"
+    assert slide3["unknown_count"] == 0
+    assert "8,0" in html and "8,0" in third
+    assert slide4["sum_display"] == "8,0 млн ₽"
+    assert "8,0 млн ₽" in html and "8,0 млн ₽" in _flat(fourth)
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
 def test_broker_empty_quarter_renders_in_html_and_pdf(client, refs):
     url = reverse("reports:quarterly_presentation")
     pages = _pdf_pages(client)  # помощник сам авторизует клиента
@@ -2011,6 +2219,44 @@ def test_distribution_totals_match_broker_slide_without(broker_data):
     client_row = slide4["tables"][1]["rows"][0]
     assert client_row["name"] == "ООО Лизинг"
     assert client_row["share_display"] == "100,00%"  # доля от «Без брокера»
+
+
+@pytest.mark.django_db
+def test_distribution_totals_match_with_restored_sums(refs, make):
+    # Восстановленная по №2 сумма без брокера входит в оба разреза слайда 4
+    # и сходится с итогом «Без брокера» слайда 3 до округления.
+    moscow = Branch.objects.create(branch_name="Москва")
+    make(
+        [10 * M],
+        broker=False,
+        branch=moscow,
+        payments=[
+            {"year": 1, "inst": 1, "due": date(2026, 7, 1), "sum": None},
+            {"year": 1, "inst": 2, "due": date(2026, 8, 1), "sum": 8 * M},
+            {
+                "year": 1,
+                "inst": 3,
+                "due": date(2026, 9, 1),
+                "paid": date(2026, 9, 5),
+                "sum": None,
+            },
+        ],
+    )
+    _pay(make, 4 * M, date(2026, 8, 10), broker=False)
+    _pay(make, 10 * M, date(2026, 8, 10), broker=True)
+    pairs = broker_payment_pairs(2026, 3)
+    slide3 = build_broker_slide(2026, 3, pairs=pairs)
+    slide4 = build_distribution_slide(2026, 3, pairs=pairs)
+    without = _row(slide3, "Все договоры")["without"]
+    assert without == 12 * M
+    assert slide3["unknown_count"] == 0
+    assert (
+        slide4["tables"][0]["total"]["sum"]
+        == slide4["tables"][1]["total"]["sum"]
+        == without
+    )
+    assert slide3["without_display"] == "12,0"
+    assert slide4["sum_display"] == "12,0 млн ₽"
 
 
 @pytest.mark.django_db

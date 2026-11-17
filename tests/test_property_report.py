@@ -12,7 +12,11 @@ from django.urls import reverse
 from apps.clients.models import Client
 from apps.insurers.models import Branch, InsuranceType, Insurer, LeasingManager
 from apps.policies.models import PaymentSchedule, Policy
-from apps.reports.services.insured_value import current_insured_sums, insured_portfolio
+from apps.reports.services.insured_value import (
+    current_insured_sums,
+    insured_portfolio,
+    select_current_insured_sums,
+)
 from apps.reports.services.property_report import build_property_report
 from apps.reports.services.property_snapshot import build_property_snapshot
 from apps.reports.services.property_text import (
@@ -134,11 +138,153 @@ def test_current_year_sum_not_max(make):
 
 
 @pytest.mark.django_db
-def test_missing_current_installment_has_unknown_sum(make):
+def test_missing_first_installment_restored_from_second(make):
     p = make([10 * M, 8 * M])
     PaymentSchedule.objects.filter(policy=p).update(installment_number=2)
-    assert current_insured_sums([p.id], AS_OF) == {}
-    assert not insured_portfolio(AS_OF)[0].insured_sum_known
+    assert current_insured_sums([p.id], AS_OF) == {p.id: 8 * M}
+    obj = insured_portfolio(AS_OF)[0]
+    assert obj.insured_sum_known
+    assert obj.insured_sum == 8 * M
+
+
+# --- Правило выбора взноса текущего года: чистая функция без базы ------------
+
+SLICE = date(2026, 9, 30)
+
+
+def schedule(*entries):
+    """Строки графика одного полиса: (год, номер взноса, срок, СС)."""
+    return [(1, year, number, due, value) for year, number, due, value in entries]
+
+
+@pytest.mark.unit
+def test_filled_first_installment_stays_priority():
+    rows = schedule(
+        (2, 1, date(2025, 10, 1), 10 * M),
+        (2, 2, date(2026, 9, 30), 8 * M),
+    )
+    assert select_current_insured_sums(rows, SLICE) == {1: 10 * M}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("first_sum", [None, "missing"])
+def test_empty_or_absent_first_restored_from_second(first_sum):
+    entries = [(2, 2, date(2026, 9, 30), 8 * M)]
+    if first_sum is None:
+        entries.insert(0, (2, 1, date(2025, 10, 1), None))
+    assert select_current_insured_sums(schedule(*entries), SLICE) == {1: 8 * M}
+
+
+@pytest.mark.unit
+def test_empty_second_restored_from_next_filled():
+    rows = schedule(
+        (2, 1, date(2025, 10, 1), None),
+        (2, 2, date(2026, 4, 1), None),
+        (2, 3, date(2026, 9, 30), 7 * M),
+    )
+    assert select_current_insured_sums(rows, SLICE) == {1: 7 * M}
+
+
+@pytest.mark.unit
+def test_smallest_number_wins_regardless_of_row_order():
+    rows = schedule(
+        (2, 3, date(2026, 9, 30), 7 * M),
+        (2, 2, date(2026, 4, 1), 8 * M),
+    )
+    assert select_current_insured_sums(rows, SLICE) == {1: 8 * M}
+
+
+@pytest.mark.unit
+def test_future_installment_not_used_but_due_on_slice_counts():
+    future = schedule(
+        (2, 1, date(2025, 10, 1), None),
+        (2, 2, date(2026, 10, 1), 8 * M),
+    )
+    assert select_current_insured_sums(future, SLICE) == {}
+    on_slice = schedule(
+        (2, 1, date(2025, 10, 1), None),
+        (2, 2, SLICE, 8 * M),
+    )
+    assert select_current_insured_sums(on_slice, SLICE) == {1: 8 * M}
+
+
+@pytest.mark.unit
+def test_new_year_without_filled_sum_does_not_return_previous_year():
+    rows = schedule(
+        (1, 1, date(2024, 10, 1), 10 * M),
+        (2, 1, date(2025, 10, 1), None),
+    )
+    assert select_current_insured_sums(rows, SLICE) == {}
+
+
+@pytest.mark.unit
+def test_no_started_rows_means_unknown():
+    rows = schedule((1, 1, date(2026, 10, 1), 10 * M))
+    assert select_current_insured_sums(rows, SLICE) == {}
+
+
+@pytest.mark.unit
+def test_control_example_2026_09_30():
+    # Прошлый год 10 млн; текущий год: №1 пуст, №2 на 30.09 — 8 млн,
+    # №3 на 01.10 — 7 млн. В срез идёт 8 млн один раз.
+    entries = [
+        (1, 1, date(2024, 10, 1), 10 * M),
+        (2, 1, date(2025, 10, 1), None),
+        (2, 2, date(2026, 9, 30), 8 * M),
+        (2, 3, date(2026, 10, 1), 7 * M),
+    ]
+    assert select_current_insured_sums(schedule(*entries), SLICE) == {1: 8 * M}
+    # Если №2 тоже пуст, на 30 сентября СС остаётся неизвестной.
+    entries[2] = (2, 2, date(2026, 9, 30), None)
+    assert select_current_insured_sums(schedule(*entries), SLICE) == {}
+
+
+@pytest.mark.unit
+def test_saved_zero_differs_from_missing():
+    rows = schedule((1, 1, date(2025, 10, 1), Decimal("0")))
+    assert select_current_insured_sums(rows, SLICE) == {1: Decimal("0")}
+    rows = schedule((1, 1, date(2025, 10, 1), None))
+    assert select_current_insured_sums(rows, SLICE) == {}
+
+
+@pytest.mark.django_db
+def test_saved_zero_is_known_in_portfolio(make):
+    zero_policy = make([10 * M])
+    unknown = make([10 * M])
+    # Ноль и пустая СС в базе — легаси-состояния; save() их не пускает.
+    PaymentSchedule.objects.filter(policy=zero_policy).update(insurance_sum=0)
+    PaymentSchedule.objects.filter(policy=unknown).update(insurance_sum=None)
+    objects = {o.policy_number: o for o in insured_portfolio(AS_OF)}
+    zero, unknown_obj = objects["IR-1"], objects["IR-2"]
+    assert zero.insured_sum_known and zero.insured_sum == Decimal("0")
+    assert not unknown_obj.insured_sum_known
+
+
+@pytest.mark.django_db
+def test_restored_policy_leaves_unknown_list_without_changing_count(make):
+    make([10 * M, 8 * M])
+    restored = make([10 * M, 8 * M])
+    PaymentSchedule.objects.filter(policy=restored, year_number=2).update(
+        insurance_sum=None
+    )
+    PaymentSchedule.objects.bulk_create(
+        [
+            PaymentSchedule(
+                policy=restored,
+                year_number=2,
+                installment_number=2,
+                due_date=date(2026, 9, 30),
+                insurance_sum=8 * M,
+                amount=Decimal("1000"),
+                kv_rub=Decimal("100"),
+            )
+        ]
+    )
+    report = build_property_report(as_of=AS_OF)
+    assert report["totals"]["count"] == 2
+    assert report["totals"]["missing_sum_count"] == 0
+    assert report["totals"]["sum"] == 16 * M
+    assert build_property_snapshot(as_of=AS_OF)["total_insurance_sum"] == 16 * M
 
 
 @pytest.mark.django_db

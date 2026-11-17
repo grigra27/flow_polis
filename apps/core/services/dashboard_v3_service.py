@@ -234,19 +234,9 @@ class DashboardV3Service:
             first = min(p["due_date"] for p in rows)
             return f"Первый срок взноса {first:%d.%m.%Y} — после даты среза"
         year = max(p["year_number"] for p in started)
-        first = next(
-            (
-                p
-                for p in started
-                if p["year_number"] == year and p["installment_number"] == 1
-            ),
-            None,
-        )
-        return (
-            f"Нет первого взноса страхового года {year}"
-            if first is None
-            else f"Не заполнена СС страхового года {year}"
-        )
+        # Сюда попадают только полисы без заполненной СС в наступивших
+        # строках текущего года: отсутствие взноса №1 сумму не скрывает.
+        return f"Не заполнена СС страхового года {year}"
 
     def payment_row(self, payment):
         return {

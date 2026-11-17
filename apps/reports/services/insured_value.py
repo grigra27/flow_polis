@@ -8,11 +8,13 @@
 лизингодателя это тоже его застрахованное имущество.
 
 Страховая стоимость полиса — страховая сумма ТЕКУЩЕГО страхового года
-(решение владельца 2026-10-17): у первого взноса последнего года, начавшегося
-не позже даты среза. У многолетних полисов сумма с годами снижается, поэтому
-максимум по графику (сумма первого года) завышал портфель примерно на 5%.
-Если год или его страховая сумма не определены, значение неизвестно:
-максимальная сумма другого года не подставляется.
+(решение владельца 2026-10-17): используется страховая сумма из первого
+по порядку взноса текущего страхового года, у которого наступил договорный
+срок и заполнена сумма. Взнос №1 не обязателен: если он отсутствует или пуст,
+сумму восстанавливает следующий подходящий взнос того же года. У многолетних
+полисов сумма с годами снижается, поэтому максимум по графику (сумма первого
+года) завышал портфель примерно на 5%. Если год или его страховая сумма
+не определены, значение неизвестно: суммы других лет не подставляются.
 """
 
 from dataclasses import dataclass
@@ -51,22 +53,41 @@ def current_insured_sums(policy_ids: Iterable[int], as_of: date) -> Dict[int, De
 def select_current_insured_sums(rows, as_of: date) -> Dict[int, Decimal]:
     """Общий расчёт для отчётов и Dashboard, включая неполные графики.
 
-    Сначала определяем текущий год, даже если его СС отсутствует. Иначе NULL
-    у нового года незаметно заменялся бы стоимостью предыдущего года.
+    Сначала определяем текущий год по всем строкам с наступившим сроком,
+    даже если их СС пустая. Иначе NULL у нового года незаметно заменялся бы
+    стоимостью предыдущего года. Внутри года берём первый по порядку взнос
+    с наступившим договорным сроком и заполненной суммой: отсутствие взноса
+    №1 само по себе не делает СС неизвестной. Будущие взносы не участвуют.
     """
-    current: Dict[int, tuple] = {}
     started_years: Dict[int, int] = {}
+    started_rows: Dict[int, list] = {}
     for policy_id, year, installment, due, value in rows:
         if due <= as_of:
             started_years[policy_id] = max(year, started_years.get(policy_id, 0))
-        if installment == 1 and due <= as_of:
-            if policy_id not in current or year > current[policy_id][0]:
-                current[policy_id] = (year, value)
-    return {
-        pk: value
-        for pk, (year, value) in current.items()
-        if value is not None and year == started_years[pk]
-    }
+            started_rows.setdefault(policy_id, []).append((year, installment, value))
+    result: Dict[int, Decimal] = {}
+    for policy_id, year in started_years.items():
+        value = first_filled_installment_sum(
+            (installment, value)
+            for row_year, installment, value in started_rows[policy_id]
+            if row_year == year
+        )
+        if value is not None:
+            result[policy_id] = value
+    return result
+
+
+def first_filled_installment_sum(installments) -> Optional[Decimal]:
+    """СС взноса с наименьшим номером среди строк с заполненной суммой.
+
+    Общий принцип выбора строки для среза портфеля и квартальных оплат;
+    набор строк-кандидатов каждый отчёт готовит по своему правилу.
+    Сохранённый ноль отличается от отсутствующего значения.
+    """
+    filled = [(number, value) for number, value in installments if value is not None]
+    if not filled:
+        return None
+    return min(filled, key=lambda item: item[0])[1]
 
 
 @dataclass

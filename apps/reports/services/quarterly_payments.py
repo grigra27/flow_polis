@@ -8,7 +8,10 @@
 «Ответственность» исключаются той же классификацией, что на слайдах 1–2.
 
 Платёж определяет попадание в отчёт, но в деньгах учитывается страховая
-сумма взноса installment_number=1 того же страхового года: пара
+сумма оплаченного страхового года: сначала взнос №1, а если он отсутствует
+или пуст — первый по номеру взнос того же года с заполненной СС
+и договорным сроком, наступившим к дате первой подходящей оплаты (сам
+оплаченный взнос допустим и при досрочной оплате). Пара
 (policy_id, year_number) считается один раз за квартал в месяце первой
 подходящей оплаты. В расчётном наборе сохраняются branch_id и client_id
 для слайда 4 — «Распределение страхования без участия брокера».
@@ -24,7 +27,7 @@ from apps.clients.models import Client
 from apps.insurers.models import Branch
 from apps.policies.models import PaymentSchedule
 
-from .insured_value import ZERO
+from .insured_value import ZERO, first_filled_installment_sum
 from .quarterly_presentation import (
     QUARTER_NUMERALS,
     _cell_display,
@@ -79,11 +82,29 @@ def _in_force_at_paid_q():
     )
 
 
+def _pair_insured_sum(rows, payment_id, paid_date):
+    """СС отобранной пары: взнос №1 оплаченного года либо следующий заполненный.
+
+    Если №1 отсутствует или пуст, берём первый по номеру взнос того же года
+    с заполненной СС и договорным сроком, наступившим к дате первой оплаты.
+    Сам оплаченный взнос допустим как источник и при досрочной оплате.
+    Более поздний неоплаченный взнос не достраивает сумму задним числом.
+    """
+    first = next((r for r in rows if r["installment_number"] == 1), None)
+    if first is not None and first["insurance_sum"] is not None:
+        return first["insurance_sum"]
+    return first_filled_installment_sum(
+        (r["installment_number"], r["insurance_sum"])
+        for r in rows
+        if r["due_date"] <= paid_date or r["pk"] == payment_id
+    )
+
+
 def broker_payment_pairs(year: int, quarter: int) -> list:
     """Пары (полис, страховой год) с фактической оплатой в квартале.
 
-    Два запроса на весь квартал: оплаты и первые взносы годов как источник
-    СС. Порядок first-paid стабилен: paid_date, затем PK платежа.
+    Два запроса на весь квартал: оплаты и строки графика оплаченных годов
+    как источник СС. Порядок first-paid стабилен: paid_date, затем PK платежа.
     """
     start = date(year, quarter * 3 - 2, 1)
     end = quarter_end(year, quarter)
@@ -114,6 +135,7 @@ def broker_payment_pairs(year: int, quarter: int) -> list:
             "policy_id": pay.policy_id,
             "year_number": pay.year_number,
             "payment_id": pay.pk,
+            "paid_date": pay.paid_date,
             "month": pay.paid_date.month - start.month + 1,
             "branch_id": policy.branch_id,
             "client_id": policy.client_id,
@@ -122,16 +144,24 @@ def broker_payment_pairs(year: int, quarter: int) -> list:
         }
     if not pairs:
         return []
-    first_sums = {
-        (row.policy_id, row.year_number): row.insurance_sum
-        for row in PaymentSchedule.objects.filter(
-            installment_number=1,
-            policy_id__in={key[0] for key in pairs},
-        ).only("policy_id", "year_number", "insurance_sum")
-    }
+    rows_by_pair = {}
+    for row in PaymentSchedule.objects.filter(
+        policy_id__in={key[0] for key in pairs},
+        year_number__in={key[1] for key in pairs},
+    ).values(
+        "pk",
+        "policy_id",
+        "year_number",
+        "installment_number",
+        "due_date",
+        "insurance_sum",
+    ):
+        rows_by_pair.setdefault((row["policy_id"], row["year_number"]), []).append(row)
     result = []
     for key, pair in pairs.items():
-        pair["insured_sum"] = first_sums.get(key)
+        pair["insured_sum"] = _pair_insured_sum(
+            rows_by_pair.get(key, []), pair["payment_id"], pair["paid_date"]
+        )
         result.append(pair)
     return result
 
@@ -277,7 +307,10 @@ def build_broker_slide(year: int, quarter: int, pairs=None) -> dict:
     note = (
         "Страховая сумма учитывается один раз на полис и страховой год за квартал; "
         "пролонгации — оплаты за второй и последующие страховые годы и перезаключения "
-        "к старому ДФА; без ОСАГО и лимитов ответственности."
+        "к старому ДФА; без ОСАГО и лимитов ответственности. "
+        "СС берётся из взноса №1 оплаченного года, а если он отсутствует или пуст — "
+        "из первого по номеру взноса того же года с заполненной СС и договорным "
+        "сроком, наступившим к дате первой оплаты; суммы других лет не подставляются."
     )
     if unknown:
         note += (

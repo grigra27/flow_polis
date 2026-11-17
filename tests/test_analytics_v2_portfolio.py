@@ -427,6 +427,52 @@ def test_partial_quarter_control_example(superuser_client, make):
         assert money.sum_rows(losses)["commission"] == churn[field]
 
 
+def test_selection_label_follows_quarter_when_period_is_wider(superuser_client, make):
+    """Период 01.08–15.10 шире III квартала: отбор и подпись — 01.08–30.09."""
+    p = params("from=2026-08-01&to=2026-10-15")
+    september = make(date(2025, 9, 20), date(2026, 9, 20), dfa="SEP-1")
+    october = make(date(2025, 10, 5), date(2026, 10, 5), dfa="OCT-1")
+    sept_buyout = churn_policy(make, "B-SEP", closed_on=date(2026, 9, 20))
+    sept_termination = churn_policy(make, "T-SEP", termination=date(2026, 9, 20))
+    churn_policy(make, "B-OCT", closed_on=date(2026, 10, 5))
+    churn_policy(make, "T-OCT", termination=date(2026, 10, 5))
+
+    # Октябрьские записи существуют: без кода квартала они попадают в отбор.
+    wider = superuser_client.get(list_url(p, "renewal_due"))
+    assert october.policy_number in [r["cells"][0] for r in wider.context["rows"]]
+
+    cases = [
+        ("renewal_due", {}, [september.policy_number]),
+        ("churn", {"reason": "early_buyout"}, [sept_buyout.policy_number]),
+        ("churn", {"reason": "termination"}, [sept_termination.policy_number]),
+        (
+            "churn",
+            {},
+            [sept_buyout.policy_number, sept_termination.policy_number],
+        ),
+    ]
+    for key, opts, expected in cases:
+        opts = {"quarter": "2026Q3", **opts}
+        url = list_url(p, key, **opts)
+        page = superuser_client.get(url)
+        assert page.status_code == 200
+        assert page.context["totals"]["count"] == len(expected), (key, opts)
+        assert sorted(r["cells"][0] for r in page.context["rows"]) == sorted(
+            expected
+        ), (key, opts)
+        assert page.context["selection_label"] == "01.08.2026 – 30.09.2026", (key, opts)
+        assert (
+            "Фактические границы отбора: 01.08.2026 – 30.09.2026"
+            in page.content.decode()
+        ), (key, opts)
+        export = superuser_client.get(url + "&format=xlsx")
+        assert sorted(excel_numbers(export)) == sorted(expected), (key, opts)
+        subtitle = excel_subtitle(export)
+        assert "отбор 01.08.2026 – 30.09.2026" in subtitle, (key, opts)
+        # Общий пользовательский период остаётся в подзаголовке отдельно.
+        assert "Период: 01.08.2026 – 15.10.2026" in subtitle, (key, opts)
+
+
 def test_quarter_rows_keep_events_on_their_actual_edges(make):
     """Период через границу кварталов и после сегодня: события на краях окна."""
     p = params("from=2026-06-15&to=2026-12-31")

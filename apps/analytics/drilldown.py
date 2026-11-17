@@ -64,7 +64,9 @@ def selection_window(metric: Metric, params: AnalyticsParams, opts=None):
     """(начало, конец) фактического отбора величины или None."""
     if metric.window is None:
         return None
-    return metric.window(params, dict(opts or {}))
+    # QueryDict нельзя приводить к dict(): значения станут списками и квартал
+    # не распознается. Отбор строк получает request.GET тем же образом.
+    return metric.window(params, opts or {})
 
 
 def resolve(key: str, params: AnalyticsParams, opts=None) -> QuerySet:

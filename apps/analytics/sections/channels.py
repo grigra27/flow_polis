@@ -84,7 +84,9 @@ def build(params, query=None):
     ):
         losses[row[f"policy__{id_field}"]] += row["kv_rub"]
 
-    keys = set(nb_count) | set(prev_count) | set(in_force) | set(losses)
+    keys = (
+        set(nb_count) | set(prev_count) | set(in_force) | set(losses) | set(due_counts)
+    )
     rows = []
     for key in keys:
         current, previous = nb_count.get(key, 0), prev_count.get(key, 0)

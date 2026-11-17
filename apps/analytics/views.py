@@ -173,7 +173,20 @@ class DrilldownView(AnalyticsMixin, TemplateView):
         )
 
     def _subtitle(self, params):
-        return f"Период: {params.period_label}; срез на {params.as_of:%d.%m.%Y}"
+        base = f"Период: {params.period_label}; срез на {params.as_of:%d.%m.%Y}"
+        window = self._selection_window(params)
+        if window is None:
+            return base
+        return f"{base}; отбор {window[0]:%d.%m.%Y} – {window[1]:%d.%m.%Y}"
+
+    def _selection_window(self, params):
+        return drilldown.selection_window(self.metric, params, self.request.GET)
+
+    def _selection_label(self, params):
+        window = self._selection_window(params)
+        if window is None:
+            return ""
+        return f"{window[0]:%d.%m.%Y} – {window[1]:%d.%m.%Y}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -199,6 +212,7 @@ class DrilldownView(AnalyticsMixin, TemplateView):
                 "totals": drilldown.list_totals(self.metric.kind, queryset),
                 "is_payments": self.metric.kind == drilldown.PAYMENTS,
                 "export_query": self._export_query(),
+                "selection_label": self._selection_label(params),
             }
         )
         return context

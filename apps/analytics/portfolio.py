@@ -101,6 +101,22 @@ def quarters_between(start: date, end: date):
     return result
 
 
+def period_window(start: date, end: date, today: date):
+    """Период не позже сегодня, границы включены; None — пересечение пустое."""
+    end = min(end, today)
+    return (start, end) if start <= end else None
+
+
+def quarter_window(q_start: date, start: date, end: date, today: date):
+    """Фактические границы квартальной строки и её расшифровки.
+
+    Начало — позднее из начала квартала и начала выбранного периода, конец —
+    раннее из конца квартала, конца периода и сегодня. Обе границы включены.
+    Таблица, список и Excel обязаны считать по одному и тому же окну.
+    """
+    return period_window(max(q_start, start), min(quarter_end(q_start), end), today)
+
+
 # --- окончания и продления --------------------------------------------------------
 
 # Новый полис по тому же ДФА с датой начала в пределах ±N дней от окончания
@@ -184,19 +200,26 @@ def renewal_statuses(due: QuerySet) -> Dict[int, Dict[str, Any]]:
     return result
 
 
-def retention_by_quarter(policies: QuerySet, start: date, end: date):
-    """По кварталам: требовали продления → продлены (из них к другой СК) → нет."""
+def retention_by_quarter(policies: QuerySet, start: date, end: date, today: date):
+    """По кварталам: требовали продления → продлены (из них к другой СК) → нет.
+
+    Строка называется кварталом, но считается по фактическому пересечению
+    квартала с выбранным периодом и сегодняшним днём.
+    """
     rows = []
     for q_start in quarters_between(start, end):
-        q_end = min(quarter_end(q_start), end)
-        statuses = renewal_statuses(renewal_due(policies, q_start, q_end))
+        window = quarter_window(q_start, start, end, today)
+        if window is None:
+            continue
+        q_from, q_to = window
+        statuses = renewal_statuses(renewal_due(policies, q_from, q_to))
         due = len(statuses)
         renewed = sum(1 for s in statuses.values() if s["status"] == RENEWED)
         switched = sum(1 for s in statuses.values() if s["status"] == SWITCHED)
         rows.append(
             {
-                "start": q_start,
-                "end": q_end,
+                "start": q_from,
+                "end": q_to,
                 "code": quarter_code(q_start),
                 "label": quarter_label(q_start),
                 "due": due,

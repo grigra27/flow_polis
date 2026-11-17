@@ -7,6 +7,7 @@
         <div>
             <a href="javascript:history.back()" class="ax-reset"><i class="bi bi-arrow-left"></i> Назад</a>
             <h2 class="ax-title mt-1">{{ metric.title }}</h2>
+            {% if selection_label %}<p class="ax-sub">Фактические границы отбора: {{ selection_label }}</p>{% endif %}
             {% if metric.note %}<p class="ax-sub">{{ metric.note }}</p>{% endif %}
         </div>
         <div class="d-flex align-items-center gap-4">

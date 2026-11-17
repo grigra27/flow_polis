@@ -59,6 +59,7 @@ def make(refs):
         dfa_closed_on=None,
         policy_active=True,
         termination=None,
+        branch=None,
     ):
         """payments: [(amount, kv, due, paid, act, insurance_sum)]."""
         counter["n"] += 1
@@ -67,7 +68,7 @@ def make(refs):
             dfa_number=dfa or f"D4-{counter['n']}",
             client=refs[client],
             insurer=refs[insurer],
-            branch=refs["branch"],
+            branch=branch or refs["branch"],
             insurance_type=refs[kind],
             property_description="Техника",
             start_date=start,
@@ -154,6 +155,63 @@ def test_channels_change_drop_and_renewal(make):
     )
     # Полисы Гавриловой 2025 года закончились в июле 2026 без продления.
     assert (g["renewal_due"], g["renewal_rate"]) == (4, 0)
+
+
+def test_channels_keeps_groups_with_only_renewal_due(make):
+    """Группа без нового бизнеса, без полисов в силе и без потерь не исчезает."""
+    q = "from=2026-07-01&to=2026-09-30"
+    old = [(4000, 1000, date(2025, 6, 1), None, None, M)]
+    tver = Branch.objects.create(branch_name="Тверь")
+    # Шишкин: требовал продления, не продлён — других показателей нет.
+    make(date(2025, 6, 1), old, end=date(2026, 8, 1), manager="m2", dfa="DUE-1")
+    # Гаврилова: требовала продления и продлена; преемник — без менеджера.
+    make(date(2025, 6, 1), old, end=date(2026, 9, 1), manager="m1", dfa="DUE-2")
+    make(
+        date(2026, 9, 2),
+        [(4000, 1000, date(2026, 9, 2), None, None, M)],
+        manager=None,
+        dfa="DUE-2",
+    )
+    # Без менеджера и другой филиал: только требовавшие продления, не продлены.
+    make(date(2025, 6, 1), old, end=date(2026, 8, 15), manager=None, dfa="DUE-3")
+    make(
+        date(2025, 6, 1),
+        old,
+        end=date(2026, 8, 20),
+        manager=None,
+        dfa="DUE-4",
+        branch=tver,
+    )
+
+    managers = {
+        r["name"]: r for r in channels.build(params(q), QueryDict("by=manager"))["rows"]
+    }
+    assert set(managers) == {"Гаврилова", "Шишкин", "Без менеджера"}
+    shishkin = managers["Шишкин"]
+    assert (shishkin["nb_count"], shishkin["in_force"], shishkin["lost"]) == (
+        0,
+        0,
+        Decimal("0"),
+    )
+    assert (shishkin["renewal_due"], shishkin["renewal_rate"]) == (1, 0)
+    gavrilova = managers["Гаврилова"]
+    assert (gavrilova["nb_count"], gavrilova["in_force"]) == (0, 0)
+    assert (gavrilova["renewal_due"], gavrilova["renewal_rate"]) == (1, 100)
+    no_manager = managers["Без менеджера"]
+    assert (no_manager["renewal_due"], no_manager["renewal_rate"]) == (2, 0)
+    assert no_manager["nb_count"] == 1  # преемник ДФА-2
+
+    branches = {
+        r["name"]: r for r in channels.build(params(q), QueryDict("by=branch"))["rows"]
+    }
+    assert set(branches) == {"Казань", "Тверь"}
+    assert (branches["Тверь"]["nb_count"], branches["Тверь"]["in_force"]) == (0, 0)
+    assert (branches["Тверь"]["renewal_due"], branches["Тверь"]["renewal_rate"]) == (
+        1,
+        0,
+    )
+    assert branches["Казань"]["renewal_due"] == 3
+    assert branches["Казань"]["renewal_rate"] == pytest.approx(100 / 3)
 
 
 def test_clients_concentration(make):

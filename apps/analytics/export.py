@@ -3,6 +3,7 @@
 вкладки — одной функцией.
 """
 
+import re
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
@@ -20,6 +21,8 @@ _HEADER_FILL = PatternFill("solid", fgColor="E9EEF5")
 _MONEY_FORMAT = "#,##0.00"
 _DATE_FORMAT = "DD.MM.YYYY"
 _MAX_WIDTH = 50
+# Excel не принимает эти символы в имени листа, а названия величин их содержат.
+_SHEET_TITLE_FORBIDDEN = re.compile(r"[\\/*?:\[\]]")
 
 
 def build_workbook(
@@ -27,7 +30,7 @@ def build_workbook(
 ) -> Workbook:
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = title[:31]
+    sheet.title = _SHEET_TITLE_FORBIDDEN.sub(" ", title)[:31].strip()
 
     sheet.cell(row=1, column=1, value=title).font = Font(bold=True, size=13)
     header_row = 2

@@ -359,6 +359,7 @@ class DashboardV3Service:
 
     def activity(self):
         windows = []
+        sums = select_current_insured_sums(self.sum_rows, self.today)
         for days in (30, 60, 90):
             start = self.today - timedelta(days=days - 1)
             ids = {
@@ -376,21 +377,27 @@ class DashboardV3Service:
                     if p["policy_id"] in ids and p["year_number"] == 1
                 ]
             )
-            sums = select_current_insured_sums(self.sum_rows, self.today)
+            # СС — только имущество: лимит «Ответственности» не стоимость
+            # имущества лизингодателя. Число полисов и премия — по всем ids.
+            property_ids = {
+                pk
+                for pk in ids
+                if not is_liability_type(self.policies[pk]["insurance_type__name"])
+            }
             windows.append(
                 {
                     "days": days,
                     "count": len(ids),
                     "premium": premium,
-                    "sum": sum((sums.get(pk, ZERO) for pk in ids), ZERO),
-                    "unknown": len(ids - sums.keys()),
+                    "sum": sum((sums.get(pk, ZERO) for pk in property_ids), ZERO),
+                    "unknown": len(property_ids - sums.keys()),
                 }
             )
         components = []
         for key, title, weight in (
             ("count", "Полисы", 20),
             ("premium", "Премия первого года", 30),
-            ("sum", "Страховая стоимость", 15),
+            ("sum", "Страховая стоимость имущества", 15),
         ):
             components.append(
                 {

@@ -32,10 +32,17 @@ DIMENSIONS = [
 
 
 def _quarter(params, opts):
-    """Квартал из opts или период фильтра, обрезанный сегодняшним днём."""
+    """Фактическое окно строки: квартал из opts ∩ период фильтра ∩ сегодня.
+
+    Код квартала задаёт квартал, но не заменяет пользовательский диапазон.
+    Без кода квартала — весь период фильтра. None — пересечение пустое.
+    """
     found = portfolio.parse_quarter(opts.get("quarter") or "")
-    start, end = found or (params.date_from, params.date_to)
-    return start, min(end, params.today)
+    if found is None:
+        return portfolio.period_window(params.date_from, params.date_to, params.today)
+    return portfolio.quarter_window(
+        found[0], params.date_from, params.date_to, params.today
+    )
 
 
 # --- величины -----------------------------------------------------------------
@@ -74,10 +81,14 @@ def expiring(params, opts):
     POLICIES,
     note="Продлён — есть новый полис по тому же ДФА с началом в пределах ±45 дней "
     "от окончания. Расчёт приближённый: один ДФА может включать несколько объектов.",
+    window=_quarter,
 )
 def renewal_due(params, opts):
-    start, end = _quarter(params, opts)
-    due = portfolio.renewal_due(params.policies(), start, end)
+    window = _quarter(params, opts)
+    policies = params.policies()
+    if window is None:
+        return policies.none()
+    due = portfolio.renewal_due(policies, *window)
     status = opts.get("status")
     if not status:
         return due
@@ -97,11 +108,15 @@ def renewal_due(params, opts):
     "Отток: досрочный выкуп и расторжение",
     POLICIES,
     note="Досрочный выкуп — ДФА закрыт раньше окончания полиса более чем на 30 дней.",
+    window=_quarter,
 )
 def churn(params, opts):
-    start, end = _quarter(params, opts)
-    reason = opts.get("reason")
+    window = _quarter(params, opts)
     policies = params.policies()
+    if window is None:
+        return policies.none()
+    start, end = window
+    reason = opts.get("reason")
     if reason == money.LOSS_EARLY_BUYOUT:
         return portfolio.early_buyouts(policies, start, end)
     if reason == money.LOSS_TERMINATION:
@@ -201,21 +216,27 @@ def _calendar(params):
 
 
 def _churn(params):
-    end = min(params.date_to, params.today)
-    if params.date_from > end:
+    window = portfolio.period_window(params.date_from, params.date_to, params.today)
+    if window is None:
         return []
+    start, end = window
     policies = params.policies()
     loss_rows = money.lost_rows(params.payments())
     rows = []
-    for q_start in portfolio.quarters_between(params.date_from, end):
-        q_end = min(portfolio.quarter_end(q_start), end)
-        q_losses = money.lost_in_period(loss_rows, q_start, q_end)
+    for q_start in portfolio.quarters_between(start, end):
+        q_window = portfolio.quarter_window(q_start, start, end, params.today)
+        if q_window is None:
+            continue
+        q_from, q_to = q_window
+        q_losses = money.lost_in_period(loss_rows, q_from, q_to)
         rows.append(
             {
                 "code": portfolio.quarter_code(q_start),
                 "label": portfolio.quarter_label(q_start),
-                "early": portfolio.early_buyouts(policies, q_start, q_end).count(),
-                "terminated": portfolio.terminations(policies, q_start, q_end).count(),
+                "start": q_from,
+                "end": q_to,
+                "early": portfolio.early_buyouts(policies, q_from, q_to).count(),
+                "terminated": portfolio.terminations(policies, q_from, q_to).count(),
                 "early_kv": money.sum_rows(
                     [r for r in q_losses if r["reason"] == money.LOSS_EARLY_BUYOUT]
                 )["commission"],
@@ -228,13 +249,8 @@ def _churn(params):
 
 
 def build(params, query=None):
-    retention_end = min(params.date_to, params.today)
-    retention = (
-        portfolio.retention_by_quarter(
-            params.policies(), params.date_from, retention_end
-        )
-        if params.date_from <= retention_end
-        else []
+    retention = portfolio.retention_by_quarter(
+        params.policies(), params.date_from, params.date_to, params.today
     )
     calendar = _calendar(params)
     return {

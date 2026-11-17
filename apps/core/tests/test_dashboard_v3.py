@@ -371,6 +371,69 @@ def test_liability_limit_stays_out_of_property_totals_on_every_surface(make_poli
     assert context["all_policy_count"] == 2
 
 
+def test_activity_sum_excludes_liability_but_keeps_count_and_premium(make_policy):
+    liability_kind = InsuranceType.objects.create(name="Ответственность")
+    recent = AS_OF - timedelta(days=10)
+    property_policy = make_policy(start_date=recent)
+    liability = make_policy(insurance_type=liability_kind, start_date=recent)
+    pay(property_policy, value=1000, amount=100)
+    pay(liability, value=5_000_000, amount=70)
+    activity = service().activity()
+    assert [window["days"] for window in activity["windows"]] == [30, 60, 90]
+    for window in activity["windows"]:
+        assert window["count"] == 2
+        assert window["premium"] == 170
+        assert window["sum"] == 1000
+        assert window["unknown"] == 0
+    assert [component["title"] for component in activity["components"]] == [
+        "Полисы",
+        "Премия первого года",
+        "Страховая стоимость имущества",
+    ]
+
+
+def test_activity_unknown_sum_counts_property_policies_only(make_policy):
+    liability_kind = InsuranceType.objects.create(name="  Ответственность  ")
+    recent = AS_OF - timedelta(days=10)
+    filled = make_policy(start_date=recent)
+    liability = make_policy(insurance_type=liability_kind, start_date=recent)
+    empty = make_policy(start_date=recent)
+    pay(filled, value=1000, amount=100)
+    pay(liability, value=None, amount=70)
+    pay(empty, value=None, amount=30)
+    for window in service().activity()["windows"]:
+        assert window["count"] == 3
+        assert window["premium"] == 200
+        assert window["sum"] == 1000
+        assert window["unknown"] == 1  # только имущественный полис с пустой СС
+
+
+def test_liability_limit_does_not_move_activity_index(make_policy):
+    liability_kind = InsuranceType.objects.create(name="Ответственность")
+    recent = AS_OF - timedelta(days=10)
+    property_policy = make_policy(start_date=recent)
+    liability = make_policy(insurance_type=liability_kind, start_date=recent)
+    pay(property_policy, value=1000, amount=100)
+    pay(liability, value=5_000_000, amount=70)
+    before = service().activity()
+    PaymentSchedule.objects.filter(policy=liability).update(insurance_sum=None)
+    assert service().activity() == before
+
+
+def test_activity_counts_started_policies_even_if_already_finished(make_policy):
+    finished = make_policy(
+        start_date=AS_OF - timedelta(days=10),
+        end_date=AS_OF - timedelta(days=5),
+        termination_date=AS_OF - timedelta(days=5),
+        policy_active=False,
+    )
+    pay(finished, value=2000, amount=50)
+    scoped = service()
+    assert scoped.property == set()  # в действующем портфеле на срезе его нет
+    window = scoped.activity()["windows"][0]
+    assert (window["count"], window["premium"], window["sum"]) == (1, 50, 2000)
+
+
 def test_commission_is_neither_loaded_nor_used_in_public_context(make_policy):
     p = make_policy(start_date=AS_OF - timedelta(days=10))
     pay(p)

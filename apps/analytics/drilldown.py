@@ -32,18 +32,24 @@ class Metric:
     kind: str  # PAYMENTS | POLICIES
     build: Callable[[AnalyticsParams, Dict[str, str]], QuerySet]
     note: str = ""
+    # Фактические границы отбора, если величина считает не весь период фильтра.
+    window: Optional[
+        Callable[[AnalyticsParams, Dict[str, str]], Optional[tuple]]
+    ] = None
 
 
 METRICS: Dict[str, Metric] = {}
 
 
-def metric(key: str, title: str, kind: str, note: str = ""):
+def metric(key: str, title: str, kind: str, note: str = "", window=None):
     """Регистрирует величину для списка «под цифрой»."""
 
     def decorator(func):
         if key in METRICS:
             raise ValueError(f"Величина {key} уже зарегистрирована")
-        METRICS[key] = Metric(key=key, title=title, kind=kind, build=func, note=note)
+        METRICS[key] = Metric(
+            key=key, title=title, kind=kind, build=func, note=note, window=window
+        )
         return func
 
     return decorator
@@ -52,6 +58,13 @@ def metric(key: str, title: str, kind: str, note: str = ""):
 def get_metric(key: str) -> Optional[Metric]:
     _load_registries()
     return METRICS.get(key)
+
+
+def selection_window(metric: Metric, params: AnalyticsParams, opts=None):
+    """(начало, конец) фактического отбора величины или None."""
+    if metric.window is None:
+        return None
+    return metric.window(params, dict(opts or {}))
 
 
 def resolve(key: str, params: AnalyticsParams, opts=None) -> QuerySet:

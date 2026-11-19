@@ -249,9 +249,11 @@ def test_footer_renders_on_dashboard(client):
     assert response.status_code == 200
     content = response.content.decode()
     assert "app-footer" in content
+    assert "График платежей" in content
     assert "Просрочено" in content
-    assert "30 дней" in content
+    assert "Ближайшие 30 дней" in content
     assert "af-chip--upcoming" in content
+    assert 'aria-hidden="true"></i> Взносы</span>' not in content
     assert "Очередные 7 дней" not in content
     assert "af-tech" in content
     assert "дайджест" in content

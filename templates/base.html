@@ -199,7 +199,7 @@
         <div class="app-footer-inner">
             {% if footer_status %}
             <div class="app-footer-ops">
-                <span class="af-group"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i> Взносы</span>
+                <span class="af-group"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i> График платежей</span>
                 <a class="af-chip {% if footer_status.overdue_count %}af-chip--danger{% else %}af-chip--ok{% endif %}"
                    href="{{ footer_status.overdue_url }}"
                    title="Неоплаченные платежи по активным полисам с прошедшей датой. Открыть журнал платежей.">
@@ -210,7 +210,7 @@
                    href="{{ footer_status.upcoming_url }}"
                    title="Неоплаченные взносы со сроком в ближайшие 30 дней. Открыть журнал платежей.">
                     <i class="bi bi-clock" aria-hidden="true"></i>
-                    30 дней <b>{{ footer_status.upcoming_count }}</b>
+                    Ближайшие 30 дней <b>{{ footer_status.upcoming_count }}</b>
                 </a>
                 {% if footer_status.show_mail %}
                 <span class="af-divider" aria-hidden="true"></span>

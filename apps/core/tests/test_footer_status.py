@@ -76,10 +76,10 @@ def portfolio(db):
     # Номера взносов уникальны в рамках года, даты строго возрастают.
     make_payment(active, -10, installment=1)  # просрочен
     make_payment(active, -5, paid=True, installment=2)  # оплачен, не считается
-    make_payment(active, 0, installment=3)  # сегодня → неделя
-    make_payment(active, 7, installment=4)  # граница недели
-    make_payment(active, 8, installment=5)  # уже за неделей
-    make_payment(active, 20, installment=6)  # будущее
+    make_payment(active, 0, installment=3)  # сегодня → окно 30 дней
+    make_payment(active, 7, installment=4)  # в окне 30 дней
+    make_payment(active, 8, installment=5)  # в окне 30 дней
+    make_payment(active, 20, installment=6)  # в окне 30 дней
     make_payment(inactive, -3)  # неактивный полис, не считается
 
     return {"active": active, "inactive": inactive}
@@ -102,9 +102,9 @@ def test_regular_user_sees_payments_only(portfolio):
     status = footer_status(_request(user))["footer_status"]
 
     assert status["overdue_count"] == 1
-    assert status["week_count"] == 2
+    assert status["upcoming_count"] == 4
     assert status["overdue_url"] == reverse("policies:payments") + "?status=overdue"
-    assert status["week_url"] == reverse("policies:payments") + "?status=week"
+    assert status["upcoming_url"] == reverse("policies:payments") + "?status=upcoming"
     assert status["show_mail"] is False
     assert status["show_tech"] is False
     assert "mail_queued" not in status
@@ -250,6 +250,22 @@ def test_footer_renders_on_dashboard(client):
     content = response.content.decode()
     assert "app-footer" in content
     assert "Просрочено" in content
+    assert "30 дней" in content
+    assert "af-chip--upcoming" in content
+    assert "Очередные 7 дней" not in content
     assert "af-tech" in content
     assert "дайджест" in content
     assert "af-clock" in content
+
+
+@pytest.mark.django_db
+def test_payment_journal_has_no_week_tab(client):
+    User.objects.create_superuser("boss4", password="x")
+    client.force_login(User.objects.get(username="boss4"))
+    response = client.get(reverse("policies:payments"))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Очередные 7 дней" not in content
+    assert "status=week" not in content
+    assert "Предстоит" in content

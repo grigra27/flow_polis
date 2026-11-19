@@ -90,12 +90,6 @@
     --status-border: #f6dfa5;
 }
 
-.pl-status-btn--week {
-    --status-ink: #7c3aed;
-    --status-surface: #f5f3ff;
-    --status-border: #ddd6fe;
-}
-
 .pl-status-btn--future {
     --status-ink: #0369a1;
     --status-surface: #f0f9ff;

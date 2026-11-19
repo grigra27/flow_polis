@@ -91,10 +91,10 @@
     border-color: #bbf7d0;
 }
 
-.af-chip--week {
-    color: #7c3aed;
-    background: #f5f3ff;
-    border-color: #ddd6fe;
+.af-chip--upcoming {
+    color: #a45b08;
+    background: #fffbeb;
+    border-color: #f6dfa5;
 }
 
 .af-chip--queue {

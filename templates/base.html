@@ -206,11 +206,11 @@
                     <i class="bi {% if footer_status.overdue_count %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %}" aria-hidden="true"></i>
                     Просрочено <b>{{ footer_status.overdue_count }}</b>
                 </a>
-                <a class="af-chip af-chip--week"
-                   href="{{ footer_status.week_url }}"
-                   title="Неоплаченные взносы со сроком в ближайшие 7 дней. Открыть журнал платежей.">
-                    <i class="bi bi-calendar-week" aria-hidden="true"></i>
-                    7 дней <b>{{ footer_status.week_count }}</b>
+                <a class="af-chip af-chip--upcoming"
+                   href="{{ footer_status.upcoming_url }}"
+                   title="Неоплаченные взносы со сроком в ближайшие 30 дней. Открыть журнал платежей.">
+                    <i class="bi bi-clock" aria-hidden="true"></i>
+                    30 дней <b>{{ footer_status.upcoming_count }}</b>
                 </a>
                 {% if footer_status.show_mail %}
                 <span class="af-divider" aria-hidden="true"></span>

@@ -45,7 +45,7 @@ def _collect_status():
     from apps.core.models import ServiceHeartbeat
     from apps.policies.models import PaymentSchedule
 
-    # Тот же срез, что в PaymentScheduleListView (status=overdue/week),
+    # Тот же срез, что в PaymentScheduleListView (status=overdue/upcoming),
     # чтобы счётчик в футере совпадал с журналом по ссылке.
     today = timezone.now().date()
     unpaid_active = PaymentSchedule.objects.filter(
@@ -53,8 +53,8 @@ def _collect_status():
     )
     data = {
         "overdue_count": unpaid_active.filter(due_date__lt=today).count(),
-        "week_count": unpaid_active.filter(
-            due_date__range=(today, today + timedelta(days=7))
+        "upcoming_count": unpaid_active.filter(
+            due_date__range=(today, today + timedelta(days=30))
         ).count(),
         "mail_queued": OutboundEmail.objects.filter(
             status=OutboundEmail.STATUS_QUEUED
@@ -108,9 +108,9 @@ def footer_status(request):
     payments_url = reverse("policies:payments")
     status = {
         "overdue_count": data["overdue_count"],
-        "week_count": data["week_count"],
+        "upcoming_count": data["upcoming_count"],
         "overdue_url": f"{payments_url}?status=overdue",
-        "week_url": f"{payments_url}?status=week",
+        "upcoming_url": f"{payments_url}?status=upcoming",
         "show_mail": is_staff and user.has_perm("communications.view_outboundemail"),
         "show_tech": is_staff,
         "server_time_iso": timezone.now().isoformat(),

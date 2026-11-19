@@ -22,7 +22,7 @@
     {% block extra_css %}{% endblock %}
     <link rel="stylesheet" href="{% static 'css/workspace_width.css' %}?v=2026-11-13">
     <link rel="stylesheet" href="{% static 'css/record_tables.css' %}?v=2026-11-14-4">
-    <link rel="stylesheet" href="{% static 'css/app_footer.css' %}?v=2026-11-19-2">
+    <link rel="stylesheet" href="{% static 'css/app_footer.css' %}?v=2026-11-19-3">
 </head>
 <body>
     <!-- Navbar -->
@@ -230,8 +230,8 @@
                 {% endif %}
             </div>
             {% endif %}
-            <div class="app-footer-meta">
-                {% if footer_status.show_tech %}
+            {% if footer_status.show_tech %}
+            <div class="app-footer-tech">
                 <span class="af-tech" title="Сборка приложения (МСК)">
                     <i class="bi bi-box-seam" aria-hidden="true"></i> {{ footer_status.build_label }}
                     <span class="af-env af-env--{{ footer_status.env_label }}">{{ footer_status.env_label }}</span>
@@ -251,7 +251,9 @@
                     <i class="bi bi-clock" aria-hidden="true"></i>
                     <span class="af-clock-time">--:--:--</span> МСК
                 </span>
-                {% endif %}
+            </div>
+            {% endif %}
+            <div class="app-footer-copy">
                 <span class="af-copy">&copy; флоу / полисы 2.0 / 2026</span>
             </div>
         </div>

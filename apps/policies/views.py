@@ -393,6 +393,17 @@ class PaymentScheduleListView(LoginRequiredMixin, ListView):
                 paid_date__isnull=True,
                 policy__policy_active=True,
             )
+        elif status == "week":
+            # Очередные взносы на ближайшие 7 дней (срез футера-информера)
+            from django.utils import timezone
+            from datetime import timedelta
+
+            today = timezone.now().date()
+            queryset = queryset.filter(
+                due_date__range=[today, today + timedelta(days=7)],
+                paid_date__isnull=True,
+                policy__policy_active=True,
+            )
         elif status == "upcoming":
             # Предстоит в ближайшие 30 дней: неоплаченные платежи от сегодня до +30 дней включительно
             # только для активных полисов

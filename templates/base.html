@@ -22,6 +22,7 @@
     {% block extra_css %}{% endblock %}
     <link rel="stylesheet" href="{% static 'css/workspace_width.css' %}?v=2026-11-13">
     <link rel="stylesheet" href="{% static 'css/record_tables.css' %}?v=2026-11-14-4">
+    <link rel="stylesheet" href="{% static 'css/app_footer.css' %}?v=2026-11-19">
 </head>
 <body>
     <!-- Navbar -->
@@ -193,10 +194,66 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="bg-light text-center text-muted py-3 mt-auto">
-        <div class="container">
-            <small>&copy; флоу / полисы 2.0 / 2026</small>
+    <!-- Footer status bar -->
+    <footer class="app-footer">
+        <div class="app-footer-inner">
+            {% if footer_status %}
+            <div class="app-footer-ops">
+                <span class="af-group"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i> Взносы</span>
+                <a class="af-chip {% if footer_status.overdue_count %}af-chip--danger{% else %}af-chip--ok{% endif %}"
+                   href="{{ footer_status.overdue_url }}"
+                   title="Неоплаченные платежи по активным полисам с прошедшей датой. Открыть журнал платежей.">
+                    <i class="bi {% if footer_status.overdue_count %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %}" aria-hidden="true"></i>
+                    Просрочено <b>{{ footer_status.overdue_count }}</b>
+                </a>
+                <a class="af-chip af-chip--week"
+                   href="{{ footer_status.week_url }}"
+                   title="Неоплаченные взносы со сроком в ближайшие 7 дней. Открыть журнал платежей.">
+                    <i class="bi bi-calendar-week" aria-hidden="true"></i>
+                    7 дней <b>{{ footer_status.week_count }}</b>
+                </a>
+                {% if footer_status.show_mail %}
+                <span class="af-divider" aria-hidden="true"></span>
+                <span class="af-group"><i class="bi bi-envelope" aria-hidden="true"></i> Письма</span>
+                <a class="af-chip {% if footer_status.mail_queued %}af-chip--queue{% else %}af-chip--muted{% endif %}"
+                   href="{{ footer_status.mail_queued_url }}"
+                   title="Исходящие письма в очереди на отправку. Открыть список в админке.">
+                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                    В очереди <b>{{ footer_status.mail_queued }}</b>
+                </a>
+                <a class="af-chip {% if footer_status.mail_failed %}af-chip--danger{% else %}af-chip--ok{% endif %}"
+                   href="{{ footer_status.mail_failed_url }}"
+                   title="Письма с ошибкой отправки — можно повторить из списка. Открыть список в админке.">
+                    <i class="bi {% if footer_status.mail_failed %}bi-x-octagon{% else %}bi-check-circle{% endif %}" aria-hidden="true"></i>
+                    Ошибки <b>{{ footer_status.mail_failed }}</b>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+            <div class="app-footer-meta">
+                {% if footer_status.show_tech %}
+                <span class="af-tech" title="Сборка приложения (МСК)">
+                    <i class="bi bi-box-seam" aria-hidden="true"></i> {{ footer_status.build_label }}
+                    <span class="af-env af-env--{{ footer_status.env_label }}">{{ footer_status.env_label }}</span>
+                </span>
+                <span class="af-tech af-tech--{{ footer_status.digest.state }}"
+                      title="Ежедневный дайджест в Telegram/VK (06:00 МСК). Показан последний успешный запуск.">
+                    <i class="bi bi-send" aria-hidden="true"></i> дайджест {{ footer_status.digest.label }}
+                </span>
+                {% if footer_status.beat_label %}
+                <span class="af-tech {% if footer_status.beat_stale %}af-tech--stale{% endif %}"
+                      title="Последний запуск периодической задачи Celery beat">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i> задачи {{ footer_status.beat_label }}
+                </span>
+                {% endif %}
+                <span class="af-tech af-clock" data-server-time="{{ footer_status.server_time_iso }}"
+                      title="Текущее время сервера (Москва)">
+                    <i class="bi bi-clock" aria-hidden="true"></i>
+                    <span class="af-clock-time">--:--:--</span> МСК
+                </span>
+                {% endif %}
+                <span class="af-copy">&copy; флоу / полисы 2.0 / 2026</span>
+            </div>
         </div>
     </footer>
 
@@ -271,6 +328,22 @@
     </script>
 
     <script src="{% static 'js/record_tables.js' %}?v=2026-11-14"></script>
+    <script>
+    (function() {
+        const clock = document.querySelector('.af-clock');
+        if (!clock) { return; }
+        const serverMs = Date.parse(clock.dataset.serverTime);
+        if (Number.isNaN(serverMs)) { return; }
+        const offset = serverMs - Date.now();
+        const out = clock.querySelector('.af-clock-time');
+        const fmt = new Intl.DateTimeFormat('ru-RU', {
+            timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        function tick() { out.textContent = fmt.format(new Date(Date.now() + offset)); }
+        tick();
+        setInterval(tick, 1000);
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -181,6 +181,20 @@ class Command(BaseCommand):
             else:
                 self.stdout.write("⏭️ VK: пропущено (--no-vk)")
 
+            if tg_success or vk_success:
+                from apps.core.models import ServiceHeartbeat
+
+                ServiceHeartbeat.objects.update_or_create(
+                    key="daily_digest",
+                    defaults={
+                        "last_success_at": timezone.now(),
+                        "detail": (
+                            f"Telegram: {'да' if tg_success else 'нет'}, "
+                            f"VK: {'да' if vk_success else 'нет'}"
+                        ),
+                    },
+                )
+
         except Exception as e:
             logger.exception(f"Ошибка при генерации дайджеста: {e}")
             self.stdout.write(self.style.ERROR(f"❌ Ошибка: {e}"))

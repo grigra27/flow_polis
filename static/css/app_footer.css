@@ -1,0 +1,176 @@
+/* Футер-статус-строка: оперативные счётчики слева, техуголок справа. */
+
+.app-footer {
+    margin-top: auto;
+    background: var(--app-color-surface-muted);
+    border-top: 1px solid var(--app-color-border);
+    font-family: var(--app-interface-font);
+    font-size: 0.78rem;
+    color: var(--app-color-text-muted);
+}
+
+.app-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem 1rem;
+    padding: 0.5rem var(--app-page-gutter);
+}
+
+.app-footer-ops,
+.app-footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.af-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: 600;
+    color: var(--app-color-text);
+    white-space: nowrap;
+}
+
+.af-group .bi {
+    color: var(--app-color-action);
+    font-size: 0.85rem;
+}
+
+.af-divider {
+    width: 1px;
+    height: 1.1rem;
+    margin-inline: 0.35rem;
+    background: var(--app-color-border-strong);
+}
+
+.af-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.55rem;
+    border: 1px solid var(--app-color-border);
+    border-radius: 999px;
+    background: var(--app-color-surface);
+    color: var(--app-color-text-muted);
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+.af-chip b {
+    font-variant-numeric: tabular-nums;
+}
+
+.af-chip:hover {
+    border-color: currentColor;
+    box-shadow: var(--app-shadow-sm);
+    transform: translateY(-1px);
+}
+
+.af-chip:focus-visible {
+    outline: 2px solid var(--app-color-action);
+    outline-offset: 2px;
+}
+
+.af-chip--danger {
+    color: #b91c1c;
+    background: #fff5f5;
+    border-color: #fecaca;
+}
+
+.af-chip--ok {
+    color: #15803d;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.af-chip--week {
+    color: #7c3aed;
+    background: #f5f3ff;
+    border-color: #ddd6fe;
+}
+
+.af-chip--queue {
+    color: #a45b08;
+    background: #fffbeb;
+    border-color: #f6dfa5;
+}
+
+.af-chip--muted {
+    color: var(--app-color-text-muted);
+    background: var(--app-color-surface);
+    border-color: var(--app-color-border);
+}
+
+.af-tech {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.af-tech .bi {
+    font-size: 0.82rem;
+}
+
+.af-tech--stale {
+    color: #a45b08;
+    font-weight: 600;
+}
+
+.af-tech--unknown {
+    opacity: 0.75;
+}
+
+.af-env {
+    padding: 0.02rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.af-env--prod {
+    background: var(--app-color-primary-soft);
+    color: var(--app-color-primary);
+}
+
+.af-env--dev {
+    background: #fffbeb;
+    color: #a45b08;
+}
+
+.af-clock-time {
+    font-variant-numeric: tabular-nums;
+}
+
+.af-copy {
+    margin-left: 0.5rem;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+@media (max-width: 991.98px) {
+    .app-footer-inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .af-copy {
+        margin-left: 0;
+    }
+}
+
+@media print {
+    .app-footer {
+        display: none;
+    }
+}

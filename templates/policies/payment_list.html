@@ -5,7 +5,7 @@
 {% block title %}График платежей{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'policies/css/payment_list.css' %}?v=2026-11-14">
+<link rel="stylesheet" href="{% static 'policies/css/payment_list.css' %}?v=2026-11-19">
 {% endblock %}
 
 {% block content %}
@@ -138,6 +138,10 @@
         <div class="pl-status-divider"></div>
 
         <!-- Future payments group -->
+        <a href="{% querystring status='week' page=None %}"
+           class="pl-status-btn pl-status-btn--week {% if selected_status == 'week' %}active{% endif %}">
+            <i class="bi bi-calendar-week"></i> Очередные 7 дней
+        </a>
         <a href="{% querystring status='upcoming' page=None %}"
            class="pl-status-btn pl-status-btn--upcoming {% if selected_status == 'upcoming' %}active{% endif %}">
             <i class="bi bi-clock"></i> Предстоит в ближ. 30 дней
@@ -166,6 +170,7 @@
 Срезы:
 • Акт согласован СК / Не оплаченные — прошедшие платежи
 • Оплаченные — все платежи с датой оплаты (без даты согласования СК), включая предоплаты
+• Очередные 7 дней — от сегодня до +7 дней
 • Предстоит в ближ. 30 дней — от сегодня до +30 дней
 • Будущие — более чем через 30 дней">
             <i class="bi bi-info-circle"></i> Пояснение

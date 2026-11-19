@@ -220,6 +220,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.accounts.context_processors.user_permissions",  # Validates: Requirements 3.2, 4.2
                 "apps.core.context_processors.service_navigation",
+                "apps.core.context_processors.footer_status",
             ],
         },
     },

@@ -124,7 +124,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-    @admin.action(description="Повторить отправку failed-писем")
+    @admin.action(permissions=["change"], description="Повторить отправку failed-писем")
     def retry_failed_emails(self, request, queryset):
         retried = 0
         for email in queryset:

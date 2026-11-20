@@ -464,7 +464,8 @@ def export_policy_expiration(request):
         # то же правило, что в разделе «Платежи → Пролонгация»
         # (prolongation_due_q: полис и ДФА активны, не расторгнут досрочно,
         # вид страхования требует пролонгации).
-        # Сортируем по филиалу (алфавитно), затем по дате окончания
+        # Сортируем по филиалу (алфавитно), затем по номеру ДФА,
+        # чтобы полисы одного ДФА шли подряд
         policies = (
             Policy.objects.select_related(
                 "client",
@@ -476,7 +477,7 @@ def export_policy_expiration(request):
             )
             .filter(end_date__gte=date_from, end_date__lte=date_to)
             .filter(prolongation_due_q())
-            .order_by("branch__branch_name", "end_date", "policy_number")
+            .order_by("branch__branch_name", "dfa_number", "end_date", "policy_number")
         )
 
         # Применяем опциональные фильтры

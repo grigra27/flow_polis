@@ -95,7 +95,7 @@ def get_prolongation_policies(year, month, request_get=None, branch_ids_filter=N
             end_date__lte=period_end,
         )
         .filter(prolongation_due_q())
-        .order_by("branch__branch_name", "end_date", "policy_number")
+        .order_by("branch__branch_name", "dfa_number", "end_date", "policy_number")
     )
 
     if request_get is None:

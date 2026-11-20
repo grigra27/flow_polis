@@ -119,6 +119,7 @@ def get_prolongation_policies(year, month, request_get=None, branch_ids_filter=N
         policies = policies.filter(
             Q(policy_number__icontains=search)
             | Q(dfa_number__icontains=search)
+            | Q(vin_number__icontains=search)
             | Q(client__client_name__icontains=search)
             | Q(policyholder__client_name__icontains=search)
             | Q(property_description__icontains=search)

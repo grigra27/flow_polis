@@ -1575,12 +1575,12 @@ class PolicyExpirationExporter(BaseExporter):
             "заполняет финансовая дирекция",  # I
             "",  # J (будет объединена с I)
             "",  # K (будет объединена с I)
-            "заполняет УБТиСЛО",  # L
-            "",  # M (будет объединена с L)
-            "",  # N (будет объединена с L)
-            "",  # O (будет объединена с L)
-            "",  # P (будет объединена с L)
-            "",  # Q (будет объединена с L)
+            "по данным брокера",  # L (Идентификатор VIN из карточки полиса)
+            "заполняет УБТиСЛО",  # M
+            "",  # N (будет объединена с M)
+            "",  # O (будет объединена с M)
+            "",  # P (будет объединена с M)
+            "",  # Q (будет объединена с M)
             "заполняет страховой брокер",  # R
             "",  # S (будет объединена с R)
             "",  # T (будет объединена с R)
@@ -1631,9 +1631,15 @@ class PolicyExpirationExporter(BaseExporter):
             cell.font = responsibility_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # L-Q: УБТиСЛО (розовый)
-        ws.merge_cells(start_row=4, start_column=12, end_row=4, end_column=17)
-        for col in range(12, 18):
+        # L: страховой брокер (зеленый) — Идентификатор VIN заполняется автоматически
+        cell_l = ws.cell(row=4, column=12)
+        cell_l.fill = broker_fill
+        cell_l.font = responsibility_font
+        cell_l.alignment = Alignment(horizontal="center", vertical="center")
+
+        # M-Q: УБТиСЛО (розовый)
+        ws.merge_cells(start_row=4, start_column=13, end_row=4, end_column=17)
+        for col in range(13, 18):
             cell = ws.cell(row=4, column=col)
             cell.fill = ubt_fill
             cell.font = responsibility_font
@@ -1758,12 +1764,12 @@ class PolicyExpirationExporter(BaseExporter):
             policy.policyholder.client_name if policy.policyholder else "",
             self.format_value(policy.end_date),
             policy.property_description,
-            # Дополнительные столбцы для ручного заполнения (пустые)
+            # Дополнительные столбцы для ручного заполнения
             "",  # Страхователь на новый страховой период
             "",  # Выгодоприобретатель
             "",  # № и дата кредитного договора/кредитной линии, банк-кредитор
             "",  # № и дата договора залога
-            "",  # Идентификатор (обычно VIN)
+            policy.vin_number or "",  # Идентификатор (обычно VIN) - из карточки полиса
             "",  # ГРН для транспортных средств и спецтехники
             "",  # Срок окончания ДФА (досрочного выкупа)
             "",  # Необходимый срок страхования
@@ -1800,7 +1806,7 @@ class PolicyExpirationExporter(BaseExporter):
             "I": 18,  # Выгодоприобретатель
             "J": 25,  # № и дата кредитного договора/кредитной линии, банк-кредитор
             "K": 20,  # № и дата договора залога
-            "L": 18,  # Идентификатор (обычно VIN)
+            "L": 18,  # Идентификатор (обычно VIN) - автозаполнение из карточки полиса
             "M": 15,  # ГРН для транспортных средств и спецтехники
             "N": 15,  # Срок окончания ДФА (досрочного выкупа)
             "O": 15,  # Необходимый срок страхования

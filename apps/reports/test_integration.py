@@ -978,6 +978,7 @@ class ReadyExportsTest(TestCase):
             start_date=date(2024, 1, 1),
             end_date=date(2024, 6, 15),  # В диапазоне
             info4="Тестовое значение Info4",
+            vin_number="XTA211440M2021181",
         )
 
         policy_out_of_range = Policy.objects.create(
@@ -1107,6 +1108,8 @@ class ReadyExportsTest(TestCase):
                 self.assertEqual(
                     ws.cell(row=row, column=26).value, "Тестовое значение Info4"
                 )
+                # Проверяем автозаполнение "Идентификатор (обычно VIN)" (12-я колонка)
+                self.assertEqual(ws.cell(row=row, column=12).value, "XTA211440M2021181")
                 break
 
         # Проверяем что без параметров дат возвращается ошибка

@@ -127,6 +127,7 @@
                         <col class="record-col-client">
                         <col class="record-col-client">
                         <col class="record-col-object">
+                        <col class="record-col-vin">
                         <col class="record-col-note">
                         <col class="record-col-status">
                     </colgroup>
@@ -140,6 +141,7 @@
                             <th class="record-col-client" scope="col">Лизингополучатель</th>
                             <th class="record-col-client" scope="col">Страхователь</th>
                             <th class="record-col-object" scope="col">Объект страхования</th>
+                            <th class="record-col-vin" scope="col">VIN</th>
                             <th class="record-col-note" scope="col">Инфо 4</th>
                             <th class="record-col-status" scope="col">Примечания</th>
                         </tr>
@@ -157,6 +159,7 @@
                             <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" only %}</td>
                             <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.policyholder.client_name label="страхователь" only %}</td>
                             <td class="record-col-object">{% include "policies/includes/table_text.html" with value=policy.property_description label="объект страхования" only %}</td>
+                            <td class="record-col-vin">{{ policy.vin_number|default:"—" }}</td>
                             <td class="record-col-note">{% include "policies/includes/table_text.html" with value=policy.info4 label="Инфо 4" only %}</td>
                             <td class="record-col-status">
                                 {% if not policy.broker_participation %}<span class="tbl-badge tbl-badge--nobroker">без брокера</span>{% endif %}
@@ -164,7 +167,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="10" class="pl-empty">
+                            <td colspan="11" class="pl-empty">
                                 <i class="bi bi-inbox"></i>
                                 Нет договоров с окончанием страхования за этот месяц по выбранным фильтрам.
                             </td>

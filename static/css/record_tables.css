@@ -11,6 +11,7 @@ table.record-table {
 
 .record-table col.record-col-policy { width: 11rem; }
 .record-table col.record-col-dfa { width: 7rem; }
+.record-table col.record-col-vin { width: 9.5rem; }
 .record-table col.record-col-insurer { width: 8.25rem; }
 .record-table col.record-col-type { width: 2.5rem; }
 .record-table col.record-col-period { width: 6.75rem; }
@@ -68,7 +69,8 @@ table.record-table td {
 }
 
 table.record-table td.record-col-policy,
-table.record-table td.record-col-dfa {
+table.record-table td.record-col-dfa,
+table.record-table td.record-col-vin {
     width: auto;
     min-width: 0;
     font-weight: 500;
@@ -76,7 +78,8 @@ table.record-table td.record-col-dfa {
 }
 
 table.record-table td.record-col-policy { color: var(--app-color-text); }
-table.record-table td.record-col-dfa { color: var(--app-color-text-muted); }
+table.record-table td.record-col-dfa,
+table.record-table td.record-col-vin { color: var(--app-color-text-muted); }
 table.record-table .record-number {
     color: var(--app-color-action);
     font-weight: 600;

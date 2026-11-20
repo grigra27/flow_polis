@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load insurer_tags %}
 
 {% block title %}Пролонгация{% endblock %}
 
@@ -150,12 +151,12 @@
                         {% for policy in policies %}
                         <tr class="{% if not policy.broker_participation %}row-nobroker{% endif %}">
                             <td class="record-col-date">{{ policy.end_date|date:"d.m.Y" }}</td>
-                            <td class="record-col-branch">{{ policy.branch.branch_name|default:"—" }}</td>
+                            <td class="record-col-branch">{% if policy.branch %}{% branch_logo policy.branch size='small' %}{% else %}—{% endif %}</td>
                             <td class="record-col-policy bil-policy-line">
                                 <a class="record-number" href="{% url 'policies:detail' policy.id %}">{{ policy.policy_number }}</a>
                             </td>
                             <td class="record-col-dfa">{{ policy.dfa_number|default:"—" }}</td>
-                            <td class="record-col-insurer">{{ policy.insurer.insurer_name }}</td>
+                            <td class="record-col-insurer">{% insurer_logo policy.insurer size='small' %}</td>
                             <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.client.client_name label="лизингополучатель" only %}</td>
                             <td class="record-col-client">{% include "policies/includes/table_text.html" with value=policy.policyholder.client_name label="страхователь" only %}</td>
                             <td class="record-col-object">{% include "policies/includes/table_text.html" with value=policy.property_description label="объект страхования" only %}</td>
